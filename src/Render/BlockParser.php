@@ -219,7 +219,7 @@ final class BlockParser
             }
 
             if (preg_match(self::BULLET, $line, $item) === 1) {
-                [$list, $index] = self::list($lines, $index, $this->inline, false, $item, $step);
+                [$list, $index] = self::list($lines, $index, $this->inline, $item, $step);
 
                 $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
 
@@ -230,7 +230,7 @@ final class BlockParser
             }
 
             if (preg_match(self::ORDERED, $line, $item) === 1) {
-                [$list, $index] = self::list($lines, $index, $this->inline, true, $item, $step);
+                [$list, $index] = self::list($lines, $index, $this->inline, $item, $step);
 
                 $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
 
@@ -418,7 +418,7 @@ final class BlockParser
         $rows = [self::runs(self::cells($lines[$index]), $this->inline)];
         $align = array_map(self::alignment(...), self::cells($lines[$index + 1]));
         $end = $index + 1;
-    
+
         while (
             $end + 1 < count($lines)
             && trim($lines[$end + 1]) !== ''
@@ -427,7 +427,7 @@ final class BlockParser
             $rows[] = self::runs(self::cells($lines[$end + 1]), $this->inline);
             $end++;
         }
-    
+
         return [new Table($rows, $align, $step), $end];
     }
 
@@ -448,18 +448,18 @@ final class BlockParser
     private static function cells(string $line): array
     {
         $cells = explode('|', trim($line));
-    
+
         if (trim($cells[0]) === '') {
             array_shift($cells);
         }
-    
+
         if ($cells !== [] && trim($cells[count($cells) - 1]) === '') {
             array_pop($cells);
         }
-    
+
         return array_map(static fn (string $cell): string => trim($cell), $cells);
     }
-    
+
     /**
      * One row's cells as the runs each of them is drawn from, because a cell is a
      * paragraph's worth of text and takes the same inline markup one does.
@@ -476,40 +476,47 @@ final class BlockParser
     /**
      * The list whose first item is `$index`, and the line its last item is on.
      *
+     * The markers are read per item rather than for the list, because a deck mixes them:
+     * `- a`, `1. b` and `- c` are one list with a bullet, a number and a bullet in it.
+     *
      * @param list<string>                             $lines
      * @param array{0: string, 1: string, 2: string, 3: string} $first The match for the
      *                                                                   line at `$index`.
      *
      * @return array{0: ListBlock, 1: int}
     */
-    private static function list(array $lines, int $index, InlineParser $inline, bool $ordered, array $first, int $step): array
+    private static function list(array $lines, int $index, InlineParser $inline, array $first, int $step): array
     {
         // The base is the first item's indent, not the last one's: a continuation is
         // relative to where the list began, so a sub-item does not swallow its own text.
         $base = strlen($first[1]);
+        $number = self::number($first);
         $items = [[
             'level' => self::depth($first[1]),
             'runs' => $inline->parse($first[3]),
-            'start' => self::number($ordered, $first),
+            'ordered' => $number !== null,
+            'start' => $number,
         ]];
         $end = $index;
-        
+
         for ($cursor = $index + 1; $cursor < count($lines); $cursor++) {
             $line = $lines[$cursor];
-        
+
             if (trim($line) === '' || preg_match(self::RULE, $line) === 1 || preg_match(self::FENCE, $line) === 1) {
                 break;
             }
-        
+
             if (preg_match(self::BULLET, $line, $next) === 1 || preg_match(self::ORDERED, $line, $next) === 1) {
                 $level = self::depth($next[1]);
+                $number = self::number($next);
                 $items[] = [
                     'level' => $level,
                     'runs' => $inline->parse($next[3]),
-                    'start' => self::start($items, $level, self::number($ordered, $next)),
+                    'ordered' => $number !== null,
+                    'start' => self::start($items, $level, $number),
                 ];
                 $end = $cursor;
-            
+
                 continue;
             }
 
@@ -522,46 +529,48 @@ final class BlockParser
             $end = $cursor;
         }
 
-        return [new ListBlock($items, $ordered, $step), $end];
+        return [new ListBlock($items, $step), $end];
     }
 
     /**
      * The number an item was written with, or null where it has none.
      *
-     * Null rather than 1 for a bullet, because a bullet carries no number and the writer
-     * writes `startAt` only on a numbered one.
+     * One function answers both what an item is and where its numbering begins: a bullet's
+     * second capture is its marker and never a digit, an ordered item's is its number, and
+     * a deck that mixes the two writes them in any order.
      *
      * @param array{0: string, 1: string, 2: string, 3: string} $item
      */
-    private static function number(bool $ordered, array $item): ?int
+    private static function number(array $item): ?int
     {
-        return $ordered && ctype_digit($item[2]) ? (int) $item[2] : null;
+        return ctype_digit($item[2]) ? (int) $item[2] : null;
     }
-    
+
+    /**
     /**
      * The number to start a numbering at, or null where this item carries on from the one
      * above it.
      *
-     * Every item's number, rather than the first one's, would restate the numbering at each
-     * item — `1. 2. 3.` comes out as three numberings that happen to agree. The item below
-     * a level change starts one again, because that is where the reader expects the count to
-     * begin again.
+     * Every item's number, rather than the first one's, would restate the numbering at
+     * each item — `1. 2. 3.` comes out as three numberings that happen to agree. The item
+     * below a level change, or below a bullet, starts one again, because that is where a
+     * reader expects the count to begin again.
      *
-     * @param list<array{level: int, runs: list<Run>, start: ?int}> $items
+     * @param list<array{level: int, runs: list<Run>, ordered: bool, start: ?int}> $items
      */
     private static function start(array $items, int $level, ?int $written): ?int
     {
-        $previous = $items[count($items) - 1] ?? null;
-    
         if ($written === null) {
             return null;
         }
-    
+
+        $previous = $items[count($items) - 1] ?? null;
+
         return $previous === null || $previous['level'] !== $level || $previous['start'] === null
             ? $written
             : null;
     }
-    
+
     /** An item's indent as a nesting depth: every two spaces is one level. */
     private static function depth(string $indent): int
     {

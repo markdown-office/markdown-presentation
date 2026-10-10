@@ -126,7 +126,13 @@ it('reads a list written with an asterisk as a list', function () {
 
 it('reads an ordered list written with a bracket as ordered', function () {
     expect(blocksOf("1) one\n")[0])->toBeInstanceOf(ListBlock::class)
-        ->and(blocksOf("1) one\n")[0]->ordered)->toBeTrue();
+        ->and(blocksOf("1) one\n")[0]->items[0]['ordered'])->toBeTrue();
+});
+
+it('keeps each item\'s own marker where a list mixes them', function () {
+    // `ordered` was one flag for the whole block, taken from the first item, so a list
+    // written `- a`, `1. b`, `- c` came out as three bullets.
+    expect(array_column(blocksOf("- a\n1. b\n- c\n")[0]->items, 'ordered'))->toBe([false, true, false]);
 });
 
 it('reads a nested item as a deeper item', function () {

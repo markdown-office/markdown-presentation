@@ -346,7 +346,7 @@ final class ShapeWriter
             $first = false;
 
             $paragraph->setBulletStyle($this->bullet(
-                $block->ordered ? Bullet::TYPE_NUMERIC : Bullet::TYPE_BULLET,
+                $item['ordered'] ? Bullet::TYPE_NUMERIC : Bullet::TYPE_BULLET,
                 $item['start'],
             ));
             

@@ -407,6 +407,15 @@ it('numbers a nested ordered list as a list of its own', function () {
 });
 
 
+it('draws a list that mixes bullets and numbers with the marker each item was written with', function () {
+    // A deck that switches marker mid-list meant it: the numbers are not an accident of the
+    // first item's.
+    $xml = renderDeck("- a\n1. b\n- c\n")->part('ppt/slides/slide1.xml');
+
+    expect(substr_count($xml, '<a:buChar char="•"/>'))->toBe(2)
+        ->and(substr_count($xml, '<a:buAutoNum type="arabicPeriod"/>'))->toBe(1);
+});
+
 it('bullets a list that is not numbered', function () {
     expect(renderDeck("- one\n- two\n")->part('ppt/slides/slide1.xml'))->toContain('<a:buChar char="•"/>');
 });

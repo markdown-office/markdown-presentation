@@ -221,6 +221,12 @@ nothing had measured.
   asterisks and underscores inside a code span are characters, and an underscore
   between two word characters is not a delimiter, so `snake_case_name` is a name.
   Unclosed markup still renders as the characters it was written as.
+- **A list keeps the marker each of its items was written with.** Before:
+  `ListBlock::$ordered` was one flag for the whole block, taken from the item the list
+  started with, so `- a` / `1. b` / `- c` came out as three bullets. After: the
+  flag is per item, and an item is numbered exactly when the marker it was
+  written with is a number — which is the same question its `start` answers, so
+  one capture answers both and a bullet never carries one.
 - **An ordered list starts at the number it is written with.** Before: the
   number was captured into a variable nothing read and the writer never set
   `startAt`, so `3. three` was numbered `1.`. After: each item carries the
