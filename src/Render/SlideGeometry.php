@@ -102,6 +102,18 @@ final class SlideGeometry
     }
 
     /**
+     * The size a slide's title is drawn at when its frontmatter named a level for it.
+     *
+     * `1` is the role's own title size and `2` is the size a `##` in that role's body would
+     * get, so a title named through the frontmatter reads the same as one written as a
+     * heading — which is the whole of what `level:` is for: a title that is not a heading.
+     */
+    public function titleSize(int $size, int $level): int
+    {
+        return $level <= 1 ? $size : $this->headingSize($level - 1);
+    }
+
+    /**
      * The height a heading of this size needs, in pixels.
     */
     public function headingHeight(int $level): int

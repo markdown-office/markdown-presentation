@@ -371,10 +371,12 @@ final class PresentationRenderer
         ShapeWriter $writer,
     ): void {
         $title = $this->geometry->title($role);
+        $level = $source->frontmatterValue('level');
         $blocks = $this->underTitle(
             $this->blocks->parse($source->content(), $source->index() + 1, $this->directory),
             $source,
             $title !== null,
+            $this->depth($level, $source->index() + 1),
         );
 
         // A step nothing was written on is not a slide. A marker on the last line of a
@@ -396,11 +398,46 @@ final class PresentationRenderer
             }
 
             if ($title !== null && $source->title() !== null) {
-                $writer->title($slide, $source->title(), $title['box'], $title['size'], $title['alignment']);
+                $size = $this->depth($level, $source->index() + 1);
+
+                $writer->title(
+                    $slide,
+                    $source->title(),
+                    $title['box'],
+                    $size === null ? $title['size'] : $this->geometry->titleSize($title['size'], $size),
+                    $title['alignment'],
+                );
             }
 
             $this->stack($slide, $blocks, $step, $role, $writer);
         }
+    }
+
+    /**
+     * The depth the frontmatter gave a slide's title, or null where it named none.
+     *
+     * Read out of the frontmatter rather than from {@see SourceSlide::level()}, which also
+     * reports how deep a heading that became the title was written: a slide opening on a
+     * `##` would otherwise have its title drawn at body-heading size, which is a change to
+     * every deck that ever wrote one and nothing anybody asked for. What the directive means
+     * is what it says — how deep to read a title that need not be a heading at all.
+     *
+     * A `Slide` built by hand rather than parsed is checked here for the same reason `theme`
+     * and `layout` are: every directive this renderer acts on is its own to type.
+     *
+     * @throws MalformedFrontmatter
+     */
+    private function depth(mixed $level, int $slide): ?int
+    {
+        if ($level === null) {
+            return null;
+        }
+
+        if (!is_int($level) || $level < 1) {
+            throw MalformedFrontmatter::wrongType($slide, 'level', 'a positive integer');
+        }
+
+        return $level;
     }
 
     /**
@@ -411,21 +448,41 @@ final class PresentationRenderer
      * so the heading that *is* the title is dropped once the title box has drawn it — and
      * only then, because a role without a title box has nowhere else to draw it.
      *
+     * On a role with no title box that heading *is* the title, and `$depth` is what says how
+     * deep to read it: a blank layout draws its title as a heading, so `level:` would
+     * otherwise govern nothing at all there.
+     *
      * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     * @param ?int                                                        $depth What `level:` named.
      *
      * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
     */
-    private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox): array
+    private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox, ?int $depth): array
     {
-        if (!$hasTitleBox || $source->title() === null || $blocks === []) {
+        if ($source->title() === null || $blocks === []) {
             return $blocks;
         }
 
         $first = $blocks[0];
 
-        return $first instanceof Heading && self::plain($first) === $source->title()
-            ? array_slice($blocks, 1)
-            : $blocks;
+        if (!$first instanceof Heading || self::plain($first) !== $source->title()) {
+            return $blocks;
+        }
+
+        if ($hasTitleBox) {
+            return array_slice($blocks, 1);
+        }
+
+        if ($depth === null) {
+            return $blocks;
+        }
+
+        // As a heading rather than as a title box, so the level itself moves: a title of
+        // level `$depth` is drawn at the size a heading one level shallower is drawn at, and
+        // `level: 1` is the top of what a body can draw.
+        $blocks[0] = new Heading($first->runs, max(1, $depth - 1), $first->step);
+
+        return $blocks;
     }
 
     /**

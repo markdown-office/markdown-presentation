@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Document\Slide;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
@@ -163,6 +165,69 @@ it('stops shrinking a heading at the sixth level', function () {
     $geometry = new SlideGeometry();
 
     expect($geometry->headingSize(7))->toBe($geometry->headingSize(6));
+});
+
+it('reads a named level as the depth a title of that level would be drawn at', function () {
+    // `level: 1` is the layout's own title and every level below it is a heading of that
+    // depth in the same body, which is the whole of what the pair means: a title that is not
+    // a heading, told how deep to read.
+    $geometry = new SlideGeometry();
+
+    expect($geometry->titleSize(28, 1))->toBe(28)
+        ->and($geometry->titleSize(28, 2))->toBe($geometry->headingSize(1))
+        ->and($geometry->titleSize(28, 3))->toBe($geometry->headingSize(2))
+        ->and($geometry->titleSize(28, 7))->toBe($geometry->headingSize(6));
+});
+
+it('draws a title named in the frontmatter at the level it names', function () {
+    // `level:` was in the directive list, was type-checked, and changed no pixel: the title
+    // box was drawn at the layout's size whatever it said.
+    expect(slideDeck("---\ntitle: Named\nlevel: 3\n---\n\nSome text.\n")->fontSize('title'))
+        ->toBe((float) (new SlideGeometry())->headingSize(2));
+});
+
+it('leaves a title at the layout size where the frontmatter names no level', function () {
+    expect(slideDeck("---\ntitle: Named\n---\n\nSome text.\n")->fontSize('title'))
+        ->toBe((float) (new SlideGeometry())->title(LayoutRole::Content)['size']);
+});
+
+it('draws a heading that became the title at the level the frontmatter names', function () {
+    // The heading is dropped from the body and the title box is what draws it, so the level
+    // the frontmatter names is the level it is drawn at — a `level:` that governs nothing
+    // here would leave the directive inert on every slide that opens on a heading.
+    expect(slideDeck("---\nlevel: 3\n---\n\n# One\n")->fontSize('title'))
+        ->toBe((float) (new SlideGeometry())->headingSize(2));
+});
+
+it('leaves a heading in the body at its own depth when the frontmatter names a title', function () {
+    // Two shapes in two boxes, and `level:` is about the title: the `#` in the body is a
+    // block of the slide's own, and a level that moved it too would resize a heading nobody
+    // named.
+    $pptx = slideDeck("---\ntitle: Named\nlevel: 3\n---\n\n# Body\n");
+    $geometry = new SlideGeometry();
+
+    expect($pptx->fontSize('title'))->toBe((float) $geometry->headingSize(2))
+        ->and($pptx->fontSize('heading'))->toBe((float) $geometry->headingSize(1));
+});
+
+it('draws the heading a blank layout uses as its title at the level named', function () {
+    // A blank layout has no title box, so its title is the heading in its body. `level:`
+    // governs that one too, or the directive would do nothing at all on the role.
+    $geometry = new SlideGeometry();
+    $pptx = slideDeck("---\nlayout: blank\nlevel: 3\n---\n\n# One\n");
+
+    expect($pptx->shapeNames())->toBe(['heading'])
+        ->and($pptx->fontSize('heading'))->toBe((float) $geometry->headingSize(2));
+});
+
+it('refuses a level that is not a positive integer, on a slide built by hand', function () {
+    // The parser checks the directive it reads; this is the check for a Slide a caller
+    // constructed, the same one `theme` and `layout` get.
+    $deck = new Deck('', [new Slide(0, '# One', '# One', ['level' => 'two'], 'One', 1, null, 0, 1)]);
+    $path = Scratch::file('deck.pptx', '');
+
+    expect(fn () => (new PresentationRenderer())->render($deck, $path))
+        ->toThrow(MalformedFrontmatter::class, 'has a "level" that is not a positive integer');
 });
 
 it('puts everything before the second heading in the left column and everything after in the right', function () {

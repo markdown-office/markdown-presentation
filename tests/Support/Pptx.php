@@ -242,6 +242,25 @@ final class Pptx
     }
 
     /**
+     * The size of the type in a shape, in points, or null where the shape has none.
+     *
+     * The first run, because a shape of several paragraphs is the size of its first one — the
+     * question a title's size is asked with is how big the shape reads, and that is set
+     * before anything else is put into it. A float, because the writer stores hundredths of
+     * a point and 12.5pt is a size a theme can ask for.
+     */
+    public function fontSize(string $name, int $slide = 1): ?float
+    {
+        foreach ($this->shapes($slide) as $shape) {
+            if ($shape['name'] === $name && $shape['size'] !== null) {
+                return $shape['size'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Where a shape sits, in the pixels PHPPresentation writes.
      *
      * @return ?array{x: float, y: float, width: float, height: float}
@@ -295,7 +314,7 @@ final class Pptx
      * A pixel is 9525 EMU at the 96 dpi the writer converts at, which is the unit
      * {@see \MarkdownPresentation\Render\SlideGeometry} counts in.
      *
-     * @return list<array{name: string, x: float, y: float, width: float, height: float, fill: ?string}>
+     * @return list<array{name: string, x: float, y: float, width: float, height: float, fill: ?string, size: ?float}>
     */
     private function shapes(int $slide = 1): array
     {
@@ -313,6 +332,9 @@ final class Pptx
             preg_match('#<a:off x="(-?\d+)" y="(-?\d+)"\s*/>\s*<a:ext cx="(\d+)" cy="(\d+)"#', $shape, $offset);
             preg_match('#<a:solidFill>\s*<a:srgbClr val="([0-9A-Fa-f]{6})"#', $shape, $fill);
 
+            // The writer writes a size in hundredths of a point, as DrawingML does.
+            preg_match('#<a:rPr[^>]*\ssz="(\d+)"#', $shape, $size);
+
             $shapes[] = [
                 'name' => $name[1],
                 'x' => ((int) ($offset[1] ?? 0)) / 9525.0,
@@ -320,6 +342,7 @@ final class Pptx
                 'width' => ((int) ($offset[3] ?? 0)) / 9525.0,
                 'height' => ((int) ($offset[4] ?? 0)) / 9525.0,
                 'fill' => isset($fill[1]) ? '#' . strtolower($fill[1]) : null,
+                'size' => isset($size[1]) ? (int) $size[1] / 100 : null,
             ];
         }
 
