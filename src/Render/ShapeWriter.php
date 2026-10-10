@@ -270,7 +270,7 @@ final class ShapeWriter
 
     private function paragraph(Slide $slide, Paragraph $block, Box $box, int $height): RichText
     {
-        $shape = $slide->createRichTextShape();
+        $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
         $this->runs($shape, $block->runs, SlideGeometry::BODY_SIZE);
 
@@ -279,7 +279,7 @@ final class ShapeWriter
 
     private function quote(Slide $slide, Quote $block, Box $box, int $height): RichText
     {
-        $shape = $slide->createRichTextShape();
+        $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
         $shape->setOffsetX($box->x + SlideGeometry::GUTTER);
         $shape->setWidth($box->width - SlideGeometry::GUTTER);
@@ -291,7 +291,7 @@ final class ShapeWriter
 
     private function heading(Slide $slide, Heading $block, Box $box, int $height): RichText
     {
-        $shape = $slide->createRichTextShape();
+        $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
 
         $size = $this->geometry->headingSize($block->level);
@@ -302,7 +302,7 @@ final class ShapeWriter
 
     private function list(Slide $slide, ListBlock $block, Box $box, int $height): RichText
     {
-        $shape = $slide->createRichTextShape();
+        $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
 
         $first = true;
@@ -329,7 +329,7 @@ final class ShapeWriter
 
     private function code(Slide $slide, Code $block, Box $box, int $height): RichText
     {
-        $shape = $slide->createRichTextShape();
+        $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
         $shape->setDescription($block->language);
         $shape->getFill()->setFillType(Fill::FILL_SOLID)->setStartColor($this->colour('lt2'));
@@ -473,7 +473,7 @@ final class ShapeWriter
     */
     public function title(Slide $slide, string $text, Box $box, int $size, string $alignment): RichText
     {
-        $shape = $slide->createRichTextShape();
+        $shape = $this->textBox($slide);
         $this->place($shape, $box, $box->height);
         $shape->setName('title');
         $shape->getActiveParagraph()->getAlignment()->setHorizontal($alignment);
@@ -486,6 +486,24 @@ final class ShapeWriter
         $shape->getActiveParagraph()->setSpacingAfter(0);
 
         return $shape;
+    }
+
+    /**
+ * * A text box that shrinks rather than grows.
+ *
+ * PHPPresentation's default is `spAutoFit`, and a shape carrying it is resized to its
+ * content by the reader — downwards over whatever the renderer put below it, which is the
+ * one failure a layout cannot recover from. `normAutofit` is the other way round: the shape
+ * keeps the height it was given and the type is scaled down until it fits. {@see
+ * self::height()} is an estimate, so a mis-estimate has to land somewhere; a box the reader
+ * finds a line too tall is a little whitespace, and a box it finds a line too short is the
+ * next block drawn over this one.
+ */
+    private function textBox(Slide $slide): RichText
+    {
+        $shape = $slide->createRichTextShape();
+
+        return $shape->setAutoFit(RichText::AUTOFIT_NORMAL);
     }
 
     /**

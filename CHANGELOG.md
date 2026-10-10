@@ -143,6 +143,13 @@ nothing had measured.
   over-allocates height rather than under-allocating it. The monospaced half is
   exact: every character advances 600/1000 of an em, which is what Consolas,
   Menlo and JetBrains Mono use.
+- **A text box shrinks rather than grows.** PHPPresentation's default is
+  `a:spAutoFit`, which hands the box's height to the reader: a block whose
+  measurement came out a line short grows downwards over whatever was below it.
+  Every text shape is now written `a:normAutofit` instead, which keeps the
+  height the layout gave it and scales the type down to fit. The measurement is
+  an estimate, so a mis-estimate has to land somewhere, and this is the direction
+  where it costs a little whitespace rather than an overlap.
 - **A code block is padded by its real insets.** `CODE_PADDING` added twelve
   pixels to the height of a block whose body insets are 91440 EMU across and
   45720 down — 9.6px and 4.8px, and cost to a text block's width as well as its

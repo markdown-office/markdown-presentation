@@ -527,6 +527,21 @@ it('bolds the run a deck bolds', function () {
     expect(renderDeck("**bold**\n")->part('ppt/slides/slide1.xml'))->toContain('b="1"');
 });
 
+it('shrinks a text box that overflows rather than growing it over the block below', function () {
+    // PHPPresentation defaults to `spAutoFit`, which hands the box's height to the reader:
+    // a paragraph measured one line short then grows onto whatever is under it. The
+    // measurement is an estimate, so a mis-estimate has to be recoverable, and shrinking the
+    // type is the direction that does not draw over another shape.
+    $xml = renderDeck("Text.\n\nMore text.\n")->part('ppt/slides/slide1.xml');
+
+    expect(substr_count($xml, '<a:normAutofit/>'))->toBe(2)
+        ->and($xml)->not->toContain('<a:spAutoFit/>');
+});
+
+it('shrinks a title that does not fit its box as well', function () {
+    expect(renderDeck("# One\n\nText.\n")->part('ppt/slides/slide1.xml'))->toContain('<a:normAutofit/>');
+});
+
 it('italics the run a deck italics', function () {
     expect(renderDeck("*italic*\n")->part('ppt/slides/slide1.xml'))->toContain('i="1"');
 });
