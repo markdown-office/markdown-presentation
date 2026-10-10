@@ -8,6 +8,32 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **32 bytes of deck asked for half a billion slides.** `<!-- v-click=500 -->` rendered 500
+  slides in 0.1s and 0.6MB, and the relationship is linear, so
+  `<!-- v-click=2147483647 -->` asked for 2.1 billion. On 64-bit,
+  `v-click=99999999999999999999` saturates `(int)` to `PHP_INT_MAX`, and the loop
+  `for ($step = self::FIRST_STEP; $step <= $steps; $step++)` never finished: the process hung
+  rather than died. Nothing in `src/` bounded it — `BlockParser::jump()` rejected a step only
+  when it went backwards.
+
+  | | Before | After |
+  | --- | --- | --- |
+  | `<!-- v-click=2147483647 -->` | renders until the machine is out of memory | `UnknownMarker`: `Slide 1 has a v-click step "2147483647", which is past the 500 steps one slide may carry: every step is written as a slide of its own. Write "<!-- v-click -->" for the next step, or name one up to 500.` |
+  | `<!-- v-click=99999999999999999999 -->` | hangs the process | the same refusal, quoting the twenty digits rather than the `PHP_INT_MAX` they saturated to |
+  | 40 slides of 20 steps each | 800 written slides | `TooManySlides`: `This deck asks for 1200 slides, and one presentation may carry 1000...` |
+
+  **Breaking**, in the sense that a deck which rendered now fails. Both ceilings are far
+  above what a deck written by a person contains — a build-up of 500 clicks is not a slide,
+  and a talk of 1000 slides does not exist — and both messages name the number that would
+  have worked.
+
+  Two ceilings rather than one because they bound two different attacks, and a deck gets
+  past the first with the second: the per-slide step check cannot see a deck of forty slides
+  that each stay inside it. `PresentationRenderer::blocks()` therefore reads every source
+  slide once, adds up the steps, and refuses before the first slide is built rather than
+  while the four hundred and ninety-ninth is being written. Reading the blocks there rather
+  than in `write()` also keeps each slide parsed once.
+
 - **A layout part was a name and nothing else.** Before: `themes/default/layouts.yml` mapped
   the portable roles onto Office's own layout names and the file recorded those names — and
   then wrote a layout part whose shape tree held nothing at all:

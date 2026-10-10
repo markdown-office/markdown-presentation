@@ -6,8 +6,10 @@ use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Document\Slide;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
+use MarkdownPresentation\Render\BlockParser;
 use MarkdownPresentation\Render\Box;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SlideGeometry;
@@ -327,6 +329,19 @@ it('keeps both columns of a two-column layout the same height', function () {
     )))->toHaveCount(1);
 });
 
+/**
+ * A deck of `$slides` slides that each build up to `$steps`.
+ *
+ * What a deck uses to get past a ceiling on one slide: every slide is inside it and the
+ * deck is over it.
+ */
+function steppedDeck(int $slides, int $steps): string
+{
+    $slide = sprintf("# One\n\n<!-- v-click=%d -->\n\nText.\n", $steps);
+
+    return str_repeat($slide . "\n---\n\n", $slides - 1) . $slide;
+}
+
 it('writes one slide for a slide with no steps', function () {
     expect(slideDeck("# One\n\nText.\n")->slideCount())->toBe(1);
 });
@@ -364,6 +379,47 @@ it('refuses a v-click step that does not go forwards', function () {
 it('refuses a v-click equals with no number', function () {
     expect(fn () => slideDeck("# One\n\n<!-- v-click= -->\n\nText.\n"))
         ->toThrow(UnknownMarker::class, 'Slide 1 has a "<!-- v-click= -->" step marker with no number');
+});
+
+it('refuses a v-click step larger than one slide could carry', function () {
+    // The measured attack: 32 bytes of deck naming `v-click=2147483647` asked for two
+    // billion slides, and `v-click=99999999999999999999` saturates the cast to
+    // `PHP_INT_MAX` and hangs the process rather than failing it. The step number written is
+    // the ceiling plus one, not the twenty-digit one, so the suite cannot be the thing that
+    // hangs -- and the message quotes the number back rather than the `PHP_INT_MAX` it
+    // saturated to.
+    expect(fn () => slideDeck(sprintf("# One\n\n<!-- v-click=%d -->\n\nText.\n", BlockParser::MAX_STEP + 1)))
+        ->toThrow(UnknownMarker::class, sprintf('Slide 1 has a v-click step "%d"', BlockParser::MAX_STEP + 1));
+});
+
+it('refuses a step too large to be held in an integer at all', function () {
+    // A twenty-digit number is a different input that reaches the same line, and the same
+    // refusal answers both: whatever the cast saturates it to, the deck wrote twenty digits.
+    expect(fn () => slideDeck("# One\n\n<!-- v-click=99999999999999999999 -->\n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a v-click step "99999999999999999999"');
+});
+
+it('renders a slide whose build-up is as long as one slide may carry', function () {
+    // The other side of the ceiling: a build-up that is long is not refused, so the bound
+    // cannot be met by drawing fewer steps than the deck wrote. Bounded on the way there,
+    // because the point is the number the marker accepts rather than the size of the file.
+    expect(slideDeck(sprintf("# One\n\n<!-- v-click=%d -->\n\nText.\n", BlockParser::MAX_STEP))->slideCount())
+        ->toBe(BlockParser::MAX_STEP);
+});
+
+it('refuses a deck with more slides than a presentation may carry', function () {
+    // BlockParser::MAX_STEP bounds one slide, so a deck gets past it by having several:
+    // three slides of 400 steps each is under the per-slide ceiling 1200 times over and
+    // 1200 written slides out of about 60 bytes of Markdown. The refusal comes before the
+    // first slide is built, so no file is written.
+    expect(fn () => slideDeck(steppedDeck(3, 400)))
+        ->toThrow(TooManySlides::class, 'This deck asks for 1200 slides, and one presentation may carry 1000');
+});
+
+it('leaves a deck on the far side of the deck ceiling alone', function () {
+    // The boundary again, from the other end: 1000 slides is rendered rather than refused,
+    // because a ceiling that refuses the number it names is a limit nobody can rely on.
+    expect(slideDeck(steppedDeck(2, 500))->slideCount())->toBe(PresentationRenderer::MAX_SLIDES);
 });
 
 it('opens a step after the block a marker closes rather than before it', function () {

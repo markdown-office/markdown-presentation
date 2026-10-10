@@ -8,8 +8,9 @@ namespace MarkdownPresentation\Exception;
  * A `v-click` marker this library cannot act on.
  *
  * A step this renderer drops would leave a deck whose slides do not say what the author
- * wrote, so both ways of getting it wrong — a number that goes backwards, and a marker
- * whose argument is not a number — are refused with the form that would have worked.
+ * wrote, so every way of getting it wrong — a number that goes backwards, a marker
+ * whose argument is not a number — are refused with the form that would have worked. So
+ * is a number larger than one slide could carry, because a step is a slide.
 */
 final class UnknownMarker extends InvalidInput
 {
@@ -20,6 +21,23 @@ final class UnknownMarker extends InvalidInput
             $slide,
             $number,
             $previous,
+        ));
+    }
+
+    /**
+     * @param int $maximum The most steps one slide may carry, which the message repeats:
+     *                     a refusal that does not say what would have worked leaves the
+     *                     author to guess the number rather than to look it up.
+     */
+    public static function tooLarge(int $slide, string $argument, int $maximum): self
+    {
+        return new self(sprintf(
+            'Slide %d has a v-click step "%s", which is past the %d steps one slide may carry: every step is '
+            . 'written as a slide of its own. Write "<!-- v-click -->" for the next step, or name one up to %d.',
+            $slide,
+            $argument,
+            $maximum,
+            $maximum,
         ));
     }
 

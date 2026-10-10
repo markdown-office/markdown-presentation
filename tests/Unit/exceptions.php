@@ -11,6 +11,7 @@ use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\MalformedTemplate;
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\ThemeNotFound;
+use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
@@ -70,6 +71,7 @@ it('reports what a deck author can fix under the class that says so', function (
         MalformedTemplate::class,
         MalformedTheme::class,
         ThemeNotFound::class,
+        TooManySlides::class,
         UnknownDirective::class,
         UnknownLayoutRole::class,
         UnknownMarker::class,
@@ -134,6 +136,14 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'a step that goes backwards' => [
         UnknownMarker::backwards(2, 1, 3)->getMessage(),
         'Steps run forwards',
+    ],
+    'a step larger than a slide could carry' => [
+        UnknownMarker::tooLarge(2, '2147483647', 500)->getMessage(),
+        'name one up to 500',
+    ],
+    'a deck of more slides than a presentation carries' => [
+        TooManySlides::in(1200, 1000)->getMessage(),
+        'one presentation may carry 1000',
     ],
     'a step that is not a number' => [
         UnknownMarker::notANumber(2, 'two')->getMessage(),

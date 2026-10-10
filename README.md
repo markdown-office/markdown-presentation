@@ -504,6 +504,30 @@ then
 A marker closing a list item is not honoured: that would mean splitting one list into several,
 which is a different feature from the one claimed here.
 
+### How many steps a deck may have
+
+Two ceilings, because they bound two different things and a deck gets past the first with
+the second:
+
+| Ceiling | Value | Bounds |
+| --- | --- | --- |
+| `Render\BlockParser::MAX_STEP` | 500 | the steps one slide may name |
+| `Render\PresentationRenderer::MAX_SLIDES` | 1000 | the slides one deck may write |
+
+Both exist because a step *is* a slide: every step of a build-up is written as a `.pptx`
+part with its shapes, its rels and its entry in `[Content_Types].xml`, and the Markdown
+asking for them is kilobytes. `<!-- v-click=2147483647 -->` is 32 bytes and asks for two
+billion of them; a twenty-digit number saturates the cast to `PHP_INT_MAX` and hangs the
+process rather than failing it. Both are refused by name, with the number that would have
+worked in the message.
+
+The second is not the first restated. A deck of forty slides with twenty steps each is
+inside every per-slide check and still asks for 800 written slides, so the total is counted
+from the parsed blocks before the first slide is built rather than while they are being.
+
+The numbers are generous on purpose: a build-up of 500 clicks is not a slide anyone gives,
+and a talk of 1000 slides does not exist. A deck that reaches either was not written to.
+
 ### Images
 
 A relative image path resolves against the directory the renderer was given, which is the

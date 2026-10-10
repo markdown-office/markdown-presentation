@@ -8,12 +8,16 @@ use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\Slide as SourceSlide;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\ContentOverflow;
+use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\MalformedTemplate;
 use MarkdownPresentation\Exception\ThemeNotFound;
+use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
+use MarkdownPresentation\Exception\UnknownMarker;
+use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
@@ -87,6 +91,20 @@ final class PresentationRenderer
     private const FIRST_STEP = 1;
 
     /**
+     * The most slides one deck may write.
+     *
+     * {@see BlockParser::MAX_STEP} bounds a single slide, which is the attack a marker is;
+     * this bounds the deck, which is the attack a deck of markers is. Forty slides of
+     * twenty steps each passes every per-slide check and asks for 800 written slides, and
+     * there is nothing about the *total* that the first ceiling can see.
+     *
+     * 1000 is five times the longest talk anybody gives and renders in about a fifth of a
+     * second, which is the point of a ceiling that is generous: it bounds the damage
+     * without being something a real deck can reach by accident.
+     */
+    public const MAX_SLIDES = 1000;
+
+    /**
      * Every block that did not fit its slide during the last render, in the order they were
      * laid out.
      *
@@ -137,6 +155,7 @@ final class PresentationRenderer
      * @throws ThemeNotFound    When the deck names a theme that does not resolve.
      * @throws ContentOverflow  When a block does not fit and the renderer is strict.
      * @throws MalformedTemplate When the theme's `template.pptx` cannot be read.
+     * @throws TooManySlides    When the deck asks for more slides than {@see self::MAX_SLIDES}.
      * @throws Exception         When the file cannot be written.
      *
      * @return string The path written.
@@ -161,9 +180,18 @@ final class PresentationRenderer
         $this->properties($presentation, $deck, $theme);
 
         $writer = new ShapeWriter($theme->theme(), $geometry);
+        $blocks = $this->blocks($deck);
 
         foreach ($deck->slides() as $slide) {
-            $this->write($presentation, $slide, $roles[$slide->index()], $layouts, $writer, $geometry);
+            $this->write(
+                $presentation,
+                $slide,
+                $roles[$slide->index()],
+                $layouts,
+                $writer,
+                $geometry,
+                $blocks[$slide->index()],
+            );
         }
 
         // PHPPresentation's constructor leaves an empty slide behind so that a fresh object is
@@ -175,6 +203,53 @@ final class PresentationRenderer
         }
 
         return $this->save($presentation, $path, $geometry, $used);
+    }
+
+    /**
+     * Every source slide's blocks, read once, keyed by the slide's index.
+     *
+     * Read here rather than in {@see self::write()} because the deck's slide count is the
+     * sum of what each of them has steps, and the loop that writes the slides is not the
+     * place to discover that five hundred slides were asked for and then refuse it: by then
+     * four hundred and ninety-nine of them are built.
+     *
+     * {@see BlockParser::MAX_STEP} bounds one slide, which a deck gets around by having
+     * several: forty slides of twenty steps each is 800 written slides from 40 lines of
+     * Markdown. So this is a second ceiling on a second shape of the same attack, and it is
+     * applied to the whole deck before the first slide exists.
+     *
+     * @return array<int, list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>>
+     *
+     * @throws ImageNotFound
+     * @throws TooManySlides
+     * @throws UnknownDirective
+     * @throws UnknownMarker
+     * @throws UnsupportedImageFormat
+     */
+    private function blocks(Deck $deck): array
+    {
+        $blocks = [];
+        $slides = 0;
+
+        foreach ($deck->slides() as $source) {
+            $read = $this->blocks->parse($source->content(), $source->index() + 1, $this->directory);
+
+            $blocks[$source->index()] = $read;
+
+            // A step nothing was written on is not a slide, which is the same rule
+            // {@see self::write()} applies to each slide on its own.
+            $slides += array_reduce(
+                $read,
+                static fn (int $most, Block $block): int => max($most, $block->step()),
+                self::FIRST_STEP,
+            );
+        }
+
+        if ($slides > self::MAX_SLIDES) {
+            throw TooManySlides::in($slides, self::MAX_SLIDES);
+        }
+
+        return $blocks;
     }
 
     /**
@@ -464,8 +539,9 @@ final class PresentationRenderer
     /**
      * One source slide, and as many written slides as it has steps.
      *
-     * @param array<string, SlideLayout> $layouts
-    */
+     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     * @param array<string, SlideLayout>                                     $layouts
+     */
     private function write(
         PhpPresentation $presentation,
         SourceSlide $source,
@@ -473,11 +549,12 @@ final class PresentationRenderer
         array $layouts,
         ShapeWriter $writer,
         SlideGeometry $geometry,
+        array $blocks,
     ): void {
         $title = $geometry->title($role);
         $level = $source->frontmatterValue('level');
         $blocks = $this->underTitle(
-            $this->blocks->parse($source->content(), $source->index() + 1, $this->directory),
+            $blocks,
             $source,
             $title !== null,
             $this->depth($level, $source->index() + 1),
