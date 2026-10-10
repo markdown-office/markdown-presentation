@@ -424,6 +424,26 @@ it('reads a table whose cells are written without padding', function () {
     expect(renderDeck("|A|B|\n|---|---|\n|1|2|\n")->texts(1))->toBe(['A', 'B', '1', '2']);
 });
 
+it('bolds a table\'s header row and fills it, because nothing else marks one out', function () {
+    // Every row was `sz="1200"` in `dk1`, so a header row and a body row were the same
+    // line of type. `a:tblPr firstRow` is the flag PowerPoint's own table styles hang a
+    // header treatment on, and the weight and fill are that treatment spelled out.
+    $xml = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n")->part('ppt/slides/slide1.xml');
+
+    expect($xml)->toContain('<a:tblPr firstRow="1"/>')
+        ->and(substr_count($xml, 'b="1"'))->toBe(2)
+        ->and(substr_count($xml, '<a:srgbClr val="E7E6E6">'))->toBe(2);
+});
+
+it('leaves a table\'s body rows at the body weight', function () {
+    // A header that is bold because every row is bold is not a header, so the assertion is
+    // the ratio: two bold runs out of the four the table has.
+    $xml = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n")->part('ppt/slides/slide1.xml');
+
+    expect(substr_count($xml, '<a:rPr '))->toBe(4)
+        ->and(substr_count($xml, 'b="1"'))->toBe(2);
+});
+
 it('writes a table as tall as the rows it writes', function () {
     // `a:tr h` is emitted per row and PowerPoint honours it, so a shape declaring fewer
     // pixels than its rows carry is drawn over the block below it. Three rows here: the

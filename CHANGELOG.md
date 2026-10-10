@@ -150,6 +150,16 @@ nothing had measured.
   height the layout gave it and scales the type down to fit. The measurement is
   an estimate, so a mis-estimate has to land somewhere, and this is the direction
   where it costs a little whitespace rather than an overlap.
+- **A table's header row is a header row.** Every row was `sz="1200"` in
+  `dk1`, so the row naming the columns looked exactly like the rows under
+  it. It is now bold, filled with `lt2`, and the table is written with
+  `a:tblPr firstRow="1"` and `bandRow` off — the flag PowerPoint's own table
+  styles hang a header treatment on, spelled out here because this library
+  writes no table style for one to come from, and with banding off because a
+  band drawn behind a fill the writer chose would fight it.
+  `<a:tblHeader/>`, which repeats the row where a table splits across
+  slides, is not written: PHPPresentation's `Row` carries no such flag, and a
+  table clamped to one slide is not a table that splits.
 - **Two blocks no longer abut.** Every paragraph was written with
   `setSpacingBefore(0)` and `setSpacingAfter(0)`, which is right — the heights decide
   where the next block starts — but the gap that leaves was nowhere, so two

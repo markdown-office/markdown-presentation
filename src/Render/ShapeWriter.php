@@ -42,6 +42,9 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
 */
 final class ShapeWriter
 {
+    /** Which row of a table is its header, counting from the first. */
+    private const HEADER_ROW = 0;
+
     public function __construct(
         private readonly Theme $theme,
         private readonly SlideGeometry $geometry = new SlideGeometry(),
@@ -360,12 +363,30 @@ final class ShapeWriter
         $shape = $slide->createTableShape(count($columns));
         $this->place($shape, $box, $height);
         $shape->setDescription(implode(',', $block->align));
+        // Both flags stated rather than inherited: PHPPresentation's `Table` turns `firstRow` and
+        // `bandRow` both on by default, and a default that changed under this library would
+        // change what a header row looks like. Banding is off because the table carries its
+        // own fills and a band drawn behind them would fight them.
+        $shape->setFirstRow(true)->setBandRow(false);
 
         foreach ($block->cells as $number => $row) {
             // The height the shape was measured with, set on the row too: PHPPresentation
             // writes `<a:tr h>` from the row rather than from the shape, so a row left at
             // its own default is drawn at a height nothing else in the layout knows about.
-            $cells = $shape->createRow()->setHeight($heights[$number])->getCells();
+            $created = $shape->createRow()->setHeight($heights[$number]);
+
+            // The header is the row a reader looks for first and nothing in the format marks
+            // one out unless it is asked to. `a:tblPr firstRow` is the flag PowerPoint's own
+            // table styles hang their header treatment on, and the weight and fill below are
+            // that treatment spelled out — this library writes no table style for it to come
+            // from. `<a:tblHeader/>`, which repeats the row where a table splits across
+            // slides, is not written: PHPPresentation's row carries no such flag, and a
+            // table clamped to one slide is not a table that splits.
+            if ($number === self::HEADER_ROW) {
+                $created->getFill()->setFillType(Fill::FILL_SOLID)->setStartColor($this->colour('lt2'));
+            }
+
+            $cells = $created->getCells();
 
             foreach ($row as $index => $text) {
                 if (!isset($cells[$index])) {
@@ -381,6 +402,7 @@ final class ShapeWriter
                 $paragraph->setSpacingAfter(0);
                 $paragraph->getFont()->setSize(SlideGeometry::TABLE_SIZE)
                     ->setName($this->font('body'))
+                    ->setBold($number === self::HEADER_ROW)
                     ->setColor($this->colour('dk1'));
 
                 $cell->createTextRun($text);
