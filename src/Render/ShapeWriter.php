@@ -109,7 +109,7 @@ final class ShapeWriter
     {
         return $this->metric->lines($this->pieces($runs, $size, $mono, $bold), $width);
     }
-    
+
     /**
      * These runs as the pieces {@see TextMetric} measures, each at its own size, face and
      * weight — which is why a code span in a paragraph is not measured at the paragraph's
@@ -122,7 +122,7 @@ final class ShapeWriter
     private function pieces(array $runs, int $size, bool $mono = false, bool $bold = false): array
     {
         $pieces = [];
-    
+
         foreach ($runs as $run) {
             $pieces[] = TextMetric::piece(
                 $run->text,
@@ -131,7 +131,7 @@ final class ShapeWriter
                 $run->bold || $bold,
             );
         }
-    
+
         return $pieces;
     }
 
@@ -215,19 +215,19 @@ final class ShapeWriter
     {
         $count = max(1, count($block->cells[0] ?? []));
         $wanted = [];
-    
+
         for ($index = 0; $index < $count; $index++) {
             $widest = SlideGeometry::TABLE_COLUMN;
-    
+
             foreach ($block->cells as $row) {
                 $widest = max($widest, $this->metric->width(
                     $this->pieces($row[$index] ?? [], SlideGeometry::TABLE_SIZE),
                 ));
             }
-    
+
             $wanted[] = $widest;
         }
-    
+
         return self::distribute($wanted, $box->width);
     }
 
@@ -349,7 +349,7 @@ final class ShapeWriter
                 $item['ordered'] ? Bullet::TYPE_NUMERIC : Bullet::TYPE_BULLET,
                 $item['start'],
             ));
-            
+
             // The level the writer numbers at, which is what makes a numbered sub-list
             // number itself instead of carrying on from the list above it. The margin and
             // the indent below are stated outright, so this moves the numbering and not the
@@ -427,7 +427,7 @@ final class ShapeWriter
                 if (!isset($cells[$index])) {
                     break;
                 }
-            
+
                 $cell = $cells[$index];
                 $cell->setWidth($columns[$index]);
                 $paragraph = $cell->getActiveParagraph();

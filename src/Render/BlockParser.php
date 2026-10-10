@@ -188,9 +188,9 @@ final class BlockParser
                 if ($quote === []) {
                     $this->flush($blocks, $quote, $paragraph, $step);
                 }
-            
+
                 $quote[] = $quoted[1];
-            
+
                 continue;
             }
 

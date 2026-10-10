@@ -503,7 +503,7 @@ final class PresentationRenderer
             self::FIRST_STEP,
         );
     }
-    
+
     /**
      * The slide's blocks, with the heading that became its title taken out of them.
      *
@@ -535,11 +535,11 @@ final class PresentationRenderer
     private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox, ?int $depth): array
     {
         $title = $source->title();
-    
+
         if ($title === null) {
             return $blocks;
         }
-    
+
         $heading = null;
         $at = 0;
 
