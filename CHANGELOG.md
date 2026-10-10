@@ -151,6 +151,34 @@ All notable changes to this project are documented here. The format follows
   consequences spelled out one by one, and the note that `MAX_PIXELS` does not reach an SVG
   because nothing here opens one.
 
+- **The notes pass deleted a part it had failed to read.**
+  `NotesColourMapPass::applyTo()` called `$zip->getFromIndex($index)` twice — once to patch the
+  part, once to compare the patched part against it — which decompresses the notes slide twice
+  for a comparison that needs no second copy. On an entry the archive could not decompress the
+  second call answered `false`, the guard compared `'' === false` (which is false), and the
+  entry was deleted and written back as **zero bytes**: a deck that opens, with a corrupt
+  speaker note and no complaint. The part is now read once, and `false` is
+  `UnreadablePackage` rather than an empty string.
+
+  The loop's own invariant is written down where it is relied on: it terminates because
+  `deleteName()` and `addFromString()` keep `numFiles` constant, one part going and one of
+  the same name coming back. Deleting without adding would take the archive apart; adding
+  without deleting would grow it by an entry per patched slide for the loop to walk again.
+
+- **A `RuntimeException` outside this package's hierarchy.** The README promised "everything
+  this library reports extends `MarkdownPresentation\Exception\Exception`, so one `catch`
+  covers it", and `NotesColourMapPass` threw a bare `RuntimeException` — which does *not* match
+  that `catch`, since `Exception` is the subclass and not the superclass. A caller following
+  the page therefore caught nothing. There is now
+  `MarkdownPresentation\Exception\UnreadablePackage`, extending `Exception` directly, and it
+  is under the base class as the page says.
+
+  It sits beside `InvalidInput` rather than under it, and
+  `tests/Unit/exceptions.php` now has the list of failures that are the caller's rather than
+  the deck's — the day that test was written for. A file that is not a package and an entry
+  that does not decompress are a disk or a download that went wrong; telling a deck author to
+  rename something would send them looking for a typo they did not write.
+
 - **A layout part was a name and nothing else.** Before: `themes/default/layouts.yml` mapped
   the portable roles onto Office's own layout names and the file recorded those names — and
   then wrote a layout part whose shape tree held nothing at all:

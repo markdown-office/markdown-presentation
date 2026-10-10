@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Render\NotesColourMapPass;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
@@ -112,11 +114,71 @@ it('leaves a deck with no notes exactly as the writer wrote it', function () use
 });
 
 it('says so when the presentation cannot be read at all', function () {
+    // The one failure the README's promise is about: a bare `RuntimeException` is not a
+    // `MarkdownPresentation\Exception\Exception`, so a caller following the page and
+    // catching the base class did not catch it.
     $path = sys_get_temp_dir() . '/mdp-not-a-deck.pptx';
     file_put_contents($path, 'not a zip');
 
     expect(fn () => NotesColourMapPass::applyTo($path))
-        ->toThrow(RuntimeException::class);
+        ->toThrow(UnreadablePackage::class, 'It is not a package this PHP can read')
+        ->and(fn () => NotesColourMapPass::applyTo($path))->toThrow(Exception::class);
+
+    @unlink($path);
+});
+
+it('refuses rather than writing back a notes slide it could not read', function () {
+    // The failure this fixes: the part was read twice -- once to patch, once to compare --
+    // and the comparison was against `false`, which is not `''`, so the entry was deleted and
+    // written back as zero bytes. A deck that opened and showed a corrupt speaker note is a
+    // worse outcome than one that was refused, and the file on disk is now the one to check.
+    //
+    // The payload is corrupted rather than written broken: a local file header carries the
+    // name and the compressed size, so flipping a byte in the deflate stream leaves the
+    // archive readable and every other part intact.
+    $path = sys_get_temp_dir() . '/mdp-corrupt-' . md5('corrupt') . '.pptx';
+
+    (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
+        new DeckParser()->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
+        $path,
+    );
+
+    $bytes = (string) file_get_contents($path);
+    $payload = null;
+
+    // Every local file header carries the name and the size of what follows it, which is
+    // what makes a byte inside one payload findable without unzipping the archive.
+    for ($at = 0; ($at = strpos($bytes, 'PK' . chr(3) . chr(4), $at)) !== false; $at++) {
+        $name = (int) unpack('v', substr($bytes, $at + 26, 2))[1];
+        $extra = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
+
+        if (str_starts_with(substr($bytes, $at + 30, $name), 'ppt/notesSlides/')) {
+            $payload = $at + 30 + $name + $extra;
+
+            break;
+        }
+    }
+
+    expect($payload)->not->toBeNull();
+
+    $bytes[$payload + 5] = chr(ord($bytes[$payload + 5]) ^ 0xFF);
+    file_put_contents($path, $bytes);
+
+    expect(fn () => NotesColourMapPass::applyTo($path))
+        ->toThrow(UnreadablePackage::class, 'so the package was left as it was found rather than rewritten with the part lost');
+
+    // And the part is still there rather than being zero bytes, which is the whole of what
+    // the comparison against `false` was getting wrong.
+    $after = new ZipArchive();
+    $after->open($path);
+
+    for ($index = 0; $index < $after->numFiles; $index++) {
+        if (str_starts_with((string) $after->getNameIndex($index), 'ppt/notesSlides/')) {
+            expect($after->statIndex($index)['size'])->toBeGreaterThan(0);
+        }
+    }
+
+    $after->close();
 
     @unlink($path);
 });

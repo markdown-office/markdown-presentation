@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Render;
 
-use RuntimeException;
+use MarkdownPresentation\Exception\UnreadablePackage;
 use ZipArchive;
 
 /**
@@ -40,16 +40,17 @@ final class NotesColourMapPass
      * A deck with no notes has nothing to fix and is not touched at all, so a file with
      * no speaker notes in it comes out the way the writer wrote it.
      *
-     * @throws RuntimeException When the presentation cannot be opened for writing, which is
-     *         the one failure this can meet: a path that is not a package, or one the
-     *         process cannot write.
+     * @throws UnreadablePackage When the presentation cannot be opened for writing, or a
+     *         notes slide cannot be read out of it. Both are the caller's rather than the
+     *         deck's, and neither is a failure a deck author can fix by naming something
+     *         else — which is why this is not an {@see \MarkdownPresentation\Exception\InvalidInput}.
      */
     public static function applyTo(string $path): int
     {
         $zip = new ZipArchive();
 
         if ($zip->open($path) !== true) {
-            throw new RuntimeException(sprintf('Unable to open the presentation at "%s".', $path));
+            throw UnreadablePackage::cannotOpen($path);
         }
 
         $changed = 0;
@@ -61,12 +62,28 @@ final class NotesColourMapPass
                 continue;
             }
 
-            $patched = self::addColourMap((string) $zip->getFromIndex($index));
+            // Read once. This called `getFromIndex()` a second time to compare against the
+            // patched part, which decompresses the notes slide twice for a comparison that
+            // needs no second copy — and, on an entry the archive cannot decompress, made
+            // that comparison false against a string, so the entry was deleted and written
+            // back as zero bytes.
+            $xml = self::contents($zip, $index);
 
-            if ($patched === $zip->getFromIndex($index)) {
+            if ($xml === false) {
+                throw UnreadablePackage::cannotRead($path, $name);
+            }
+
+            $patched = self::addColourMap($xml);
+
+            if ($patched === $xml) {
                 continue;
             }
 
+            // This loop terminates because these two keep `numFiles` where it is: the part
+            // goes and one of the same name comes back, and `addFromString()` appends
+            // rather than replaces. Deleting without adding would take the archive apart,
+            // and adding without deleting would grow it by one entry per patched slide for
+            // this loop to walk over again.
             $zip->deleteName($name);
             $zip->addFromString($name, $patched);
             $changed++;
@@ -75,6 +92,27 @@ final class NotesColourMapPass
         $zip->close();
 
         return $changed;
+    }
+
+    /**
+     * A part's contents, or false where the archive cannot produce them.
+     *
+     * An entry whose payload does not decompress raises a warning before `ZipArchive`
+     * answers false, and the refusal above is the answer a caller gets either way: the
+     * warning is noise about a file this method is about to refuse. Handled rather than
+     * silenced, because `@` does not keep a diagnostic from a handler that is listening —
+     * and {@see \MarkdownPresentation\Render\ImageConverter::decode()} is the same
+     * problem solved the same way.
+     */
+    private static function contents(ZipArchive $zip, int $index): string|false
+    {
+        set_error_handler(static fn (): bool => true);
+
+        try {
+            return $zip->getFromIndex($index);
+        } finally {
+            restore_error_handler();
+        }
     }
 
     /**

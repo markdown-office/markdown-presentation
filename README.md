@@ -1104,6 +1104,24 @@ Everything this library reports extends `MarkdownPresentation\Exception\Exceptio
 The failures a deck author can fix by naming something else extend
 `MarkdownPresentation\Exception\InvalidInput` below it.
 
+One sits beside those two rather than under `InvalidInput`:
+`MarkdownPresentation\Exception\UnreadablePackage`, for a `.pptx` that cannot be opened and
+a part of one that cannot be decompressed. Nothing a deck names fixes either — it is the
+disk, the download that stopped, the file that was not a deck — and a deck author told to go
+and rename something would go and rename something. It is still under the base class, so the
+same one `catch` reaches it.
+
+```php
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\NotesColourMapPass;
+
+try {
+    NotesColourMapPass::applyTo(sys_get_temp_dir() . '/deck.pptx');
+} catch (Exception $failure) {
+    echo get_class($failure), ": ", $failure->getMessage(), "\n";
+}
+```
+
 ## Conformance
 
 Splitting is derived from `parseSync` in `slidev/packages/parser/src/core.ts`, pinned

@@ -16,6 +16,7 @@ use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Exception\UnsupportedLink;
 use MarkdownPresentation\Tests\Support\Doctest;
@@ -62,8 +63,7 @@ it('reports every failure under one base class', function (string $class) {
 
 it('reports what a deck author can fix under the class that says so', function (string $class) {
     // The base is for everything; the one below it is for the failures a deck author
-    // can fix by naming something else. Every type in this package is one or the
-    // other today, and the day one is not, this says which it is.
+    // can fix by naming something else.
     $authorFixable = [
         ContentOverflow::class,
         FencedFrontmatter::class,
@@ -81,6 +81,11 @@ it('reports what a deck author can fix under the class that says so', function (
         UnsupportedLink::class,
     ];
 
+    // The failures that are not the deck's to fix, which is the day this file was written
+    // for: a package this process cannot open is a disk or a download that went wrong, and a
+    // deck author told to go and rename something would go and rename something.
+    $callerSide = [UnreadablePackage::class];
+
     if ($class === Exception::class || $class === InvalidInput::class) {
         // Neither is a subclass of the other, so the two are asked about as they are.
         expect($class === Exception::class || is_subclass_of($class, Exception::class))->toBeTrue();
@@ -88,9 +93,22 @@ it('reports what a deck author can fix under the class that says so', function (
         return;
     }
 
+    if (in_array($class, $callerSide, true)) {
+        expect(is_subclass_of($class, Exception::class))->toBeTrue()
+            ->and(is_subclass_of($class, InvalidInput::class))->toBeFalse();
+
+        return;
+    }
+
     expect($authorFixable)->toContain($class)
         ->and(is_subclass_of($class, InvalidInput::class))->toBeTrue();
 })->with(reportedExceptions());
+
+it('reports a failure under one catch, whatever it is a failure of', function () {
+    // The promise the README makes, asserted rather than described: one `catch` on the base
+    // covers everything this library throws, including the failures that are not the deck's.
+    expect(UnreadablePackage::cannotOpen('/tmp/deck.pptx'))->toBeInstanceOf(Exception::class);
+});
 
 it('names a slide and a file in every failure, because the fix is in the message', function () {
     // A message that says what is wrong but not where leaves the author hunting, and
@@ -162,6 +180,10 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'an image no package can carry and nothing can decode' => [
         UnsupportedImageFormat::undecodable(3, 'chart.tiff', 'tiff')->getMessage(),
         'Convert it to GIF, JPEG, PNG or SVG first',
+    ],
+    'a package this process cannot open at all' => [
+        UnreadablePackage::cannotOpen('/tmp/deck.pptx')->getMessage(),
+        'It is not a package this PHP can read, or the process cannot write it.',
     ],
     'a link target that is a scheme a reader would act on' => [
         UnsupportedLink::target('javascript:alert(1)')->getMessage(),
