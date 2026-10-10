@@ -190,6 +190,24 @@ nothing had measured.
   pixels to the height of a block whose body insets are 91440 EMU across and
   45720 down — 9.6px and 4.8px, and cost to a text block's width as well as its
   height. Both are measured now, as `SlideGeometry::INSET_X` and `INSET_Y`.
+- **A title with inline markup is drawn once.** Before: `DeckParser` stores a
+  slide's title as it was written and the renderer compared it against the
+  heading's text with its markup already taken out, so the two could never match
+  as soon as either carried any: `# Release **v2** notes` drew a title reading
+  `Release **v2** notes` *and* the same line again in the body as three runs.
+  After: both sides are stripped by the one `InlineParser` that read the
+  heading — `InlineParser::text()` on its runs and `InlineParser::plain()` on the
+  title — so the comparison cannot be made differently on the two sides. The
+  heading that became the title is now looked for among the slide's blocks rather
+  than assumed to be the first one, because the title is the first *heading* and a
+  paragraph written above one does not stop it being the title; a heading further
+  down the slide is still content and is still drawn.
+- **A title carries its inline markup.** Before: `ShapeWriter::title()` was handed
+  the title as a string and wrote it as one run, so `title: Ops **runbook**`
+  reached the slide as asterisks. After: the title goes through the same inline
+  pipeline as any other text. `docProps/core.xml` is the exception and is
+  deliberately so: `dc:title` is a metadata string with nothing on the other end
+  to interpret emphasis, so it carries the stripped text.
 
 ### Notes
 

@@ -125,12 +125,12 @@ it('measures a paragraph by the lines it wraps to', function () {
 });
 
 it('measures a heading by the lines it wraps to', function () {
-    // `##` is 20pt and bold, so the same 500 characters are wider again and still come to
-    // seven lines of the 32px a line at that size is.
-    // A paragraph first, because a heading opening a slide is its title and is not drawn
-    // in the body at all.
-    expect(measured("Lead.\n\n## " . str_repeat('h', 500) . "\n")->positionOf('heading')['height'])
-        ->toBe(224.0);
+        // `##` is 20pt and bold, so the same 500 characters are wider again and still come to
+        // seven lines of the 32px a line at that size is.
+        // A heading first, because the first heading of a slide is its title and is drawn in
+        // the title box rather than in the body: this is the second one that is measured.
+        expect(measured("# Lead\n\n## " . str_repeat('h', 500) . "\n")->positionOf('heading')['height'])
+            ->toBe(224.0);
 });
 
 it('measures a quote by the lines it wraps to', function () {

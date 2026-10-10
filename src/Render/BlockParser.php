@@ -94,8 +94,14 @@ final class BlockParser
     /** The line a container fence is opened on, which Slidev nests content in. */
     private const CONTAINER = '/^[ \t]*:::[^\n]*/m';
 
+    /**
+     * `$inline` is public because a slide's title is normalised with the same parser its
+     * body was read with: {@see \MarkdownPresentation\Render\PresentationRenderer} decides
+     * whether a heading is that title by comparing the two, and two parsers would be two
+     * definitions of what the text of a run of markup is.
+     */
     public function __construct(
-        private readonly InlineParser $inline = new InlineParser(),
+        public readonly InlineParser $inline = new InlineParser(),
         private readonly ImageConverter $images = new ImageConverter(),
     ) {
     }
@@ -487,19 +493,11 @@ final class BlockParser
             }
 
             $last = count($items) - 1;
-            $items[$last]['runs'] = $inline->parse(self::plain($items[$last]['runs']) . ' ' . trim($line));
+            $items[$last]['runs'] = $inline->parse(InlineParser::text($items[$last]['runs']) . ' ' . trim($line));
             $end = $cursor;
         }
 
         return [new ListBlock($items, $ordered, $step), $end];
-    }
-
-    /**
-     * @param list<Run> $runs
-    */
-    private static function plain(array $runs): string
-    {
-        return implode('', array_map(static fn (Run $run): string => $run->text, $runs));
     }
 
     /** An item's indent as a nesting depth: every two spaces is one level. */

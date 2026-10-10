@@ -248,7 +248,7 @@ mapping can be read off `ppt/slides/slideN.xml` without the library:
 
 | Markdown | Shape | Notes |
 | --- | --- | --- |
-| `# Heading` | `title`, then `heading` | The first heading becomes the title; it is not drawn twice |
+| `# Heading` | `title`, then `heading` | The first heading becomes the title and is not drawn twice, whatever markup it carries |
 | A paragraph | `paragraph` | `**bold**`, `*italic*`, `` `code` `` and `[text](url)` are runs, not characters |
 | `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted; nesting is the indent |
 | ```` ```lang ```` | `code` | Mono font, filled with `lt2`, the language in the shape's description. No colouring |
@@ -256,6 +256,10 @@ mapping can be read off `ppt/slides/slideN.xml` without the library:
 | `> a` | `quote` | Italic, in `dk2`, indented |
 | `***` | `rule` | A bar in `accent1`. `---` is a slide delimiter and never reaches here |
 | A line that is only `![alt](path)` | `image` | Fitted to its box, aspect kept, centred. A path that is not a file is a failure |
+
+A title is text like any other: a frontmatter `title: Ops **runbook**` is drawn with the
+word in bold rather than as asterisks, and the deck's own `dc:title` carries the same title as
+plain text, because nothing on the other end of a metadata field reads a pair of asterisks.
 
 Blocks stack down the body box, each one starting where the one above it ended with a gap
 between them.

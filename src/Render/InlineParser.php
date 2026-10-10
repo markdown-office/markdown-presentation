@@ -59,6 +59,33 @@ final class InlineParser
 
     /**
      *
+     * What a reader sees of these runs, which is the text with its markup taken out.
+     *
+     * The comparison a title is made against goes through here and through
+     * {@see self::parse()} and nothing else, so the two sides of it cannot be
+     * normalised differently and then found unequal.
+     *
+     * @param list<Run> $runs
+    */
+    public static function text(array $runs): string
+    {
+        return implode('', array_map(static fn (Run $run): string => $run->text, $runs));
+    }
+
+    /**
+     * The text as a reader reads it: parsed and laid back out, so the markup is gone.
+     *
+     * An instance method rather than a static one because the strip is this parser's:
+     * a title and a heading normalised by two parsers are two strings that agree only
+     * while the two parsers do.
+    */
+    public function plain(string $text): string
+    {
+        return self::text($this->parse($text));
+    }
+
+    /**
+     *
      * The leftmost markup after `$cursor`, and the run it becomes.
      *
      * Leftmost rather than in the order of {@see self::PATTERNS}, because a paragraph that

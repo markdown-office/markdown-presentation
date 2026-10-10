@@ -276,6 +276,56 @@ it('writes the heading once, in the title box', function () {
     expect($pptx->texts(1))->toBe(['One', 'Some text.']);
 });
 
+it('writes a heading carrying inline markup once, and as markup rather than as characters', function () {
+    // The one spelling a model writes in an H1. The title box was handed the heading as it
+    // was written and the heading was compared against that after its own markup had been
+    // taken out, so the two could never match: the title read "Release **v2** notes" and
+    // the same line was drawn again underneath it as three runs.
+    $pptx = renderDeck("# Release **v2** notes\n\nBody.\n");
+
+    expect($pptx->shapeNames())->toBe(['title', 'paragraph'])
+        ->and($pptx->texts(1))->toBe(['Release ', 'v2', ' notes', 'Body.'])
+        ->and($pptx->part('ppt/slides/slide1.xml'))->toContain('b="1"');
+});
+
+it('writes the title heading once even where a paragraph comes before it', function () {
+    // The title is the first *heading*, not the first block: a slide that opens with a line
+    // of prose still draws its heading in the title box, and the body copy of it was the
+    // same line on the slide twice.
+    $pptx = renderDeck("Lead.\n\n# The title\n");
+
+    expect($pptx->shapeNames())->toBe(['title', 'paragraph'])
+        ->and($pptx->texts(1))->toBe(['The title', 'Lead.']);
+});
+
+it('keeps a heading that only repeats the title, because it is not the one that became it', function () {
+    // Only the slide's first block is compared, so a heading further down is content the
+    // author wrote and dropping every heading that reads like the title would take it out.
+    $pptx = renderDeck("---\ntitle: One\n---\n\n# One\n\n## One\n");
+
+    expect($pptx->shapeNames())->toBe(['title', 'heading'])
+        ->and($pptx->texts(1))->toBe(['One', 'One']);
+});
+
+it('writes a title named in the frontmatter with its markup, like any other text', function () {
+    // A title is a string in a frontmatter block and a run of markup in a title box, and
+    // the box is the one that can show what was written. Drawn as characters, a title of
+    // "Ops **runbook**" is a deck about asterisks.
+    $pptx = renderDeck("---\ntitle: Ops **runbook**\n---\n\nBody.\n");
+
+    expect($pptx->texts(1))->toBe(['Ops ', 'runbook', 'Body.']);
+});
+
+it('writes the deck title into the document properties as text, without its markup', function () {
+    // The properties part is metadata: nothing on the other end of dc:title interprets a
+    // pair of asterisks, and it is read in file browsers and search results rather than on
+    // a slide.
+    $core = renderDeck("---\ntitle: Ops **runbook**\n---\n\n# One\n")->part('docProps/core.xml');
+
+    expect($core)->toContain('<dc:title>Ops runbook</dc:title>')
+        ->and($core)->not->toContain('**');
+});
+
 it('draws a heading that is not the title in the body', function () {
     $pptx = renderDeck("# Title\n\n## A section\n");
 
@@ -611,8 +661,8 @@ it('colours a link inside a heading with the hyperlink colour and not the headin
     // "the hyperlink colour" is satisfied by a bullet. The heading passes `dk1` for every
     // run and `$font ?? …` short-circuited the link branch, so a link in a heading was
     // `dk1`: a clickable word in the same colour as the sentence around it.
-    $xml = renderDeck("---\ntheme: minimal\n---\n\nLead.\n\n## The [docs](https://example.com)\n")
-        ->part('ppt/slides/slide1.xml');
+        $xml = renderDeck("---\ntheme: minimal\n---\n\n# Lead\n\n## The [docs](https://example.com)\n")
+            ->part('ppt/slides/slide1.xml');
 
     expect($xml)->toMatch('#<a:srgbClr val="3F6FB5">(?:(?!</a:rPr>).)*<a:hlinkClick#s')
         ->and(substr_count($xml, '<a:srgbClr val="3F6FB5">'))->toBe(1);

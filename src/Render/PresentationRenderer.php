@@ -381,7 +381,10 @@ final class PresentationRenderer
         $title = $deck->frontmatterValue('title');
 
         if ($title !== null) {
-            $properties->setTitle(self::text($title, 'title'));
+            // Stripped, because this part is a string in a metadata field: there is nothing
+            // on the other end to interpret `**`, and a title of `Ops **runbook**` is a
+            // title of "Ops runbook" to every reader of the file.
+            $properties->setTitle($this->blocks->inline->plain(self::text($title, 'title')));
         }
 
         $description = $deck->frontmatterValue('description');
@@ -447,7 +450,7 @@ final class PresentationRenderer
 
                 $writer->title(
                     $slide,
-                    $source->title(),
+                    $this->blocks->inline->parse($source->title()),
                     $title['box'],
                     $size === null ? $title['size'] : $this->geometry->titleSize($title['size'], $size),
                     $title['alignment'],
@@ -486,12 +489,23 @@ final class PresentationRenderer
     }
 
     /**
-     * The slide's blocks without the one that became its title.
+     * The slide's blocks, with the heading that became its title taken out of them.
      *
-     * A slide's title is its first heading, so that heading is still the first block of the
-     * content the parser was given. Drawing both would put the same line on the slide twice,
-     * so the heading that *is* the title is dropped once the title box has drawn it — and
-     * only then, because a role without a title box has nowhere else to draw it.
+     * A slide's title is its first heading, and that heading is still a block of the content
+     * the parser was given. Drawing both would put the same line on the slide twice, so the
+     * heading that *is* the title is dropped once the title box has drawn it — and only
+     * then, because a role without a title box has nowhere else to draw it.
+     *
+     * The first *heading* and not the first block, because the title is a heading and a
+     * paragraph written above one does not stop it being the title. Only the first heading
+     * can be: {@see \MarkdownPresentation\Document\DeckParser} reads no other as one, so a
+     * heading further down the slide is content the author put there.
+     *
+     * The two are told apart by their text and not by their markup, both sides stripped by
+     * the one {@see InlineParser} that read the heading: `# Release **v2** notes` is the
+     * title of a slide titled `Release **v2** notes`, not a heading drawn a second time on
+     * top of it. A strip is lossy, so two titles that read the same are one title — which is
+     * what a reader of the slide would say too.
      *
      * On a role with no title box that heading *is* the title, and `$depth` is what says how
      * deep to read it: a blank layout draws its title as a heading, so `level:` would
@@ -504,18 +518,31 @@ final class PresentationRenderer
     */
     private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox, ?int $depth): array
     {
-        if ($source->title() === null || $blocks === []) {
+        if ($source->title() === null) {
             return $blocks;
         }
 
-        $first = $blocks[0];
+        $heading = null;
+        $at = 0;
 
-        if (!$first instanceof Heading || self::plain($first) !== $source->title()) {
+        foreach ($blocks as $offset => $block) {
+            if ($block instanceof Heading) {
+                $heading = $block;
+                $at = $offset;
+
+                break;
+            }
+        }
+
+        if (
+            $heading === null
+            || InlineParser::text($heading->runs) !== $this->blocks->inline->plain($source->title())
+        ) {
             return $blocks;
         }
 
         if ($hasTitleBox) {
-            return array_slice($blocks, 1);
+            return array_merge(array_slice($blocks, 0, $at), array_slice($blocks, $at + 1));
         }
 
         if ($depth === null) {
@@ -525,18 +552,9 @@ final class PresentationRenderer
         // As a heading rather than as a title box, so the level itself moves: a title of
         // level `$depth` is drawn at the size a heading one level shallower is drawn at, and
         // `level: 1` is the top of what a body can draw.
-        $blocks[0] = new Heading($first->runs, max(1, $depth - 1), $first->step);
+        $blocks[$at] = new Heading($heading->runs, max(1, $depth - 1), $heading->step);
 
         return $blocks;
-    }
-
-    /**
-     * The text of a heading, which is what decides whether it is the slide's title or a block
-     * of its body.
-    */
-    private static function plain(Heading $heading): string
-    {
-        return implode('', array_map(static fn (Run $run): string => $run->text, $heading->runs));
     }
 
     private function note(WrittenSlide $slide, string $text): void

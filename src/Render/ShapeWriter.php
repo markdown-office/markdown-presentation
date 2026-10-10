@@ -275,7 +275,7 @@ final class ShapeWriter
     {
         $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
-        $this->runs($shape, $block->runs, SlideGeometry::BODY_SIZE);
+        $this->runs($shape->getActiveParagraph(), $block->runs, SlideGeometry::BODY_SIZE);
 
         return $shape;
     }
@@ -287,7 +287,13 @@ final class ShapeWriter
         $shape->setOffsetX($box->x + SlideGeometry::GUTTER);
         $shape->setWidth($box->width - SlideGeometry::GUTTER);
 
-        $this->runs($shape, $block->runs, SlideGeometry::QUOTE_SIZE, italic: true, font: $this->colour('dk2'));
+        $this->runs(
+            $shape->getActiveParagraph(),
+            $block->runs,
+            SlideGeometry::QUOTE_SIZE,
+            italic: true,
+            font: $this->colour('dk2'),
+        );
 
         return $shape;
     }
@@ -298,7 +304,14 @@ final class ShapeWriter
         $this->place($shape, $box, $height);
 
         $size = $this->geometry->headingSize($block->level);
-        $this->runs($shape, $block->runs, $size, bold: true, font: $this->colour('dk1'), face: $this->font('heading'));
+        $this->runs(
+            $shape->getActiveParagraph(),
+            $block->runs,
+            $size,
+            bold: true,
+            font: $this->colour('dk1'),
+            face: $this->font('heading'),
+        );
 
         return $shape;
     }
@@ -324,7 +337,7 @@ final class ShapeWriter
             $paragraph->getAlignment()->setMarginLeft($item['level'] * SlideGeometry::GUTTER);
             $paragraph->getAlignment()->setIndent(-SlideGeometry::GUTTER);
 
-            $this->runs($shape, $item['runs'], SlideGeometry::BODY_SIZE, into: $paragraph);
+            $this->runs($paragraph, $item['runs'], SlideGeometry::BODY_SIZE);
         }
 
         return $shape;
@@ -492,20 +505,27 @@ final class ShapeWriter
      * A title, which is the one place a heading is not asked for: the title box takes the
      * slide's title at the size the role gives it, whatever level the heading was written
      * at.
-    */
-    public function title(Slide $slide, string $text, Box $box, int $size, string $alignment): RichText
+     *
+     * Runs rather than a string, because a title carries the same inline markup any other
+     * text does, and `# Release **v2** notes` is the spelling a model reaches for first.
+     *
+     * @param list<Run> $runs
+     */
+    public function title(Slide $slide, array $runs, Box $box, int $size, string $alignment): RichText
     {
         $shape = $this->textBox($slide);
         $this->place($shape, $box, $box->height);
         $shape->setName('title');
         $shape->getActiveParagraph()->getAlignment()->setHorizontal($alignment);
-        $shape->createTextRun($text)->getFont()
-            ->setBold(true)
-            ->setSize($size)
-            ->setName($this->font('heading'))
-            ->setColor($this->colour('dk1'));
-        $shape->getActiveParagraph()->setSpacingBefore(0);
-        $shape->getActiveParagraph()->setSpacingAfter(0);
+
+        $this->runs(
+            $shape->getActiveParagraph(),
+            $runs,
+            $size,
+            bold: true,
+            font: $this->colour('dk1'),
+            face: $this->font('heading'),
+        );
 
         return $shape;
     }
@@ -543,11 +563,11 @@ final class ShapeWriter
 
     /**
      *
-     * The runs of one paragraph, in a shape that may already have paragraphs above them.
+     * The runs of one paragraph.
      *
-     * The first paragraph of a shape is the one `getActiveParagraph()` points at, and
-     * `createParagraph()` only ever makes a later one, so the caller says which paragraph
-     * its runs belong to rather than the writer guessing.
+     * The paragraph rather than the shape around it, because a table cell's is not the
+     * shape's: {@see \PhpOffice\PhpPresentation\Shape\Table\Cell} is a container of its own,
+     * and a shape asked for its active paragraph cannot name a cell's.
      *
      * Spacing is zeroed here rather than left at PowerPoint's default because
      * {@see self::height()} decides where the next block starts, and a leading gap the
@@ -556,16 +576,14 @@ final class ShapeWriter
      * @param list<Run> $runs
     */
     private function runs(
-        RichText $shape,
+        TextParagraph $paragraph,
         array $runs,
         int $size,
         bool $bold = false,
         bool $italic = false,
-        ?TextParagraph $into = null,
         ?Color $font = null,
         ?string $face = null,
     ): void {
-        $paragraph = $into ?? $shape->getActiveParagraph();
         $paragraph->setSpacingBefore(0);
         $paragraph->setSpacingAfter(0);
 
