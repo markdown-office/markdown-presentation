@@ -452,10 +452,12 @@ final class ShapeWriter
         $converted = $block->converted;
         $shape = $converted === null ? $this->fromFile($slide, $block) : $this->fromBytes($slide, $converted);
         // The alt text, because `descr` is what a screen reader reads out and what
-        // PowerPoint's alt-text pane shows. The written path is the fallback for a deck that
-        // named no alt: it is what the author recognises, and an empty description says
-        // nothing at all. The resolved path is in the relationship the picture was embedded
-        // from, which is where a reader looking for it belongs.
+        // PowerPoint's alt-text pane shows, and a file path read aloud is not a description
+        // of a picture. The written path stands in only for a deck that named no alt: it is
+        // what the author recognises, and an empty description says nothing at all. Nothing
+        // in the file records where the deck found the picture — the media part carries the
+        // bytes under a name of PHPPresentation's, and the slide's own relationships name no
+        // image — so this is the only description of it that reaches the file.
         $shape->setDescription($block->alt === '' ? $block->written : $block->alt);
 
         $this->place($shape, $box, $height);

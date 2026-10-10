@@ -59,10 +59,10 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 
 ### Fixed
 
-Four places where the library rendered silence rather than a failure over a
-directive a deck could name, each now either acted on or refused with the
-spelling that would have worked, and five where a block was drawn at a place
-nothing had measured.
+Places where the library rendered silence rather than a failure over a directive a
+deck could name, each now either acted on or refused with the spelling that
+would have worked; places where a block was drawn at a place nothing had
+measured; and places where what the deck said did not survive into the file.
 
 - **`author:` reaches the file.** Before: `author:` was in the directive list,
   was enforced as a slide-1 directive and was read by nobody —
@@ -244,8 +244,10 @@ nothing had measured.
   path* into `descr` instead, which is what a screen reader reads out and what
   PowerPoint's alt-text pane shows. After: `descr` carries the alt text, and the
   written path only where the deck named none, because an empty description says
-  nothing at all. The resolved path is in the relationship the picture was
-  embedded from, which is where a reader looking for it belongs.
+  nothing at all. Nothing in the file records where the deck found the picture:
+  the media part carries its bytes under a name of the writer's, and the slide's
+  relationships name no image at all, so the alt text is the only description of
+  it that reaches the file.
 - **Four spaces of indent is one level, not two.** Before: `depth()` was
   `intdiv(indent, 2) + 1`, counted from column zero, so a sub-list written `-
   one` / `    - deep` — a tab's width, and what a model writes — came out at
