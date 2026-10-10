@@ -207,7 +207,10 @@ final class ShapeWriter
         $shape->setDescription(implode(',', $block->align));
 
         foreach ($block->cells as $row) {
-            $cells = $shape->createRow()->getCells();
+            // The height the shape was measured with, set on the row as well: PHPPresentation
+            // writes `<a:tr h>` from the row rather than from the shape, so a row left at its
+            // own default is drawn at a height the rest of the layout never accounted for.
+            $cells = $shape->createRow()->setHeight(SlideGeometry::TABLE_ROW)->getCells();
 
             foreach ($row as $index => $text) {
                 if (!isset($cells[$index])) {

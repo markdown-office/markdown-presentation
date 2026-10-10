@@ -36,8 +36,15 @@ final class SlideGeometry
     /** The height of one line of code, which is smaller and tighter than body text. */
     public const CODE_LINE = 18;
 
-    /** The height of one table row, including the space either side of its text. */
-    public const TABLE_ROW = 26;
+    /**
+     * The height of one table row, in pixels.
+     *
+     * PHPPresentation's `Row` defaults to 38 and writes that as `<a:tr h>`, so a shape
+     * declaring fewer would be drawn taller than it was measured and every table would
+     * overlap whatever came after it. {@see \MarkdownPresentation\Render\ShapeWriter}
+     * sets it on every row it creates, so the two cannot drift apart again.
+     */
+    public const TABLE_ROW = 38;
 
     /** What a rule costs, in height, once the gap above it is counted. */
     public const RULE_HEIGHT = 16;

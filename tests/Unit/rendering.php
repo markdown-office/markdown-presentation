@@ -424,6 +424,25 @@ it('reads a table whose cells are written without padding', function () {
     expect(renderDeck("|A|B|\n|---|---|\n|1|2|\n")->texts(1))->toBe(['A', 'B', '1', '2']);
 });
 
+it('writes a table as tall as the rows it writes', function () {
+    // `a:tr h` is emitted per row and PowerPoint honours it, so a shape declaring fewer
+    // pixels than its rows carry is drawn over the block below it. Three rows here: the
+    // header and the two the alignment row is not.
+    $pptx = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n");
+
+    expect($pptx->positionOf('table')['height'])->toBe(3.0 * 38.0)
+        ->and($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:tr h="361950">');
+});
+
+it('starts the block after a table below the rows the table writes', function () {
+    // The defect this is about was a shape measured at `rows × 26` while every row was
+    // written at 38, so four rows declared 104px and the next block landed on the last one.
+    $pptx = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |\n| 7 | 8 |\n\nAfter.\n");
+
+    expect($pptx->positionOf('table')['height'])->toBe(5.0 * 38.0)
+        ->and($pptx->positionOf('paragraph')['y'])->toBe(104.0 + 5 * 38.0);
+});
+
 it('renders a block quote as a quote shape', function () {
     expect(renderDeck("> quoted\n")->shapeNames())->toBe(['quote']);
 });
