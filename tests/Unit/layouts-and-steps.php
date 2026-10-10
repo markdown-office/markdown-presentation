@@ -220,6 +220,34 @@ it('draws the heading a blank layout uses as its title at the level named', func
         ->and($pptx->fontSize('heading'))->toBe((float) $geometry->headingSize(2));
 });
 
+it('draws a title named in the frontmatter on a blank layout, which has no title box', function () {
+    // `title:` was accepted, checked as a string and drawn nowhere: the role has no title box
+    // and the title was never pushed into the body, so the slide said nothing the deck asked
+    // it to say. It is drawn as the heading a blank slide's title already is.
+    $pptx = slideDeck("---\nlayout: blank\ntitle: Named\n---\n\nBody.\n");
+
+    expect($pptx->shapeNames())->toBe(['heading', 'paragraph'])
+        ->and($pptx->texts(1))->toBe(['Named', 'Body.']);
+});
+
+it('draws a blank layout\'s frontmatter title at the level it names', function () {
+    // The same `level:` the body heading of a blank slide is read at, or the directive would
+    // govern only the role that happens to have a heading in it.
+    $pptx = slideDeck("---\nlayout: blank\ntitle: Named\nlevel: 3\n---\n\nBody.\n");
+
+    expect($pptx->fontSize('heading'))->toBe((float) (new SlideGeometry())->headingSize(2));
+});
+
+it('draws a blank layout\'s title once, whether it came from the frontmatter or a heading', function () {
+    // The heading in the body is that role's title already; adding the frontmatter's on top
+    // of it would put the same line on the slide twice, which is what the title box does for
+    // every other role.
+    $pptx = slideDeck("---\nlayout: blank\ntitle: Named\n---\n\n# Named\n\nBody.\n");
+
+    expect($pptx->shapeNames())->toBe(['heading', 'paragraph'])
+        ->and($pptx->texts(1))->toBe(['Named', 'Body.']);
+});
+
 it('refuses a level that is not a positive integer, on a slide built by hand', function () {
     // The parser checks the directive it reads; this is the check for a Slide a caller
     // constructed, the same one `theme` and `layout` get.

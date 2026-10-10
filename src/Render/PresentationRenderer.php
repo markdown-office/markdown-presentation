@@ -489,6 +489,22 @@ final class PresentationRenderer
     }
 
     /**
+     * The heading a role with no title box draws a title as.
+     *
+     * At the depth the frontmatter named, the same way {@see self::underTitle()} re-reads a
+     * heading that became the title: `level: 1` is the top of what a body can draw and every
+     * level below it is the size a heading of that depth is drawn at.
+     */
+    private function titleHeading(string $title, ?int $depth): Heading
+    {
+        return new Heading(
+            $this->blocks->inline->parse($title),
+            $depth === null ? 1 : max(1, $depth - 1),
+            self::FIRST_STEP,
+        );
+    }
+    
+    /**
      * The slide's blocks, with the heading that became its title taken out of them.
      *
      * A slide's title is its first heading, and that heading is still a block of the content
@@ -518,10 +534,12 @@ final class PresentationRenderer
     */
     private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox, ?int $depth): array
     {
-        if ($source->title() === null) {
+        $title = $source->title();
+    
+        if ($title === null) {
             return $blocks;
         }
-
+    
         $heading = null;
         $at = 0;
 
@@ -536,9 +554,14 @@ final class PresentationRenderer
 
         if (
             $heading === null
-            || InlineParser::text($heading->runs) !== $this->blocks->inline->plain($source->title())
+            || InlineParser::text($heading->runs) !== $this->blocks->inline->plain($title)
         ) {
-            return $blocks;
+            // A role with no title box has nothing but its body to draw a title in, and a
+            // title it does not draw is the silence this library refuses everywhere else —
+            // the fifth version of it, after `author:`, `level:`, a trailing marker and a
+            // directive in a body. The frontmatter title becomes a heading, which is what a
+            // blank slide's title already is.
+            return $hasTitleBox ? $blocks : [$this->titleHeading($title, $depth), ...$blocks];
         }
 
         if ($hasTitleBox) {

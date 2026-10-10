@@ -380,6 +380,12 @@ The five roles are `title`, `content`, `two-column`, `section` and `blank`. Only
 deck uses are built, so a theme that maps two of the five does not fail on the three nobody
 asked for.
 
+`blank` has no title box — that is what makes it blank — so a slide using it carries its title
+as a heading: the one in its body if it wrote one, and the one its frontmatter named if it did
+not. `level:` governs whichever of the two it is, at the same depth it would govern a body
+heading. The alternative, refusing a `title:` on a blank slide, would refuse a perfectly good
+deck over the one thing the library does draw perfectly well there.
+
 ### Steps
 
 `<!-- v-click -->` on a line of its own opens a step. PowerPoint has no "press a key to

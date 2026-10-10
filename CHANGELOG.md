@@ -221,6 +221,16 @@ nothing had measured.
   asterisks and underscores inside a code span are characters, and an underscore
   between two word characters is not a delimiter, so `snake_case_name` is a name.
   Unclosed markup still renders as the characters it was written as.
+- **A blank layout draws the title its frontmatter names.** Before: `layout:
+  blank` has no title box and a `title:` was never pushed into the body, so a
+  slide that named one drew nothing it was named after — the fifth instance of
+  the same species as `author:` and `level:` until they were fixed, a directive
+  accepted and producing nothing. After: a blank slide with no heading to be its
+  title draws the frontmatter title as a heading, at the depth `level:` names,
+  which is exactly what the role already does with a heading it wrote itself. It
+  is drawn rather than refused because the alternative is refusing a deck for
+  the one thing the role does draw well; the shape is named `heading`, because
+  that is the block it became.
 - **A quote written over several lines is one shape.** Before: every `>` line
   flushed the buffers and became a `Quote` of its own, so a sentence written
   across two lines came out as two shapes with two indents, two gaps and two line
