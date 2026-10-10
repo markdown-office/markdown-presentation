@@ -412,6 +412,59 @@ and none of them is a placeholder: promoting one would make *Reset* move that bl
 the rest of the column floating. The outline view shows a deck's titles and still shows no
 bullets.
 
+### Templates
+
+A theme may ship a `template.pptx` beside its `layouts.yml`, and a deck written against it is
+laid out in *that template's* geometry rather than in this library's. The template is read for
+the placeholder boxes its own layouts carry, and both the slides and the layout parts this
+renderer writes are placed at them:
+
+```php
+use MarkdownPresentation\Render\TemplateGeometry;
+
+// The one theme in this repository that ships a template; see its layouts.yml.
+$boxes = (new TemplateGeometry((string) getenv('MARKDOWN_PRESENTATION_ROOT') . '/tests/fixtures/themes/templated/template.pptx'))->boxes();
+
+printf(
+    "%s: %d×%d at %d,%d\n",
+    'Title and Content',
+    $boxes['Title and Content']['title']->width,
+    $boxes['Title and Content']['title']->height,
+    $boxes['Title and Content']['title']->x,
+    $boxes['Title and Content']['title']->y,
+);
+```
+
+```text
+Title and Content: 828×79 at 66,54
+```
+
+Those numbers are pixels of the 960 × 540 slide this library writes, and they come from a
+template whose own page is 12192000 × 6858000 EMU — a stock 16:9 PowerPoint slide, 1280 × 720
+of the pixels a box counts in. Each axis is scaled by the ratio of the template's page to this
+one, so a placeholder keeps the position its designer chose rather than being divided by a
+constant that only fits this library's own page.
+
+Three rules decide what a template is allowed to change:
+
+- **A template fills in the roles it covers and says nothing about the rest.** A layout it
+  does not have, and a layout it has with no placeholders in it — Office's own *Blank* — leave
+  that role where `SlideGeometry` puts it. This is the same rule `layouts.yml` follows, where a
+  theme mapping three of the five roles is a theme that works.
+- **A template places; it does not typeset.** Sizes and alignments stay with `SlideGeometry`,
+  because a template states them in a *master*'s `p:txStyles` — a whole typographic system,
+  not a layout — and adopting one would resize the type of every deck that shipped a template.
+- **A template supplies geometry, not decoration.** Its master's drawings — a logo, a rule, a
+  decorated background — are not copied onto slides, because a deck's page is painted from
+  `theme.yml` and the same artwork on two themes that disagree about it is worse than none.
+
+A placeholder a layout states no position for takes its master's, which is what PowerPoint
+writes for a layout that does not move the one it inherited. A footer, a date and a slide
+number are placeholders too and are left out rather than laid out as body text.
+
+A template that cannot be read is a named failure — `Exception\MalformedTemplate` — rather
+than a theme that quietly renders as though it had not said where its geometry comes from.
+
 ### Steps
 
 `<!-- v-click -->` on a line of its own opens a step. PowerPoint has no "press a key to
@@ -611,7 +664,7 @@ themes/corporate-dark/
 ├── theme.yml        required   colours, fonts, metadata
 ├── styles.yml       optional   Word style-slot overrides
 ├── layouts.yml      optional   semantic role → template layout name
-├── template.pptx    optional   PowerPoint master and layouts
+├── template.pptx    optional   PowerPoint template: where the layouts put their boxes
 ├── README.md        optional   attribution
 └── LICENSE          optional
 ```

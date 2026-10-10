@@ -1,0 +1,26 @@
+# A theme that ships a template of its own, which is what `templates.pptx` is for.
+#
+# The layouts below name the ones `template.pptx` carries. Only three of the five roles are
+# mapped, and that is deliberate: a template that covers part of the vocabulary is a theme
+# that works, not one that fails on the roles its deck never asked for.
+name: Templated
+description: A theme whose geometry comes from its own PowerPoint template.
+author: markdown-office
+dark: false
+colors:
+  dk1: "#1B1B1F"
+  lt1: "#FAFAFA"
+  dk2: "#4A4A55"
+  lt2: "#E6E6EC"
+  accent1: "#3F6FB5"
+  accent2: "#C4622D"
+  accent3: "#8A8A93"
+  accent4: "#B58900"
+  accent5: "#2E8B9E"
+  accent6: "#4F7A3D"
+  hlink: "#2B5C9E"
+  folHlink: "#6B4A9E"
+fonts:
+  heading: Source Sans Pro
+  body: Source Sans Pro
+  mono: Fira Code

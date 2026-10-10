@@ -8,6 +8,7 @@ use MarkdownPresentation\Exception\FencedFrontmatter;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\MalformedTemplate;
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\UnknownDirective;
@@ -66,6 +67,7 @@ it('reports what a deck author can fix under the class that says so', function (
         FencedFrontmatter::class,
         ImageNotFound::class,
         MalformedFrontmatter::class,
+        MalformedTemplate::class,
         MalformedTheme::class,
         ThemeNotFound::class,
         UnknownDirective::class,

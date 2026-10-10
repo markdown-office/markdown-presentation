@@ -1,0 +1,11 @@
+# The layout names this theme's own `template.pptx` gives each role.
+#
+# `section` is mapped to a layout the template does not have, and `blank` to one it has with
+# nothing in it. Both are deliberate: a template that covers part of the vocabulary is a theme
+# that works, and the roles it says nothing about keep the geometry the library puts them at.
+layouts:
+  title: Title Slide
+  content: Title and Content
+  two-column: Two Content
+  section: Section Header
+  blank: Blank

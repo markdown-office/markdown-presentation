@@ -111,6 +111,55 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 
 ### Added
 
+- **`ThemeLoader` had been storing a theme's `template.pptx` path and nothing ever opened
+  it.** Before: a theme directory's `template.pptx` was read as a path, kept, and never read,
+  so a theme that shipped one got exactly the geometry every other theme got. After:
+  `Render\TemplateGeometry` reads the file, takes the placeholder boxes each of its layouts
+  carries, and the deck is laid out in them — the slides *and* the layout parts this renderer
+  writes, so *Reset* stays a no-op there too.
+
+  | Read from the template | Stays with `SlideGeometry` |
+  | --- | --- |
+  | the position of each layout's `title` and `body` placeholders | the size of the type and its alignment |
+  | a placeholder a layout does not place, from its master | the page, the colours, the fonts |
+  | which column is which, by `p:ph@idx` | the shapes on the slide, one per block |
+  | — | the master's own drawings: a logo, a rule, a decorated background |
+
+  The precedence is per role: **a template fills in the roles it covers and says nothing
+  about the rest.** A role whose layout the file does not have, and one whose layout it has
+  with no placeholders in it — Office's own *Blank* — keep the geometry the library puts them
+  at. That is the same rule `layouts.yml` already follows, where a theme that maps three of
+  the five roles is a theme that works rather than one that fails on the two.
+
+  EMU to pixels is a **ratio, not a division by 9525**. A stock 16:9 PowerPoint page is
+  12192000 × 6858000 EMU, which is 1280 × 720 of the pixels a `Box` counts in rather than
+  960 × 540; dividing by the constant would put every placeholder of a stock template off the
+  right and the bottom of the slide. Each axis is scaled by the ratio of the template's page
+  to this one's, so a placeholder keeps the position its designer chose.
+
+  A placeholder that states no position takes its master's, which is what PowerPoint writes
+  for a layout that does not move the one it inherited; a placeholder whose box has been
+  dragged off the page — an `a:xfrm` full of zeroes — states nothing and is skipped. A footer,
+  a date and a slide number are placeholders too and are left out rather than laid out as body
+  text.
+
+  A template that cannot be read is a named failure — `Exception\MalformedTemplate`, under
+  `InvalidInput` — rather than a theme that renders as though it had not said where its
+  geometry comes from. It names the file and, where a part is at fault, the part. Measurement
+  and overflow clamping are unchanged: they read the box they are given, so the same deck
+  overflows in a theme whose content column is shorter and does not in one whose is not.
+
+  No shipped theme ships a template, so `default`, `minimal` and `corporate-dark` are
+  untouched: all 42 preview images of the eleven example decks are byte-identical, and the
+  only parts of each package that differ from before are the layout parts and each slide
+  title's `<p:nvPr/>`.
+
+  A new theme is `tests/fixtures/themes/templated/`, whose `template.pptx` is written by
+  `tests/fixtures/themes/templated/build.php` rather than kept as an opaque binary. It is
+  deliberately a foreign file — a page that is not 960 × 540, placeholders written out of
+  order, one that inherits from its master and one that is not a placeholder at all — because
+  a template built by this library would agree with the reader about everything that matters.
+
 - `dark: true` in a `theme.yml` — the key that says the page is dark. It renames no
   colour; `dk1` is still the dark one and `lt1` the light one. It says which of them
   paints the page and which paints the type on it, which is what the colour map on the

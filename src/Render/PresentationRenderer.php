@@ -10,6 +10,7 @@ use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\MalformedTemplate;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
@@ -135,6 +136,7 @@ final class PresentationRenderer
      * @throws InvalidInput     When a slide names something this library cannot render.
      * @throws ThemeNotFound    When the deck names a theme that does not resolve.
      * @throws ContentOverflow  When a block does not fit and the renderer is strict.
+     * @throws MalformedTemplate When the theme's `template.pptx` cannot be read.
      * @throws Exception         When the file cannot be written.
      *
      * @return string The path written.
@@ -154,13 +156,14 @@ final class PresentationRenderer
         $presentation->getLayout()->setDocumentLayout(DocumentLayout::LAYOUT_SCREEN_16X9);
 
         $used = $this->usedRoles($roles);
+        $geometry = $this->geometry->with($this->template($theme, $used));
         $layouts = $this->layouts($this->slideMaster($presentation), $theme, $used);
         $this->properties($presentation, $deck, $theme);
 
-        $writer = new ShapeWriter($theme->theme(), $this->geometry);
+        $writer = new ShapeWriter($theme->theme(), $geometry);
 
         foreach ($deck->slides() as $slide) {
-            $this->write($presentation, $slide, $roles[$slide->index()], $layouts, $writer);
+            $this->write($presentation, $slide, $roles[$slide->index()], $layouts, $writer, $geometry);
         }
 
         // PHPPresentation's constructor leaves an empty slide behind so that a fresh object is
@@ -171,7 +174,46 @@ final class PresentationRenderer
             $presentation->removeSlideByIndex(0);
         }
 
-        return $this->save($presentation, $path, $used);
+        return $this->save($presentation, $path, $geometry, $used);
+    }
+
+    /**
+     * The boxes a theme's own `template.pptx` gives the roles the deck uses.
+     *
+     * A theme ships one or ships none, and this is where that decides anything: the roles a
+     * template covers are drawn in the template's geometry and the rest keep
+     * {@see SlideGeometry}'s, which is the precedence — a template fills in what it has and
+     * says nothing about what it does not, the same rule `layouts.yml` follows. Read before
+     * anything is built, so a template that cannot be read fails while there is still no file
+     * on disk to clean up.
+     *
+     * Keyed by the layout *name* rather than by the role, because that is what the template
+     * has: two roles a theme maps onto one name are one layout, and take the same boxes.
+     *
+     * @param list<LayoutRole> $roles
+     *
+     * @return array<string, array{title?: Box, body?: non-empty-list<Box>}>
+     *
+     * @throws MalformedTemplate
+     */
+    private function template(LoadedTheme $theme, array $roles): array
+    {
+        if ($theme->template() === null) {
+            return [];
+        }
+
+        $layouts = (new TemplateGeometry((string) $theme->template()))->boxes();
+        $boxes = [];
+
+        foreach ($roles as $role) {
+            $name = $theme->layout($role->value);
+
+            if (isset($layouts[$name])) {
+                $boxes[$role->value] = $layouts[$name];
+            }
+        }
+
+        return $boxes;
     }
 
     /**
@@ -430,8 +472,9 @@ final class PresentationRenderer
         LayoutRole $role,
         array $layouts,
         ShapeWriter $writer,
+        SlideGeometry $geometry,
     ): void {
-        $title = $this->geometry->title($role);
+        $title = $geometry->title($role);
         $level = $source->frontmatterValue('level');
         $blocks = $this->underTitle(
             $this->blocks->parse($source->content(), $source->index() + 1, $this->directory),
@@ -465,12 +508,12 @@ final class PresentationRenderer
                     $slide,
                     $this->blocks->inline->parse($source->title()),
                     $title['box'],
-                    $size === null ? $title['size'] : $this->geometry->titleSize($title['size'], $size),
+                    $size === null ? $title['size'] : $geometry->titleSize($title['size'], $size),
                     $title['alignment'],
                 );
             }
 
-            $this->stack($slide, $blocks, $step, $role, $writer, $source->index() + 1);
+            $this->stack($slide, $blocks, $step, $role, $writer, $source->index() + 1, $geometry);
         }
     }
 
@@ -616,10 +659,11 @@ final class PresentationRenderer
         LayoutRole $role,
         ShapeWriter $writer,
         int $number,
+        SlideGeometry $geometry,
     ): void {
         $columns = $this->columns($blocks, $role);
 
-        foreach ($this->geometry->body($role) as $column => $box) {
+        foreach ($geometry->body($role) as $column => $box) {
             $y = $box->y;
             $bottom = $box->y + $box->height;
 
@@ -737,7 +781,7 @@ final class PresentationRenderer
      *
      * @throws Exception
     */
-    private function save(PhpPresentation $presentation, string $path, array $roles): string
+    private function save(PhpPresentation $presentation, string $path, SlideGeometry $geometry, array $roles): string
     {
         $directory = dirname($path);
 
@@ -748,7 +792,7 @@ final class PresentationRenderer
         IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
 
         NotesColourMapPass::applyTo($path);
-        PlaceholderPass::applyTo($path, $this->geometry, $roles);
+        PlaceholderPass::applyTo($path, $geometry, $roles);
 
         return $path;
     }
