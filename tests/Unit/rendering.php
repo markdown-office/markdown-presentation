@@ -588,6 +588,15 @@ it('renders a block quote as a quote shape', function () {
     expect(renderDeck("> quoted\n")->shapeNames())->toBe(['quote']);
 });
 
+it('draws a quote written across two lines as one shape', function () {
+    // The line break is kept, so the shape is two lines tall — which is what a reader of the
+    // Markdown meant by writing it over two lines.
+    $pptx = renderDeck("> line one\n> line two\n");
+
+    expect($pptx->shapeNames())->toBe(['quote'])
+        ->and($pptx->texts(1))->toBe(["line one\nline two"]);
+});
+
 it('indents a block quote from the margin', function () {
     // The number rather than "greater than 40": the shape is 860 of the 880 the body box is,
     // which is what "indented by a gutter" has to mean if the block below it is to keep its

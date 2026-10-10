@@ -206,6 +206,31 @@ it('reads a quote and keeps what was after the marker', function () {
         ->toBe('quoted text');
 });
 
+it('reads a quote written across two lines as one block', function () {
+    // Every `>` line made a shape of its own: one sentence of two lines came out as two
+    // blocks, with two indents, two gaps and two line heights between them.
+    $blocks = blocksOf("> line one\n> line two\n");
+
+    expect($blocks)->toHaveCount(1)
+        ->and($blocks[0])->toBeInstanceOf(Quote::class)
+        ->and(InlineParser::text($blocks[0]->runs))->toBe("line one\nline two");
+});
+
+it('reads a blank line as what ends a quote', function () {
+    $blocks = blocksOf("> one\n\n> two\n");
+
+    expect($blocks)->toHaveCount(2)
+        ->and(array_map(static fn (Block $block): string => InlineParser::text($block->runs), $blocks))
+        ->toBe(['one', 'two']);
+});
+
+it('keeps a paragraph written after a quote where it was written', function () {
+    $blocks = blocksOf("> one\ntext\n");
+
+    expect(array_map(static fn (Block $block): string => $block::class, $blocks))
+        ->toBe([Quote::class, Paragraph::class]);
+});
+
 it('reads a table as a header row, an alignment row and body rows', function () {
     $block = blocksOf("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n")[0];
 

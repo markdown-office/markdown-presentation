@@ -132,6 +132,7 @@ final class BlockParser
         self::refuse($slide, self::prose($lines));
 
         $blocks = [];
+        $quote = [];
         $paragraph = [];
         $step = 1;
 
@@ -139,9 +140,7 @@ final class BlockParser
             if (preg_match(self::FENCE, $lines[$index], $fence) === 1) {
                 [$code, $index] = self::code($lines, $index, $fence, $step);
 
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
+                $this->flush($blocks, $quote, $paragraph, $step);
                 $blocks[] = $code;
 
                 continue;
@@ -153,9 +152,7 @@ final class BlockParser
                 // The step opens *after* the block the marker closes. Advancing first would
                 // put the block a writer wrote above the marker on the step below it, which
                 // is the reverse of what the author meant.
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
+                $this->flush($blocks, $quote, $paragraph, $step);
                 $step = self::jump($slide, $argument, $step);
 
                 continue;
@@ -164,44 +161,41 @@ final class BlockParser
             $line = $lines[$index];
 
             if (trim($line) === '') {
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
+                $this->flush($blocks, $quote, $paragraph, $step);
 
                 continue;
             }
 
             if (preg_match(self::HEADING, $line, $heading) === 1) {
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
+                $this->flush($blocks, $quote, $paragraph, $step);
                 $blocks[] = new Heading($this->inline->parse($heading[2]), strlen($heading[1]), $step);
 
                 continue;
             }
 
             if (preg_match(self::RULE, $line) === 1) {
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
+                $this->flush($blocks, $quote, $paragraph, $step);
                 $blocks[] = new Rule($step);
 
                 continue;
             }
 
+            // Consecutive `>` lines are one block, the way they are in Markdown: a quote
+            // written across two lines is one sentence, and two shapes are two of the
+            // indentation, the gap and the line height that one sentence would not have.
+            // Only the first of them opens the block — the rest are still inside it.
             if (preg_match(self::QUOTE, $line, $quoted) === 1) {
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
-                $blocks[] = new Quote($this->inline->parse($quoted[1]), $step);
-
+                if ($quote === []) {
+                    $this->flush($blocks, $quote, $paragraph, $step);
+                }
+            
+                $quote[] = $quoted[1];
+            
                 continue;
             }
 
             if (preg_match(self::IMAGE, trim($line), $image) === 1) {
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
+                $this->flush($blocks, $quote, $paragraph, $step);
                 $blocks[] = self::image($image, $slide, $directory, $step);
 
                 continue;
@@ -210,9 +204,7 @@ final class BlockParser
             if (str_contains($line, '|') && preg_match(self::ALIGNMENT_ROW, $lines[$index + 1] ?? '') === 1) {
                 [$table, $index] = $this->table($lines, $index, $step);
 
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
+                $this->flush($blocks, $quote, $paragraph, $step);
                 $blocks[] = $table;
 
                 continue;
@@ -221,9 +213,7 @@ final class BlockParser
             if (preg_match(self::BULLET, $line, $item) === 1) {
                 [$list, $index] = self::list($lines, $index, $this->inline, $item, $step);
 
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
+                $this->flush($blocks, $quote, $paragraph, $step);
                 $blocks[] = $list;
 
                 continue;
@@ -232,9 +222,7 @@ final class BlockParser
             if (preg_match(self::ORDERED, $line, $item) === 1) {
                 [$list, $index] = self::list($lines, $index, $this->inline, $item, $step);
 
-                $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
-
-                $paragraph = [];
+                $this->flush($blocks, $quote, $paragraph, $step);
                 $blocks[] = $list;
 
                 continue;
@@ -243,7 +231,9 @@ final class BlockParser
             $paragraph[] = trim($line);
         }
 
-        return self::flush($blocks, $paragraph, $step, $this->inline);
+        $this->flush($blocks, $quote, $paragraph, $step);
+
+        return $blocks;
     }
 
     /**
@@ -620,19 +610,29 @@ final class BlockParser
     }
 
     /**
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
-     * @param list<string>                                                   $paragraph
+     * Close whatever the last lines left open: a quote first and then a paragraph, because
+     * that is the order they were written in.
      *
-     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
+     * Both buffers, rather than the paragraph one, because a quote runs over as many lines
+     * as it is written in. The line after a quote closes the quote the way a blank line
+     * does, without being one.
+     *
+     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     * @param list<string>                                                   $quote
+     * @param list<string>                                                   $paragraph
     */
-    private static function flush(array $blocks, array $paragraph, int $step, InlineParser $inline): array
+    private function flush(array &$blocks, array &$quote, array &$paragraph, int $step): void
     {
-        if ($paragraph === []) {
-            return $blocks;
+        if ($quote !== []) {
+            $blocks[] = new Quote($this->inline->parse(implode("\n", $quote)), $step);
+            $quote = [];
         }
 
-        $blocks[] = new Paragraph($inline->parse(implode("\n", $paragraph)), $step);
+        if ($paragraph === []) {
+            return;
+        }
 
-        return $blocks;
+        $blocks[] = new Paragraph($this->inline->parse(implode("\n", $paragraph)), $step);
+        $paragraph = [];
     }
 }

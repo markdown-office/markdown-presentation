@@ -221,6 +221,14 @@ nothing had measured.
   asterisks and underscores inside a code span are characters, and an underscore
   between two word characters is not a delimiter, so `snake_case_name` is a name.
   Unclosed markup still renders as the characters it was written as.
+- **A quote written over several lines is one shape.** Before: every `>` line
+  flushed the buffers and became a `Quote` of its own, so a sentence written
+  across two lines came out as two shapes with two indents, two gaps and two line
+  heights between them — while the list right above it joined its own
+  continuation lines. After: consecutive `>` lines are collected into one quote
+  and joined with the line break the deck wrote, the way a paragraph joins its
+  own lines. A blank line still ends the quote, and a block after it still comes
+  after it.
 - **An image's alt text is its alt text.** Before: the `![…]` was parsed and
   stored on `Block\Image` and read by nothing — `ShapeWriter` wrote the *file
   path* into `descr` instead, which is what a screen reader reads out and what
