@@ -18,6 +18,10 @@ use MarkdownPresentation\Exception\MalformedTheme;
  *
  * Colours and fonts a file does not mention keep Office's defaults, so a theme that
  * names two accents still produces a colour scheme that is complete.
+ *
+ * `dark: true` says the page is dark. It renames no colour — `dk1` is still the dark
+ * one and `lt1` the light one — it says which of them plays which part, which is what
+ * PowerPoint's own dark themes do with the colour map rather than with the palette.
 */
 final class Theme
 {
@@ -46,7 +50,7 @@ final class Theme
         /** The font slots, in the order a `theme.yml` should list them. */
     public const FONTS = ['heading', 'body', 'mono'];
         /** The keys a `theme.yml` may have. */
-    public const KEYS = ['name', 'description', 'author', 'colors', 'fonts'];
+    public const KEYS = ['name', 'description', 'author', 'dark', 'colors', 'fonts'];
     /**
      * The spellings the concept draft used, mapped onto DrawingML's own. {@see
      * self::colourNames()} lists them wherever a colour name is offered to the
@@ -71,6 +75,7 @@ final class Theme
         private readonly string $name,
         private readonly ?string $description,
         private readonly ?string $author,
+        private readonly bool $dark,
         private readonly array $colours,
         private readonly array $fonts,
     ) {
@@ -86,6 +91,7 @@ final class Theme
             $name,
             null,
             null,
+            false,
             [
                 self::DK1 => '#000000',
                 self::LT1 => '#FFFFFF',
@@ -139,6 +145,7 @@ final class Theme
             trim($name),
             self::text($data, 'description', $file),
             self::text($data, 'author', $file),
+            self::readDark($data, $file),
             self::readColours($data['colors'] ?? null, $file) ?? $defaults->colours,
             self::readFonts($data['fonts'] ?? null, $file) ?? $defaults->fonts,
         );
@@ -157,6 +164,52 @@ final class Theme
     public function author(): ?string
     {
         return $this->author;
+    }
+
+    /**
+     * Whether the page this theme paints is dark.
+     *
+     * The palette does not change either way: `dk1` is the dark colour and `lt1` the
+     * light one whichever this says. What changes is which of them paints the page and
+     * which paints the type on it.
+     */
+    public function isDark(): bool
+    {
+        return $this->dark;
+    }
+
+    /*
+     * The four parts the master's colour map maps — `bg1`, `tx1`, `bg2`, `tx2` — each
+     * resolved to the slot that plays it on this theme.
+     *
+     * Asked of the theme rather than read off the master because a shape's colour reaches
+     * the file as a literal `a:srgbClr` and the map is never consulted for it again: a
+     * shape that named `dk1` outright would paint dark type on the page `page()` paints
+     * dark. These four are therefore the same fact as the map, which is what keeps the
+     * two in step.
+     */
+    /** The slot the page behind every slide is painted with. */
+    public function page(): string
+    {
+        return $this->dark ? self::DK1 : self::LT1;
+    }
+
+    /** The slot body text, a heading, a title and a table cell are drawn in. */
+    public function ink(): string
+    {
+        return $this->dark ? self::LT1 : self::DK1;
+    }
+
+    /** The slot a code block and a table's header row are filled with. */
+    public function panel(): string
+    {
+        return $this->dark ? self::DK2 : self::LT2;
+    }
+
+    /** The slot a quote and a code block's own text are drawn in. */
+    public function subtleInk(): string
+    {
+        return $this->dark ? self::LT2 : self::DK2;
     }
 
     /**
@@ -197,7 +250,7 @@ final class Theme
     /**
      * The theme as the array it was read from, in DrawingML's spellings.
      *
-     * @return array{name: string, description: ?string, author: ?string, colors: array<string, string>, fonts: array<string, string>}
+     * @return array{name: string, description: ?string, author: ?string, dark: bool, colors: array<string, string>, fonts: array<string, string>}
     */
     public function toArray(): array
     {
@@ -205,6 +258,7 @@ final class Theme
             'name' => $this->name,
             'description' => $this->description,
             'author' => $this->author,
+            'dark' => $this->dark,
             'colors' => $this->colours,
             'fonts' => $this->fonts,
         ];
@@ -221,8 +275,28 @@ final class Theme
     }
 
     /**
+     * `dark:` read as the boolean it has to be: `dark: yes` is a YAML 1.1 truthy
+     * string rather than the flag, so only `true` and `false` are accepted and anything
+     * else is a mistake somebody can fix.
+     *
+     * @param array<array-key, mixed> $data
+     *
+     * @throws MalformedTheme
+     */
+    private static function readDark(array $data, string $file): bool
+    {
+        $dark = $data['dark'] ?? false;
+
+        if (!is_bool($dark)) {
+            throw MalformedTheme::wrongType($file, 'dark', 'true or false');
+        }
+
+        return $dark;
+    }
+
+    /**
      * @return array<string, string>|null Null when the theme names no colours, so the defaults stand.
-    */
+     */
     private static function readColours(mixed $data, string $file): ?array
     {
         if ($data === null) {

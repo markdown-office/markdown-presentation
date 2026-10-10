@@ -593,6 +593,7 @@ is one of them, which is the file on disk:
 name: Corporate Dark
 description: Dark corporate deck for technical briefings.
 author: markdown-office
+dark: true
 colors:
   dk1: "#1E1E2E"
   lt1: "#CDD6F4"

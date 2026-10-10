@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Exception\MalformedTheme;
+use MarkdownPresentation\Tests\Support\Contrast;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\StyleSlots;
 use MarkdownPresentation\Theme\Theme;
@@ -81,7 +82,15 @@ it('gives the theme back as the array it was read from', function () {
 
     expect($array['name'])->toBe('Round')
         ->and($array['colors']['dk1'])->toBe('#101010')
+        ->and($array['dark'])->toBeFalse()
         ->and(Theme::fromArray($array)->colour('dk1'))->toBe('#101010');
+
+    // A round trip that dropped `dark` would turn a dark theme into a light one with
+    // nothing saying so, which is the failure this key exists to make impossible.
+    $night = Theme::fromArray(['name' => 'Night', 'dark' => true, 'colors' => $array['colors']]);
+
+    expect($night->toArray()['dark'])->toBeTrue()
+        ->and(Theme::fromArray($night->toArray())->isDark())->toBeTrue();
 });
 
 it('refuses a theme with no name', function () {
@@ -90,7 +99,49 @@ it('refuses a theme with no name', function () {
 
 it('refuses a key that is not one of a theme, and names the ones that are', function () {
     Theme::fromArray(['name' => 'Typo', 'colour' => []]);
-})->throws(MalformedTheme::class, '"colour" is not a key of a theme. Valid keys: name, description, author, colors, fonts');
+})->throws(MalformedTheme::class, '"colour" is not a key of a theme. Valid keys: name, description, author, dark, colors, fonts');
+
+it('reads a theme that says its page is dark, without changing a colour of it', function () {
+    // `dark` says which of the two plays which part. It renames nothing: a theme that
+    // declares itself dark while painting its page with the light token is a theme whose
+    // palette and whose flag disagree, and only the flag can be acted on.
+    $theme = Theme::fromArray([
+        'name' => 'Night',
+        'dark' => true,
+        'colors' => ['dk1' => '#1E1E2E', 'lt1' => '#CDD6F4', 'dk2' => '#181825', 'lt2' => '#BAC2DE'],
+    ]);
+
+    expect($theme->isDark())->toBeTrue()
+        ->and($theme->colour('dk1'))->toBe('#1E1E2E')
+        ->and($theme->colour('lt1'))->toBe('#CDD6F4');
+});
+
+it('paints the page and the type on it with opposite slots, whichever way round they are', function () {
+    // These four are the master's colour map. A shape reaching a slot named outright
+    // rather than through the theme would paint its own map.
+    $night = Theme::fromArray(['name' => 'Night', 'dark' => true]);
+    $day = Theme::fromArray(['name' => 'Day']);
+
+    expect($night->page())->toBe(Theme::DK1)
+        ->and($night->ink())->toBe(Theme::LT1)
+        ->and($night->panel())->toBe(Theme::DK2)
+        ->and($night->subtleInk())->toBe(Theme::LT2)
+        ->and($day->page())->toBe(Theme::LT1)
+        ->and($day->ink())->toBe(Theme::DK1)
+        ->and($day->panel())->toBe(Theme::LT2)
+        ->and($day->subtleInk())->toBe(Theme::DK2)
+        ->and(Theme::defaults()->isDark())->toBeFalse();
+});
+
+it('refuses a dark flag that is not a boolean, rather than guessing at it', function () {
+    // `dark: yes` is a YAML 1.1 truthy *string* rather than the flag, so a theme written
+    // that way would silently render light unless the type is checked.
+    Theme::fromArray(['name' => 'Typo', 'dark' => 'yes']);
+})->throws(MalformedTheme::class, '"dark" is not true or false');
+
+it('refuses a dark flag written as something else at all', function () {
+    Theme::fromArray(['name' => 'Typo', 'dark' => ['yes']]);
+})->throws(MalformedTheme::class, '"dark" is not true or false');
 
 it('refuses a colour name that is not one of a theme, and names the ones that are', function () {
     Theme::fromArray(['name' => 'Typo', 'colors' => ['accent7' => '#FFFFFF']]);
@@ -152,4 +203,40 @@ it('loads every theme that ships with the library', function () {
         expect($loaded->theme()->name())->not->toBeEmpty()
             ->and($loaded->roles())->toContain('title', 'content', 'two-column');
     }
+});
+
+it('loads the dark flag off disk, so the shipped dark theme really is one', function () {
+    $loader = new MarkdownPresentation\Theme\ThemeLoader();
+
+    // The file is read, not assumed: `corporate-dark` has said it is dark since the
+    // flag was added, and a theme with a near-black `dk1` and no flag renders light.
+    expect($loader->load(dirname(__DIR__, 2) . '/themes/corporate-dark')->theme()->isDark())->toBeTrue();
+
+    foreach (['default', 'minimal'] as $name) {
+        expect($loader->load(dirname(__DIR__, 2) . '/themes/' . $name)->theme()->isDark())->toBeFalse();
+    }
+});
+
+it('paints every dark theme that ships in type a reader can read', function () {
+    $loader = new MarkdownPresentation\Theme\ThemeLoader();
+    $ratios = [];
+
+    foreach (['default', 'corporate-dark', 'minimal'] as $name) {
+        $theme = $loader->load(dirname(__DIR__, 2) . '/themes/' . $name)->theme();
+
+        if ($theme->isDark() === false) {
+            continue;
+        }
+
+        $page = (string) $theme->colour($theme->page());
+
+        foreach (['ink', 'subtleInk'] as $role) {
+            $ratios[$name . '.' . $role] = Contrast::ratio((string) $theme->colour($theme->{$role}()), $page);
+        }
+    }
+
+    // 4.5 is AA for body text and every pairing here is far above it. A palette edited
+    // to something dimmer fails here rather than in a room with the lights off.
+    expect($ratios)->not->toBe([])
+        ->and(min($ratios))->toBeGreaterThanOrEqual(4.5);
 });
