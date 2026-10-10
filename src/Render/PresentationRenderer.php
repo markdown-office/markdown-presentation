@@ -320,7 +320,18 @@ final class PresentationRenderer
     private function properties(PhpPresentation $presentation, Deck $deck, LoadedTheme $theme): void
     {
         $properties = $presentation->getDocumentProperties();
-        $properties->setCreator($theme->theme()->author() ?? 'markdown-presentation');
+
+        // The deck's author if it names one, the theme's otherwise. The deck is the more
+        // specific of the two — it is the document, and the theme is the template it was
+        // written in — so a deck naming its own author is not credited to whoever wrote the
+        // theme. A theme's author is a default rather than a claim, which is why the name
+        // this falls back to is the library's own and not the theme's when the theme has
+        // none either.
+        $author = $deck->frontmatterValue('author');
+
+        $properties->setCreator($author === null
+            ? $theme->theme()->author() ?? 'markdown-presentation'
+            : self::text($author, 'author'));
 
         $title = $deck->frontmatterValue('title');
 

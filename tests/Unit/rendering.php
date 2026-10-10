@@ -192,10 +192,26 @@ it('takes the deck metadata as the document properties', function () {
         ->and($core)->toContain('<dc:description>About it</dc:description>');
 });
 
-it('credits the theme author, because the deck has no other way to say who made it', function () {
+it('credits the deck that names an author, rather than the theme it was written in', function () {
+    // `author:` is in the directive list and was read by nobody: `dc:creator` was the theme's
+    // author whatever the deck said, so a deck written by one person and rendered in another
+    // person's theme was credited to the theme's author.
+    $pptx = renderDeck("---\ntheme: corporate-dark\nauthor: Fabi\n---\n\n# One\n");
+    $core = $pptx->part('docProps/core.xml');
+
+    expect($core)->toContain('<dc:creator>Fabi</dc:creator>')
+        ->and($core)->not->toContain('markdown-office');
+});
+
+it('credits the theme author for a deck that names none', function () {
     $pptx = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n");
 
-    expect($pptx->part('docProps/core.xml'))->toContain('markdown-office');
+    expect($pptx->part('docProps/core.xml'))->toContain('<dc:creator>markdown-office</dc:creator>');
+});
+
+it('refuses an author that is not a string, rather than rendering a number as a name', function () {
+    expect(fn () => renderDeck("---\nauthor: 42\n---\n\n# One\n"))
+        ->toThrow(MalformedFrontmatter::class, 'has a "author" that is not a string');
 });
 
 it('writes a slide name that says which slide of the deck it came from', function () {
