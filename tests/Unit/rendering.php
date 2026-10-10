@@ -13,6 +13,7 @@ use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Render\ImageConverter;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
@@ -997,6 +998,44 @@ it('refuses an image that is not a file, and says where it looked', function () 
     // it and no complaint from anywhere.
     expect(fn () => renderDeck("![missing](nope.png)\n"))
         ->toThrow(ImageNotFound::class, 'resolved to "' . imageDirectory() . '/nope.png"');
+});
+
+it('refuses a picture whose header claims more pixels than this render opens', function () {
+    // A decompression bomb is kilobytes on disk: `getimagesize()` reads a header, so a PNG
+    // claiming to be 50000 x 50000 is about a hundred bytes and is 9.3 GB the moment GD
+    // decodes it. GD's own ceiling would stop it -- as a fatal error, halfway through a
+    // render, with no message naming the deck that caused it.
+    //
+    // The header is patched rather than the image drawn, because drawing a real one of that
+    // size is the bomb. PNG puts the width and the height in `IHDR` as two big-endian
+    // 32-bit integers at offset 16, which is what is being replaced here.
+    $png = png(2, 2);
+    $path = imageDirectory() . '/bomb.png';
+    file_put_contents(
+        $path,
+        substr((string) file_get_contents($png), 0, 16) . pack('NN', 50000, 50000) . substr((string) file_get_contents($png), 24),
+    );
+
+    expect(getimagesize($path))->toBeArray()
+        ->and(getimagesize($path)[0])->toBe(50000)
+        ->and(getimagesize($path)[1])->toBe(50000);
+
+    expect(fn () => renderDeck("![a bomb](bomb.png)\n"))
+        ->toThrow(UnsupportedImageFormat::class, 'which measures 50000 x 50000 pixels');
+});
+
+it('opens a picture as large as it says it will', function () {
+    // The other side of the bound: the ceiling is a number rather than "everything over a
+    // few thousand", and 4K is carried like any other PNG. Also a patched header, for the
+    // same reason -- a real 4096 x 4096 image is 64 MB of memory to draw.
+    $png = (string) file_get_contents(png(2, 2));
+    $side = (int) sqrt(ImageConverter::MAX_PIXELS);
+    file_put_contents(
+        imageDirectory() . '/four-k.png',
+        substr($png, 0, 16) . pack('NN', $side, $side) . substr($png, 24),
+    );
+
+    expect(array_values(preg_grep('#^ppt/media/#', renderDeck("![a dot](four-k.png)\n")->parts()))[0])->toEndWith('.png');
 });
 
 it('embeds a picture in a format a .pptx cannot carry as a PNG', function () {

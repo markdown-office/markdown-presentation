@@ -710,7 +710,39 @@ So are a format nothing here can decode — an ICO, say — and a file whose pay
 short, which measures perfectly and is still not an image anybody can draw.
 
 An SVG is taken on its extension and never measured: `getimagesize()` cannot read one that
-sizes itself by `viewBox`, and before PHP 8.5 it could not read one at all.
+sizes itself by `viewBox`, and before PHP 8.5 it could not read one at all. Every other
+carried format is a raster, so it is measured, and a picture that claims more than
+**4096 × 4096 pixels** is refused before anything opens it:
+
+```
+Slide 1 shows "bomb.png", which measures 50000 x 50000 pixels. Decoding it is about 9.3 GB of memory, and this render opens no picture over 16777216 pixels: scale it down before putting it in a deck.
+```
+
+That is a decompression bomb — a hundred bytes on disk, gigabytes of memory the moment it
+is decoded — and the size is out of the values `getimagesize()` had already returned rather
+than out of a second look at the file.
+
+### What an SVG costs you
+
+**An SVG is written into the package byte for byte, unexamined.** Nothing here parses one,
+filters one, or measures one, and that is not an oversight that could be fixed here: an SVG
+is arbitrary XML with scripts, external references and embedded HTML in it, and a correct
+sanitiser is a parser and a policy about what to drop. This library has no claim to either,
+so it does not pretend to.
+
+What that means in practice:
+
+- the file is in the deck whatever it contains — `<script>`, `<foreignObject>`, or
+  `<image href="https://tracker.example/pixel">`;
+- what any reader does with that is the reader's business. PowerPoint does not run a script
+  out of an SVG; a browser, a preview service and a converter to HTML or PDF all might;
+- the `MAX_PIXELS` bound above does not apply to an SVG, because nothing here opens one.
+
+So an SVG is the one image this library will not tell you anything about. If a deck can come
+from somebody you would not hand a file to, treat the output as untrusted: render it, then
+open it somewhere isolated, and prefer a raster. The containment rule above still applies —
+an SVG is read from a directory the caller allowed, like any other picture — but what is
+inside it is nobody's decision but yours.
 
 ### What the theme reaches
 

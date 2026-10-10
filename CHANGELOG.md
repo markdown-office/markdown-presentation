@@ -121,6 +121,36 @@ All notable changes to this project are documented here. The format follows
   **Breaking**: a deck carrying a refused target rendered before and is refused now. A deck
   whose links are URLs, mail addresses or relative paths is unaffected.
 
+- **A kilobyte of PNG could exhaust the machine.** `ImageConverter::format()` called
+  `getimagesize()`, kept the MIME type and discarded `$size[0]`/`$size[1]` — and then
+  `convert()` decoded the whole image into a `truecolor` bitmap. A picture is 4 bytes to the
+  pixel once decoded, so a PNG whose header claims 50000 × 50000 is about a hundred bytes on
+  disk and 9.3 GB of memory when GD opens it. GD's own ceiling stops it, as a fatal error
+  halfway through a render with no message naming the deck that caused it.
+
+  Now refused, from the width and the height `getimagesize()` had already returned and
+  before anything opens the file:
+
+  | | Before | After |
+  | --- | --- | --- |
+  | a PNG whose header claims 50000 × 50000 | decoded until the process is killed | `UnsupportedImageFormat`: `Slide 1 shows "bomb.png", which measures 50000 x 50000 pixels. Decoding it is about 9.3 GB of memory, and this render opens no picture over 16777216 pixels: scale it down before putting it in a deck.` |
+
+  The bound is 4096 × 4096 — `ImageConverter::MAX_PIXELS`, a public constant so the number
+  is a fact about this library rather than a number inside a method. A slide is drawn at
+  1920 × 1080, so it is four times the resolution of anything the output can show.
+
+- **An SVG was embedded unexamined, and nothing said so.** The format check has always been
+  an extension check for SVG, because `getimagesize()` cannot read a `viewBox`-sized one
+  before PHP 8.5. What that means is that the file goes into `ppt/media/` byte for byte:
+  whatever `<script>`, `<foreignObject>` or `<image href="https://tracker/…">` it contains is
+  in the deck, and whatever a reader does with it is the reader's decision.
+
+  Not fixed here, and the README says so next to the extension-only check rather than
+  leaving a reader to find out: sanitising SVG properly is a parser and a policy about what
+  to drop, and this library has no claim to either. What it now has is the sentence, its
+  consequences spelled out one by one, and the note that `MAX_PIXELS` does not reach an SVG
+  because nothing here opens one.
+
 - **A layout part was a name and nothing else.** Before: `themes/default/layouts.yml` mapped
   the portable roles onto Office's own layout names and the file recorded those names — and
   then wrote a layout part whose shape tree held nothing at all:

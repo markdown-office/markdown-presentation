@@ -37,6 +37,20 @@ final class ImageConverter
     private const CARRIED = ['gif', 'jpg', 'png', 'svg'];
 
     /**
+     * The most pixels this render will open, and why the number is that one.
+     *
+     * A decompression bomb is kilobytes on disk: `getimagesize()` reads a header, so a PNG
+     * claiming to be 50000 × 50000 is about a hundred bytes and is ten gigabytes of memory
+     * the moment GD decodes it. GD's own ceiling arrives as a fatal error rather than as a
+     * refusal, which is the failure a deck should not be able to cause at all.
+     *
+     * 4096 × 4096 is a 4K picture, far past the 1920 × 1080 a slide is drawn at, so no
+     * picture worth embedding is refused and a picture this library will not open can be
+     * named with its size in the failure.
+     */
+    public const MAX_PIXELS = 4096 * 4096;
+
+    /**
      * What a MIME type goes into the package under.
      *
      * A `.jpeg` is a JPEG, so the extension a file happens to be called is not what is
@@ -62,7 +76,7 @@ final class ImageConverter
      */
     public function png(int $slide, string $written, string $path): ?ConvertedImage
     {
-        $format = self::format($path);
+        $format = self::format($slide, $written, $path);
 
         if ($format === null) {
             throw UnsupportedImageFormat::notAnImage($slide, $written);
@@ -84,11 +98,16 @@ final class ImageConverter
      * the older builds this package supports a perfectly good SVG answers false. Refusing
      * one as a file that is not an image is the failure the extension is here to avoid.
      *
+     * The other half of that is that {@see self::MAX_PIXELS} does not apply to an SVG:
+     * nothing here opens one, and nothing here could refuse one by size even if it did.
+     * What is in the package is the file, byte for byte — see the README for what that
+     * means to whoever opens the deck.
+     *
      * Every other carried format *is* a raster, so one of those names that will not
      * measure is a file that is not the image it claims to be — a PDF, a download that
      * never finished — and saying so beats embedding it as a PNG.
      */
-    private static function format(string $path): ?string
+    private static function format(int $slide, string $written, string $path): ?string
     {
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
@@ -100,6 +119,13 @@ final class ImageConverter
 
         if (!is_array($size)) {
             return null;
+        }
+
+        // Out of the values already fetched rather than out of another `getimagesize()`:
+        // the width and the height are in `$size` and this is the only place the file is
+        // measured, so a bomb is refused before anything opens it.
+        if ($size[0] * $size[1] > self::MAX_PIXELS) {
+            throw UnsupportedImageFormat::tooLarge($slide, $written, $size[0], $size[1], self::MAX_PIXELS);
         }
 
         return self::FROM_MIME[strtolower($size['mime'])] ?? $extension;
