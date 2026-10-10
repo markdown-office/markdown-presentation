@@ -159,7 +159,7 @@ final class ShapeWriter
      * The height of each of a table's rows, in pixels.
      *
      * A row is at least {@see SlideGeometry::TABLE_ROW} whatever it says, and taller than
-     * that when its longest cell wraps — which is the row PowerPoint grows to fit, so the
+     * that when its longest cell wraps: PowerPoint grows a row to fit its content, so the
      * height has to know before the row does.
      *
      * @return list<int>
@@ -190,8 +190,8 @@ final class ShapeWriter
      * The width of each of a table's columns, in pixels.
      *
      * Proportional to the widest cell in each rather than equal, because a table whose
-     * columns are all a third of the body box wraps its narrow columns into ribbons one word
-     * wide while its wide one sits empty.
+     * columns are all a third of the body box wraps its narrow columns one word to a line
+     * while its wide one sits empty.
      *
      * @return non-empty-list<int>
      */

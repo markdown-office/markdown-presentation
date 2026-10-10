@@ -296,11 +296,20 @@ final class PresentationRenderer
     /**
      * The master: its colour scheme, and the page behind every slide.
      *
-     * The colour scheme is the whole reason a theme's colours belong in a `.pptx` at all:
-     * PowerPoint reads `clrScheme` to decide what `accent1` means everywhere in the file, so
-     * writing it here is what makes a themed deck themed rather than a deck with a few
-     * hard-coded colours in it.
-    */
+     * All twelve slots go in whatever the theme named, and the ones no shape uses go in
+     * anyway: DrawingML's `CT_ColorScheme` is a sequence of exactly twelve required
+     * elements, so a scheme with five of them is not a scheme with five colours, it is an
+     * invalid theme part. `accent2`–`accent6` and `folHlink` are written because the format
+     * has no way to leave them out, and because they are what PowerPoint's own colour picker
+     * offers for a theme someone edits in the application.
+     *
+     * What that does *not* do is make a shape refer to a slot by name.
+     * {@see \PhpOffice\PhpPresentation\Writer\PowerPoint2007\AbstractDecoratorWriter::writeColor()}
+     * writes `a:srgbClr` for every `Color` it is given, `SchemeColor` included, so the accent
+     * a bullet or a rule is painted with reaches the file as a literal value. Re-theming the
+     * deck in PowerPoint restyles the picker's swatches; it does not restyle the shapes
+     * already on the slides.
+     */
     private function master(SlideMaster $master, Theme $theme): void
     {
         foreach (Theme::COLOURS as $slot) {

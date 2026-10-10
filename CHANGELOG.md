@@ -193,6 +193,19 @@ nothing had measured.
 
 ### Notes
 
+- `accent1` is still written as `a:srgbClr` and not as an `a:schemeClr` naming the slot, so
+  re-theming a deck in PowerPoint changes the swatches its colour picker offers and does not
+  restyle the bullets, rules and text already on the slides. This is not fixable here:
+  `AbstractDecoratorWriter::writeColor()` writes `a:srgbClr` for every `Color` it is given,
+  `SchemeColor` included, and it is what writes a run's colour, a fill and a bullet's. The
+  only place the library honours a `SchemeColor` is the master's `p:txStyles`, which applies
+  to placeholder shapes, and none of these shapes are placeholders. The claim in the README
+  that `accent1` means the theme's accent "everywhere in the file" was therefore false and
+  has been corrected.
+- All twelve colour slots are written whether a shape uses them or not, which was not a
+  choice: DrawingML's `CT_ColorScheme` is twelve required elements, so a scheme with five of
+  them is an invalid theme part. `accent2`–`accent6` and `folHlink` reach the file because
+  the format has no way to leave them out.
 - Six tests were rewritten because they could not fail. `usesColour('#89b4fa')`
   under `corporate-dark`, where `accent1` *is* `hlink`, is satisfied by a deck with one
   bullet and no link — and by a deck with nothing but a rule; `round($w / $h) === 4.0`

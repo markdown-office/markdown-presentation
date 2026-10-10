@@ -499,10 +499,19 @@ sizes itself by `viewBox`, and before PHP 8.5 it could not read one at all.
 ### What the theme reaches
 
 The twelve colours of `theme.yml` are written into the presentation's colour scheme, which
-is what makes `accent1` mean the theme's accent everywhere in the file rather than only
-where it was typed out. `lt1` becomes the page behind every slide. The `heading`, `body` and
+is what PowerPoint's colour picker reads, so a theme edited in the application offers the
+theme's own swatches. `lt1` becomes the page behind every slide. The `heading`, `body` and
 `mono` fonts are applied to the runs that use them, because a `.pptx`'s font scheme is not
 reachable from here.
+
+Two limits worth knowing. All twelve slots are written whether a shape uses them or not:
+DrawingML's `CT_ColorScheme` is twelve required elements, so a scheme missing one is an
+invalid theme part, and `accent2`–`accent6` and `folHlink` are written because the format
+leaves no way to leave them out. And a colour reaching a *shape* is written as `a:srgbClr`,
+not as an `a:schemeClr` naming the slot — PHPPresentation's writer emits `a:srgbClr` for
+every `Color` it is handed, `SchemeColor` included. So re-theming in PowerPoint changes the
+swatches the picker offers; it does not restyle the bullets, rules and text already on the
+slides.
 
 `styles.yml` is **not** read. Its slots are the Word half's vocabulary and the shipped themes
 write `.docx` style ids, which a `.pptx` has no use for; mapping them onto shapes would be
