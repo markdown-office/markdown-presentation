@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A deck with a speaker note could not be opened by Keynote.** PHPPresentation writes a
+  colour map for a slide and for a slide layout but not for a notes slide. Keynote refuses
+  such a file outright — "deck.pptx can't be imported" — while the same deck without a note
+  imports fine, and PowerPoint and LibreOffice never notice. Every notes slide is now given
+  `<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>`, where `CT_NotesSlide` requires it in
+  order.
+
+  Upstream has this open as
+  [PHPOffice/PHPPresentation#1034](https://github.com/PHPOffice/PHPPresentation/pull/1034).
+  `NotesColourMapPass` should be deleted once this package takes that release, rather than
+  kept as a second implementation of a fix upstream then owns.
+
 The first slice of the PowerPoint half of `markdown-office`. It decides where a
 slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 

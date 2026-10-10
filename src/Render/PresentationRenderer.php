@@ -732,6 +732,8 @@ final class PresentationRenderer
 
         IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
 
+        NotesColourMapPass::applyTo($path);
+
         return $path;
     }
 }
