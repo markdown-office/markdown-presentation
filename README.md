@@ -1104,6 +1104,32 @@ Everything this library reports extends `MarkdownPresentation\Exception\Exceptio
 The failures a deck author can fix by naming something else extend
 `MarkdownPresentation\Exception\InvalidInput` below it.
 
+### What a failure repeats
+
+A failure repeats the path it looked at, so a message reads
+`Slide 1 shows the image "../logo.png", which is a file at "/srv/brand/logo.png" rather
+than one this render may read`, and a message that names a `theme.yml` names the full path
+to it.
+
+**That repeats absolute paths of the machine that rendered the deck**, and that is a stated
+choice rather than an oversight. For the person running this from a terminal it is the
+useful half of the message: a deck written on one machine and converted on another resolves
+its paths against the wrong directory, and the difference between `logo.png` and
+`/Users/someone/deck/logo.png` is the whole of what is wrong. A failure that refused to say
+where it looked would send the author to `find`, or — in a container — to nowhere at all.
+
+The cost is real and it is worth stating rather than defending: a deck whose failure ends up
+in a log, an issue tracker or a CI transcript carries the layout of the machine that
+produced it. So:
+
+- a deck this library renders is not untrusted input, because nothing untrusted gets to
+  choose the paths in the message — see [Images](#images) and the theme resolution order
+  for what a deck may point at;
+- if your failures leave your machine, catch `MarkdownPresentation\Exception\Exception`,
+  log `getMessage()` where your users can see it, and consider rendering with the paths you
+  would not publish. There is no switch that turns the paths off, because a switch is
+  something somebody would eventually get wrong.
+
 One sits beside those two rather than under `InvalidInput`:
 `MarkdownPresentation\Exception\UnreadablePackage`, for a `.pptx` that cannot be opened and
 a part of one that cannot be decompressed. Nothing a deck names fixes either — it is the

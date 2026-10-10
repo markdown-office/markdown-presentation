@@ -277,6 +277,18 @@ All notable changes to this project are documented here. The format follows
   `NotesColourMapPass` should be deleted once this package takes that release, rather than
   kept as a second implementation of a fix upstream then owns.
 
+### Notes
+
+- **Exception messages repeat absolute server paths, and that is a choice.** Not a finding
+  fixed here: for a person running this from a terminal the path is the useful half of the
+  message, because the difference between `logo.png` and `/Users/someone/deck/logo.png` is
+  the whole of what is wrong, and a failure that would not say where it looked would send
+  the author to `find`. The cost — a deck whose failure ends up in a log, an issue tracker
+  or a CI transcript carries the layout of the machine that produced it — is now written down
+  in the README under *What a failure repeats*, along with what bounds it: a deck cannot
+  choose the paths in a message, because the two things a deck writes paths for (an image and
+  a theme) are contained to directories the calling program allowed.
+
 The first slice of the PowerPoint half of `markdown-office`. It decides where a
 slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 
