@@ -97,6 +97,30 @@ All notable changes to this project are documented here. The format follows
   reaching for kept as the other half: an absolute path *inside* the working directory still
   resolves, and a directory the caller allowed still loads.
 
+- **Any URL scheme in a deck became a live hyperlink.** `[text](anything)` was written into
+  the package as a hyperlink on the run, so the target decided what happened when a reader
+  clicked it:
+
+  | Target | What it is when a reader follows it |
+  | --- | --- |
+  | `\\host\share\payload.exe` | an SMB connection made with no prompt. The reader's credentials go to whoever answers as NTLM: a relay primitive that costs the reader nothing |
+  | `javascript:…` | a script in every reader that renders the deck as a document, and a stored payload in every pipeline that converts a deck to HTML |
+  | `data:`, `vbscript:`, `file://`, `phar://` | the same class of thing |
+
+  Now refused at parse time by `InlineParser::link()` with the alternatives in the message:
+  a target naming a scheme other than `https`, `http` or `mailto`, and a share in either
+  spelling (`\\host\share`, `//host/share`).
+
+  **A relative target is carried, not refused**, which is a narrower fix than an
+  allow-list. `![alt](logo.png)` inside a sentence is a picture this renderer draws as text,
+  and an allow-list would refuse every deck that writes one — including this package's own
+  `tests/Unit/block-parsing.php`, whose *"reads an image inside a paragraph as text"* test
+  passes an absolute path. What is refused is the two shapes a reader's machine acts on, and
+  what is carried is a path beside the deck.
+
+  **Breaking**: a deck carrying a refused target rendered before and is refused now. A deck
+  whose links are URLs, mail addresses or relative paths is unaffected.
+
 - **A layout part was a name and nothing else.** Before: `themes/default/layouts.yml` mapped
   the portable roles onto Office's own layout names and the file recorded those names — and
   then wrote a layout part whose shape tree held nothing at all:

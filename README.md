@@ -249,7 +249,7 @@ mapping can be read off `ppt/slides/slideN.xml` without the library:
 | Markdown | Shape | Notes |
 | --- | --- | --- |
 | `# Heading` | `title`, then `heading` | The first heading becomes the title and is not drawn twice, whatever markup it carries |
-| A paragraph | `paragraph` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters |
+| A paragraph | `paragraph` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters. A link target is checked — see [Links](#links) |
 | `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted, from the number the deck writes; nesting is the indent |
 | ```` ```lang ```` | `code` | Mono font, filled with `bg2`, the language in the shape's description. No colouring |
 | `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has; a cell carries the same inline markup a paragraph does. The header row is bold, filled with `bg2`, and the columns are as wide as what they hold |
@@ -271,6 +271,50 @@ different width is not detected — which is why every text shape is written `a:
 The box keeps the height the layout gave it and the reader scales the type down to fit, so
 an estimate that came out a line short costs a little whitespace instead of drawing one
 block over the next.
+
+### Links
+
+A link's target becomes a live hyperlink in the file, which means the target is not a
+question about how a slide looks but about what happens when a reader clicks it. So it is
+checked where the deck is read rather than when the file is opened:
+
+| Target | Carried? | Why |
+| --- | --- | --- |
+| `https://…`, `http://…`, `mailto:…` | yes | a URL a reader opens in a browser or a mail client |
+| `docs/notes.md`, `logo.png` | yes | a path relative to the deck; nothing on the reader's machine acts on it |
+| `javascript:…`, `data:…`, `vbscript:…` | **no** | a script in every reader that renders the deck as a document, and in every pipeline that converts one to HTML |
+| `\\host\share\payload.exe`, `//host/share` | **no** | an SMB connection made with no prompt. The reader's credentials go to whoever answers: an NTLM relay, and the only hyperlink here that costs a reader something to click |
+| `phar://…`, `file://…` | **no** | a PHP stream wrapper and a path on the reader's own disk |
+
+A relative target is carried rather than refused because `![alt](logo.png)` inside a
+sentence is a picture this renderer draws as text, not a link: refusing every relative
+target would refuse every deck that writes one.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+try {
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse("# One\n\n[Click me](javascript:alert(1))\n"),
+        sys_get_temp_dir() . '/deck.pptx',
+    );
+} catch (Exception $failure) {
+    echo $failure->getMessage(), "\n";
+}
+```
+
+```text
+The link "javascript:alert(1" is not a URL a deck may carry. A .pptx hyperlink is followed by the person who opens it: a Windows share is a credential relay, and a javascript: target is a script in any reader that renders the deck. Write it as "https://…", "http://…" or "mailto:…".
+```
+
+The missing closing parenthesis is the link pattern's own: `[text](target)` stops at the
+first `)`, which is Markdown's rule and not this library's. The message quotes what the
+deck's target really was, because that is what an author greps for.
+
+**Breaking**: a deck carrying a link target other than those refused above is one this
+render now stops on. Nothing that named a URL is affected.
 
 Emphasis is deliberately not CommonMark's. A delimiter that does not close is left as the
 characters it was written as — `2 * 3` and `**unclosed` are drawn as they are, because a deck

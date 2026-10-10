@@ -4,9 +4,22 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Render;
 
+use MarkdownPresentation\Exception\UnsupportedLink;
+
 /**
  * The inline Markdown of one paragraph's text: emphasis, code spans, strikethrough and
  * links.
+ *
+ * A link's target is checked, and it is the one piece of markup here that decides what a
+ * reader's machine does rather than what a slide looks like: a target in a `.pptx` is
+ * followed, so `\\host\share` is an NTLM relay to whoever answers and `javascript:` is a
+ * script in every reader that renders the deck. A target this renderer cannot vouch for is
+ * {@see UnsupportedLink} at parse time rather than a live link in a file somebody opens.
+ *
+ * A relative target is not one of them, and cannot be: `[alt](logo.png)` inside a sentence
+ * is a picture the renderer draws as text, and refusing every relative target would refuse
+ * every deck that writes one. What is refused is the two shapes a reader's machine acts on
+ * -- a scheme, and a Windows or UNC share -- and {@see UnsupportedLink} says so.
  *
  * Deliberately not a CommonMark inline parser. An emphasis delimiter that does not close
  * is left as the character it is, which is what a reader expects and what a strict parser
@@ -40,11 +53,38 @@ final class InlineParser
     ];
 
     /**
+     * The targets a deck may point at, in the order the message names them.
+     *
+     * `stripos()` rather than `str_starts_with()` because a scheme is case-insensitive and
+     * `HTTP://` means the same thing as `http://`.
+     */
+    private const LINK_SCHEMES = ['https://', 'http://', 'mailto:'];
+
+    /**
+     * Any scheme at all: what a reader will act on rather than open, which is every scheme
+     * this list does not name.
+     *
+     * The one or more character before the colon is what keeps a Windows drive letter out of
+     * it — `C:\logo.png` is a path a deck writes, and RFC 3986's one-letter scheme is a
+     * reader's problem rather than a deck author's.
+     */
+    private const SCHEME = '#\A[a-zA-Z][a-zA-Z0-9+.-]+:#';
+
+    /**
+     * A Windows or UNC share, in either spelling: `\\host\share\payload.exe` and
+     * `//host/share`. An SMB connection is made when a reader clicks it and the credentials
+     * go with it, which is the one hyperlink that costs a reader something to click.
+     */
+    private const SHARE = '#\A[/\\\\]{2}#';
+
+    /**
      *
      * Every run the text is made of, in order. Text with no markup in it is one run.
      *
      * @return list<Run>
-    */
+     *
+     * @throws UnsupportedLink
+     */
     public function parse(string $text): array
     {
         $runs = [];
@@ -102,7 +142,9 @@ final class InlineParser
      * move.
      *
      * @return ?array{at: int, length: int, run: Run}
-    */
+     *
+     * @throws UnsupportedLink
+     */
     private static function next(string $text, int $cursor): ?array
     {
         $found = null;
@@ -132,7 +174,9 @@ final class InlineParser
 
     /**
      * @param 'code'|'bold'|'boldItalic'|'emphasis'|'italic'|'link'|'strike'|'strong' $kind
-    */
+     *
+     * @throws UnsupportedLink
+     */
     private static function run(string $kind, string $text, string $target): Run
     {
         return match ($kind) {
@@ -143,7 +187,27 @@ final class InlineParser
             'strong' => new Run($text, bold: true),
             'emphasis' => new Run($text, italic: true),
             'strike' => new Run($text, strike: true),
-            'link' => new Run($text, link: $target),
+            'link' => self::link($text, $target),
         };
+    }
+
+    /**
+     * A run that is a hyperlink, for a target this library is willing to hand a reader.
+     *
+     * @throws UnsupportedLink
+     */
+    private static function link(string $text, string $target): Run
+    {
+        foreach (self::LINK_SCHEMES as $scheme) {
+            if (stripos($target, $scheme) === 0) {
+                return new Run($text, link: $target);
+            }
+        }
+
+        if (preg_match(self::SCHEME, $target) === 1 || preg_match(self::SHARE, $target) === 1) {
+            throw UnsupportedLink::target($target);
+        }
+
+        return new Run($text, link: $target);
     }
 }

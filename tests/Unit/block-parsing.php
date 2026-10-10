@@ -5,6 +5,7 @@ declare(strict_types=1);
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownDirective;
+use MarkdownPresentation\Exception\UnsupportedLink;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
@@ -448,6 +449,46 @@ it('reads a link as its text with a target', function () {
     expect((new InlineParser())->parse('[text](https://example.com)'))->toEqual([
         new Run('text', link: 'https://example.com'),
     ]);
+});
+
+it('refuses a link target a reader would act on rather than open', function () {
+    // A hyperlink in a `.pptx` is followed by the person who opens it, so what the target
+    // means to their machine is the question. `javascript:` is a script in every reader that
+    // renders the deck as a document and in every pipeline that converts one to HTML, and
+    // `data:` is the same thing with the script inlined. Refused where it is written rather
+    // than carried into a file somebody opens.
+    // No closing parenthesis in any of them: the link pattern stops at one, so
+    // `javascript:alert(1)` would be refused as `javascript:alert(1`.
+    foreach (['javascript:alert', 'vbscript:msgbox', 'data:text/html,<b>x', 'phar://payload.phar/x', 'file:///etc/passwd'] as $target) {
+        expect(fn () => (new InlineParser())->parse(sprintf('[click](%s)', $target)))
+            ->toThrow(UnsupportedLink::class, sprintf('The link "%s" is not a URL a deck may carry', $target));
+    }
+});
+
+it('refuses a Windows share, which is a credential relay to whoever answers', function () {
+    // Both spellings, because the follower is not a browser: `\\host\share\payload.exe` is
+    // an SMB connection made with no prompt, and the reader's credentials go with it.
+    foreach (['\\\\host\\share\\payload.exe', '//host/share/payload.exe'] as $target) {
+        expect(fn () => (new InlineParser())->parse(sprintf('[click](%s)', $target)))
+            ->toThrow(UnsupportedLink::class, 'is not a URL a deck may carry');
+    }
+});
+
+it('keeps a link whose target is a path relative to the deck', function () {
+    // The other side of the rule, and the reason it is not an allow-list: `![alt](logo.png)`
+    // inside a sentence is a picture this renderer draws as text, and every deck that writes
+    // one would fail to render under an allow-list. A relative target is a file beside the
+    // deck, not something a reader's machine acts on.
+    imagepng(imagecreatetruecolor(2, 2), imageDirectory() . '/2x2.png');
+    $runs = (new InlineParser())->parse('see ![alt](2x2.png) here');
+
+    expect(array_map(static fn (Run $run): ?string => $run->link, $runs))->toBe([null, '2x2.png', null]);
+});
+
+it('keeps a Windows drive letter, which is a path rather than a scheme', function () {
+    // One letter before the colon: `C:\logo.png` is a picture on the disk, and RFC 3986's
+    // one-character scheme is a reader's problem rather than a deck author's.
+    expect((new InlineParser())->parse('![alt](C:\\logo.png)')[1])->toEqual(new Run('alt', link: 'C:\\logo.png'));
 });
 
 it('keeps runs in the order they were written rather than the order of the patterns', function () {

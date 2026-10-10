@@ -17,6 +17,7 @@ use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
+use MarkdownPresentation\Exception\UnsupportedLink;
 use MarkdownPresentation\Tests\Support\Doctest;
 
 /**
@@ -77,6 +78,7 @@ it('reports what a deck author can fix under the class that says so', function (
         UnknownMarker::class,
         UnknownStyleSlot::class,
         UnsupportedImageFormat::class,
+        UnsupportedLink::class,
     ];
 
     if ($class === Exception::class || $class === InvalidInput::class) {
@@ -160,6 +162,10 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'an image no package can carry and nothing can decode' => [
         UnsupportedImageFormat::undecodable(3, 'chart.tiff', 'tiff')->getMessage(),
         'Convert it to GIF, JPEG, PNG or SVG first',
+    ],
+    'a link target that is a scheme a reader would act on' => [
+        UnsupportedLink::target('javascript:alert(1)')->getMessage(),
+        'Write it as "https://…", "http://…" or "mailto:…"',
     ],
     'a file that is not an image at all' => [
         UnsupportedImageFormat::notAnImage(1, 'diagram.pdf')->getMessage(),
