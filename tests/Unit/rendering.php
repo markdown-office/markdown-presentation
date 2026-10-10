@@ -468,9 +468,10 @@ it('renders a block quote as a quote shape', function () {
 });
 
 it('indents a block quote from the margin', function () {
-    $pptx = renderDeck("> quoted\n");
-
-    expect($pptx->positionOf('quote')['x'])->toBeGreaterThan(40.0);
+    // The number rather than "greater than 40": the shape is 860 of the 880 the body box is,
+    // which is what "indented by a gutter" has to mean if the block below it is to keep its
+    // full width.
+    expect(renderDeck("> quoted\n")->positionOf('quote')['x'])->toBe(60.0);
 });
 
 it('renders a thematic break as a rule rather than dropping it', function () {
@@ -480,11 +481,14 @@ it('renders a thematic break as a rule rather than dropping it', function () {
 });
 
 it('writes a rule as a bar rather than as text', function () {
-    $pptx = renderDeck("***\n");
-    $position = $pptx->positionOf('rule');
+    // Two pixels at the top of a 16px slot, and the body's full width. A `< 5.0` would have
+    // passed for a rule written at a negative height, which is the shape of the bug this
+    // whole branch is about.
+    $position = renderDeck("***\n")->positionOf('rule');
 
-    expect($position['height'])->toBeLessThan(5.0)
-        ->and($position['width'])->toBeGreaterThan(100.0);
+    expect($position['height'])->toBe(2.0)
+        ->and($position['width'])->toBe(880.0)
+        ->and($position['y'])->toBe(112.0);
 });
 
 it('writes a rule as a rectangle rather than as whatever an auto shape defaults to', function () {
@@ -591,9 +595,14 @@ it('writes a link as its text with a target', function () {
 });
 
 it('colours a link with the theme hyperlink colour', function () {
-    $pptx = renderDeck("---\ntheme: corporate-dark\n---\n\n[docs](https://example.com)\n");
+    // `minimal`, and the run that carries the hyperlink rather than "the colour appears
+    // somewhere": under `corporate-dark` the hyperlink colour *is* the accent colour, so a
+    // deck with one bullet and no link at all satisfies `usesColour()` — as does a deck
+    // with nothing on it but a rule.
+    $xml = renderDeck("---\ntheme: minimal\n---\n\n[docs](https://example.com)\n")
+        ->part('ppt/slides/slide1.xml');
 
-    expect($pptx->usesColour('#89b4fa'))->toBeTrue();
+    expect($xml)->toMatch('#<a:srgbClr val="3F6FB5">(?:(?!</a:rPr>).)*<a:hlinkClick#s');
 });
 
 it('colours a link inside a heading with the hyperlink colour and not the heading\'s', function () {
@@ -639,25 +648,28 @@ it('embeds the image the deck names', function () {
 });
 
 it('scales an image to fit its box and keeps its shape', function () {
-    // A 4:1 image, because a ratio the box could produce by accident asserts nothing: the
-    // body box is about 880 × 396, which rounds to 2:1, so a 2:1 image would come out the same
-    // whether or not the scaling happened.
-    $png = png(40, 10);
-    $pptx = renderDeck(sprintf("![wide](%s)\n", basename($png)));
-    $position = $pptx->positionOf('image');
-
-    expect(round($position['width'] / $position['height']))->toBe(4.0);
-});
-
-it('centres an image that does not fill its box', function () {
-    // A 4:1 image fills the box's width and leaves a gap above and below it. Centring only
-    // the horizontal would leave it hard against the top of the region, which is what the
-    // slack being vertical means.
+    // The numbers, not the ratio. `round($w / $h) === 4.0` passes just as happily on
+    // `w = -1536, h = -384` as it does on positive ones — and it passed that way for a
+    // while. The claim is that the picture took the box's width and came back the height
+    // its own 4:1 gives it: 880 out of 880 × 396, so 220, centred in the 176 left over.
     $png = png(40, 10);
     $position = renderDeck(sprintf("![wide](%s)\n", basename($png)))->positionOf('image');
 
     expect($position['x'])->toBe(40.0)
-        ->and($position['y'])->toBeGreaterThan(104.0);
+        ->and($position['y'])->toBe(192.0)
+        ->and($position['width'])->toBe(880.0)
+        ->and($position['height'])->toBe(220.0);
+});
+
+it('centres an image that does not fill its box', function () {
+    // A 4:1 image fills the box's width and leaves 176px above and below. Centring only the
+    // horizontal would leave it hard against the top of the region, which is what the slack
+    // being vertical means: 104 + 176 / 2 is 192.
+    $png = png(40, 10);
+    $position = renderDeck(sprintf("![wide](%s)\n", basename($png)))->positionOf('image');
+
+    expect($position['x'])->toBe(40.0)
+        ->and($position['y'])->toBe(192.0);
 });
 
 it('keeps the path a deck wrote where a reader can find it', function () {
@@ -788,18 +800,19 @@ it('converts a BMP rather than writing a content type for one', function () {
 });
 
 it('keeps a converted image its own shape rather than stretching it to the box', function () {
-    // A 4:1 source, for the same reason the PNG test above uses one: the body box is about
-    // 2:1, so a ratio the box could produce by accident asserts nothing. `Drawing\Base64`
-    // measures nothing where `Drawing\File` measures the file it was given, so a converted
-    // picture that was not given its size came out stretched.
+    // `Drawing\Base64` measures nothing where `Drawing\File` measures the file it was
+    // given, so a converted picture that was not given its size came out stretched. The
+    // numbers rather than the ratio, for the reason the PNG test above gives.
     $webp = convertible('webp', 40, 10);
 
     if ($webp === null) {
         $this->markTestSkipped('This GD build cannot write a WebP.');
     }
 
-    expect(round(renderDeck("![wide](dot.webp)\n")->positionOf('image')['width']
-        / renderDeck("![wide](dot.webp)\n")->positionOf('image')['height']))->toBe(4.0);
+    $position = renderDeck("![wide](dot.webp)\n")->positionOf('image');
+
+    expect($position['width'])->toBe(880.0)
+        ->and($position['height'])->toBe(220.0);
 });
 
 it('leaves an image the package already carries exactly as it was', function () {
@@ -931,11 +944,12 @@ it('writes the theme colours into the colour scheme', function () {
 });
 
 it('paints the master background with the theme lt1 colour', function () {
-    // `lt1` is the slot DrawingML means by the page, and a theme that swaps its two is asking
-    // for exactly that.
-    $pptx = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n");
+    // Asserted inside `<p:bg>` rather than by "the colour appears somewhere": the colour
+    // scheme carries `lt1` too, so `usesColour()` is satisfied by the scheme alone and
+    // says nothing about the page behind every slide.
+    $master = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
 
-    expect($pptx->usesColour('#cdd6f4'))->toBeTrue();
+    expect($master)->toMatch('#<p:bg>.*?<a:srgbClr val="CDD6F4".*?</p:bg>#s');
 });
 
 it('writes body text in the theme body font', function () {

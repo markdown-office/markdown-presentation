@@ -193,6 +193,15 @@ nothing had measured.
 
 ### Notes
 
+- Six tests were rewritten because they could not fail. `usesColour('#89b4fa')`
+  under `corporate-dark`, where `accent1` *is* `hlink`, is satisfied by a deck with one
+  bullet and no link — and by a deck with nothing but a rule; `round($w / $h) === 4.0`
+  passes on `w = -1536, h = -384` as happily as on positive values, which is how a negative
+  image geometry went unnoticed. Every one of them now asserts the numbers, or the element
+  that carries them, so a wrong value has nowhere to hide. `Block\Table`'s claim that its
+  cells keep their inline runs was false and is gone; its phrase is in `dead-code.php` so it
+  cannot come back.
+
 - An unknown theme name, an unknown layout role, an unknown `styles.yml` slot, a
   frontmatter key nobody acts on, a `v-click` step that does not go forwards, a
   frontmatter block that is not a mapping, a `title` that is not a string, a slide

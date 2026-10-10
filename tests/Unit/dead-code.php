@@ -64,6 +64,10 @@ it('does not claim again what the code does not do', function (string $claim) {
     'an image is embedded whatever format it is in' => 'embedded unchanged, whatever format the deck named it in',
     'the package cannot write a pptx' => 'it renders nothing',
     'a deck has no other way to name who made it' => 'the deck has no other way to say who made it',
+    // `BlockParser` hands a table its cells as trimmed strings, so a cell can carry neither
+    // bold nor a link however its shape is written. A docblock saying otherwise is what a
+    // reviewer reads instead of opening the parser.
+    'a table cell keeps its inline runs' => 'Cells keep their inline runs',
 ]);
 
 it('has no decorative dividers in it', function () {
