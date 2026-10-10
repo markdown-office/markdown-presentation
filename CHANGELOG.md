@@ -59,10 +59,10 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 
 ### Fixed
 
-Four places where the library rendered silence rather than a failure, which
-is the outcome its whole design is against. Each was a directive a deck could
-name, and each is now either acted on or refused with the spelling that would
-have worked.
+Four places where the library rendered silence rather than a failure over a
+directive a deck could name, each now either acted on or refused with the
+spelling that would have worked, and five where a block was drawn at a place
+nothing had measured.
 
 - **`author:` reaches the file.** Before: `author:` was in the directive list,
   was enforced as a slide-1 directive and was read by nobody —
@@ -116,6 +116,37 @@ have worked.
   nothing diverged. Anchoring at column zero instead would have fixed this bug
   and introduced two worse ones, which the `closing delimiter indented` deck in
   the fixture shows.
+- **A table is measured by the rows it writes.** Before: `SlideGeometry::TABLE_ROW`
+  was 26 while PHPPresentation's `Row` writes `<a:tr h>` at 38, so a four-row
+  table declared 104px, was drawn at 152px, and the block after it was placed
+  at 208 — every table overlapped whatever followed it. After: the constant is
+  38 and `ShapeWriter` sets it on every row it creates, so the height in the
+  frame and the height on the row are the same number by construction.
+- **No shape is written at a geometry the format refuses.** Before: the room
+  left in a column was whatever was under the cursor, which goes negative once
+  the cursor passes the bottom of the box. Thirty paragraphs followed by an
+  image wrote `<a:ext cx="-381000" cy="-95250"/>`, and `a:ext` is an
+  `ST_PositiveCoordinate`: PowerPoint offers to repair the file or drops the
+  shape without saying so. After: the renderer holds both the cursor and the
+  block's height inside the column's box, and the writer clamps whatever it is
+  handed, so a block that does not fit is drawn as small as the room allows
+  rather than over what is under it.
+- **Blocks are measured by how many lines they wrap to.** Before: a paragraph
+  was 26px whatever it said — a 200-word paragraph wraps to about ten lines —
+  a code block was `lines × 18 + 24`, so sixty lines measured 1104px on a 540px
+  slide, and a list was `items × 26`. After: `Render\TextMetric` counts the
+  lines, from an advance-width table bundled in the package rather than from a
+  font file — `imagettfbbox()` measures whichever face the build machine has, so
+  the same deck would lay out differently on two machines and the output would be
+  a property of the machine. The reference is Helvetica's own widths, within a
+  few percent of Calibri, Inter and Roboto and on the wide side, so the estimate
+  over-allocates height rather than under-allocating it. The monospaced half is
+  exact: every character advances 600/1000 of an em, which is what Consolas,
+  Menlo and JetBrains Mono use.
+- **A code block is padded by its real insets.** `CODE_PADDING` added twelve
+  pixels to the height of a block whose body insets are 91440 EMU across and
+  45720 down — 9.6px and 4.8px, and cost to a text block's width as well as its
+  height. Both are measured now, as `SlideGeometry::INSET_X` and `INSET_Y`.
 
 ### Notes
 

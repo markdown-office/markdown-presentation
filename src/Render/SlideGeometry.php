@@ -17,6 +17,10 @@ use MarkdownPresentation\Theme\LayoutRole;
  * The numbers are fractions of a 960 × 540 slide, which is the unit {@see Box} holds. They
  * are deliberately plain — a 40 pixel margin all the way round and everything left over for
  * content — because a layout that needs more than that is what `template.pptx` is for.
+ *
+ * The heights here are *budgets*: {@see ShapeWriter} asks {@see TextMetric} how many lines
+ * a block actually takes and multiplies by {@see self::lineHeight()}, so what is left here
+ * is only what does not depend on the text at all.
 */
 final class SlideGeometry
 {
@@ -29,12 +33,6 @@ final class SlideGeometry
     public const CODE_SIZE = 12;
     public const TABLE_SIZE = 12;
     public const QUOTE_SIZE = 15;
-
-    /** The height of one line of body text, in pixels. */
-    public const BODY_LINE = 26;
-
-    /** The height of one line of code, which is smaller and tighter than body text. */
-    public const CODE_LINE = 18;
 
     /**
      * The height of one table row, in pixels.
@@ -55,13 +53,29 @@ final class SlideGeometry
      */
     public const MIN_SIZE = 1;
 
-    /** What a rule costs, in height, once the gap above it is counted. */
+    /**
+     * The body insets PHPPresentation writes into every text shape, in pixels.
+     *
+     * 91440 EMU across and 45720 down, which is 9.6 and 4.8 at the 9525 EMU a pixel is.
+     * Rounded up, because what these cost is the width text has left to wrap in, and
+     * rounding down would measure against a box wider than the one the reader wraps in.
+     */
+    public const INSET_X = 10;
+    public const INSET_Y = 5;
+
+    /** The narrowest a table column is drawn, whatever its cells ask for. */
+    public const TABLE_COLUMN = 80;
+
+    /** The vertical room a rule occupies, the two-pixel bar centred in it. */
     public const RULE_HEIGHT = 16;
 
-    /** The padding a code block carries inside its fill. */
-    public const CODE_PADDING = 12;
-
     private const BODY_WIDTH = self::WIDTH - 2 * self::MARGIN;
+
+    /** A point is 4/3 of a pixel at the 96 dpi {@see Box} counts in. */
+    private const PIXELS_PER_POINT = 4 / 3;
+
+    /** The multiple of a line's own height that one line of text is drawn at. */
+    private const LINE_SPACING = 1.2;
 
     /** A heading one level deeper than a content slide's title, down to the sixth. */
     private const HEADING_SIZES = [22, 20, 18, 16, 14];
@@ -130,10 +144,22 @@ final class SlideGeometry
     }
 
     /**
-     * The height a heading of this size needs, in pixels.
-    */
-    public function headingHeight(int $level): int
+     * The height of one line of type this size, in pixels.
+     *
+     * One method rather than a constant per block: a paragraph, a heading, a quote and a
+     * table cell are each one line of type, and the four constants this replaced were four
+     * places for the same number to be wrong in.
+     */
+    public function lineHeight(int $size): int
     {
-        return intdiv($this->headingSize($level) * 8, 6) + 10;
+        return (int) round($size * self::PIXELS_PER_POINT * self::LINE_SPACING);
+    }
+
+    /**
+     * The height a heading of this size takes for this many lines, in pixels.
+     */
+    public function headingHeight(int $level, int $lines): int
+    {
+        return $lines * $this->lineHeight($this->headingSize($level));
     }
 }

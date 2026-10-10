@@ -45,6 +45,7 @@ final class ShapeWriter
     public function __construct(
         private readonly Theme $theme,
         private readonly SlideGeometry $geometry = new SlideGeometry(),
+        private readonly TextMetric $metric = new TextMetric(),
     ) {
     }
 
@@ -53,38 +54,191 @@ final class ShapeWriter
      * How tall a block is, in pixels. `$room` is how much of its box is left, which only an
      * image consults: an image takes what a paragraph and a table would not.
      *
+     * `$box` is the column the block is laid out in rather than the block's own box: the
+     * width text wraps in is the column's, and a block is measured before it has a box.
+     *
      * The union rather than `Block`, because it is exhaustive: a ninth kind of block is not
      * something this method can guess a height for, and naming the eight is what says so at
      * the type rather than at run time.
      *
      * @param Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table $block
-    */
-    public function height(Block $block, int $room): int
+     */
+    public function height(Block $block, Box $box, int $room): int
     {
+        $width = $this->textWidth($box);
+
         return match (true) {
-            $block instanceof Heading => $this->geometry->headingHeight($block->level),
-            $block instanceof Code => count($block->lines) * SlideGeometry::CODE_LINE + 2 * SlideGeometry::CODE_PADDING,
-            $block instanceof ListBlock => count($block->items) * SlideGeometry::BODY_LINE,
-            $block instanceof Table => count($block->cells) * SlideGeometry::TABLE_ROW,
+            $block instanceof Heading => $this->geometry->headingHeight(
+                $block->level,
+                $this->runLines($block->runs, $width, $this->geometry->headingSize($block->level), bold: true),
+            ),
+            $block instanceof Code => $this->codeHeight($block, $width),
+            $block instanceof ListBlock => $this->listHeight($block, $box),
+            $block instanceof Table => $this->tableHeight($block, $box),
             $block instanceof Rule => SlideGeometry::RULE_HEIGHT,
             $block instanceof Image => $room,
-            $block instanceof Quote => $this->lines($block->runs),
-            $block instanceof Paragraph => $this->lines($block->runs),
+            $block instanceof Quote => $this->runLines(
+                $block->runs,
+                $width - SlideGeometry::GUTTER,
+                SlideGeometry::QUOTE_SIZE,
+            ) * $this->geometry->lineHeight(SlideGeometry::QUOTE_SIZE),
+            $block instanceof Paragraph => $this->runLines($block->runs, $width, SlideGeometry::BODY_SIZE)
+                * $this->geometry->lineHeight(SlideGeometry::BODY_SIZE),
         };
     }
 
     /**
+     * The width text is laid out in inside a box, in pixels.
      *
-     * The height of a run of text, in lines.
-     *
-     * A paragraph with no line break in it is one line and not none, which is what the `max`
-     * is for.
-     *
-     * @param list<Run> $runs
-    */
-    private function lines(array $runs): int
+     * PHPPresentation insets a text shape's body on all four sides whether it is told to or
+     * not, so this is narrower than the box for every block that draws type, and not only
+     * for the padding inside a code block's fill.
+     */
+    private function textWidth(Box $box): int
     {
-        return max(1, substr_count(self::text($runs), "\n") + 1) * SlideGeometry::BODY_LINE;
+        return max(SlideGeometry::MIN_SIZE, $box->width - 2 * SlideGeometry::INSET_X);
+    }
+
+    /**
+     * @param list<Run> $runs
+     */
+    private function runLines(array $runs, int $width, int $size, bool $mono = false, bool $bold = false): int
+    {
+        $pieces = [];
+
+        foreach ($runs as $run) {
+            $pieces[] = TextMetric::piece(
+                $run->text,
+                $run->code ? SlideGeometry::CODE_SIZE : $size,
+                $run->code || $mono,
+                $run->bold || $bold,
+            );
+        }
+
+        return $this->metric->lines($pieces, $width);
+    }
+
+    private function codeHeight(Code $block, int $width): int
+    {
+        $lines = 0;
+
+        foreach ($block->lines as $line) {
+            $lines += $this->metric->lines(
+                [TextMetric::piece($line, SlideGeometry::CODE_SIZE, mono: true)],
+                $width,
+            );
+        }
+
+        return $lines * $this->geometry->lineHeight(SlideGeometry::CODE_SIZE) + 2 * SlideGeometry::INSET_Y;
+    }
+
+    private function listHeight(ListBlock $block, Box $box): int
+    {
+        $lines = 0;
+
+        foreach ($block->items as $item) {
+            $lines += $this->runLines(
+                $item['runs'],
+                $this->textWidth($box) - $item['level'] * SlideGeometry::GUTTER,
+                SlideGeometry::BODY_SIZE,
+            );
+        }
+
+        return $lines * $this->geometry->lineHeight(SlideGeometry::BODY_SIZE);
+    }
+
+    private function tableHeight(Table $block, Box $box): int
+    {
+        return array_sum($this->rowHeights($block, $box));
+    }
+
+    /**
+     * The height of each of a table's rows, in pixels.
+     *
+     * A row is at least {@see SlideGeometry::TABLE_ROW} whatever it says, and taller than
+     * that when its longest cell wraps — which is the row PowerPoint grows to fit, so the
+     * height has to know before the row does.
+     *
+     * @return list<int>
+     */
+    private function rowHeights(Table $block, Box $box): array
+    {
+        $widths = $this->columns($block, $box);
+        $line = $this->geometry->lineHeight(SlideGeometry::TABLE_SIZE);
+        $heights = [];
+
+        foreach ($block->cells as $row) {
+            $lines = 1;
+
+            foreach ($widths as $index => $width) {
+                $lines = max($lines, $this->metric->lines(
+                    [TextMetric::piece($row[$index] ?? '', SlideGeometry::TABLE_SIZE)],
+                    $width,
+                ));
+            }
+
+            $heights[] = max(SlideGeometry::TABLE_ROW, $lines * $line);
+        }
+
+        return $heights;
+    }
+
+    /**
+     * The width of each of a table's columns, in pixels.
+     *
+     * Proportional to the widest cell in each rather than equal, because a table whose
+     * columns are all a third of the body box wraps its narrow columns into ribbons one word
+     * wide while its wide one sits empty.
+     *
+     * @return non-empty-list<int>
+     */
+    private function columns(Table $block, Box $box): array
+    {
+        $count = max(1, count($block->cells[0] ?? []));
+        $wanted = [];
+
+        for ($index = 0; $index < $count; $index++) {
+            $widest = SlideGeometry::TABLE_COLUMN;
+
+            foreach ($block->cells as $row) {
+                $widest = max($widest, $this->metric->width([
+                    TextMetric::piece($row[$index] ?? '', SlideGeometry::TABLE_SIZE),
+                ]));
+            }
+
+            $wanted[] = $widest;
+        }
+
+        return self::distribute($wanted, $box->width);
+    }
+
+    /**
+     * Scale weights to a total, to the pixel.
+     *
+     * The last column takes the remainder rather than `intdiv()` on every column, which drops
+     * up to a pixel each: twelve columns of 880 came to 876 and three came to 879, and a grid
+     * narrower than the shape it sits in is one PowerPoint lays out again itself.
+     *
+     * @param non-empty-list<int> $weights
+     *
+     * @return non-empty-list<int>
+     */
+    private static function distribute(array $weights, int $total): array
+    {
+        $sum = array_sum($weights);
+        $widths = [];
+        $used = 0;
+        $last = array_key_last($weights);
+
+        foreach ($weights as $index => $weight) {
+            $share = $index === $last
+                ? $total - $used
+                : (int) floor($weight * $total / $sum);
+            $widths[] = $share;
+            $used += $share;
+        }
+
+        return $widths;
     }
 
     /**
@@ -201,16 +355,17 @@ final class ShapeWriter
 
     private function table(Slide $slide, Table $block, Box $box, int $height): TableShape
     {
-        $columns = max(1, count($block->cells[0] ?? []));
-        $shape = $slide->createTableShape($columns);
+        $columns = $this->columns($block, $box);
+        $heights = $this->rowHeights($block, $box);
+        $shape = $slide->createTableShape(count($columns));
         $this->place($shape, $box, $height);
         $shape->setDescription(implode(',', $block->align));
 
-        foreach ($block->cells as $row) {
-            // The height the shape was measured with, set on the row as well: PHPPresentation
-            // writes `<a:tr h>` from the row rather than from the shape, so a row left at its
-            // own default is drawn at a height the rest of the layout never accounted for.
-            $cells = $shape->createRow()->setHeight(SlideGeometry::TABLE_ROW)->getCells();
+        foreach ($block->cells as $number => $row) {
+            // The height the shape was measured with, set on the row too: PHPPresentation
+            // writes `<a:tr h>` from the row rather than from the shape, so a row left at
+            // its own default is drawn at a height nothing else in the layout knows about.
+            $cells = $shape->createRow()->setHeight($heights[$number])->getCells();
 
             foreach ($row as $index => $text) {
                 if (!isset($cells[$index])) {
@@ -218,7 +373,7 @@ final class ShapeWriter
                 }
 
                 $cell = $cells[$index];
-                $cell->setWidth(intdiv($box->width, $columns));
+                $cell->setWidth($columns[$index]);
                 $paragraph = $cell->getActiveParagraph();
                 $paragraph->getAlignment()->setHorizontal($this->alignment($block->align[$index] ?? 'left'));
                 $paragraph->setBulletStyle($this->bullet(Bullet::TYPE_NONE));
@@ -428,13 +583,5 @@ final class ShapeWriter
     private function font(string $slot): string
     {
         return $this->theme->font($slot) ?? '';
-    }
-
-    /**
-     * @param list<Run> $runs
-    */
-    private static function text(array $runs): string
-    {
-        return implode('', array_map(static fn (Run $run): string => $run->text, $runs));
     }
 }
