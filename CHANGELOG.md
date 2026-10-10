@@ -73,6 +73,30 @@ All notable changes to this project are documented here. The format follows
   from a root the calling program allowed"*. A test asserting the vulnerability is a test that
   fails when the vulnerability is fixed, which is the wrong way round.
 
+- **`theme:` was a path the deck controlled.** `ThemeResolver::resolve()` treated anything
+  with a `/` in it as a directory and loaded `<dir>/theme.yml` from wherever it pointed:
+  `../` walked out and an absolute path was used verbatim. What a theme load reaches is not
+  only colours — a deck naming no `author` takes `dc:creator` from the theme it was rendered
+  in (`PresentationRenderer::properties()`), so `theme: ../../secrets/theme.yml` was a way to
+  put an arbitrary file's `author:` line into `docProps/core.xml` of the download.
+
+  | Deck names | Before | After |
+  | --- | --- | --- |
+  | `theme: ../secrets/theme` | loaded; its `author:` is in `docProps/core.xml` | `ThemeNotFound`: `The theme "../secrets/theme" is a directory at "/srv/secrets/theme" rather than one this render may read (/srv/decks). Copy it under the working directory, or give the ThemeResolver that directory as one of its additional roots.` |
+  | `theme: /elsewhere/acme` | loaded | the same failure — a spelling, not a permission |
+  | `theme: phar://payload.phar/theme` | joined onto the working directory, refused as "no directory" | refused as a URL, which is what it is |
+
+  The rule is `Filesystem\PathScope`, the same one an image path has to pass, over the same two
+  ways out: `..` and a symlink. A shared library of themes beside the project is still
+  reachable, as `new ThemeResolver($root, roots: ['/srv/themes'])`.
+
+  **Breaking**: a deck whose `theme:` resolved outside the working directory or the built-in
+  themes rendered before and is refused now. `tests/Unit/theme-resolver.php` carried two
+  tests asserting that — *"resolves a path, so a theme can live anywhere"* and *"resolves an
+  absolute path as it stands"* — and both are now the refusal, with the shapes they were
+  reaching for kept as the other half: an absolute path *inside* the working directory still
+  resolves, and a directory the caller allowed still loads.
+
 - **A layout part was a name and nothing else.** Before: `themes/default/layouts.yml` mapped
   the portable roles onto Office's own layout names and the file recorded those names — and
   then wrote a layout part whose shape tree held nothing at all:

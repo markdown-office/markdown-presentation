@@ -559,12 +559,29 @@ roots are a constructor argument. It is the program's decision, made before a de
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Render\PresentationRenderer;
 
-$deck = (new DeckParser())->parse("# One\n\n![a dot](/srv/brand/dot.png)\n");
+mkdir(__DIR__ . '/brand');
+$image = imagecreatetruecolor(40, 20);
+imagefill($image, 0, 0, imagecolorallocate($image, 10, 200, 30));
+imagepng($image, __DIR__ . '/brand/dot.png');
 
-(new PresentationRenderer(__DIR__, imageRoots: ['/srv/brand']))->render(
+$deck = (new DeckParser())->parse("# One\n\n![a dot](brand/dot.png)\n");
+
+(new PresentationRenderer(__DIR__, imageRoots: [__DIR__ . '/brand']))->render(
     $deck,
     sys_get_temp_dir() . '/deck.pptx',
 );
+
+$zip = new ZipArchive();
+$zip->open(sys_get_temp_dir() . '/deck.pptx');
+
+echo str_contains(implode(',', array_map(
+    static fn (int $i): string => (string) $zip->getNameIndex($i),
+    range(0, $zip->numFiles - 1),
+)), 'ppt/media/') ? "embedded from the allowed root\n" : "not embedded\n";
+```
+
+```text
+embedded from the allowed root
 ```
 
 What a deck writes is never a way to widen that list. A path naming a stream wrapper —
@@ -862,7 +879,8 @@ Falling back to the default theme instead would produce a deck in the wrong colo
 with nothing in the output to say so, which is the failure mode this whole library is
 built to avoid.
 
-A theme named by path is loaded from wherever it is:
+A theme named by path is loaded from wherever it is — under the directory the resolver was
+given:
 
 ```php
 use MarkdownPresentation\Theme\ThemeResolver;
@@ -878,6 +896,22 @@ echo $theme->directory(), "\n";
 Minimal
 <root>/themes/minimal
 ```
+
+**A theme path has to land inside the working directory, the built-in themes, or another
+root the resolver was given.** A `theme:` is a path a deck writes, so the same rule as an
+image's applies, and the reason is more than tidiness: a deck naming no `author` of its own
+takes `dc:creator` from the theme it was rendered in, so `theme: ../../secrets/theme.yml`
+was a way to ask for an arbitrary file's `author:` line and be handed it in `docProps/core.xml`
+of the download. `../`, an absolute path elsewhere and a symlink out of the tree are all
+refused, and the failure names the directory it found and the roots it may read:
+
+```
+The theme "../secrets" is a directory at "/srv/decks/../secrets" rather than one this render may read (/srv/decks). Copy it under the working directory, or give the ThemeResolver that directory as one of its additional roots.
+```
+
+A shared library of themes beside the project is a real case and is reachable, as a
+constructor argument — `new ThemeResolver($root, roots: ['/srv/themes'])` — because that is
+the program's decision and never the deck's.
 
 ### Layout roles
 
