@@ -141,6 +141,25 @@ it('reads four spaces of indent as two levels', function () {
     expect(array_column($items, 'level'))->toBe([1, 3]);
 });
 
+it('keeps the number the first ordered item was written with', function () {
+    // The number is what the writer's `startAt` is, and it was captured into a variable
+    // nobody read: `3. three` came out as `1.` Only the item that begins a numbering carries
+    // it; the rest carry on from it, which is what makes `1. 2. 3.` three items of one list
+    // rather than three lists.
+    expect(array_column(blocksOf("3. three\n4. four\n")[0]->items, 'start'))->toBe([3, null]);
+});
+
+it('starts a nested ordered list again at its own level', function () {
+    // The sub-list begins a numbering of its own, and the item that comes back to the outer
+    // level restates the number: PHPPresentation ends a numbering when a paragraph at a
+    // deeper level interrupts it, so `2. two` is the only thing that reads as two.
+    expect(array_column(blocksOf("1. one\n  1. sub\n2. two\n")[0]->items, 'start'))->toBe([1, 1, 2]);
+});
+
+it('keeps no number for a bulleted item', function () {
+    expect(array_column(blocksOf("- one\n- two\n")[0]->items, 'start'))->toBe([null, null]);
+});
+
 it('reads a fenced block as code and keeps its lines', function () {
     $block = blocksOf("```\none\ntwo\n```\n")[0];
 

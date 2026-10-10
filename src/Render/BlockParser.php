@@ -487,20 +487,29 @@ final class BlockParser
         // The base is the first item's indent, not the last one's: a continuation is
         // relative to where the list began, so a sub-item does not swallow its own text.
         $base = strlen($first[1]);
-        $items = [['level' => self::depth($first[1]), 'runs' => $inline->parse($first[3])]];
+        $items = [[
+            'level' => self::depth($first[1]),
+            'runs' => $inline->parse($first[3]),
+            'start' => self::number($ordered, $first),
+        ]];
         $end = $index;
-
+        
         for ($cursor = $index + 1; $cursor < count($lines); $cursor++) {
             $line = $lines[$cursor];
-
+        
             if (trim($line) === '' || preg_match(self::RULE, $line) === 1 || preg_match(self::FENCE, $line) === 1) {
                 break;
             }
-
+        
             if (preg_match(self::BULLET, $line, $next) === 1 || preg_match(self::ORDERED, $line, $next) === 1) {
-                $items[] = ['level' => self::depth($next[1]), 'runs' => $inline->parse($next[3])];
+                $level = self::depth($next[1]);
+                $items[] = [
+                    'level' => $level,
+                    'runs' => $inline->parse($next[3]),
+                    'start' => self::start($items, $level, self::number($ordered, $next)),
+                ];
                 $end = $cursor;
-
+            
                 continue;
             }
 
@@ -516,6 +525,43 @@ final class BlockParser
         return [new ListBlock($items, $ordered, $step), $end];
     }
 
+    /**
+     * The number an item was written with, or null where it has none.
+     *
+     * Null rather than 1 for a bullet, because a bullet carries no number and the writer
+     * writes `startAt` only on a numbered one.
+     *
+     * @param array{0: string, 1: string, 2: string, 3: string} $item
+     */
+    private static function number(bool $ordered, array $item): ?int
+    {
+        return $ordered && ctype_digit($item[2]) ? (int) $item[2] : null;
+    }
+    
+    /**
+     * The number to start a numbering at, or null where this item carries on from the one
+     * above it.
+     *
+     * Every item's number, rather than the first one's, would restate the numbering at each
+     * item — `1. 2. 3.` comes out as three numberings that happen to agree. The item below
+     * a level change starts one again, because that is where the reader expects the count to
+     * begin again.
+     *
+     * @param list<array{level: int, runs: list<Run>, start: ?int}> $items
+     */
+    private static function start(array $items, int $level, ?int $written): ?int
+    {
+        $previous = $items[count($items) - 1] ?? null;
+    
+        if ($written === null) {
+            return null;
+        }
+    
+        return $previous === null || $previous['level'] !== $level || $previous['start'] === null
+            ? $written
+            : null;
+    }
+    
     /** An item's indent as a nesting depth: every two spaces is one level. */
     private static function depth(string $indent): int
     {

@@ -250,7 +250,7 @@ mapping can be read off `ppt/slides/slideN.xml` without the library:
 | --- | --- | --- |
 | `# Heading` | `title`, then `heading` | The first heading becomes the title and is not drawn twice, whatever markup it carries |
 | A paragraph | `paragraph` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters |
-| `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted; nesting is the indent |
+| `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted, from the number the deck writes; nesting is the indent |
 | ```` ```lang ```` | `code` | Mono font, filled with `lt2`, the language in the shape's description. No colouring |
 | `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has; a cell carries the same inline markup a paragraph does. The header row is bold, filled with `lt2`, and the columns are as wide as what they hold |
 | `> a` | `quote` | Italic, in `dk2`, indented |

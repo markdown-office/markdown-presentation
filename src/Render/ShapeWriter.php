@@ -347,8 +347,14 @@ final class ShapeWriter
 
             $paragraph->setBulletStyle($this->bullet(
                 $block->ordered ? Bullet::TYPE_NUMERIC : Bullet::TYPE_BULLET,
+                $item['start'],
             ));
-
+            
+            // The level the writer numbers at, which is what makes a numbered sub-list
+            // number itself instead of carrying on from the list above it. The margin and
+            // the indent below are stated outright, so this moves the numbering and not the
+            // position.
+            $paragraph->getAlignment()->setLevel($item['level'] - 1);
             $paragraph->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
             $paragraph->getAlignment()->setMarginLeft($item['level'] * SlideGeometry::GUTTER);
             $paragraph->getAlignment()->setIndent(-SlideGeometry::GUTTER);
@@ -632,14 +638,20 @@ final class ShapeWriter
      * Built rather than taken from the paragraph: `getBulletStyle()` is declared nullable
      * even though the constructor always fills it, and a paragraph that had lost its bullet
      * would otherwise end the render with a call on null.
+     *
+     * `$start` is null for a bullet, and for an ordered item written without one.
+     * PHPPresentation's own rule is that a start equal to the number the numbering before it
+     * began at continues it, so `1. 1. 1.` still reads as `1. 2. 3.` and `3. 4.` reads as
+     * it is written.
     */
-    private function bullet(string $type): Bullet
+    private function bullet(string $type, ?int $start = null): Bullet
     {
         $bullet = new Bullet();
         $bullet->setBulletType($type)
             ->setBulletChar('•')
             ->setBulletNumericStyle(Bullet::NUMERIC_ARABICPERIOD)
-            ->setBulletColor($this->colour('accent1'));
+            ->setBulletColor($this->colour('accent1'))
+            ->setBulletNumericStartAt($start);
 
         return $bullet;
     }

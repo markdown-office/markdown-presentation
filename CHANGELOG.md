@@ -221,6 +221,16 @@ nothing had measured.
   asterisks and underscores inside a code span are characters, and an underscore
   between two word characters is not a delimiter, so `snake_case_name` is a name.
   Unclosed markup still renders as the characters it was written as.
+- **An ordered list starts at the number it is written with.** Before: the
+  number was captured into a variable nothing read and the writer never set
+  `startAt`, so `3. three` was numbered `1.`. After: each item carries the
+  number it was written with, and the writer sets `startAt` on it. The item
+  below a change of level starts a numbering again — PHPPresentation ends a
+  numbering when a paragraph at a deeper level interrupts it, so `2. two` after
+  a sub-list is the only thing that reads as two — and every paragraph is given
+  the level the writer numbers at, without which a numbered sub-list carries on
+  from the list above it and comes out as `2.` where the deck wrote `1.`.
+  Bulleted items carry no number.
 - **A table cell carries its inline markup.** Before: `BlockParser` handed the
   writer trimmed strings and `ShapeWriter` called `createTextRun()` on each one,
   so a cell could carry neither bold nor a link however its shape was written —

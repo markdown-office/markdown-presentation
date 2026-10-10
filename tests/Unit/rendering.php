@@ -378,6 +378,35 @@ it('numbers an ordered list rather than bulleting it', function () {
         ->and($pptx->part('ppt/slides/slide1.xml'))->not->toContain('<a:buChar');
 });
 
+it('starts an ordered list at the number the deck names', function () {
+    // `3. three` drawn as `1.` is a list that does not say what the deck said.
+    //
+    // The number is `startAt`, and PHPPresentation writes the start of a numbering on every
+    // paragraph of it the way PowerPoint does — both paragraphs say three, and the second
+    // counts on to four rather than beginning a numbering of its own.
+    $xml = renderDeck("3. three\n4. four\n")->part('ppt/slides/slide1.xml');
+
+    expect($xml)->toContain('<a:buAutoNum type="arabicPeriod" startAt="3"/>')
+        ->and(substr_count($xml, 'startAt="3"'))->toBe(2);
+});
+
+it('leaves a list that starts at one with no start of its own', function () {
+    // The other half of the claim above: `startAt` on a list that begins at one would say
+    // the deck renumbered from one, which is what a reader takes `startAt="1"` to mean.
+    expect(renderDeck("1. one\n2. two\n")->part('ppt/slides/slide1.xml'))->not->toContain('startAt');
+});
+
+it('numbers a nested ordered list as a list of its own', function () {
+    // Without a level of its own the sub-list is the same numbering as the one above it, so
+    // `1.` under `1.` comes out as `2.`
+    $xml = renderDeck("1. one\n  1. sub\n2. two\n")->part('ppt/slides/slide1.xml');
+
+    expect(substr_count($xml, '<a:buAutoNum'))->toBe(3)
+        ->and(substr_count($xml, 'lvl="1"'))->toBe(1)
+        ->and(substr_count($xml, 'startAt'))->toBe(1);
+});
+
+
 it('bullets a list that is not numbered', function () {
     expect(renderDeck("- one\n- two\n")->part('ppt/slides/slide1.xml'))->toContain('<a:buChar char="•"/>');
 });
