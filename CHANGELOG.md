@@ -216,11 +216,11 @@ measured; and places where what the deck said did not survive into the file.
   and `~~strike~~` were not in the grammar at all and reached the slide as the
   characters they were written as. After: each three-character delimiter is
   matched before the two-character one it starts with, the other three are
-  parsed, and `Run` carries a `strike`, which the writer
-  writes as `strike="sngStrike"` on that run. Two rules are kept deliberately: the
-  asterisks and underscores inside a code span are characters, and an underscore
-  between two word characters is not a delimiter, so `snake_case_name` is a name.
-  Unclosed markup still renders as the characters it was written as.
+  parsed, and `Run` carries a `strike`, which the writer puts on the run's font
+  as `strike="sngStrike"`. Two rules are kept deliberately: the asterisks and
+  underscores inside a code span are characters, and an underscore between two
+  word characters is not a delimiter, so `snake_case_name` is a name. Unclosed
+  markup still renders as the characters it was written as.
 - **A blank layout draws the title its frontmatter names.** Before: `layout:
   blank` has no title box and a `title:` was never pushed into the body, so a
   slide that named one drew nothing it was named after — the fifth instance of
@@ -263,14 +263,14 @@ measured; and places where what the deck said did not survive into the file.
   one capture answers both and a bullet never carries one.
 - **An ordered list starts at the number it is written with.** Before: the
   number was captured into a variable nothing read and the writer never set
-  `startAt`, so `3. three` was numbered `1.`. After: each item carries the
-  number it was written with, and the writer sets `startAt` on it. The item
-  below a change of level starts a numbering again — PHPPresentation ends a
-  numbering when a paragraph at a deeper level interrupts it, so `2. two` after
-  a sub-list is the only thing that reads as two — and every paragraph is given
-  the level the writer numbers at, without which a numbered sub-list carries on
-  from the list above it and comes out as `2.` where the deck wrote `1.`.
-  Bulleted items carry no number.
+  `startAt`, so `3. three` was numbered `1.`. After: every item carries the
+  number it was written with, the item that begins a numbering writes it as
+  `startAt` and the rest carry on from it. The item below a change of level
+  begins a numbering again — PHPPresentation ends one when a paragraph at a
+  deeper level interrupts it, so `2. two` after a sub-list is the only thing that
+  reads as two — and every paragraph is given the level the writer numbers at,
+  without which a numbered sub-list carries on from the list above it and comes
+  out as `2.` where the deck wrote `1.`. A bulleted item carries no number.
 - **A table cell carries its inline markup.** Before: `BlockParser` handed the
   writer trimmed strings and `ShapeWriter` called `createTextRun()` on each one,
   so a cell could carry neither bold nor a link however its shape was written —
@@ -278,13 +278,13 @@ measured; and places where what the deck said did not survive into the file.
   `[lk](https://example.com)`. After: cells are parsed like any other text and
   drawn by the same `ShapeWriter::runs()` a paragraph goes through, so bold,
   italic, code, links, sizes and colours all apply. Measurement follows the runs
-  too, through `TextMetric::pieces()`, which keeps the `{text, size, mono, bold}`
-  contract the rest of the writer measures with: a header row is measured bold
-  because it is drawn bold, and a code span in a cell is measured at the code
-  size and in the mono face because it is drawn at them. The claim on
-  `Block\Table` that "cells keep their inline runs" is restored to the code and
-  removed from the dead-claims list in `tests/Unit/dead-code.php`; the two tests
-  that asserted the cells were plain strings now assert the runs they are.
+  too, through a new `ShapeWriter::pieces()` that keeps `TextMetric`'s
+  `{text, size, mono, bold}` contract: a header row is measured bold because it
+  is drawn bold, and a code span in a cell is measured at the code size and in
+  the mono face because it is drawn at them. "Cells keep their inline runs" is
+  now true of `Block\Table`, so it is back on the class and off the dead-claims
+  list in `tests/Unit/dead-code.php`; the two tests that asserted the cells were
+  plain strings assert the runs instead.
 
 ### Notes
 

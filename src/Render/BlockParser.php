@@ -538,7 +538,6 @@ final class BlockParser
     }
 
     /**
-    /**
      * The number to start a numbering at, or null where this item carries on from the one
      * above it.
      *
