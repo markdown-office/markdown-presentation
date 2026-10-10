@@ -177,7 +177,11 @@ it('reads a table as a header row, an alignment row and body rows', function () 
     $block = blocksOf("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n")[0];
 
     expect($block)->toBeInstanceOf(Table::class)
-        ->and($block->cells)->toBe([['A', 'B'], ['1', '2'], ['3', '4']]);
+        ->and($block->cells)->toEqual([
+            [[new Run('A')], [new Run('B')]],
+            [[new Run('1')], [new Run('2')]],
+            [[new Run('3')], [new Run('4')]],
+        ]);
 });
 
 it('reads a table row that stops short by leaving the cells it has', function () {
@@ -185,7 +189,22 @@ it('reads a table row that stops short by leaving the cells it has', function ()
     // renderer that invents cells would write words the author never did.
     $block = blocksOf("| A | B |\n| --- | --- |\n| 1 |\n")[0];
 
-    expect($block->cells)->toBe([['A', 'B'], ['1']]);
+    expect($block->cells)->toEqual([
+        [[new Run('A')], [new Run('B')]],
+        [[new Run('1')]],
+    ]);
+});
+
+it('reads a cell as the runs it is drawn from, markup and all', function () {
+    // A cell is a paragraph's worth of text and takes the same inline markup one does. The
+    // parser handed the writer trimmed strings, so `**Name**` reached the slide as six
+    // characters and `[lk](https://example.com)` as twenty-six.
+    $block = blocksOf("| A | B |\n| --- | --- |\n| **Name** | [lk](https://example.com) |\n")[0];
+
+    expect($block->cells[1])->toEqual([
+        [new Run('Name', bold: true)],
+        [new Run('lk', link: 'https://example.com')],
+    ]);
 });
 
 it('reads a table whose columns are centred, left and right', function () {

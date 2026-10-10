@@ -208,6 +208,20 @@ nothing had measured.
   pipeline as any other text. `docProps/core.xml` is the exception and is
   deliberately so: `dc:title` is a metadata string with nothing on the other end
   to interpret emphasis, so it carries the stripped text.
+- **A table cell carries its inline markup.** Before: `BlockParser` handed the
+  writer trimmed strings and `ShapeWriter` called `createTextRun()` on each one,
+  so a cell could carry neither bold nor a link however its shape was written —
+  `| **Name** | [lk](https://example.com) |` reached the slide as `**Name**` and
+  `[lk](https://example.com)`. After: cells are parsed like any other text and
+  drawn by the same `ShapeWriter::runs()` a paragraph goes through, so bold,
+  italic, code, links, sizes and colours all apply. Measurement follows the runs
+  too, through `TextMetric::pieces()`, which keeps the `{text, size, mono, bold}`
+  contract the rest of the writer measures with: a header row is measured bold
+  because it is drawn bold, and a code span in a cell is measured at the code
+  size and in the mono face because it is drawn at them. The claim on
+  `Block\Table` that "cells keep their inline runs" is restored to the code and
+  removed from the dead-claims list in `tests/Unit/dead-code.php`; the two tests
+  that asserted the cells were plain strings now assert the runs they are.
 
 ### Notes
 

@@ -104,11 +104,25 @@ final class ShapeWriter
 
     /**
      * @param list<Run> $runs
-     */
+    */
     private function runLines(array $runs, int $width, int $size, bool $mono = false, bool $bold = false): int
     {
+        return $this->metric->lines($this->pieces($runs, $size, $mono, $bold), $width);
+    }
+    
+    /**
+     * These runs as the pieces {@see TextMetric} measures, each at its own size, face and
+     * weight — which is why a code span in a paragraph is not measured at the paragraph's
+     * size, and a header row is measured wider than it is drawn.
+     *
+     * @param list<Run> $runs
+     *
+     * @return list<TextMetric::Piece>
+    */
+    private function pieces(array $runs, int $size, bool $mono = false, bool $bold = false): array
+    {
         $pieces = [];
-
+    
         foreach ($runs as $run) {
             $pieces[] = TextMetric::piece(
                 $run->text,
@@ -117,8 +131,8 @@ final class ShapeWriter
                 $run->bold || $bold,
             );
         }
-
-        return $this->metric->lines($pieces, $width);
+    
+        return $pieces;
     }
 
     private function codeHeight(Code $block, int $width): int
@@ -170,13 +184,15 @@ final class ShapeWriter
         $line = $this->geometry->lineHeight(SlideGeometry::TABLE_SIZE);
         $heights = [];
 
-        foreach ($block->cells as $row) {
+        foreach ($block->cells as $number => $row) {
             $lines = 1;
 
             foreach ($widths as $index => $width) {
-                $lines = max($lines, $this->metric->lines(
-                    [TextMetric::piece($row[$index] ?? '', SlideGeometry::TABLE_SIZE)],
+                $lines = max($lines, $this->runLines(
+                    $row[$index] ?? [],
                     $width,
+                    SlideGeometry::TABLE_SIZE,
+                    bold: $number === self::HEADER_ROW,
                 ));
             }
 
@@ -194,24 +210,24 @@ final class ShapeWriter
      * while its wide one sits empty.
      *
      * @return non-empty-list<int>
-     */
+    */
     private function columns(Table $block, Box $box): array
     {
         $count = max(1, count($block->cells[0] ?? []));
         $wanted = [];
-
+    
         for ($index = 0; $index < $count; $index++) {
             $widest = SlideGeometry::TABLE_COLUMN;
-
+    
             foreach ($block->cells as $row) {
-                $widest = max($widest, $this->metric->width([
-                    TextMetric::piece($row[$index] ?? '', SlideGeometry::TABLE_SIZE),
-                ]));
+                $widest = max($widest, $this->metric->width(
+                    $this->pieces($row[$index] ?? [], SlideGeometry::TABLE_SIZE),
+                ));
             }
-
+    
             $wanted[] = $widest;
         }
-
+    
         return self::distribute($wanted, $box->width);
     }
 
@@ -401,24 +417,24 @@ final class ShapeWriter
 
             $cells = $created->getCells();
 
-            foreach ($row as $index => $text) {
+            foreach ($row as $index => $runs) {
                 if (!isset($cells[$index])) {
                     break;
                 }
-
+            
                 $cell = $cells[$index];
                 $cell->setWidth($columns[$index]);
                 $paragraph = $cell->getActiveParagraph();
                 $paragraph->getAlignment()->setHorizontal($this->alignment($block->align[$index] ?? 'left'));
                 $paragraph->setBulletStyle($this->bullet(Bullet::TYPE_NONE));
-                $paragraph->setSpacingBefore(0);
-                $paragraph->setSpacingAfter(0);
-                $paragraph->getFont()->setSize(SlideGeometry::TABLE_SIZE)
-                    ->setName($this->font('body'))
-                    ->setBold($number === self::HEADER_ROW)
-                    ->setColor($this->colour('dk1'));
 
-                $cell->createTextRun($text);
+                $this->runs(
+                    $paragraph,
+                    $runs,
+                    SlideGeometry::TABLE_SIZE,
+                    bold: $number === self::HEADER_ROW,
+                    font: $this->colour('dk1'),
+                );
             }
         }
 

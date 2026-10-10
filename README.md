@@ -252,7 +252,7 @@ mapping can be read off `ppt/slides/slideN.xml` without the library:
 | A paragraph | `paragraph` | `**bold**`, `*italic*`, `` `code` `` and `[text](url)` are runs, not characters |
 | `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted; nesting is the indent |
 | ```` ```lang ```` | `code` | Mono font, filled with `lt2`, the language in the shape's description. No colouring |
-| `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has. The header row is bold, filled with `lt2`, and the columns are as wide as what they hold |
+| `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has; a cell carries the same inline markup a paragraph does. The header row is bold, filled with `lt2`, and the columns are as wide as what they hold |
 | `> a` | `quote` | Italic, in `dk2`, indented |
 | `***` | `rule` | A bar in `accent1`. `---` is a slide delimiter and never reaches here |
 | A line that is only `![alt](path)` | `image` | Fitted to its box, aspect kept, centred. A path that is not a file is a failure |

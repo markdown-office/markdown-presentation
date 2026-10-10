@@ -208,7 +208,7 @@ final class BlockParser
             }
 
             if (str_contains($line, '|') && preg_match(self::ALIGNMENT_ROW, $lines[$index + 1] ?? '') === 1) {
-                [$table, $index] = self::table($lines, $index, $step);
+                [$table, $index] = $this->table($lines, $index, $step);
 
                 $blocks = self::flush($blocks, $paragraph, $step, $this->inline);
 
@@ -406,25 +406,28 @@ final class BlockParser
     /**
      * The pipe table whose header row is `$index`, and the line its last row is on.
      *
+     * The alignment row is read as text and not parsed: `---:` is an alignment, and a
+     * parser handed one would read `---` as a rule.
+     *
      * @param list<string> $lines
      *
      * @return array{0: Table, 1: int}
     */
-    private static function table(array $lines, int $index, int $step): array
+    private function table(array $lines, int $index, int $step): array
     {
-        $rows = [self::row($lines[$index])];
-        $align = array_map(self::alignment(...), self::row($lines[$index + 1]));
+        $rows = [self::runs(self::cells($lines[$index]), $this->inline)];
+        $align = array_map(self::alignment(...), self::cells($lines[$index + 1]));
         $end = $index + 1;
-
+    
         while (
             $end + 1 < count($lines)
             && trim($lines[$end + 1]) !== ''
             && str_contains($lines[$end + 1], '|')
         ) {
-            $rows[] = self::row($lines[$end + 1]);
+            $rows[] = self::runs(self::cells($lines[$end + 1]), $this->inline);
             $end++;
         }
-
+    
         return [new Table($rows, $align, $step), $end];
     }
 
@@ -442,19 +445,32 @@ final class BlockParser
      *
      * @return list<string>
     */
-    private static function row(string $line): array
+    private static function cells(string $line): array
     {
         $cells = explode('|', trim($line));
-
+    
         if (trim($cells[0]) === '') {
             array_shift($cells);
         }
-
+    
         if ($cells !== [] && trim($cells[count($cells) - 1]) === '') {
             array_pop($cells);
         }
-
+    
         return array_map(static fn (string $cell): string => trim($cell), $cells);
+    }
+    
+    /**
+     * One row's cells as the runs each of them is drawn from, because a cell is a
+     * paragraph's worth of text and takes the same inline markup one does.
+     *
+     * @param list<string> $cells
+     *
+     * @return list<list<Run>>
+    */
+    private static function runs(array $cells, InlineParser $inline): array
+    {
+        return array_map($inline->parse(...), $cells);
     }
 
     /**

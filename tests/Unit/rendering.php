@@ -452,6 +452,29 @@ it('writes every cell of a table', function () {
     expect($pptx->texts(1))->toBe(['A', 'B', '1', '2']);
 });
 
+it('writes a table cell carrying markup as runs', function () {
+    // The same inline pipeline a paragraph goes through: bold, code and links are runs in a
+    // cell, and a cell written `**Name**` used to reach the slide as those six characters.
+    // The run and its font rather than the text alone: `Name` is one run out of four, and it
+    // is the bold one.
+    $pptx = renderDeck("| A |\n| --- |\n| **Name** and `id` |\n");
+
+    expect($pptx->texts(1))->toBe(['A', 'Name', ' and ', 'id'])
+        ->and($pptx->part('ppt/slides/slide1.xml'))
+        ->toMatch('#<a:r>\s*<a:rPr[^>]*\bb="1"[^>]*>.*?</a:rPr>\s*<a:t><!\[CDATA\[Name\]\]></a:t>#s')
+        ->toMatch('#<a:r>\s*<a:rPr[^>]*>(?:(?!</a:rPr>).)*<a:latin typeface="[^"]*"/>(?:(?!</a:rPr>).)*</a:rPr>\s*<a:t><!\[CDATA\[id\]\]></a:t>#s');
+});
+
+it('writes a link in a table cell as a link', function () {
+    // `[lk](https://example.com)` drawn as characters is a sentence about Markdown sitting
+    // in the middle of a table of data.
+    $pptx = renderDeck("| A |\n| --- |\n| [lk](https://example.com) |\n");
+
+    expect($pptx->texts(1))->toBe(['A', 'lk'])
+        ->and($pptx->part('ppt/slides/slide1.xml'))
+        ->toMatch('#<a:hlinkClick[^>]*/>(?:(?!</a:r>).)*<a:t><!\[CDATA\[lk\]\]></a:t>#s');
+});
+
 it('aligns a column the way its alignment row says', function () {
     // The alignment row is the only place a deck states alignment, so dropping it would drop
     // the one thing the writer wrote about it.
