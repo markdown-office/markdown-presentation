@@ -359,6 +359,9 @@ final class PresentationRenderer
             $title !== null,
         );
 
+        // A step nothing was written on is not a slide. A marker on the last line of a
+        // slide asks for a click that would reveal nothing, and the file would carry two
+        // slides drawn the same way — which is not what the deck said, it is a copy of it.
         $steps = array_reduce(
             $blocks,
             static fn (int $most, Block $block): int => max($most, $block->step()),

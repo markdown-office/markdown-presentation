@@ -43,6 +43,22 @@ final class DeckParser
     */
     private const FRONTMATTER = '/\A---[^\r\n]*\r?\n([\s\S]*?)---/';
 
+    /**
+     * The body of a comment that is a step marker, without the `<!--` and `-->` around it.
+     *
+     * {@see \MarkdownPresentation\Render\BlockParser} matches the same shape against a whole
+     * line, and {@see self::takeNote()} matches it against the comment alone, so the two
+     * cannot disagree about whether `<!-- v-click -->` is a note. A deck whose last line is
+     * a marker is the case that needs them to: the note is taken before anything is parsed
+     * into blocks, so a marker read as a note leaves the deck a step short and writes the
+     * marker into the notes pane.
+     *
+     * Capture 1 is the step, and nothing here looks at it: `<!-- v-click=two -->` is not a
+     * step this library can draw either, and refusing it where it would have been drawn
+     * names the mistake instead of hiding it in the notes pane.
+     */
+    public const MARKER_BODY = '[ \t]*v-click[ \t]*(?:=[ \t]*(.*?)[ \t]*)?';
+
     /** An opening YAML code fence, which Slidev would read as frontmatter. */
     private const FENCED_YAML = '/\A[ \t]*`{3,}[ \t]*(?:yaml|yml)\b/';
     /**
@@ -261,6 +277,14 @@ final class DeckParser
         }
 
         $note = trim(substr($content, $start + 4, $end - $start - 4));
+
+        // A comment that is nothing but a step marker is that step. It runs to the end of
+        // the slide because there is nothing after it, which is what makes it look like a
+        // note, and taking it would drop the step the author wrote. Anything else is a note,
+        // marker-shaped substring and all: a note that mentions `v-click` is a note.
+        if (preg_match('/\A' . self::MARKER_BODY . '\z/s', $note) === 1) {
+            return [$content, null];
+        }
 
         return [rtrim(substr($content, 0, $start)), $note === '' ? null : $note];
     }

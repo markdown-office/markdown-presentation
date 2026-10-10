@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Render;
 
+use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
@@ -57,8 +58,13 @@ final class BlockParser
      *
      * Capture 1 is the step, absent for the bare form and empty for `v-click=` with
      * nothing after the equals, which is a mistake.
+     *
+     * The body between the markers is {@see DeckParser::MARKER_BODY} rather than a second
+     * copy of it. {@see DeckParser} decides what a trailing comment is before a slide ever
+     * reaches here, so the shape it calls a note and the shape this calls a step have to be
+     * the same one — and a deck ending on a marker is what notices when they are not.
     */
-    private const MARKER = '/\A[ \t]*<!--[ \t]*v-click[ \t]*(?:=[ \t]*(.*?)[ \t]*)?-->[ \t]*\z/';
+    private const MARKER = '/\A[ \t]*<!--[ \t]*' . DeckParser::MARKER_BODY . '-->[ \t]*\z/';
 
     /** The info string of a fence, whose first word is the language. */
     private const LANGUAGE = '/\A(\S*)/';

@@ -242,6 +242,24 @@ it('opens a step after the block a marker closes rather than before it', functio
         ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.']);
 });
 
+it('draws a marker on the last line as a step rather than as a note', function () {
+    // A marker on the last line runs to the end of the slide, which is what a speaker note
+    // does too. Read as a note it took the step with it: nothing on step two, and a notes
+    // pane reading "v-click" that a presenter would say out loud.
+    $pptx = slideDeck("# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n\n<!-- v-click -->\n");
+
+    expect($pptx->slideCount())->toBe(2)
+        ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.'])
+        ->and($pptx->parts())->not->toContain('ppt/notesSlides/notesSlide1.xml');
+});
+
+it('refuses a trailing marker it cannot draw rather than writing it in the notes pane', function () {
+    // A marker this renderer cannot draw is a failure wherever it stands. Only the notes pane
+    // was swallowing it, which turned a mistake into something a presenter would read aloud.
+    expect(fn () => slideDeck("# One\n\n<!-- v-click=two -->\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a v-click step "two"');
+});
+
 it('gives every step of one source slide the same layout', function () {
     $pptx = slideDeck("---\nlayout: title\n---\n# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n");
 

@@ -160,6 +160,35 @@ it('reads no note from a comment that does not reach the end of the slide', func
     expect(split("# One\n\n<!--\nnote\n-->\n\nafter\n")[0]['note'])->toBeNull();
 });
 
+it('reads a trailing step marker as a marker rather than as a note', function () {
+    // It runs to the end of the slide because there is nothing after it, which is the whole
+    // of what made this look like a note: the deck lost a step and the notes pane gained the
+    // literal text "v-click".
+    expect(split("# One\n\nFirst.\n\n<!-- v-click -->\n")[0])
+        ->toMatchArray(['note' => null, 'content' => "# One\n\nFirst.\n\n<!-- v-click -->"]);
+});
+
+it('reads a trailing numbered step marker as a marker too', function (string $markdown) {
+    // Including the two forms that are not steps anybody can draw. Refusing them is the
+    // renderer's job and names the mistake; taking them as a note would hide it.
+    expect(split($markdown)[0])->toMatchArray(['note' => null]);
+})->with([
+    'named step' => "# One\n\n<!-- v-click=3 -->\n",
+    'a step that is not a number' => "# One\n\n<!-- v-click=two -->\n",
+    'an equals with nothing after it' => "# One\n\n<!-- v-click= -->\n",
+]);
+
+it('reads a note that only mentions a step marker as a note', function () {
+    // The note is a note because of what it says, not because of a word somewhere in it: a
+    // presenter who writes "click through to the last one" in the notes pane has written a
+    // note, and taking it for a marker would drop it.
+    expect(split("# One\n\n<!-- click v-click again to reveal the rest -->\n")[0])
+        ->toMatchArray([
+            'note' => 'click v-click again to reveal the rest',
+            'content' => '# One',
+        ]);
+});
+
 it('takes the title from the frontmatter, then from a name, then from the first heading', function () {
     expect(split("---\ntitle: Named\n---\n\n# Heading\n")[0]['title'])->toBe('Named')
         ->and(split("---\nname: Named\n---\n\n# Heading\n")[0]['title'])->toBe('Named')
