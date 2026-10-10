@@ -81,6 +81,7 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a deck has no other way to name who made it' => 'the deck has no other way to say who made it',
     'the page behind every slide is always lt1' => 'becomes the page behind every slide',
     'accent1 paints the headings' => 'rules, bullets, headings',
+    'a theme that ships a template has its layouts ignored' => 'A theme\'s `template.pptx` is not opened',
 ]);
 
 it('has no decorative dividers in it', function () {

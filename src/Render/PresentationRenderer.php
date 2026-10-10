@@ -153,7 +153,8 @@ final class PresentationRenderer
         $presentation = new PhpPresentation();
         $presentation->getLayout()->setDocumentLayout(DocumentLayout::LAYOUT_SCREEN_16X9);
 
-        $layouts = $this->layouts($this->slideMaster($presentation), $theme, $this->usedRoles($roles));
+        $used = $this->usedRoles($roles);
+        $layouts = $this->layouts($this->slideMaster($presentation), $theme, $used);
         $this->properties($presentation, $deck, $theme);
 
         $writer = new ShapeWriter($theme->theme(), $this->geometry);
@@ -170,7 +171,7 @@ final class PresentationRenderer
             $presentation->removeSlideByIndex(0);
         }
 
-        return $this->save($presentation, $path);
+        return $this->save($presentation, $path, $used);
     }
 
     /**
@@ -343,9 +344,10 @@ final class PresentationRenderer
      * layout part is called `Two Content`, and the deck's portable vocabulary and the
      * template's private one stay apart — which is the whole point of the role.
      *
-     * A theme's `template.pptx` is not opened: taking a role's placeholders from one is the
-     * same job `layouts.yml` already does by naming them, and no shipped theme ships one to
-     * take them from.
+     * The placeholders that make the part mean something are written afterwards by
+     * {@see PlaceholderPass} — PHPPresentation's own placeholder support would take a
+     * slide's title shape out of the shape collection's contract, which is why that is a
+     * pass over the written package rather than shapes added here.
      *
      * @param list<LayoutRole> $roles
      *
@@ -731,9 +733,11 @@ final class PresentationRenderer
      * low-level "could not close zip file", after a broken archive has been left behind.
      * Saying so here is what makes the failure one a caller can act on.
      *
+     * @param list<LayoutRole> $roles The roles the deck used, in the order their layouts were built.
+     *
      * @throws Exception
     */
-    private function save(PhpPresentation $presentation, string $path): string
+    private function save(PhpPresentation $presentation, string $path, array $roles): string
     {
         $directory = dirname($path);
 
@@ -744,6 +748,7 @@ final class PresentationRenderer
         IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
 
         NotesColourMapPass::applyTo($path);
+        PlaceholderPass::applyTo($path, $this->geometry, $roles);
 
         return $path;
     }

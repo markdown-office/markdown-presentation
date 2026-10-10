@@ -386,6 +386,32 @@ not. `level:` governs whichever of the two it is, at the same depth it would gov
 heading. The alternative, refusing a `title:` on a blank slide, would refuse a perfectly good
 deck over the one thing the library does draw perfectly well there.
 
+### Placeholders
+
+A layout part is not only a name. Each one carries a placeholder for its title and one for
+each of its columns, and the title shape on every slide refers to the layout's:
+
+```xml
+<p:sp><p:nvSpPr>
+  <p:cNvPr id="2" name="Title Placeholder 2"/>
+  <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
+  <p:nvPr><p:ph type="title"/></p:nvPr>
+</p:nvSpPr>…</p:sp>
+```
+
+That is what makes *Reset Slide* restore anything, what puts the deck's titles in the outline
+view, and what makes a layout other than a blank rectangle in the layout picker. The boxes a
+layout's placeholders are written at are the boxes the slides are drawn in, so *Reset*
+restores the geometry the slide already had and moves nothing.
+
+`two-column` gets two body placeholders, `idx="1"` and `idx="2"`; every other role gets one.
+`blank` gets no title placeholder, because it has no title box — that is what makes it blank.
+
+A slide's body is a stack of differently shaped blocks — a table, a picture, a code block —
+and none of them is a placeholder: promoting one would make *Reset* move that block and leave
+the rest of the column floating. The outline view shows a deck's titles and still shows no
+bullets.
+
 ### Steps
 
 `<!-- v-click -->` on a line of its own opens a step. PowerPoint has no "press a key to

@@ -227,6 +227,61 @@ final class Pptx
     }
 
     /**
+     * The placeholders a layout part carries, and where each one sits.
+     *
+     * Keyed by what `p:ph` says — `title`, or `body 1` for the body at index 1 — because
+     * that is the name a slide's shape has to refer to for the two to be the same
+     * placeholder, and the geometry is in the pixels
+     * {@see \MarkdownPresentation\Render\SlideGeometry} counts in.
+     *
+     * @return array<string, array{x: float, y: float, width: float, height: float}>
+     */
+    public function layoutPlaceholders(int $layout = 1): array
+    {
+        $found = [];
+
+        foreach (preg_split('#(?=<p:sp>)#', $this->part(sprintf('ppt/slideLayouts/slideLayout%d.xml', $layout))) ?: [] as $shape) {
+            // `idx` is absent on a title and `0` means the same thing, so it is only part of
+            // the key where the layout wrote it. `PREG_UNMATCHED_AS_NULL` is what makes the
+            // one that does not apply null rather than a missing offset.
+            if (preg_match('#<p:ph type="([^"]+)"(?: idx="(\d+)")?/>#', $shape, $ph, PREG_UNMATCHED_AS_NULL) !== 1) {
+                continue;
+            }
+
+            preg_match('#<a:off x="(-?\d+)" y="(-?\d+)"\s*/>\s*<a:ext cx="(\d+)" cy="(\d+)"#', $shape, $offset);
+
+            $found[$ph[2] === null ? $ph[1] : $ph[1] . ' ' . $ph[2]] = [
+                'x' => ((int) ($offset[1] ?? 0)) / 9525.0,
+                'y' => ((int) ($offset[2] ?? 0)) / 9525.0,
+                'width' => ((int) ($offset[3] ?? 0)) / 9525.0,
+                'height' => ((int) ($offset[4] ?? 0)) / 9525.0,
+            ];
+        }
+
+        return $found;
+    }
+
+    /**
+     * The placeholder a named shape on a slide refers to, as the attributes of its `p:ph`,
+     * or null where the shape is not one.
+     *
+     * By name and not by position, because the shape tree's own group carries a `<p:nvPr/>`
+     * too and the first one in the file belongs to no shape.
+     */
+    public function placeholderOf(string $name, int $slide = 1): ?string
+    {
+        foreach (preg_split('#(?=<p:sp>|<p:graphicFrame>|<p:pic>)#', $this->part("ppt/slides/slide{$slide}.xml")) ?: [] as $shape) {
+            if (preg_match('/<p:cNvPr id="\d+" name="([^"]*)"/', $shape, $found) !== 1 || $found[1] !== $name) {
+                continue;
+            }
+
+            return preg_match('#<p:ph ([^/]*)/>#', $shape, $ph) === 1 ? $ph[1] : null;
+        }
+
+        return null;
+    }
+
+    /**
      * The fill colour of the shape named `$name` on a slide, as `#rrggbb`, or null when the
      * shape has no fill.
     */

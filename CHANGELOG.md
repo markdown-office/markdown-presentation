@@ -8,6 +8,55 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A layout part was a name and nothing else.** Before: `themes/default/layouts.yml` mapped
+  the portable roles onto Office's own layout names and the file recorded those names — and
+  then wrote a layout part whose shape tree held nothing at all:
+
+  ```xml
+  <p:sldLayout …><p:cSld name="Title and Content"><p:spTree>
+    <p:nvGrpSpPr/><p:grpSpPr><a:xfrm>…0,0…</a:xfrm></p:grpSpPr>
+  </p:spTree></p:cSld></p:sldLayout>
+  ```
+
+  Every shape on every slide was a free-floating text box positioned by `SlideGeometry`, which
+  is hardcoded in PHP and not themeable. So PowerPoint's *Reset Slide* and *Reset* did
+  nothing, the outline view was empty, the layout picker offered five blank rectangles, and
+  no theme could move anything. After: every layout part a deck uses carries a placeholder for
+  its title and one for each of its columns, and the title shape on each slide refers to the
+  layout's.
+
+  | Role | Placeholders in the layout part |
+  | --- | --- |
+  | `title` | `title`, `body 1` |
+  | `content` | `title`, `body 1` |
+  | `two-column` | `title`, `body 1`, `body 2` |
+  | `section` | `title`, `body 1` |
+  | `blank` | `body 1` — the role has no title, so its layout has no title placeholder |
+
+  Written at the boxes the slides are drawn in, so *Reset* restores the geometry a slide
+  already has and moves nothing; a test compares the two boxes rather than assuming.
+
+  Nothing on a slide moved. All 42 preview images of the eleven example decks are
+  byte-identical before and after, and the only parts of each package that changed are the
+  layout parts and the `<p:nvPr/>` of each slide's title shape.
+
+  This is a pass over the written package (`Render\PlaceholderPass`) rather than shapes added
+  through PHPPresentation, because `Shape\Placeholder` is written for a shape that is *only* a
+  placeholder and this library's title is not that:
+  `AbstractSlide::writeShapeText()` names a placeholder `"Placeholder for title"` whatever it
+  was called, and writes an **empty** `<a:bodyPr/>` for one — dropping the `normAutofit` and
+  the insets `ShapeWriter::textBox()` sets, which hands the shape back to the reader to
+  resize.
+
+  What is deliberately *not* written: prompt text (PowerPoint shows "Click to add title" of
+  its own accord for an empty placeholder), `idx` on a title (absent is `0`, and that is how
+  Office writes the pair), `txBox` on a placeholder (it says the shape is a free text box and
+  takes it out of the layout's inheritance), and a `<p:ph>` on anything but the title. A
+  slide's body is a stack of differently shaped blocks — a table, a picture, a code block —
+  and promoting one of them to a placeholder would make *Reset* move that block and leave the
+  rest of the column floating. The outline view therefore shows a deck's titles and still
+  shows no bullets.
+
 - **`corporate-dark` was a dark palette on a white page.** Before: the theme named
   itself dark and had a near-black `dk1` and a near-white `lt1`, and every deck rendered
   with the light token painting the page and the dark token painting the type: a

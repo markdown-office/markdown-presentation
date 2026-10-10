@@ -8,6 +8,7 @@ use MarkdownPresentation\Document\Slide;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
+use MarkdownPresentation\Render\Box;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SlideGeometry;
 use MarkdownPresentation\Theme\LayoutRole;
@@ -124,6 +125,45 @@ it('leaves a blank layout with no title box at all', function () {
     // A blank layout that drew a title would not be blank, and the way to put a title on such
     // a slide is to write a heading in its body.
     expect((new SlideGeometry())->title(LayoutRole::Blank))->toBeNull();
+});
+
+it('takes a role\'s title and body from a template where one covers it', function () {
+    // A theme that ships a `template.pptx` says where its layouts put their boxes, and those
+    // are what the slide is drawn in — measured against, so a narrower box wraps earlier.
+    $title = new Box(96, 48, 700, 60);
+    $body = new Box(96, 140, 700, 320);
+    $geometry = (new SlideGeometry())->with(['content' => ['title' => $title, 'body' => [$body]]]);
+
+    expect($geometry->title(LayoutRole::Content)['box'])->toEqual($title)
+        ->and($geometry->body(LayoutRole::Content))->toEqual([$body]);
+});
+
+it('leaves the roles a template says nothing about where the library puts them', function () {
+    // A template with two of the five layouts is a theme that works, not one that fails on
+    // the three its deck never asked for — the rule `layouts.yml` already follows.
+    $geometry = (new SlideGeometry())->with(['content' => ['body' => [new Box(0, 0, 10, 10)]]]);
+
+    expect($geometry->body(LayoutRole::TwoColumn))->toHaveCount(2)
+        ->and($geometry->title(LayoutRole::Content)['box'])->toEqual(
+            (new SlideGeometry())->title(LayoutRole::Content)['box'],
+        );
+});
+
+it('keeps the type a title is drawn at where the library puts it', function () {
+    // A template states its type in a master rather than in a layout, and adopting a whole
+    // typographic system would resize the type of every deck that shipped one.
+    $geometry = (new SlideGeometry())->with(['title' => ['title' => new Box(0, 0, 10, 10)]]);
+
+    expect($geometry->title(LayoutRole::Title)['size'])->toBe(40)
+        ->and($geometry->title(LayoutRole::Title)['alignment'])->toBe('l');
+});
+
+it('leaves a blank layout without a title whatever a template\'s blank layout carries', function () {
+    // The role is blank because it has no title box, and a template that happens to put a
+    // title placeholder on its own blank layout does not turn it into a different role.
+    $geometry = (new SlideGeometry())->with(['blank' => ['title' => new Box(0, 0, 10, 10)]]);
+
+    expect($geometry->title(LayoutRole::Blank))->toBeNull();
 });
 
 it('keeps the body of a blank layout from where a title would have ended', function () {
