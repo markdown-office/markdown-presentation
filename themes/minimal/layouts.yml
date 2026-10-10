@@ -1,0 +1,6 @@
+layouts:
+  title: Title Slide
+  content: Title and Content
+  two-column: Two Content
+  section: Section Header
+  blank: Blank

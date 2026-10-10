@@ -1,0 +1,257 @@
+[
+ {
+  "name": "list in frontmatter",
+  "why": "A frontmatter block that is a YAML list carries no keys to read configuration from, so it is refused instead of stored as something no caller asked for.",
+  "port": {
+   "error": "The frontmatter of slide 1 is not a mapping of keys to values, so there is nothing to read configuration from."
+  }
+ },
+ {
+  "name": "scalar frontmatter",
+  "why": "A frontmatter block that is a YAML scalar is not a mapping, and a scalar where a mapping was expected is a mistake rather than an empty configuration.",
+  "port": {
+   "error": "The frontmatter of slide 1 is not a mapping of keys to values, so there is nothing to read configuration from."
+  }
+ },
+ {
+  "name": "broken yaml frontmatter",
+  "why": "Slidev keeps parsing invalid YAML and takes what it can. A deck author gets an error naming the slide instead, because a silently half-read block is how a deck comes out with the wrong title and nobody knows why.",
+  "port": {
+   "error": "The frontmatter of slide 1 is not valid YAML: Malformed inline YAML string at line 2."
+  }
+ },
+ {
+  "name": "title not a string",
+  "why": "Slidev takes the value as the title whatever its type. A number is not a title, so it is refused rather than rendered.",
+  "port": {
+   "error": "The frontmatter of slide 1 has a \"title\" that is not a string."
+  }
+ },
+ {
+  "name": "level not an int",
+  "why": "Slidev passes the value through to whatever consumes the level. A level that is not an integer is refused instead.",
+  "port": {
+   "error": "The frontmatter of slide 1 has a \"level\" that is not a positive integer."
+  }
+ },
+ {
+  "name": "fenced yaml frontmatter",
+  "why": "Slidev reads a slide that opens with a fenced yaml block as frontmatter. Here it would be a code block, so the ambiguous shape is refused rather than read the other way round.",
+  "port": {
+   "error": "Slide 1 opens with a fenced yaml block. Slidev reads that as frontmatter; this library does not, so it is refused rather than read as a code block. Delimit the frontmatter with \"---\" instead."
+  }
+ },
+ {
+  "name": "comment closed on the delimiter line",
+  "why": "The note is empty. An empty note is no note, so there is none rather than an empty string.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n<!-- -->",
+     "content": "# One",
+     "frontmatter": [],
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": [],
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "empty trailing comment",
+  "why": "The note is empty. An empty note is no note, so there is none rather than an empty string.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!--  -->\n",
+     "content": "# One",
+     "frontmatter": [],
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "level zero",
+  "why": "Slidev keeps the heading depth because a zero is falsy, which is a truthiness check where a range was meant. A heading level below one is refused instead.",
+  "port": {
+   "error": "The frontmatter of slide 1 has a \"level\" that is not a positive integer."
+  }
+ },
+ {
+  "name": "tildes are not a fence",
+  "why": "Tildes fence a code block in CommonMark, so the `---` between them is code rather than a delimiter. Slidev recognises only backticks and splits the slide, leaving the block split across two slides.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n~~~\n---\n~~~\n",
+     "content": "# One\n\n~~~\n---\n~~~",
+     "frontmatter": [],
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": [],
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "indented opener, delimiter, flush closer",
+  "why": "The same consequence seen from the other side: the `---` is inside the block, so the block runs to the flush closer and the delimiter no longer splits anything.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "  ```\na\n---\nb\n```",
+     "content": "```\na\n---\nb\n```",
+     "frontmatter": [],
+     "title": null,
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\nc\n",
+     "content": "---\nc",
+     "frontmatter": [],
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "unterminated fence",
+  "why": "A fence that is never closed runs to the end of the deck, which is what CommonMark says one is. Slidev leaves the index where it was and reads every following line as ordinary content, so a `---` inside an unclosed fence splits the deck and the next slide opens with a literal delimiter.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n```\n---\nnever closed\n",
+     "content": "# One\n\n```\n---\nnever closed",
+     "frontmatter": [],
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "unterminated tilde",
+  "why": "The same for a tilde fence, which Slidev does not recognise as a fence at all.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "~~~\n# A\n---\n# B\n",
+     "content": "~~~\n# A\n---\n# B",
+     "frontmatter": [],
+     "title": "A",
+     "level": 1,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "tilde fence",
+  "why": "Tildes fence a code block in CommonMark. Slidev matches a backtick run only, so a `~~~` block is read as prose and a `---` inside it splits the deck.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "~~~\n# A\n---\n~~~\n",
+     "content": "~~~\n# A\n---\n~~~",
+     "frontmatter": [],
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "tilde fence long",
+  "why": "A tilde run of any length fences a block, as CommonMark has it.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "~~~~\n# A\n---\n~~~~\n",
+     "content": "~~~~\n# A\n---\n~~~~",
+     "frontmatter": [],
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "de-indented fence",
+  "why": "A closing fence may be indented less than the opening one. Slidev matches the close with `startsWith` against the raw line, so the opener's indentation has to be repeated exactly and an otherwise ordinary block is split by the delimiter inside it.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "  ```\na\n---\n```\n",
+     "content": "```\na\n---\n```",
+     "frontmatter": [],
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "indented opener closed flush, delimiter between",
+  "why": "A consequence of the closing fence not having to repeat the opener's indentation: the flush closer closes the block, so the `---` between them is a delimiter again and splits the slide.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "  ```\na\n```",
+     "content": "```\na\n```",
+     "frontmatter": [],
+     "title": null,
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\nb\n```\n",
+     "content": "---\nb\n```",
+     "frontmatter": [],
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  }
+ }
+]

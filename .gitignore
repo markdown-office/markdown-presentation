@@ -1,0 +1,39 @@
+# Dependencies, installed by Composer. The lock file is not committed either: it is
+# a library, and a committed lock file pins the development dependencies of a
+# checkout rather than anything a consumer gets. `composer audit` needs one, so the
+# audit job resolves before it audits.
+/vendor/
+/composer.lock
+
+# The analyser, fetched by checksum into here by tools/install-phpstan.php. The
+# version and the hash live in that script and in the job that runs it, so nothing
+# but a downloaded binary is ever ignored by accident.
+/tools/phpstan.phar
+/tools/slidev-parity/node_modules/
+/tools/slidev-parity/package-lock.json
+/tools/slidev-parity/core.ts
+/tools/slidev-parity/core.runnable.ts
+
+# Everything the build produces.
+
+# Scratch space for the tests, emptied after every run.
+/tmp/
+
+# Test runner state.
+/.phpunit.cache/
+/.phpunit.result.cache
+
+# A local override; the committed configuration is phpunit.xml.dist.
+/phpunit.xml
+
+# Coverage reports, if written next to the project rather than into build/.
+/coverage/
+/coverage.xml
+/clover.xml
+
+# Editors and operating systems.
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~

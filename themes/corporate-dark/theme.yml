@@ -1,0 +1,20 @@
+name: Corporate Dark
+description: Dark corporate deck for technical briefings.
+author: markdown-office
+colors:
+  dk1: "#1E1E2E"
+  lt1: "#CDD6F4"
+  dk2: "#181825"
+  lt2: "#BAC2DE"
+  accent1: "#89B4FA"
+  accent2: "#A6E3A1"
+  accent3: "#F9E2AF"
+  accent4: "#F38BA8"
+  accent5: "#CBA6F7"
+  accent6: "#94E2D5"
+  hlink: "#89B4FA"
+  folHlink: "#CBA6F7"
+fonts:
+  heading: Inter
+  body: Roboto
+  mono: JetBrains Mono

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         failOnWarning="true"
+         failOnRisky="true"
+         beStrictAboutOutputDuringTests="true"
+         cacheDirectory=".phpunit.cache">
+    <!--
+        Pest test files are closures, not classes, so they carry no `Test.php`
+        suffix; the suites are matched on the extension instead.
+    -->
+    <testsuites>
+        <testsuite name="unit">
+            <directory suffix=".php">tests/Unit</directory>
+        </testsuite>
+        <!--
+            Every fenced example in README.md, run. The mechanism is described where
+            it is written down — in tests/Support/Doctest.php.
+        -->
+        <testsuite name="readme">
+            <directory suffix=".php">tests/Readme</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+</phpunit>

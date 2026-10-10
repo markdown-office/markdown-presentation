@@ -1,0 +1,16 @@
+# PHPStan, fetched by checksum rather than installed as a dependency — see
+# tools/phpstan.sh for the version and the hash.
+#
+# Level 9, with no `ignoreErrors`, no baseline and no suppression comment anywhere
+# in this repository. `tests/Unit` and `tests/Readme` are not analysed: every one of
+# their tests is a closure handed to `it()` and every assertion goes through
+# `expect()`, both of which resolve at run time, so an analyser given neither can
+# only report that the functions are unknown. The support code those tests lean on
+# *is* analysed, and it is where the array shapes live.
+parameters:
+    level: 9
+
+    paths:
+        - src
+        - tests/Support
+        - tools/install-phpstan.php

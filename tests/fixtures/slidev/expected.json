@@ -1,0 +1,2060 @@
+{
+ "slides": {
+  "simple": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "deck frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\nauthor: Fabi\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck",
+      "author": "Fabi"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "deck frontmatter then empty slide": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\n---\n",
+     "content": "",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "frontmatter only, nothing else": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\n---\n",
+     "content": "",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "slide frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\nlayout: two-column\n---\n\n## Left\n",
+     "content": "## Left",
+     "frontmatter": {
+      "layout": "two-column"
+     },
+     "title": "Left",
+     "level": 2,
+     "note": null
+    }
+   ]
+  },
+  "frontmatter followed by blank line": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\nlayout: content\n---\n\nBody\n",
+     "content": "Body",
+     "frontmatter": {
+      "layout": "content"
+     },
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "four dashes": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "four dashes at the top": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "----\n\n# One\n",
+     "content": "----\n\n# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "five dashes": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "dashes with trailing space": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "dashes with trailing text": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "--- trailing\nsomething: here\n---\n\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {
+      "something": "here"
+     },
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "empty document": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "",
+     "content": "",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "only dashes": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\n",
+     "content": "---",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "two delimiters": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\n---\n# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "ends on a delimiter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "",
+     "content": "",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "ends on frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\nlayout: blank\n---\n",
+     "content": "",
+     "frontmatter": {
+      "layout": "blank"
+     },
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "unterminated frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\nlayout: blank\n",
+     "content": "---\nlayout: blank",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "unterminated frontmatter at start": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\nlayout: blank\n",
+     "content": "---\nlayout: blank",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "thematic break": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n***\n\nMore\n",
+     "content": "# One\n\n***\n\nMore",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "underscore thematic break": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n___\n\nMore\n",
+     "content": "# One\n\n___\n\nMore",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "fence with dashes": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n```\n---\nnot a slide\n---\n```\n",
+     "content": "# One\n\n```\n---\nnot a slide\n---\n```",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "fence with dashes and language": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n```yaml\nkey: value\n---\n```\n",
+     "content": "# One\n\n```yaml\nkey: value\n---\n```",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "indented fence": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n  ```\n  ---\n  ```\n",
+     "content": "# One\n\n  ```\n  ---\n  ```",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "longer fence": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n````\n```\n---\n````\n",
+     "content": "# One\n\n````\n```\n---\n````",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "unterminated fence": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n```",
+     "content": "# One\n\n```",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\nnever closed\n",
+     "content": "---\nnever closed",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "fence as first line": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "```\n---\n```\n\n# One\n",
+     "content": "```\n---\n```\n\n# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "fence indented four spaces, closed flush": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n    ```\n    ---\n    ```\n",
+     "content": "# One\n\n    ```\n    ---\n    ```",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "html comment with dashes": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!--\n---\n-->\n\nStill one slide\n",
+     "content": "# One\n\n<!--\n---\n-->\n\nStill one slide",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "html comment on one line": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!-- note -->\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": "note"
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "html comment opened and closed on one line": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "<!-- a -->\n# One\n",
+     "content": "<!-- a -->\n# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "two comments on a line": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "<!-- a --><!--\nb\n-->\n\n# One\n",
+     "content": "<!-- a --><!--\nb\n-->\n\n# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "comment ending the slide": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!--\nthe note\n-->\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": "the note"
+    }
+   ]
+  },
+  "comment in the middle": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!-- mid -->\n\nBody\n",
+     "content": "# One\n\n<!-- mid -->\n\nBody",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "title from heading": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# Heading\n\nBody\n",
+     "content": "# Heading\n\nBody",
+     "frontmatter": {},
+     "title": "Heading",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "title from frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Named\nlevel: 3\n---\n\nBody\n",
+     "content": "Body",
+     "frontmatter": {
+      "title": "Named",
+      "level": 3
+     },
+     "title": "Named",
+     "level": 3,
+     "note": null
+    }
+   ]
+  },
+  "title from name": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\nname: Named\n---\n\nBody\n",
+     "content": "Body",
+     "frontmatter": {
+      "name": "Named"
+     },
+     "title": "Named",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "heading inside a fence": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "```\n# Not a title\n```\n",
+     "content": "```\n# Not a title\n```",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "crlf": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "frontmatter with nested keys": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\nlayout: two-column\noptions:\n  depth: 2\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "layout": "two-column",
+      "options": {
+       "depth": 2
+      }
+     },
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "empty frontmatter block": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "list in frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\n- one\n- two\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": [
+      "one",
+      "two"
+     ],
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "scalar frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\njust a string\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": "just a string",
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "broken yaml frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: \"unclosed\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "unclosed"
+     },
+     "title": "unclosed",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "title not a string": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: 42\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": 42
+     },
+     "title": 42,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "level not an int": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\nlevel: deep\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "level": "deep"
+     },
+     "title": "One",
+     "level": "deep",
+     "note": null
+    }
+   ]
+  },
+  "fenced yaml frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "```yaml\ntitle: Deck",
+     "content": "```yaml\ntitle: Deck",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "delimiter inside an indented code block": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n    ---\n\n# Two\n",
+     "content": "# One\n\n    ---\n\n# Two",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "delimiter alone between two blank lines": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "",
+     "content": "",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 2,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "delimiter with trailing whitespace as opener": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "--- \ntitle: Deck\n--- \n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "opener with a tab after it": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\t\ntitle: Deck\n---\t\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "closing delimiter indented": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\n  ---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "fence inside a comment": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "<!--\n```\n---\n```\n-->\n\n# One\n",
+     "content": "<!--\n```\n---\n```\n-->\n\n# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "comment opened inside a fence": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "```\n<!--\n---\n```\n",
+     "content": "```\n<!--\n---\n```",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "comment unclosed at the end of the deck": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!--\nnever closed\n",
+     "content": "# One\n\n<!--\nnever closed",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "comment closed on the delimiter line": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n<!-- -->",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": ""
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "lone carriage return": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\r\r# Two\n",
+     "content": "# One\r\r# Two",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "crlf fence": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n```\n---\n```\n",
+     "content": "# One\n```\n---\n```",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "crlf frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "trailing blank lines only": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "\n\n\n",
+     "content": "",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "whitespace only deck": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "   \n\t\n",
+     "content": "",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "fence with trailing spaces on the close": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n```\ntext\n```   \n",
+     "content": "# One\n\n```\ntext\n```",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "fence closing with more backticks": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n```\ntext\n`````\n",
+     "content": "# One\n\n```\ntext\n`````",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "fence nested in a list": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n- item\n\n  ```\n  ---\n  ```\n",
+     "content": "# One\n\n- item\n\n  ```\n  ---\n  ```",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "delimiter inside a list item": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n- item\n- ---\n\n# Two\n",
+     "content": "# One\n\n- item\n- ---\n\n# Two",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "four dashes then frontmatter": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "layout: blank",
+     "content": "layout: blank",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 2,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "frontmatter then four dashes": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "empty slide between delimiters": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "",
+     "content": "",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 2,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "delimiter at the very end": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "delimiter with spaces only line after": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "   \n\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "heading with trailing hashes": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# Title #\n\nBody\n",
+     "content": "# Title #\n\nBody",
+     "frontmatter": {},
+     "title": "Title #",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "heading with no space": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "#Title\n",
+     "content": "#Title",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "heading deeper than six": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "####### Deep\n",
+     "content": "####### Deep",
+     "frontmatter": {},
+     "title": "Deep",
+     "level": 7,
+     "note": null
+    }
+   ]
+  },
+  "title and name both": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: One\nname: Two\n---\n\n# Three\n",
+     "content": "# Three",
+     "frontmatter": {
+      "title": "One",
+      "name": "Two"
+     },
+     "title": "One",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "empty title falls through to name": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: \"\"\nname: Two\n---\n\n# Three\n",
+     "content": "# Three",
+     "frontmatter": {
+      "title": "",
+      "name": "Two"
+     },
+     "title": "Two",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "level zero": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Named\nlevel: 0\n---\n\n# Three\n",
+     "content": "# Three",
+     "frontmatter": {
+      "title": "Named",
+      "level": 0
+     },
+     "title": "Named",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "level with a heading": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\nlevel: 2\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "level": 2
+     },
+     "title": "One",
+     "level": 2,
+     "note": null
+    }
+   ]
+  },
+  "note with text after it": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!--\nnote\n-->\n\nafter\n",
+     "content": "# One\n\n<!--\nnote\n-->\n\nafter",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "two trailing comments": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!-- one -->\n<!-- two -->\n",
+     "content": "# One\n\n<!-- one -->",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": "two"
+    }
+   ]
+  },
+  "empty trailing comment": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!--  -->\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": ""
+    }
+   ]
+  },
+  "comment with a delimiter inside the note": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!--\n---\nnote\n-->\n",
+     "content": "# One",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": "---\nnote"
+    }
+   ]
+  },
+  "fenced frontmatter on the second slide": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: Deck\n---\n\n# One\n\n```yaml\nkey: value\n```\n",
+     "content": "# One\n\n```yaml\nkey: value\n```",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "fence that looks indented but is not": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n```\ntext\n  ```\n",
+     "content": "# One\n\n```\ntext\n  ```",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": {},
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "tildes are not a fence": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n~~~",
+     "content": "# One\n\n~~~",
+     "frontmatter": {},
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\n~~~\n\n---\n\n# Two\n",
+     "content": "# Two",
+     "frontmatter": "~~~",
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "frontmatter with a comment inside": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\n# a comment\ntitle: Deck\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck"
+     },
+     "title": "Deck",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "frontmatter with quotes": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: \"Deck: one\"\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": "Deck: one"
+     },
+     "title": "Deck: one",
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "frontmatter with null value": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "---\ntitle: ~\n---\n\n# One\n",
+     "content": "# One",
+     "frontmatter": {
+      "title": null
+     },
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "indented opener closed flush, delimiter between": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "  ```\na\n```\n---\nb\n```\n",
+     "content": "```\na\n```\n---\nb\n```",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "indented opener, delimiter, flush closer": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "  ```\na",
+     "content": "```\na",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\nb\n```\n---\nc\n",
+     "content": "c",
+     "frontmatter": "b ```",
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "tilde fence": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "~~~\n# A",
+     "content": "~~~\n# A",
+     "frontmatter": {},
+     "title": "A",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\n~~~\n",
+     "content": "---\n~~~",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "tilde fence long": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "~~~~\n# A",
+     "content": "~~~~\n# A",
+     "frontmatter": {},
+     "title": "A",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\n~~~~\n",
+     "content": "---\n~~~~",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "de-indented fence": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "  ```\na",
+     "content": "```\na",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\n```\n",
+     "content": "---\n```",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "fence info string": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "```php\n$a = 1;\n---\n```\n",
+     "content": "```php\n$a = 1;\n---\n```",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  },
+  "unterminated tilde": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "~~~\n# A",
+     "content": "~~~\n# A",
+     "frontmatter": {},
+     "title": "A",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "---\n# B\n",
+     "content": "---\n# B",
+     "frontmatter": {},
+     "title": "B",
+     "level": 1,
+     "note": null
+    }
+   ]
+  },
+  "four backticks closed by three": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "````\n# A\n---\n```\n````\n",
+     "content": "````\n# A\n---\n```\n````",
+     "frontmatter": {},
+     "title": null,
+     "level": null,
+     "note": null
+    }
+   ]
+  }
+ },
+ "decks": [
+  {
+   "name": "simple",
+   "markdown": "# One\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "deck frontmatter",
+   "markdown": "---\ntitle: Deck\nauthor: Fabi\n---\n\n# One\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "deck frontmatter then empty slide",
+   "markdown": "---\ntitle: Deck\n---\n\n---\n\n# One\n"
+  },
+  {
+   "name": "frontmatter only, nothing else",
+   "markdown": "---\ntitle: Deck\n---\n"
+  },
+  {
+   "name": "slide frontmatter",
+   "markdown": "---\ntitle: Deck\n---\n\n# One\n\n---\nlayout: two-column\n---\n\n## Left\n"
+  },
+  {
+   "name": "frontmatter followed by blank line",
+   "markdown": "---\nlayout: content\n---\n\nBody\n"
+  },
+  {
+   "name": "four dashes",
+   "markdown": "# One\n\n----\n\n# Two\n"
+  },
+  {
+   "name": "four dashes at the top",
+   "markdown": "----\n\n# One\n"
+  },
+  {
+   "name": "five dashes",
+   "markdown": "# One\n\n-----\n\n# Two\n"
+  },
+  {
+   "name": "dashes with trailing space",
+   "markdown": "# One\n\n---   \n\n# Two\n"
+  },
+  {
+   "name": "dashes with trailing text",
+   "markdown": "# One\n\n--- trailing\nsomething: here\n---\n\n# Two\n"
+  },
+  {
+   "name": "empty document",
+   "markdown": ""
+  },
+  {
+   "name": "only dashes",
+   "markdown": "---\n"
+  },
+  {
+   "name": "two delimiters",
+   "markdown": "---\n---\n# One\n"
+  },
+  {
+   "name": "ends on a delimiter",
+   "markdown": "# One\n\n---\n"
+  },
+  {
+   "name": "ends on frontmatter",
+   "markdown": "---\ntitle: Deck\n---\n\n# One\n\n---\nlayout: blank\n---\n"
+  },
+  {
+   "name": "unterminated frontmatter",
+   "markdown": "# One\n\n---\nlayout: blank\n"
+  },
+  {
+   "name": "unterminated frontmatter at start",
+   "markdown": "---\nlayout: blank\n"
+  },
+  {
+   "name": "thematic break",
+   "markdown": "# One\n\n***\n\nMore\n"
+  },
+  {
+   "name": "underscore thematic break",
+   "markdown": "# One\n\n___\n\nMore\n"
+  },
+  {
+   "name": "fence with dashes",
+   "markdown": "# One\n\n```\n---\nnot a slide\n---\n```\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "fence with dashes and language",
+   "markdown": "# One\n\n```yaml\nkey: value\n---\n```\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "indented fence",
+   "markdown": "# One\n\n  ```\n  ---\n  ```\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "longer fence",
+   "markdown": "# One\n\n````\n```\n---\n````\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "unterminated fence",
+   "markdown": "# One\n\n```\n---\nnever closed\n"
+  },
+  {
+   "name": "fence as first line",
+   "markdown": "```\n---\n```\n\n# One\n"
+  },
+  {
+   "name": "fence indented four spaces, closed flush",
+   "markdown": "# One\n\n    ```\n    ---\n    ```\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "html comment with dashes",
+   "markdown": "# One\n\n<!--\n---\n-->\n\nStill one slide\n"
+  },
+  {
+   "name": "html comment on one line",
+   "markdown": "# One\n\n<!-- note -->\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "html comment opened and closed on one line",
+   "markdown": "<!-- a -->\n# One\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "two comments on a line",
+   "markdown": "<!-- a --><!--\nb\n-->\n\n# One\n"
+  },
+  {
+   "name": "comment ending the slide",
+   "markdown": "# One\n\n<!--\nthe note\n-->\n"
+  },
+  {
+   "name": "comment in the middle",
+   "markdown": "# One\n\n<!-- mid -->\n\nBody\n"
+  },
+  {
+   "name": "title from heading",
+   "markdown": "# Heading\n\nBody\n"
+  },
+  {
+   "name": "title from frontmatter",
+   "markdown": "---\ntitle: Named\nlevel: 3\n---\n\nBody\n"
+  },
+  {
+   "name": "title from name",
+   "markdown": "---\nname: Named\n---\n\nBody\n"
+  },
+  {
+   "name": "heading inside a fence",
+   "markdown": "```\n# Not a title\n```\n"
+  },
+  {
+   "name": "crlf",
+   "markdown": "---\r\ntitle: Deck\r\n---\r\n\r\n# One\r\n\r\n---\r\n\r\n# Two\r\n"
+  },
+  {
+   "name": "frontmatter with nested keys",
+   "markdown": "---\nlayout: two-column\noptions:\n  depth: 2\n---\n\n# One\n"
+  },
+  {
+   "name": "empty frontmatter block",
+   "markdown": "---\n---\n\n# One\n"
+  },
+  {
+   "name": "list in frontmatter",
+   "markdown": "---\n- one\n- two\n---\n\n# One\n"
+  },
+  {
+   "name": "scalar frontmatter",
+   "markdown": "---\njust a string\n---\n\n# One\n"
+  },
+  {
+   "name": "broken yaml frontmatter",
+   "markdown": "---\ntitle: \"unclosed\n---\n\n# One\n"
+  },
+  {
+   "name": "title not a string",
+   "markdown": "---\ntitle: 42\n---\n\n# One\n"
+  },
+  {
+   "name": "level not an int",
+   "markdown": "---\nlevel: deep\n---\n\n# One\n"
+  },
+  {
+   "name": "fenced yaml frontmatter",
+   "markdown": "```yaml\ntitle: Deck\n---\n\n# One\n"
+  },
+  {
+   "name": "delimiter inside an indented code block",
+   "markdown": "# One\n\n    ---\n\n# Two\n"
+  },
+  {
+   "name": "delimiter alone between two blank lines",
+   "markdown": "# One\n\n---\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "delimiter with trailing whitespace as opener",
+   "markdown": "--- \ntitle: Deck\n--- \n\n# One\n"
+  },
+  {
+   "name": "opener with a tab after it",
+   "markdown": "---\t\ntitle: Deck\n---\t\n\n# One\n"
+  },
+  {
+   "name": "closing delimiter indented",
+   "markdown": "---\ntitle: Deck\n  ---\n\n# One\n"
+  },
+  {
+   "name": "fence inside a comment",
+   "markdown": "<!--\n```\n---\n```\n-->\n\n# One\n"
+  },
+  {
+   "name": "comment opened inside a fence",
+   "markdown": "```\n<!--\n---\n```\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "comment unclosed at the end of the deck",
+   "markdown": "# One\n\n<!--\nnever closed\n"
+  },
+  {
+   "name": "comment closed on the delimiter line",
+   "markdown": "# One\n<!-- -->\n---\n\n# Two\n"
+  },
+  {
+   "name": "lone carriage return",
+   "markdown": "# One\r\r# Two\n"
+  },
+  {
+   "name": "crlf fence",
+   "markdown": "# One\r\n```\r\n---\r\n```\r\n\r\n---\r\n\r\n# Two\r\n"
+  },
+  {
+   "name": "crlf frontmatter",
+   "markdown": "---\r\ntitle: Deck\r\n---\r\n\r\n# One\r\n\r\n---\r\n\r\n# Two\r\n"
+  },
+  {
+   "name": "trailing blank lines only",
+   "markdown": "\n\n\n"
+  },
+  {
+   "name": "whitespace only deck",
+   "markdown": "   \n\t\n"
+  },
+  {
+   "name": "fence with trailing spaces on the close",
+   "markdown": "# One\n\n```\ntext\n```   \n\n---\n\n# Two\n"
+  },
+  {
+   "name": "fence closing with more backticks",
+   "markdown": "# One\n\n```\ntext\n`````\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "fence nested in a list",
+   "markdown": "# One\n\n- item\n\n  ```\n  ---\n  ```\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "delimiter inside a list item",
+   "markdown": "# One\n\n- item\n- ---\n\n# Two\n"
+  },
+  {
+   "name": "four dashes then frontmatter",
+   "markdown": "# One\n\n----\nlayout: blank\n---\n\n# Two\n"
+  },
+  {
+   "name": "frontmatter then four dashes",
+   "markdown": "---\ntitle: Deck\n---\n\n# One\n\n----\n\n# Two\n"
+  },
+  {
+   "name": "empty slide between delimiters",
+   "markdown": "# One\n\n---\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "delimiter at the very end",
+   "markdown": "# One\n\n---"
+  },
+  {
+   "name": "delimiter with spaces only line after",
+   "markdown": "# One\n\n---\n   \n\n# Two\n"
+  },
+  {
+   "name": "heading with trailing hashes",
+   "markdown": "# Title #\n\nBody\n"
+  },
+  {
+   "name": "heading with no space",
+   "markdown": "#Title\n"
+  },
+  {
+   "name": "heading deeper than six",
+   "markdown": "####### Deep\n"
+  },
+  {
+   "name": "title and name both",
+   "markdown": "---\ntitle: One\nname: Two\n---\n\n# Three\n"
+  },
+  {
+   "name": "empty title falls through to name",
+   "markdown": "---\ntitle: \"\"\nname: Two\n---\n\n# Three\n"
+  },
+  {
+   "name": "level zero",
+   "markdown": "---\ntitle: Named\nlevel: 0\n---\n\n# Three\n"
+  },
+  {
+   "name": "level with a heading",
+   "markdown": "---\nlevel: 2\n---\n\n# One\n"
+  },
+  {
+   "name": "note with text after it",
+   "markdown": "# One\n\n<!--\nnote\n-->\n\nafter\n"
+  },
+  {
+   "name": "two trailing comments",
+   "markdown": "# One\n\n<!-- one -->\n<!-- two -->\n"
+  },
+  {
+   "name": "empty trailing comment",
+   "markdown": "# One\n\n<!--  -->\n"
+  },
+  {
+   "name": "comment with a delimiter inside the note",
+   "markdown": "# One\n\n<!--\n---\nnote\n-->\n"
+  },
+  {
+   "name": "fenced frontmatter on the second slide",
+   "markdown": "---\ntitle: Deck\n---\n\n# One\n\n```yaml\nkey: value\n```\n"
+  },
+  {
+   "name": "fence that looks indented but is not",
+   "markdown": "# One\n\n```\ntext\n  ```\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "tildes are not a fence",
+   "markdown": "# One\n\n~~~\n---\n~~~\n\n---\n\n# Two\n"
+  },
+  {
+   "name": "frontmatter with a comment inside",
+   "markdown": "---\n# a comment\ntitle: Deck\n---\n\n# One\n"
+  },
+  {
+   "name": "frontmatter with quotes",
+   "markdown": "---\ntitle: \"Deck: one\"\n---\n\n# One\n"
+  },
+  {
+   "name": "frontmatter with null value",
+   "markdown": "---\ntitle: ~\n---\n\n# One\n"
+  },
+  {
+   "name": "indented opener closed flush, delimiter between",
+   "markdown": "  ```\na\n```\n---\nb\n```\n"
+  },
+  {
+   "name": "indented opener, delimiter, flush closer",
+   "markdown": "  ```\na\n---\nb\n```\n---\nc\n"
+  },
+  {
+   "name": "tilde fence",
+   "markdown": "~~~\n# A\n---\n~~~\n"
+  },
+  {
+   "name": "tilde fence long",
+   "markdown": "~~~~\n# A\n---\n~~~~\n"
+  },
+  {
+   "name": "de-indented fence",
+   "markdown": "  ```\na\n---\n```\n"
+  },
+  {
+   "name": "fence info string",
+   "markdown": "```php\n$a = 1;\n---\n```\n"
+  },
+  {
+   "name": "unterminated tilde",
+   "markdown": "~~~\n# A\n---\n# B\n"
+  },
+  {
+   "name": "four backticks closed by three",
+   "markdown": "````\n# A\n---\n```\n````\n"
+  }
+ ]
+}

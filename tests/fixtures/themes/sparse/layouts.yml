@@ -1,0 +1,5 @@
+# Two of the five roles. The other three are not mapped, and a deck that asks for
+# one of them is told which roles this theme does have.
+layouts:
+  title: Deck Title
+  content: Body Text

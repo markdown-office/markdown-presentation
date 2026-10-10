@@ -1,0 +1,63 @@
+{
+    "name": "markdown-presentation/markdown-presentation",
+    "description": "The PowerPoint half of markdown-office: a Slidev-compatible deck splitter and a strict theme resolver for Markdown slide decks.",
+    "type": "library",
+    "keywords": [
+        "markdown",
+        "pptx",
+        "powerpoint",
+        "slides",
+        "deck",
+        "slidev",
+        "theme",
+        "yaml",
+        "frontmatter"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Fabian Graßl",
+            "email": "mail@fabiangrassl.de"
+        }
+    ],
+    "require": {
+        "ext-dom": "*",
+        "ext-gd": "*",
+        "ext-zip": "*",
+        "phpoffice/phppresentation": "dev-master#54586957f0fbbce0e3a9434c88cb6050f6cc0759",
+        "php": "^8.2",
+        "symfony/yaml": "^7.2 || ^8.0"
+    },
+    "require-dev": {
+        "ext-simplexml": "*",
+        "pestphp/pest": "^3.0 || ^4.0 || ^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "MarkdownPresentation\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MarkdownPresentation\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "test:unit": "pest --testsuite=unit",
+        "test:readme": "pest --testsuite=readme",
+        "test:coverage": "pest --coverage --min=100",
+        "analyse": "tools/phpstan.sh",
+        "check": [
+            "@composer validate --strict",
+            "@analyse",
+            "@test"
+        ]
+    }
+}

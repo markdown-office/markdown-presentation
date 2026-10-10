@@ -1,0 +1,20 @@
+name: Minimal
+description: Dense text-first decks, with as little on a slide as the text needs.
+author: markdown-office
+colors:
+  dk1: "#1A1A1A"
+  lt1: "#FFFFFF"
+  dk2: "#4A4A4A"
+  lt2: "#F5F5F5"
+  accent1: "#333333"
+  accent2: "#666666"
+  accent3: "#999999"
+  accent4: "#CCCCCC"
+  accent5: "#3F6FB5"
+  accent6: "#8A5A44"
+  hlink: "#3F6FB5"
+  folHlink: "#8A5A44"
+fonts:
+  heading: Georgia
+  body: Georgia
+  mono: Menlo

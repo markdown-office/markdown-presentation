@@ -1,0 +1,523 @@
+<?php
+
+declare(strict_types=1);
+
+namespace MarkdownPresentation\Render;
+
+use MarkdownPresentation\Document\Deck;
+use MarkdownPresentation\Document\Slide as SourceSlide;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Exception\InvalidInput;
+use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\ThemeNotFound;
+use MarkdownPresentation\Exception\UnknownDirective;
+use MarkdownPresentation\Exception\UnknownLayoutRole;
+use MarkdownPresentation\Render\Block\Block;
+use MarkdownPresentation\Render\Block\Code;
+use MarkdownPresentation\Render\Block\Heading;
+use MarkdownPresentation\Render\Block\Image;
+use MarkdownPresentation\Render\Block\ListBlock;
+use MarkdownPresentation\Render\Block\Paragraph;
+use MarkdownPresentation\Render\Block\Quote;
+use MarkdownPresentation\Render\Block\Rule;
+use MarkdownPresentation\Render\Block\Table;
+use MarkdownPresentation\Theme\LayoutRole;
+use MarkdownPresentation\Theme\LoadedTheme;
+use MarkdownPresentation\Theme\Theme;
+use MarkdownPresentation\Theme\ThemeResolver;
+use PhpOffice\PhpPresentation\DocumentLayout;
+use PhpOffice\PhpPresentation\IOFactory;
+use PhpOffice\PhpPresentation\PhpPresentation;
+use PhpOffice\PhpPresentation\Slide as WrittenSlide;
+use PhpOffice\PhpPresentation\Slide\Background\Color as BackgroundColor;
+use PhpOffice\PhpPresentation\Slide\Note;
+use PhpOffice\PhpPresentation\Slide\SlideLayout;
+use PhpOffice\PhpPresentation\Slide\SlideMaster;
+use PhpOffice\PhpPresentation\Style\Color;
+use PhpOffice\PhpPresentation\Style\SchemeColor;
+
+/**
+ * A deck and the theme it names, written out as a `.pptx`.
+ *
+ * The order of the work is the order of what can go wrong: every slide's frontmatter is read
+ * and checked, the theme is resolved, and only then is anything built. A deck whose fourth
+ * slide names a directive nobody reads therefore fails before it has written a byte rather
+ * than leaving a half-finished file where a whole one was expected.
+ *
+ * Two things this renderer deliberately does not do, both because doing them quietly would
+ * be the failure this library exists to avoid:
+ *
+ * - A deck that names no theme gets the built-in `default`. That is the absence of a
+ *   directive, not a fallback from a directive that failed — a named theme that does not
+ *   resolve is still {@see ThemeNotFound}.
+ * - `styles.yml` is not read. {@see \MarkdownPresentation\Theme\StyleSlots} is the Word
+ *   half's vocabulary and the shipped themes write `.docx` style ids, which a `.pptx` has
+ *   no use for; mapping them onto shapes would be inventing a vocabulary nobody wrote down.
+ *   A slot that does not exist still fails at {@see \MarkdownPresentation\Theme\ThemeLoader}
+ *   time, so a typo in a `styles.yml` is never rendered as silence.
+*/
+final class PresentationRenderer
+{
+    /**
+     * The frontmatter keys this library acts on, in the order a failure offers them.
+     *
+     * Closed on purpose. Slidev accepts dozens more, so refusing one is a real cost, and
+     * the whole of what makes it affordable is that {@see UnknownDirective} names this list
+     * in the failure itself.
+    */
+    public const DIRECTIVES = ['title', 'name', 'level', 'layout', 'theme', 'author', 'description'];
+
+    /** The keys that describe the deck rather than a slide, and so belong to slide 1's block. */
+    public const DECK_DIRECTIVES = ['theme', 'author', 'description'];
+
+    /** The theme a deck that names none gets. */
+    public const DEFAULT_THEME = 'default';
+
+    /** The step a slide with no `v-click` in it is drawn at. */
+    private const FIRST_STEP = 1;
+
+    /**
+     * @param string $directory The directory a relative image path in the deck resolves
+     *                          against, which is the directory the deck itself is in.
+    */
+    public function __construct(
+        private readonly string $directory = '.',
+        private readonly ThemeResolver $themes = new ThemeResolver(),
+        private readonly BlockParser $blocks = new BlockParser(),
+        private readonly SlideGeometry $geometry = new SlideGeometry(),
+    ) {
+    }
+
+    /**
+     * @throws InvalidInput  When a slide names something this library cannot render.
+     * @throws ThemeNotFound When the deck names a theme that does not resolve.
+     * @throws Exception      When the file cannot be written.
+     *
+     * @return string The path written.
+    */
+    public function render(Deck $deck, string $path): string
+    {
+        foreach ($deck->slides() as $slide) {
+            $this->check($slide);
+        }
+
+        $theme = $this->theme($deck);
+        $roles = $this->roles($deck, $theme);
+
+        $presentation = new PhpPresentation();
+        $presentation->getLayout()->setDocumentLayout(DocumentLayout::LAYOUT_SCREEN_16X9);
+
+        $layouts = $this->layouts($this->slideMaster($presentation), $theme, $this->usedRoles($roles));
+        $this->properties($presentation, $deck, $theme);
+
+        $writer = new ShapeWriter($theme->theme(), $this->geometry);
+
+        foreach ($deck->slides() as $slide) {
+            $this->write($presentation, $slide, $roles[$slide->index()], $layouts, $writer);
+        }
+
+        // PHPPresentation's constructor leaves an empty slide behind so that a fresh object is
+        // usable. A deck that had slides does not want it, and a deck that had none still
+        // does: PowerPoint will not open a presentation with no slides at all, so the empty
+        // one is what a deck with no slides is.
+        if ($deck->count() > 0) {
+            $presentation->removeSlideByIndex(0);
+        }
+
+        return $this->save($presentation, $path);
+    }
+
+    /**
+     * Every frontmatter key of every slide, checked before anything is built.
+     *
+     * @throws UnknownDirective
+    */
+    private function check(SourceSlide $slide): void
+    {
+        foreach (array_keys($slide->frontmatter()) as $key) {
+            $key = (string) $key;
+
+            if (!in_array($key, self::DIRECTIVES, true)) {
+                throw UnknownDirective::named($slide->index() + 1, $key, self::DIRECTIVES);
+            }
+
+            if ($slide->index() !== 0 && in_array($key, self::DECK_DIRECTIVES, true)) {
+                throw UnknownDirective::misplaced($slide->index() + 1, $key);
+            }
+        }
+    }
+
+    /**
+     * @throws ThemeNotFound
+     * @throws MalformedFrontmatter
+    */
+    private function theme(Deck $deck): LoadedTheme
+    {
+        $name = $deck->frontmatterValue('theme', self::DEFAULT_THEME);
+
+        if (!is_string($name) || trim($name) === '') {
+            throw MalformedFrontmatter::wrongType(1, 'theme', 'a theme name');
+        }
+
+        return $this->themes->resolve(trim($name));
+    }
+
+    /**
+     * The role of each of the deck's slides, by index.
+     *
+     * Resolved before anything is built so that a role the theme does not map fails while
+     * there is still no file on disk to clean up.
+     *
+     * @return array<int, LayoutRole>
+     *
+     * @throws MalformedFrontmatter
+     * @throws UnknownLayoutRole
+    */
+    private function roles(Deck $deck, LoadedTheme $theme): array
+    {
+        $roles = [];
+
+        foreach ($deck->slides() as $slide) {
+            $named = $slide->frontmatterValue('layout', LayoutRole::Content->value);
+
+            if (!is_string($named) || trim($named) === '') {
+                throw MalformedFrontmatter::wrongType(
+                    $slide->index() + 1,
+                    'layout',
+                    sprintf('a layout role — one of: %s', implode(', ', LayoutRole::names())),
+                );
+            }
+
+            $roles[$slide->index()] = LayoutRole::from($this->checkRole(trim($named), $theme, $slide->index() + 1));
+        }
+
+        return $roles;
+    }
+
+    /**
+     * @throws UnknownLayoutRole
+    */
+    private function checkRole(string $role, LoadedTheme $theme, int $slide): string
+    {
+        if (LayoutRole::tryFrom($role) === null) {
+            throw UnknownLayoutRole::notARoleOn($slide, $role, LayoutRole::names());
+        }
+
+        // Asked of the theme rather than checked here, because a role the theme does not map
+        // is the theme's to fix and its message already says so.
+        $theme->layout($role);
+
+        return $role;
+    }
+
+    /**
+     * The roles the deck's slides use, in first-seen order and each of them once.
+     *
+     * Only the roles that are used are built. A theme that maps two of the five would
+     * otherwise fail on the three its deck never asked for, which is not the same failure as
+     * a deck that asks for one it did not map.
+     *
+     * Compared on the role's value rather than with `array_unique`, which casts each element
+     * to a string and an enum cannot be cast to one.
+     *
+     * @param array<int, LayoutRole> $roles
+     *
+     * @return list<LayoutRole>
+    */
+    private function usedRoles(array $roles): array
+    {
+        $used = [];
+
+        foreach ($roles as $role) {
+            if (!in_array($role->value, array_column($used, 'value'), true)) {
+                $used[] = $role;
+            }
+        }
+
+        return $used;
+    }
+
+    /**
+     * The master the slides hang off.
+     *
+     * PHPPresentation's constructor always makes one; the `??` is what happens if it ever
+     * stops, and making a master is cheaper than refusing to draw a deck over it.
+    */
+    private function slideMaster(PhpPresentation $presentation): SlideMaster
+    {
+        return $presentation->getAllMasterSlides()[0] ?? $presentation->createMasterSlide();
+    }
+
+    /**
+     * The master: its colour scheme, and the page behind every slide.
+     *
+     * The colour scheme is the whole reason a theme's colours belong in a `.pptx` at all:
+     * PowerPoint reads `clrScheme` to decide what `accent1` means everywhere in the file, so
+     * writing it here is what makes a themed deck themed rather than a deck with a few
+     * hard-coded colours in it.
+    */
+    private function master(SlideMaster $master, Theme $theme): void
+    {
+        foreach (Theme::COLOURS as $slot) {
+            $colour = new SchemeColor();
+            $colour->setValue($slot);
+            $colour->setRGB(ltrim($theme->colour($slot) ?? '#000000', '#'));
+            $master->addSchemeColor($colour);
+        }
+
+        $background = new BackgroundColor();
+        $background->setColor(new Color(ltrim($theme->colour('lt1') ?? '#FFFFFF', '#')));
+        $master->setBackground($background);
+    }
+
+    /**
+     * One slide layout per role the deck used, each named the way the theme names it.
+     *
+     * This is where a {@see LayoutRole} becomes a layout in the file. A deck that writes
+     * `layout: two-column` against a theme that maps it to `Two Content` gets slides whose
+     * layout part is called `Two Content`, and the deck's portable vocabulary and the
+     * template's private one stay apart — which is the whole point of the role.
+     *
+     * A theme's `template.pptx` is not opened: taking a role's placeholders from one is the
+     * same job `layouts.yml` already does by naming them, and no shipped theme ships one to
+     * take them from.
+     *
+     * @param list<LayoutRole> $roles
+     *
+     * @return array<string, SlideLayout>
+    */
+    private function layouts(SlideMaster $master, LoadedTheme $theme, array $roles): array
+    {
+        $this->master($master, $theme->theme());
+
+        $layouts = [];
+        $existing = $master->getAllSlideLayouts();
+
+        foreach ($roles as $position => $role) {
+            // PHPPresentation's constructor leaves the master holding one empty layout.
+            // Reusing it for the first role is what stops a deck with a single role from
+            // carrying a second, nameless layout part in its file.
+            $layout = $position === 0 && isset($existing[0]) ? $existing[0] : $master->createSlideLayout();
+            $layout->setLayoutName($theme->layout($role->value));
+            $layouts[$role->value] = $layout;
+        }
+
+        return $layouts;
+    }
+
+    /**
+     * The deck's own metadata, on the properties part every `.docx` and `.pptx` has.
+     *
+     * @throws MalformedFrontmatter
+    */
+    private function properties(PhpPresentation $presentation, Deck $deck, LoadedTheme $theme): void
+    {
+        $properties = $presentation->getDocumentProperties();
+        $properties->setCreator($theme->theme()->author() ?? 'markdown-presentation');
+
+        $title = $deck->frontmatterValue('title');
+
+        if ($title !== null) {
+            $properties->setTitle(self::text($title, 'title'));
+        }
+
+        $description = $deck->frontmatterValue('description');
+
+        if ($description !== null) {
+            $properties->setDescription(self::text($description, 'description'));
+        }
+    }
+
+    /**
+     * @throws MalformedFrontmatter
+    */
+    private static function text(mixed $value, string $key): string
+    {
+        if (!is_string($value)) {
+            throw MalformedFrontmatter::wrongType(1, $key, 'a string');
+        }
+
+        return $value;
+    }
+
+    /**
+     * One source slide, and as many written slides as it has steps.
+     *
+     * @param array<string, SlideLayout> $layouts
+    */
+    private function write(
+        PhpPresentation $presentation,
+        SourceSlide $source,
+        LayoutRole $role,
+        array $layouts,
+        ShapeWriter $writer,
+    ): void {
+        $title = $this->geometry->title($role);
+        $blocks = $this->underTitle(
+            $this->blocks->parse($source->content(), $source->index() + 1, $this->directory),
+            $source,
+            $title !== null,
+        );
+
+        $steps = array_reduce(
+            $blocks,
+            static fn (int $most, Block $block): int => max($most, $block->step()),
+            self::FIRST_STEP,
+        );
+
+        for ($step = self::FIRST_STEP; $step <= $steps; $step++) {
+            $slide = $presentation->createSlide();
+            $slide->setSlideLayout($layouts[$role->value]);
+            $slide->setName($source->title() === null ? null : sprintf('slide %d', $source->index() + 1));
+
+            if ($source->note() !== null) {
+                $this->note($slide, $source->note());
+            }
+
+            if ($title !== null && $source->title() !== null) {
+                $writer->title($slide, $source->title(), $title['box'], $title['size'], $title['alignment']);
+            }
+
+            $this->stack($slide, $blocks, $step, $role, $writer);
+        }
+    }
+
+    /**
+     * The slide's blocks without the one that became its title.
+     *
+     * A slide's title is its first heading, so that heading is still the first block of the
+     * content the parser was given. Drawing both would put the same line on the slide twice,
+     * so the heading that *is* the title is dropped once the title box has drawn it — and
+     * only then, because a role without a title box has nowhere else to draw it.
+     *
+     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     *
+     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
+    */
+    private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox): array
+    {
+        if (!$hasTitleBox || $source->title() === null || $blocks === []) {
+            return $blocks;
+        }
+
+        $first = $blocks[0];
+
+        return $first instanceof Heading && self::plain($first) === $source->title()
+            ? array_slice($blocks, 1)
+            : $blocks;
+    }
+
+    /**
+     * The text of a heading, which is what decides whether it is the slide's title or a block
+     * of its body.
+    */
+    private static function plain(Heading $heading): string
+    {
+        return implode('', array_map(static fn (Run $run): string => $run->text, $heading->runs));
+    }
+
+    private function note(WrittenSlide $slide, string $text): void
+    {
+        $note = new Note();
+        $note->createRichTextShape()->createTextRun($text);
+        $slide->setNote($note);
+    }
+
+    /**
+     * A step's blocks, stacked into the role's body boxes.
+     *
+     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+    */
+    private function stack(WrittenSlide $slide, array $blocks, int $step, LayoutRole $role, ShapeWriter $writer): void
+    {
+        $columns = $this->columns($blocks, $role);
+
+        foreach ($this->geometry->body($role) as $column => $box) {
+            $y = $box->y;
+
+            foreach ($this->visible($blocks, $columns, $step, $column) as $block) {
+                $height = $writer->height($block, $box->y + $box->height - $y);
+                $writer->write($slide, $block, new Box($box->x, $y, $box->width, $height), $height);
+                $y += $height;
+            }
+        }
+    }
+
+    /**
+     * Which column each block belongs to.
+     *
+     * Two columns divide at the first heading of the second level, because that is the
+     * heading a writer puts on a column of a slide and there is nothing else to go on. A deck
+     * that never writes one fills the left column and leaves the right empty, which is
+     * honest: it asked for two columns and wrote one.
+     *
+     * Decided once for the whole slide rather than per column, because a block that opens the
+     * second column belongs to the second column, and a per-column walk that decided
+     * otherwise after collecting it drew it in both.
+     *
+     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     *
+     * @return list<int>
+    */
+    private function columns(array $blocks, LayoutRole $role): array
+    {
+        $columns = [];
+        $current = 0;
+
+        foreach ($blocks as $block) {
+            if ($role === LayoutRole::TwoColumn && $current === 0 && $this->opensSecondColumn($block)) {
+                $current = 1;
+            }
+
+            $columns[] = $current;
+        }
+
+        return $columns;
+    }
+
+    /**
+     * The blocks of one column at one step, in order.
+     *
+     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     * @param list<int>                                                       $columns Which column each block belongs to.
+     *
+     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
+    */
+    private function visible(array $blocks, array $columns, int $step, int $column): array
+    {
+        $visible = [];
+
+        foreach ($blocks as $offset => $block) {
+            if ($columns[$offset] === $column && $block->step() <= $step) {
+                $visible[] = $block;
+            }
+        }
+
+        return $visible;
+    }
+
+    private function opensSecondColumn(Block $block): bool
+    {
+        return $block instanceof Heading && $block->level === 2;
+    }
+
+    /**
+     * PHPPresentation answers a path whose directory is not there by emitting a warning and a
+     * low-level "could not close zip file", after a broken archive has been left behind.
+     * Saying so here is what makes the failure one a caller can act on.
+     *
+     * @throws Exception
+    */
+    private function save(PhpPresentation $presentation, string $path): string
+    {
+        $directory = dirname($path);
+
+        if (!is_dir($directory)) {
+            throw new Exception(sprintf('There is no directory at "%s" to write "%s" into.', $directory, basename($path)));
+        }
+
+        IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
+
+        return $path;
+    }
+}

@@ -1,0 +1,12 @@
+# Word style slots, by the names in a .docx template's styles. A value is either a
+# styleId — "Heading1", not "Heading 1" — or an inline style array.
+heading.1: Heading1
+heading.2: Heading2
+paragraph: BodyText
+blockQuote: PullQuote
+codeFont:
+  name: JetBrains Mono
+  size: 9
+linkFont:
+  color: 89B4FA
+  underline: single

@@ -1,0 +1,4 @@
+# The slot is `blockQuote` and this is `blockquote`. A style slot that does not
+# exist would be ignored at render time and the deck would come out with none of the
+# styling the theme asked for, so the theme is refused instead.
+blockquote: PullQuote

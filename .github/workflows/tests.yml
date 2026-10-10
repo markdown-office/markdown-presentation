@@ -1,0 +1,159 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+  # Every job below installs what the manifest resolves at the time, because there is
+  # no lock file to pin it: a library does not commit one. This is the job that finds
+  # out when something upstream moves.
+  schedule:
+    - cron: '17 6 * * 1'
+
+# One push does not need four runs; the last is enough.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      # A manifest that does not validate is not worth running anything else
+      # against.
+      - name: Validate the manifest
+        run: composer validate --strict
+
+      - name: Install
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      # Every fenced example in the README is executed, so the documentation cannot
+      # quietly stop describing what the code does. Run on its own here as well as
+      # with the suite below, because it is the one thing that fails when the page
+      # and the library disagree, and it should say so before the whole suite runs.
+      - name: The examples in the README work
+        run: vendor/bin/pest --testsuite=readme
+
+  test:
+    name: php ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.5']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: ${{ matrix.php }}
+          # pcov rather than xdebug: it is roughly an order of magnitude faster.
+          coverage: pcov
+          tools: composer:v2
+
+      # Pest 5 needs PHP 8.4, so this resolves the newest Pest the platform allows
+      # — Pest 3 on 8.2, Pest 5 on 8.5 — rather than being pinned to one of them. The
+      # suite is written to run on all three, which is the whole reason for the range
+      # in `require-dev` rather than a single version.
+      - name: Install
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Test
+        run: vendor/bin/pest
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          coverage: pcov
+          tools: composer:v2
+
+      - name: Install
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      # 100 rather than a high number, because the whole of this package is branches
+      # whose failure modes are the product: which delimiter opens frontmatter, which
+      # colour names are accepted, which theme names resolve. An unexercised branch
+      # there is a rule nobody is testing, and this suite is small enough that
+      # everything in `src/` can be run.
+      #
+      # The exact figure is not written down on purpose — it is 100 because the gate
+      # is 100, and a number in a comment goes stale the moment either moves.
+      - name: Coverage
+        run: |
+          vendor/bin/pest --coverage --min=100 \
+            --coverage-clover=build/coverage/clover.xml \
+            --log-junit build/coverage/junit.xml
+
+      - name: Upload the coverage report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage
+          path: build/coverage
+          retention-days: 7
+
+  static:
+    name: static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      # Level 9, fetched by checksum rather than resolved through the manifest, with
+      # no `ignoreErrors`, no baseline and no suppression comment anywhere in the
+      # repository. The script checks the hash, so the analyser is the same one the
+      # level was chosen against rather than whatever is newest that morning.
+      - name: Analyse
+        run: composer analyse
+
+  audit:
+    name: known security advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      # A library commits no lock file, so there is nothing for `composer audit` to
+      # read and it is a no-op without one. Resolving first — without installing, so
+      # the job stays quick — gives it the set of packages a consumer would actually
+      # be given.
+      - name: Resolve what a consumer would be given
+        run: composer update --no-install --prefer-dist --no-interaction --no-progress
+
+      - name: Audit it
+        run: composer audit --locked --no-interaction
+
+      # The dependency tree is left behind on purpose: `audit --locked` is what
+      # makes this job different from the one above, and deleting the resolution
+      # would make it a copy of it.
+      - name: What was resolved
+        run: composer show --direct
