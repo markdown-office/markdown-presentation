@@ -57,6 +57,66 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
   write, and the Word style slots a `styles.yml` may name.
 - Three base themes: `default`, `corporate-dark` and `minimal`.
 
+### Fixed
+
+Four places where the library rendered silence rather than a failure, which
+is the outcome its whole design is against. Each was a directive a deck could
+name, and each is now either acted on or refused with the spelling that would
+have worked.
+
+- **`author:` reaches the file.** Before: `author:` was in the directive list,
+  was enforced as a slide-1 directive and was read by nobody —
+  `docProps/core.xml` carried the *theme's* author whatever the deck said, so a
+  deck written by one person was credited to whoever wrote the theme. After: the
+  deck's `author:` is `dc:creator`, the theme's is what a deck that names none
+  falls back to, and an `author:` that is not a string is a failure like a
+  `title:` that is not one. The deck wins because it is the document and the
+  theme is the template it was written in.
+- **`level:` governs the size of the title.** Before: validated by
+  `DeckParser`, carried on `Slide::level()`, and read by nothing — a directive a
+  deck could set correctly and that could not change a pixel. After: it is the
+  size the slide's title is drawn at. `level: 1` is the layout's own title size
+  and every level below it is the size a heading of that depth is drawn at in the
+  same body, so a title named in the frontmatter reads the same as one written as
+  a heading. Where a slide has both a `title:` and a `#` in its body, `level:`
+  moves the title and the `#` keeps its own depth — they are two shapes in two
+  boxes, and only one of them is the title. A `blank` layout has no title box,
+  so its title is the heading in its body, and `level:` governs that one too.
+- **A marker on the last line of a slide is a step.** Before: any HTML comment
+  running to the end of a slide was taken as its speaker note, and the note was
+  taken before anything was parsed into blocks, so `<!-- v-click -->` as the
+  last line cost the deck its step and wrote the literal text `v-click` into the
+  notes pane. After: a comment that is nothing but a step marker is that step.
+  `<!-- v-click=two -->` in the same position is now refused by name instead of
+  hidden in the notes. A note that merely mentions `v-click` is still a note,
+  and a step nothing was written on is still not a slide: the file would carry
+  two slides drawn the same way, which is a copy rather than what the deck said.
+- **A directive in the body of a slide is refused, not drawn.** Before:
+  `BlockParser` matched one comment, `<!-- v-click -->`, and everything else
+  fell through to the paragraph branch — so `<!-- v-if false -->` became a
+  shape holding that literal text, and so did `<v-click>` and `::: note`. After:
+  an HTML comment that is neither a step nor the note after the last line, a
+  `v-*` element or any element carrying a `v-*` directive, and a `:::` container
+  are all `UnknownDirective`, naming what was found and the spelling that would
+  have worked. The whole slide is judged before it is parsed into blocks, so a
+  directive in a table row or a wrapped list item is refused like one standing on
+  a line of its own; a comment inside a fenced code block is left to the code
+  block, which is how a deck shows one. A marker sharing its line with a word is
+  not a marker, and now raises rather than printing. A plain HTML tag is not in
+  Slidev's vocabulary and is still text — `<b>` is a deck saying something about
+  HTML, not a directive.
+- **A frontmatter block is closed by a delimiter line.** Before: the port of
+  Slidev's `RE_FRONTMATTER` matched three dashes *anywhere*, so the lazy closer
+  stopped inside the block — `description: a---b` read `a` and put `-b` and the
+  closer into the slide's body, and a quoted value holding `---` was not YAML at
+  all. After: the closer is anchored to a line, indented by no more than three
+  spaces as every other block construct here is, and the match ends at the end of
+  that line. Parity is unchanged — 94 decks, 77 identical, the same 17 declared
+  divergences — and `tests/fixtures/slidev/divergences.json` is untouched because
+  nothing diverged. Anchoring at column zero instead would have fixed this bug
+  and introduced two worse ones, which the `closing delimiter indented` deck in
+  the fixture shows.
+
 ### Notes
 
 - An unknown theme name, an unknown layout role, an unknown `styles.yml` slot, a
@@ -66,6 +126,16 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
   `.pptx` can carry are all refused with a message naming what would have worked. A
   silent fallback produces a broken deck with no feedback anywhere, which is the
   failure this library exists to avoid.
+- A comment after a slide's last line is still that slide's speaker note, which is
+  what the dialect has always said it is. A directive written in that position —
+  `<!-- v-if false -->` as the last thing on a slide — is therefore read as a note,
+  because nothing in the grammar tells a note from a directive there. Refusing it
+  would take the note feature with it; Slidev resolves the same ambiguity the same
+  way.
+- A `<!-- v-click -->` after the words of a list item is no longer drawn as text: it
+  is not a step, so it is refused like any other comment. The README's line saying
+  such a marker "is not honoured" now describes a refusal rather than literal text,
+  and wants rewording.
 - Every slide's frontmatter is checked before anything is built, so a deck whose
   fourth slide names something nobody reads fails before it has written a byte
   rather than leaving half a file where a whole one was expected.

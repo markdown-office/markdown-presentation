@@ -66,7 +66,14 @@ final class Slide
     {
         return $this->title;
     }
-        /** How deep the title's heading is, when the title is a heading. */
+        /**
+ * How deep the title reads: the depth of the heading it became, or the `level:`
+     * the frontmatter named, which is the one that wins where both are there.
+     *
+     * Not what the renderer sizes a title box from, and deliberately so: this is also
+     * the depth a heading that happened to become the title was written at, and a
+     * title box drawn at that size would shrink every slide opening on a `##`.
+     */
     public function level(): ?int
     {
         return $this->level;

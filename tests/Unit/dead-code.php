@@ -63,6 +63,7 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a v-click marker closing a list item is honoured' => 'a marker closing a list item',
     'an image is embedded whatever format it is in' => 'embedded unchanged, whatever format the deck named it in',
     'the package cannot write a pptx' => 'it renders nothing',
+    'a deck has no other way to name who made it' => 'the deck has no other way to say who made it',
 ]);
 
 it('has no decorative dividers in it', function () {
