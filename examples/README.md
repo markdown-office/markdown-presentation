@@ -19,7 +19,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | --- | --- | --- |
 | `01-kitchen-sink.md` | `01-kitchen-sink.pptx` | Every construct at once: emphasis, `code`, strikethrough, links, nested lists, an ordered list starting at 7, an aligned table with markup in its cells, a two-line quote, code, a rule, and a trailing comment becoming a speaker note |
 | `02-layout-roles.md` | `02-layout-roles.pptx` | All five layout roles, one per slide |
-| `03-themes.md` | three files | The same deck in `default`, `corporate-dark` and `minimal`, changed by nothing but the `theme:` line, so the three can be compared side by side |
+| `03-themes.md` | three files | The same deck in `default`, `corporate-dark` and `minimal`, changed by nothing but the `theme:` line, so the three can be compared side by side — and the middle one is the one that shows what `dark: true` in a `theme.yml` does |
 | `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does |
 | `05-steps.md` | `05-steps.pptx` | `<!-- v-click -->` steps, cumulative |
 | `06-tables.md` | `06-tables.pptx` | Table alignment, a bold filled header, widths from content |
@@ -49,5 +49,9 @@ A few of these are here because the render is the only honest evidence:
 - **`02`, the `blank` slide.** `blank` has no title box — that is what makes it
   blank — so a frontmatter `title:` there is drawn as a heading in the body
   instead. A `##` in that body keeps its own depth and comes out smaller.
+- **`03-themes-corporate-dark`.** The only one of the three with a dark page,
+  and the only one whose text is painted in the theme's light token rather than
+  its dark one. Nothing else about it differs: the same `theme.yml` colours, the
+  same twelve slots, `bg1` and `tx1` swapped.
 - **`09`.** The title is `Ops **runbook**: what *changed*` and is drawn with the
   emphasis, once, and is not repeated in the body.

@@ -15,9 +15,9 @@ palettes and can be compared side by side.
 
 ## What a theme reaches
 
-The rule under this heading is painted in `accent1`, the table's header row is
-filled with `lt2`, and the quote is set in `dk2`. Those are the slots a shape
-reaches for; the other nine are in the colour scheme and nothing else.
+The rule under this heading is painted in `accent1`. The table's header row is
+filled with `bg2` and the quote is set in `tx2`, and a dark theme maps those to
+the other two slots — `dk2` for the fill, `lt2` for the quote.
 
 ***
 
@@ -25,9 +25,9 @@ reaches for; the other nine are in the colour scheme and nothing else.
 
 | Slot | Written to |
 | :--- | :--------- |
-| `lt1` | the page behind every slide |
-| `dk1` | the body text |
-| `accent1` | rules, bullets, headings |
+| `bg1` | the page behind every slide |
+| `tx1` | the title, a heading, a table cell |
+| `accent1` | rules and bullets |
 
 ---
 

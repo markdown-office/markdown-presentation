@@ -8,6 +8,43 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **`corporate-dark` was a dark palette on a white page.** Before: the theme named
+  itself dark and had a near-black `dk1` and a near-white `lt1`, and every deck rendered
+  with the light token painting the page and the dark token painting the type: a
+  `#CDD6F4` page under a `#1E1E2E` heading, in a deck called *Corporate Dark*. The palette
+  was never wrong; the mapping was. `PresentationRenderer::master()` wrote the same colour
+  map for every theme — `<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2"/>` — and
+  `bg1="lt1"` says the page is painted with the light one. After: a theme says `dark: true`
+  and the map swaps to `bg1="dk1" tx1="lt1" bg2="dk2" tx2="lt2"`, which is what
+  PowerPoint's own dark themes do. The same twelve colours now produce a `#1E1E2E` page
+  under a `#CDD6F4` heading.
+
+  The swap had to reach further than the map. `AbstractDecoratorWriter::writeColor()`
+  writes `a:srgbClr` for every `Color` it is given, so every shape on every slide carries
+  a literal hex and never consults the colour map — swapping it alone would have produced
+  a dark page with `#1E1E2E` text on it. So the four roles the map maps are now asked of
+  the theme (`Theme::page()`, `ink()`, `subtleInk()`, `panel()`) at every point a shape
+  picks a colour, which is also what keeps the map and the shapes from disagreeing:
+
+  | Drawn as | Slot it was named | Slot on a dark theme |
+  | --- | --- | --- |
+  | the page behind every slide | `lt1` | `dk1` |
+  | body text, headings, titles, table cells | `dk1` | `lt1` |
+  | a quote, a code block's own text | `dk2` | `lt2` |
+  | a code block's fill, a table's header row | `lt2` | `dk2` |
+  | rules, bullets, links | `accent1`, `hlink` | unchanged — the map does not move them |
+
+  `default` and `minimal` write byte-identical parts: for a light theme the four roles
+  resolve to the slots the map already named.
+
+  The palette needed no adjustment. Measured against the page it now paints: body text
+  11.3:1, a quote 9.3:1, the code block's text on its own fill 9.9:1, the table header's
+  text on its own fill 12.1:1, bullets and rules 7.8:1 — all far above the 4.5:1 AA floor.
+  `dk2` is `#181825`, one step *below* the page rather than above it, so a code block and
+  a table header read as a recessed band at 1.07:1 against the page; that is the same
+  subtlety `default`'s `#E7E6E6` header has against white, and it is legible in the
+  rendered previews. A test now fails a shipped dark theme whose ink drops under 4.5:1.
+
 - **A deck with a speaker note could not be opened by Keynote.** PHPPresentation writes a
   colour map for a slide and for a slide layout but not for a notes slide. Keynote refuses
   such a file outright — "deck.pptx can't be imported" — while the same deck without a note
@@ -25,6 +62,13 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 
 ### Added
 
+- `dark: true` in a `theme.yml` — the key that says the page is dark. It renames no
+  colour; `dk1` is still the dark one and `lt1` the light one. It says which of them
+  paints the page and which paints the type on it, which is what the colour map on the
+  master then records and what every shape's colour is resolved through. A value that is
+  not a boolean is refused — `dark: yes` is a YAML 1.1 truthy *string*, and a theme
+  written that way would otherwise render light with nothing saying so — and a key that is
+  not one names the ones that are, as every other key in the file does.
 - `Document\DeckParser` — a Slidev-compatible deck splitter, a port of `parseSync`
   in `slidev/packages/parser/src/core.ts`. `---` closes a slide, a fenced code
   block is skipped whole, an HTML comment is tracked across lines, and the first
@@ -310,7 +354,15 @@ measured; and places where what the deck said did not survive into the file.
   only place the library honours a `SchemeColor` is the master's `p:txStyles`, which applies
   to placeholder shapes, and none of these shapes are placeholders. The claim in the README
   that `accent1` means the theme's accent "everywhere in the file" was therefore false and
-  has been corrected.
+  has been corrected. What a dark theme needed was therefore not a `SchemeColor` but a
+  resolution step of its own, which is what `Theme::page()`, `ink()`, `subtleInk()` and
+  `panel()` are.
+- A table's cell borders are the one colour on a slide that is not chosen from the theme:
+  PHPPresentation's `Shape\Table\Cell` writes `<a:lnL>` and its siblings as literal black,
+  and nothing here asks it for anything else. Black reads as a grid on a light page and as
+  a 1.07:1 line on a dark one, so a dark theme's tables are gridded by a colour it cannot
+  choose. Changing it for a dark theme only would be a second rule with no slot behind it,
+  and changing it for every theme is a different feature from the one in this branch.
 - All twelve colour slots are written whether a shape uses them or not, which was not a
   choice: DrawingML's `CT_ColorScheme` is twelve required elements, so a scheme with five of
   them is an invalid theme part. `accent2`–`accent6` and `folHlink` reach the file because

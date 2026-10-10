@@ -47,6 +47,21 @@ function sourcesWithClaim(string $claim): array
         }
     }
 
+    // The gallery is read by whoever is looking for an example, and a deck that
+    // describes what it demonstrates has been wrong about it before: the slides are
+    // built by a test, and what they *say* about themselves is not.
+    foreach (glob(Doctest::root() . '/examples/README.md') ?: [] as $page) {
+        if (str_contains((string) file_get_contents($page), $claim)) {
+            $found[] = 'examples/' . basename($page);
+        }
+    }
+
+    foreach (glob(Doctest::root() . '/examples/markdown/*.md') ?: [] as $deck) {
+        if (str_contains((string) file_get_contents($deck), $claim)) {
+            $found[] = 'examples/markdown/' . basename($deck);
+        }
+    }
+
     sort($found);
 
     return $found;
@@ -64,6 +79,8 @@ it('does not claim again what the code does not do', function (string $claim) {
     'an image is embedded whatever format it is in' => 'embedded unchanged, whatever format the deck named it in',
     'the package cannot write a pptx' => 'it renders nothing',
     'a deck has no other way to name who made it' => 'the deck has no other way to say who made it',
+    'the page behind every slide is always lt1' => 'becomes the page behind every slide',
+    'accent1 paints the headings' => 'rules, bullets, headings',
 ]);
 
 it('has no decorative dividers in it', function () {
