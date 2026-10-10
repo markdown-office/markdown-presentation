@@ -19,7 +19,7 @@ use MarkdownPresentation\Exception\UnsupportedLink;
  * A relative target is not one of them, and cannot be: `[alt](logo.png)` inside a sentence
  * is a picture the renderer draws as text, and refusing every relative target would refuse
  * every deck that writes one. What is refused is the two shapes a reader's machine acts on
- * -- a scheme, and a Windows or UNC share -- and {@see UnsupportedLink} says so.
+ * — a scheme, and a Windows or UNC share — and {@see UnsupportedLink} says so.
  *
  * Deliberately not a CommonMark inline parser. An emphasis delimiter that does not close
  * is left as the character it is, which is what a reader expects and what a strict parser
