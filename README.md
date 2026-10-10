@@ -251,9 +251,9 @@ mapping can be read off `ppt/slides/slideN.xml` without the library:
 | `# Heading` | `title`, then `heading` | The first heading becomes the title and is not drawn twice, whatever markup it carries |
 | A paragraph | `paragraph` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters |
 | `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted, from the number the deck writes; nesting is the indent |
-| ```` ```lang ```` | `code` | Mono font, filled with `lt2`, the language in the shape's description. No colouring |
-| `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has; a cell carries the same inline markup a paragraph does. The header row is bold, filled with `lt2`, and the columns are as wide as what they hold |
-| `> a` | `quote` | Italic, in `dk2`, indented. Written over several lines it is one shape |
+| ```` ```lang ```` | `code` | Mono font, filled with `bg2`, the language in the shape's description. No colouring |
+| `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has; a cell carries the same inline markup a paragraph does. The header row is bold, filled with `bg2`, and the columns are as wide as what they hold |
+| `> a` | `quote` | Italic, in `tx2`, indented. Written over several lines it is one shape |
 | `***` | `rule` | A bar in `accent1`. `---` is a slide delimiter and never reaches here |
 | A line that is only `![alt](path)` | `image` | Fitted to its box, aspect kept, centred. The alt text is the shape's description, and the written path stands in where the deck named none. A path that is not a file is a failure |
 
@@ -516,9 +516,10 @@ sizes itself by `viewBox`, and before PHP 8.5 it could not read one at all.
 
 The twelve colours of `theme.yml` are written into the presentation's colour scheme, which
 is what PowerPoint's colour picker reads, so a theme edited in the application offers the
-theme's own swatches. `lt1` becomes the page behind every slide. The `heading`, `body` and
-`mono` fonts are applied to the runs that use them, because a `.pptx`'s font scheme is not
-reachable from here.
+theme's own swatches. The page behind every slide, the type on it and the panels it fills
+follow `dark:` — see [Dark themes](#dark-themes). The `heading`, `body` and `mono` fonts are
+applied to the runs that use them, because a `.pptx`'s font scheme is not reachable from
+here.
 
 Two limits worth knowing. All twelve slots are written whether a shape uses them or not:
 DrawingML's `CT_ColorScheme` is twelve required elements, so a scheme missing one is an
@@ -527,7 +528,10 @@ leaves no way to leave them out. And a colour reaching a *shape* is written as `
 not as an `a:schemeClr` naming the slot — PHPPresentation's writer emits `a:srgbClr` for
 every `Color` it is handed, `SchemeColor` included. So re-theming in PowerPoint changes the
 swatches the picker offers; it does not restyle the bullets, rules and text already on the
-slides.
+slides. The colour map the master writes says which slot each of `bg1`, `tx1`, `bg2` and
+`tx2` is, and it is written from the same four the shapes are painted with rather than
+independently of them — but it is the theme that decides, not the map: a shape's colour is
+resolved here and written out as hex, and the map is never consulted for it again.
 
 `styles.yml` is **not** read. Its slots are the Word half's vocabulary and the shipped themes
 write `.docx` style ids, which a `.pptx` has no use for; mapping them onto shapes would be
@@ -633,6 +637,56 @@ echo $theme->colour('accent1'), "\n";
 ```text
 #101010 #101010
 #4472C4
+```
+
+### Dark themes
+
+`dark: true` says the page is dark. It renames no colour — `dk1` is still the dark
+one and `lt1` the light one — it says which of the two plays which part, which is
+what PowerPoint's own dark themes do with the colour map rather than with the
+palette:
+
+```php
+use Symfony\Component\Yaml\Yaml;
+use MarkdownPresentation\Theme\Theme;
+
+$dark = Theme::fromArray(Yaml::parse("name: Night\ndark: true\n"));
+
+echo $dark->isDark() ? 'dark' : 'light', "\n";
+echo $dark->page(), " paints the page, ", $dark->ink(), " paints the type\n";
+echo $dark->panel(), " fills a panel, ", $dark->subtleInk(), " paints the quiet type\n";
+```
+
+```text
+dark
+dk1 paints the page, lt1 paints the type
+dk2 fills a panel, lt2 paints the quiet type
+```
+
+Those four are the master's colour map — `bg1`, `tx1`, `bg2`, `tx2` — asked of the
+theme rather than read off the master, so a shape and the master that paints it
+cannot disagree about which slot is which. Everything that reaches a shape reaches
+it through them: body text, headings, titles and table cells in `tx1`; quotes and a
+code block's own text in `tx2`; a code block and a table's header row filled with
+`bg2`; the page behind every slide in `bg1`.
+
+A flag that is not a boolean is a failure, because a theme written `dark: yes` would
+otherwise render light with nothing saying so:
+
+```php
+use Symfony\Component\Yaml\Yaml;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Theme\Theme;
+
+try {
+    Theme::fromArray(Yaml::parse("name: Night\ndark: yes\n"));
+} catch (Exception $failure) {
+    echo $failure->getMessage(), "\n";
+}
+```
+
+```text
+In "theme.yml": "dark" is not true or false.
 ```
 
 ### Resolution order
@@ -862,6 +916,7 @@ renders of one deck differ; the parts are what a test reads.
 | A `layout:` role becomes a slide layout part named by the theme | `ppt/slideLayouts/`, `ppt/slides/_rels/` |
 | One shape per block, named after the kind of block it was | `<p:cNvPr name="…">` |
 | The theme's twelve colours become the colour scheme | `ppt/theme/theme1.xml` |
+| A dark theme swaps the colour map, and its shapes follow it | `ppt/slideMasters/slideMaster1.xml`, `ppt/slides/slideN.xml` |
 | The theme's `heading`, `body` and `mono` reach the runs that use them | `<a:latin typeface="…">` |
 | `styles.yml` reaches no shape, because a `.pptx` has no use for a `.docx` style id | — |
 

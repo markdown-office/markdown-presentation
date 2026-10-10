@@ -35,6 +35,7 @@ use PhpOffice\PhpPresentation\Slide\Note;
 use PhpOffice\PhpPresentation\Slide\SlideLayout;
 use PhpOffice\PhpPresentation\Slide\SlideMaster;
 use PhpOffice\PhpPresentation\Style\Color;
+use PhpOffice\PhpPresentation\Style\ColorMap;
 use PhpOffice\PhpPresentation\Style\SchemeColor;
 
 /**
@@ -309,6 +310,10 @@ final class PresentationRenderer
      * a bullet or a rule is painted with reaches the file as a literal value. Re-theming the
      * deck in PowerPoint restyles the picker's swatches; it does not restyle the shapes
      * already on the slides.
+     *
+     * The colour map is written from the theme's own four roles, so a dark theme's map and
+     * its shapes cannot disagree about which slot paints what — {@see \MarkdownPresentation\Theme\Theme::page()}
+     * and its three neighbours are where the swap lives.
      */
     private function master(SlideMaster $master, Theme $theme): void
     {
@@ -319,8 +324,14 @@ final class PresentationRenderer
             $master->addSchemeColor($colour);
         }
 
+        $master->colorMap
+            ->changeColor(ColorMap::COLOR_BG1, $theme->page())
+            ->changeColor(ColorMap::COLOR_TX1, $theme->ink())
+            ->changeColor(ColorMap::COLOR_BG2, $theme->panel())
+            ->changeColor(ColorMap::COLOR_TX2, $theme->subtleInk());
+
         $background = new BackgroundColor();
-        $background->setColor(new Color(ltrim($theme->colour('lt1') ?? '#FFFFFF', '#')));
+        $background->setColor(new Color(ltrim($theme->colour($theme->page()) ?? '#FFFFFF', '#')));
         $master->setBackground($background);
     }
 

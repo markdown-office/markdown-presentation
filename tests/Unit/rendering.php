@@ -457,10 +457,15 @@ it('writes the code in the mono font the theme names', function () {
     expect($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:latin typeface="Menlo"/>');
 });
 
-it('fills the code shape with the theme lt2 colour', function () {
-    $pptx = renderDeck("---\ntheme: corporate-dark\n---\n\n```\nplain\n```\n");
+it('fills the code shape with the colour the theme paints its panels in', function () {
+    // `dk2` on a dark theme and `lt2` on a light one. The theme's palette is not what
+    // decides it: the same twelve colours give a light panel on one theme and a dark
+    // panel on the other, which is the swap the colour map makes.
+    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n```\nplain\n```\n");
+    $light = renderDeck("---\ntheme: minimal\n---\n\n```\nplain\n```\n");
 
-    expect($pptx->fillOf('code'))->toBe('#bac2de');
+    expect($dark->fillOf('code'))->toBe('#181825')
+        ->and($light->fillOf('code'))->toBe('#f5f5f5');
 });
 
 it('keeps the language a fence names where a reader can find it', function () {
@@ -1115,13 +1120,110 @@ it('writes the theme colours into the colour scheme', function () {
         ->and($scheme['hlink'])->toBe('#89b4fa');
 });
 
-it('paints the master background with the theme lt1 colour', function () {
+it('paints the master background with the colour the theme paints its page in', function () {
     // Asserted inside `<p:bg>` rather than by "the colour appears somewhere": the colour
-    // scheme carries `lt1` too, so `usesColour()` is satisfied by the scheme alone and
+    // scheme carries every slot, so `usesColour()` is satisfied by the scheme alone and
     // says nothing about the page behind every slide.
-    $master = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
+    //
+    // `lt1` on a light theme and `dk1` on a dark one. `corporate-dark` was `lt1` here —
+    // a near-white page under a name that says dark — and `dark: true` is what moved it.
+    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
+    $light = renderDeck("---\ntheme: minimal\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
 
-    expect($master)->toMatch('#<p:bg>.*?<a:srgbClr val="CDD6F4".*?</p:bg>#s');
+    expect($dark)->toMatch('#<p:bg>.*?<a:srgbClr val="1E1E2E".*?</p:bg>#s')
+        ->and($light)->toMatch('#<p:bg>.*?<a:srgbClr val="FFFFFF".*?</p:bg>#s');
+});
+
+it('maps a dark theme\'s page and text the other way round', function () {
+    // `bg1="lt1"` says the page is painted with the *light* token, which is the whole
+    // defect: a theme whose `dk1` is near-black came out a near-white page. PowerPoint's
+    // own dark themes keep the palette and swap the map, and this is that swap.
+    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
+
+    expect($dark)->toContain('<p:clrMap bg1="dk1" tx1="lt1" bg2="dk2" tx2="lt2"');
+});
+
+it('leaves a light theme\'s colour map where it was', function () {
+    $light = renderDeck("---\ntheme: minimal\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
+
+    expect($light)->toContain('<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2"');
+});
+
+it('writes a dark theme\'s body text in the light token', function () {
+    // The map alone does not do this. A colour reaching a shape is written as a literal
+    // `a:srgbClr` and the map is never consulted for it, so a dark theme whose map was
+    // swapped and whose shapes were not is a dark page with near-black text on it.
+    $slide = renderDeck("---\ntheme: corporate-dark\n---\n\nSome text.\n")->part('ppt/slides/slide1.xml');
+
+    expect($slide)->toMatch('#<a:r>\s*<a:rPr[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="CDD6F4">#')
+        ->and($slide)->not->toContain('val="1E1E2E"');
+});
+
+it('writes a light theme\'s body text in the dark token', function () {
+    $slide = renderDeck("---\ntheme: minimal\n---\n\nSome text.\n")->part('ppt/slides/slide1.xml');
+
+    expect($slide)->toMatch('#<a:r>\s*<a:rPr[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="1A1A1A">#');
+});
+
+it('writes a dark theme\'s title and headings in the light token', function () {
+    $slide = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n\n## Two\n")->part('ppt/slides/slide1.xml');
+
+    expect($slide)->toMatch('#<a:r>\s*<a:rPr[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="CDD6F4">#');
+});
+
+it('writes a dark theme\'s quote in the second light token rather than the second dark one', function () {
+    // `dk2` is #181825, which on the #1E1E2E page it is quoted against is the page
+    // again. The quote is legible or it is not, so the slot follows the theme.
+    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n> quoted\n")->part('ppt/slides/slide1.xml');
+    $light = renderDeck("---\ntheme: minimal\n---\n\n> quoted\n")->part('ppt/slides/slide1.xml');
+
+    expect($dark)->toContain('<a:srgbClr val="BAC2DE">')
+        ->and($dark)->not->toContain('val="181825"')
+        ->and($light)->toContain('<a:srgbClr val="4A4A4A">');
+});
+
+it('fills a dark theme\'s code block with a colour its text can be read on', function () {
+    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n```\nplain\n```\n");
+    $slide = $dark->part('ppt/slides/slide1.xml');
+
+    // The fill is `dk2` and the code is `lt2`: the same two slots a light theme uses the
+    // other way round. Read off the run rather than off the part, because the colour
+    // scheme carries every slot the slide never draws with.
+    expect($dark->fillOf('code'))->toBe('#181825')
+        ->and($slide)->toMatch('#<a:r>\s*<a:rPr[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="BAC2DE">#');
+});
+
+it('fills a dark theme\'s table header with a colour its text can be read on', function () {
+    $xml = renderDeck("---\ntheme: corporate-dark\n---\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n")
+        ->part('ppt/slides/slide1.xml');
+
+    // The header row carries `dk2` and its type `lt1`. The count is per cell, because
+    // that is where the fill is written, and a fill that reached one cell of two would
+    // still put the colour in the file.
+    expect(substr_count($xml, '<a:srgbClr val="181825">'))->toBe(2)
+        ->and($xml)->toMatch('#<a:r>\s*<a:rPr[^>]*\bb="1"[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="CDD6F4">#');
+});
+
+it('paints a dark theme\'s bullets and rule in the accent, which the swap leaves alone', function () {
+    // `accent1` maps to `accent1` whichever way round the two pairs go, so these are the
+    // one kind of colour that follows the theme without being changed by `dark:`.
+    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n- one\n\n***\n");
+
+    expect($dark->fillOf('rule'))->toBe('#89b4fa')
+        ->and($dark->part('ppt/slides/slide1.xml'))->toMatch('#<a:buClr>\s*<a:srgbClr val="89B4FA">#');
+});
+
+it('leaves a light theme\'s colours where the map says they are', function () {
+    // The other half of the claim above, and the one that catches a swap written into
+    // the shape colours rather than into the theme: `minimal` says nothing about
+    // darkness and has to come out exactly as it did.
+    $light = renderDeck("---\ntheme: minimal\n---\n\n| A |\n| --- |\n| 1 |\n\n> quoted\n\n```\nx\n```\n");
+    $slide = $light->part('ppt/slides/slide1.xml');
+
+    expect($light->fillOf('code'))->toBe('#f5f5f5')
+        ->and($slide)->toContain('<a:srgbClr val="F5F5F5">')
+        ->and($slide)->toContain('<a:srgbClr val="1A1A1A">')
+        ->and($slide)->toContain('<a:srgbClr val="4A4A4A">');
 });
 
 it('writes body text in the theme body font', function () {

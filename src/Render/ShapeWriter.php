@@ -310,7 +310,7 @@ final class ShapeWriter
             $block->runs,
             SlideGeometry::QUOTE_SIZE,
             italic: true,
-            font: $this->colour('dk2'),
+            font: $this->subtleInk(),
         );
 
         return $shape;
@@ -327,7 +327,7 @@ final class ShapeWriter
             $block->runs,
             $size,
             bold: true,
-            font: $this->colour('dk1'),
+            font: $this->ink(),
             face: $this->font('heading'),
         );
 
@@ -372,7 +372,7 @@ final class ShapeWriter
         $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
         $shape->setDescription($block->language);
-        $shape->getFill()->setFillType(Fill::FILL_SOLID)->setStartColor($this->colour('lt2'));
+        $shape->getFill()->setFillType(Fill::FILL_SOLID)->setStartColor($this->panel());
 
         $first = true;
 
@@ -385,7 +385,7 @@ final class ShapeWriter
             $paragraph->setSpacingAfter(0);
             $paragraph->getFont()->setSize(SlideGeometry::CODE_SIZE)
                 ->setName($this->font('mono'))
-                ->setColor($this->colour('dk2'));
+                ->setColor($this->subtleInk());
 
             $paragraph->createTextRun($line);
         }
@@ -420,7 +420,7 @@ final class ShapeWriter
             // slides, is not written: PHPPresentation's row carries no such flag, and a
             // table clamped to one slide is not a table that splits.
             if ($number === self::HEADER_ROW) {
-                $created->getFill()->setFillType(Fill::FILL_SOLID)->setStartColor($this->colour('lt2'));
+                $created->getFill()->setFillType(Fill::FILL_SOLID)->setStartColor($this->panel());
             }
 
             $cells = $created->getCells();
@@ -444,7 +444,7 @@ final class ShapeWriter
                     $runs,
                     SlideGeometry::TABLE_SIZE,
                     bold: $number === self::HEADER_ROW,
-                    font: $this->colour('dk1'),
+                    font: $this->ink(),
                 );
             }
         }
@@ -557,7 +557,7 @@ final class ShapeWriter
             $runs,
             $size,
             bold: true,
-            font: $this->colour('dk1'),
+            font: $this->ink(),
             face: $this->font('heading'),
         );
 
@@ -621,6 +621,8 @@ final class ShapeWriter
         $paragraph->setSpacingBefore(0);
         $paragraph->setSpacingAfter(0);
 
+        $plain = $font ?? $this->ink();
+
         foreach ($runs as $run) {
             $element = $paragraph->createTextRun($run->text);
             $element->getFont()
@@ -630,9 +632,9 @@ final class ShapeWriter
                 ->setItalic($run->italic || $italic)
                 ->setStrikethrough($run->strike ? StyleFont::STRIKE_SINGLE : StyleFont::STRIKE_NONE)
                 // The link branch is asked first: `$font ?? …` short-circuited it, so a link
-                // inside a heading or a quote was drawn in the heading's `dk1` or the quote's
-                // `dk2` and looked like ordinary text that happened to be clickable.
-                ->setColor($run->link === null ? ($font ?? $this->colour('dk1')) : $this->colour('hlink'));
+                // inside a heading or a quote was drawn in the heading's own colour and
+                // looked like ordinary text that happened to be clickable.
+                ->setColor($run->link === null ? $plain : $this->colour('hlink'));
 
             if ($run->link === null) {
                 continue;
@@ -675,6 +677,30 @@ final class ShapeWriter
             'right' => Alignment::HORIZONTAL_RIGHT,
             default => Alignment::HORIZONTAL_LEFT,
         };
+    }
+
+    /**
+     * Every colour a shape is painted with, by the part it plays rather than by the slot
+     * that holds it.
+     *
+     * The accents and the hyperlinks are slots either way and go through {@see self::colour()}
+     * directly; everything that paints the page, the type on it, or a panel on it is
+     * resolved here, so a dark theme's shapes follow its `dark: true` rather than the
+     * `dk1` they would have been given either way.
+     */
+    private function ink(): Color
+    {
+        return $this->colour($this->theme->ink());
+    }
+
+    private function subtleInk(): Color
+    {
+        return $this->colour($this->theme->subtleInk());
+    }
+
+    private function panel(): Color
+    {
+        return $this->colour($this->theme->panel());
     }
 
     private function colour(string $slot): Color
