@@ -37,3 +37,5 @@
 .vscode/
 *.swp
 *~
+# Everything the examples build produces.
+/examples/out/
