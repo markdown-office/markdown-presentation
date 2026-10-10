@@ -157,3 +157,49 @@ it('gives a table row the height of the lines its longest cell wraps to', functi
     expect(measured("| A |\n| --- |\n| " . str_repeat('z', 500) . " |\n")->positionOf('table')['height'])
         ->toBe(38 + 4 * 19.0);
 });
+
+/**
+ * The widths a table's grid was written at, in pixels, straight out of `<a:gridCol>`.
+ *
+ * @return list<float>
+ */
+function columnsOf(string $markdown): array
+{
+    preg_match_all('#<a:gridCol w="(\d+)"#', measured($markdown)->part('ppt/slides/slide1.xml'), $found);
+
+    return array_map(static fn (string $emu): float => ((int) $emu) / 9525.0, $found[1]);
+}
+
+it('gives a table\'s columns the width of what they hold', function () {
+    // Equal columns came from `intdiv(880, $columns)`, which is a third of the body box for
+    // every column whatever it says: a column whose header is one character and a column
+    // whose cells are a sentence were drawn the same, and the narrow one wrapped to one
+    // word a line while the wide one sat empty.
+    $markdown = "| A |\n| --- |\n| " . str_repeat('z', 60) . " |\n| b |\n";
+    $widths = columnsOf($markdown);
+
+    expect($widths[0])->toBe(880.0);
+});
+
+it('divides a table\'s width between its columns exactly', function () {
+    // `intdiv` drops up to a pixel per column: twelve columns of 880 came to 876 and three
+    // came to 879, and a grid narrower than the shape it sits in is one PowerPoint lays out
+    // again itself.
+    foreach ([3, 7, 12] as $columns) {
+        $row = implode('|', array_fill(0, $columns, ' x '));
+        $align = implode('|', array_fill(0, $columns, ' --- '));
+        $widths = columnsOf("|$row|\n|$align|\n");
+
+        expect(array_sum($widths))->toBe(880.0);
+    }
+});
+
+it('never draws a table column narrower than a label fits', function () {
+    // Proportional widths alone would let one very long column starve the rest: a table of
+    // two columns, one holding a sentence and one holding a letter, would give the letter
+    // a column too narrow to show it.
+    $markdown = "| " . str_repeat('z', 60) . " | b |\n| --- | --- |\n| " . str_repeat('z', 60) . " | b |\n";
+    $widths = columnsOf($markdown);
+
+    expect(min($widths))->toBeGreaterThanOrEqual(80.0);
+});

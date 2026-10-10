@@ -150,6 +150,18 @@ nothing had measured.
   height the layout gave it and scales the type down to fit. The measurement is
   an estimate, so a mis-estimate has to land somewhere, and this is the direction
   where it costs a little whitespace rather than an overlap.
+- **Two blocks no longer abut.** Every paragraph was written with
+  `setSpacingBefore(0)` and `setSpacingAfter(0)`, which is right — the heights decide
+  where the next block starts — but the gap that leaves was nowhere, so two
+  consecutive paragraphs sat with one line of text against the next. The gap is
+  in the layout now (`SlideGeometry::BLOCK_GAP`), where the heights can see it.
+- **A table's columns are divided exactly, and are not all the same.** Before:
+  `intdiv(880, $columns)` per column, which drops up to a pixel each — twelve
+  columns came to 876 and three to 879, and a grid narrower than the shape it
+  sits in is one PowerPoint lays out again itself — and every column was that
+  width whatever it held. After: the last column takes the remainder so the grid
+  is the shape's width exactly, and the columns are proportional to the widest
+  cell in each, with a floor wide enough for a label to show in.
 - **A code block is padded by its real insets.** `CODE_PADDING` added twelve
   pixels to the height of a block whose body insets are 91440 EMU across and
   45720 down — 9.6px and 4.8px, and cost to a text block's width as well as its

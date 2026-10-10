@@ -521,7 +521,7 @@ final class PresentationRenderer
                 $room = max(0, $bottom - $y);
                 $height = max(min($writer->height($block, $box, $room), $room), SlideGeometry::MIN_SIZE);
                 $writer->write($slide, $block, new Box($box->x, $y, $box->width, $height), $height);
-                $y += $height;
+                $y += $height + SlideGeometry::BLOCK_GAP;
             }
         }
     }

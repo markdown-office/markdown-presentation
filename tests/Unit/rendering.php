@@ -440,7 +440,7 @@ it('starts the block after a table below the rows the table writes', function ()
     $pptx = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |\n| 7 | 8 |\n\nAfter.\n");
 
     expect($pptx->positionOf('table')['height'])->toBe(5.0 * 38.0)
-        ->and($pptx->positionOf('paragraph')['y'])->toBe(104.0 + 5 * 38.0);
+        ->and($pptx->positionOf('paragraph')['y'])->toBe(104.0 + 5 * 38.0 + 12.0);
 });
 
 it('renders a block quote as a quote shape', function () {
@@ -507,10 +507,19 @@ it('starts a body block below the title box', function () {
     expect($pptx->positionOf('paragraph')['y'])->toBeGreaterThan($pptx->positionOf('title')['y']);
 });
 
+it('leaves a gap between two blocks of a column', function () {
+    // Every paragraph is written with `setSpacingBefore(0)` and `setSpacingAfter(0)`, so
+    // without a gap in the layout two consecutive paragraphs abut with nothing between
+    // them: one line of text against the next.
+    $tops = array_column(renderDeck("First.\n\nSecond.\n")->positions(), 'y');
+
+    expect($tops[1] - $tops[0])->toBe(38.0);
+});
+
 it('keeps two blocks from being written at the same height', function () {
-    // Each block's top is the one above it plus that block's height, so two blocks sharing a
-    // top is the arithmetic drifting — which shows up as one drawn over the other rather
-    // than as a failure.
+    // Each block's top is the one above it plus that block's height and the gap, so two
+    // blocks sharing a top is the arithmetic drifting — which shows up as one drawn over
+    // the other rather than as a failure.
     $tops = array_column(renderDeck("# T\n\nA.\n\n```\nx\n```\n\nB.\n")->positions(), 'y');
 
     expect(array_values(array_unique($tops)))->toHaveCount(count($tops));

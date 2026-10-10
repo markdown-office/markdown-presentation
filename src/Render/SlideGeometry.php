@@ -69,6 +69,17 @@ final class SlideGeometry
     /** The vertical room a rule occupies, the two-pixel bar centred in it. */
     public const RULE_HEIGHT = 16;
 
+    /**
+     * The gap left between two blocks in a column.
+     *
+     * In the layout rather than in the shapes: every paragraph is written with
+     * `setSpacingBefore(0)` and `setSpacingAfter(0)`, because {@see ShapeWriter::height()}
+     * decides where the next block starts and a leading gap it does not know about is what
+     * puts one shape on top of the one before it. A gap the heights do know about is the
+     * only kind that survives.
+     */
+    public const BLOCK_GAP = 12;
+
     private const BODY_WIDTH = self::WIDTH - 2 * self::MARGIN;
 
     /** A point is 4/3 of a pixel at the 96 dpi {@see Box} counts in. */
