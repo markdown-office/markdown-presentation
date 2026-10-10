@@ -532,6 +532,10 @@ final class PresentationRenderer
      *
      * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
     */
+    /**
+     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks The slide's blocks, in reading order.
+     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
+     */
     private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox, ?int $depth): array
     {
         $title = $source->title();
@@ -577,7 +581,7 @@ final class PresentationRenderer
         // `level: 1` is the top of what a body can draw.
         $blocks[$at] = new Heading($heading->runs, max(1, $depth - 1), $heading->step);
 
-        return $blocks;
+        return array_values($blocks);
     }
 
     private function note(WrittenSlide $slide, string $text): void

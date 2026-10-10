@@ -39,6 +39,8 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
  *
  * Every shape is named after the kind of block it came from, so the whole mapping can be
  * read off `ppt/slides/slideN.xml` without opening the library.
+ *
+ * @phpstan-import-type Piece from TextMetric
 */
 final class ShapeWriter
 {
@@ -66,7 +68,7 @@ final class ShapeWriter
      *
      * @param Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table $block
      */
-    public function height(Block $block, Box $box, int $room): int
+    public function height(Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table $block, Box $box, int $room): int
     {
         $width = $this->textWidth($box);
 
@@ -117,7 +119,7 @@ final class ShapeWriter
      *
      * @param list<Run> $runs
      *
-     * @return list<TextMetric::Piece>
+     * @return list<Piece>
     */
     private function pieces(array $runs, int $size, bool $mono = false, bool $bold = false): array
     {
@@ -190,7 +192,7 @@ final class ShapeWriter
             foreach ($widths as $index => $width) {
                 $lines = max($lines, $this->runLines(
                     $row[$index] ?? [],
-                    $width,
+                    $width - 2 * SlideGeometry::TABLE_PADDING,
                     SlideGeometry::TABLE_SIZE,
                     bold: $number === self::HEADER_ROW,
                 ));
@@ -269,7 +271,7 @@ final class ShapeWriter
      *
      * @param Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table $block
     */
-    public function write(Slide $slide, Block $block, Box $box, int $height): AbstractShape
+    public function write(Slide $slide, Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table $block, Box $box, int $height): AbstractShape
     {
         $shape = match (true) {
             $block instanceof Code => $this->code($slide, $block, $box, $height),
@@ -431,7 +433,10 @@ final class ShapeWriter
                 $cell = $cells[$index];
                 $cell->setWidth($columns[$index]);
                 $paragraph = $cell->getActiveParagraph();
-                $paragraph->getAlignment()->setHorizontal($this->alignment($block->align[$index] ?? 'left'));
+                $paragraph->getAlignment()
+                    ->setHorizontal($this->alignment($block->align[$index] ?? 'left'))
+                    ->setMarginLeft(SlideGeometry::TABLE_PADDING)
+                    ->setMarginRight(SlideGeometry::TABLE_PADDING);
                 $paragraph->setBulletStyle($this->bullet(Bullet::TYPE_NONE));
 
                 $this->runs(

@@ -124,6 +124,40 @@ it('measures a paragraph by the lines it wraps to', function () {
     expect(measured(str_repeat('x', 500) . "\n")->positionOf('paragraph')['height'])->toBe(130.0);
 });
 
+it('measures a run boundary as a change of face rather than as a line', function () {
+    // The cursor used to restart at every run, so a sentence written with markup cost a
+    // line per `**bold**` in it: this one reads as one line and measured as six, and the
+    // block after it was clamped to nothing.
+    $metric = new TextMetric();
+    $runs = [
+        TextMetric::piece('A paragraph with ', 16),
+        TextMetric::piece('bold', 16, bold: true),
+        TextMetric::piece(', ', 16),
+        TextMetric::piece('italic', 16),
+        TextMetric::piece(' and a link', 16),
+        TextMetric::piece(' in it.', 16),
+    ];
+
+    expect($metric->lines($runs, 4000))->toBe(1)
+        ->and($metric->lines($runs, 4000))
+        ->toBe($metric->lines([TextMetric::piece('A paragraph with bold, italic and a link in it.', 16)], 4000));
+});
+
+it('measures a paragraph carrying markup as the paragraph it reads as', function () {
+    // The same claim read off a written file, because the number was never the complaint:
+    // the paragraph was over-allocated by its own markup, which pushed the block below it
+    // down and had that one clamped.
+    $sentence = 'A paragraph with bold, italic, both, code, struck and a link in it.';
+    $marked = str_replace(
+        ['bold', 'italic', 'both', 'code', 'struck', 'link'],
+        ['**bold**', '*italic*', '***both***', '`code`', '~~struck~~', '[link](https://example.com)'],
+        $sentence,
+    );
+
+    expect(measured("# Lead\n\n$marked\n")->positionOf('paragraph')['height'])
+        ->toBe(measured("# Lead\n\n$sentence\n")->positionOf('paragraph')['height']);
+});
+
 it('measures a heading by the lines it wraps to', function () {
         // `##` is 20pt and bold, so the same 500 characters are wider again and still come to
         // seven lines of the 32px a line at that size is.
@@ -202,4 +236,32 @@ it('never draws a table column narrower than a label fits', function () {
     $widths = columnsOf($markdown);
 
     expect(min($widths))->toBeGreaterThanOrEqual(80.0);
+});
+
+it('keeps a table cell\'s text off its neighbour\'s', function () {
+    // PHPPresentation writes a cell's `a:bodyPr` with no insets and gives `Cell` no inset
+    // to set, so a cell's text starts exactly at its edge: a right-aligned cell and the
+    // left-aligned one beside it met at the border and read as one word, which is what
+    // `struck` and `plain` became in the built examples. The paragraph's own margins are
+    // what stands in for the inset, on both sides, or a right-aligned cell would still
+    // touch the one after it. 57150 EMU is 6px, which is `SlideGeometry::TABLE_PADDING`
+    // written out rather than read back, so the assertion is on what was written.
+    $xml = measured("| a | b |\n| :--- | ---: |\n| 1 | 2 |\n")->part('ppt/slides/slide1.xml');
+    preg_match_all('#<a:pPr[^>]*>#', $xml, $found);
+
+    expect($found[0])->toHaveCount(4);
+
+    foreach ($found[0] as $properties) {
+        expect($properties)->toContain('marL="57150"')->toContain('marR="57150"');
+    }
+});
+
+it('measures a table cell against the width its padding leaves', function () {
+    // The padding is not free: a cell measured against the whole column uses six pixels its
+    // text does not have, and a cell whose last line is exactly that wide wraps — which is a
+    // row taller than the text in it needs. 292 `z` are 1752px of type in an 880px column:
+    // three lines once 12px of that column is padding, two without.
+    $markdown = "| A |\n| --- |\n| " . str_repeat('z', 292) . " |\n";
+
+    expect(measured($markdown)->positionOf('table')['height'])->toBe(38.0 + 3 * 19.0);
 });

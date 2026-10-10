@@ -66,6 +66,22 @@ final class SlideGeometry
     /** The narrowest a table column is drawn, whatever its cells ask for. */
     public const TABLE_COLUMN = 80;
 
+    /**
+     * The air inside a table cell, on the left and on the right.
+     *
+     * PHPPresentation writes a cell's `a:bodyPr` with no `lIns`/`rIns` at all, and
+     * `Cell` carries no inset of its own to set, so a cell has none: the text in it starts
+     * exactly at the cell's edge. Two neighbours then touch — a right-aligned cell and the
+     * left-aligned one beside it meet with no gap between them and read as one word, and a
+     * cell wider than its column shows its neighbour's text through it.
+     *
+     * The paragraph's own margins are what stands in for the inset, for the same reason a
+     * list item's are: `marL` and `marR` move the text inside its box without moving the
+     * box, and a right margin holds a right-aligned cell off its neighbour as a left margin
+     * holds a left-aligned one off its.
+     */
+    public const TABLE_PADDING = 6;
+
     /** The vertical room a rule occupies, the two-pixel bar centred in it. */
     public const RULE_HEIGHT = 16;
 

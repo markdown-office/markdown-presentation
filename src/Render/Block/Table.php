@@ -16,8 +16,9 @@ use MarkdownPresentation\Render\Run;
 final class Table implements Block
 {
     /**
-     * @param list<list<Run>> $cells Every cell of every row, as the runs it is drawn from:
-     *                                row 0 is the header row.
+     * @param list<list<list<Run>>> $cells Every cell of every row, as the runs it is
+     *                                     drawn from: row 0 is the header row, then one
+     *                                     list of runs per cell.
      * @param list<string>     $align One of `left`, `center` or `right` per column, from
      *                                the alignment row.
     */

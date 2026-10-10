@@ -108,16 +108,27 @@ final class TextMetric
     {
         // Below a pixel the loop that breaks an over-long word would never advance it.
         $width = max(1, $width);
-        $lines = 0;
+
+        // The state is the whole stream's rather than one run's, and carrying it across the
+        // runs is the point of the method: a run boundary is a change of face, not a line
+        // break. Measured one run at a time, a paragraph cost a line per `**bold**` in it —
+        // twelve runs of one line of text measured as twelve lines, which over-allocated
+        // every paragraph carrying markup and clamped whatever was drawn below it.
+        $lines = 1;
+        $used = 0;
+        $gap = 0;
 
         foreach ($pieces as $piece) {
-            // A newline inside a run is a break the deck asked for, not a space, so it
-            // starts a line whatever the width.
-            foreach (explode("\n", $piece['text']) as $segment) {
-                $lines += $this->wrapped(
-                    self::piece($segment, $piece['size'], $piece['mono'], $piece['bold']),
-                    $width,
-                );
+            foreach (explode("\n", $piece['text']) as $number => $segment) {
+                // A newline inside a run is a break the deck asked for, not a space, so it
+                // starts a line whatever the width.
+                if ($number > 0) {
+                    ++$lines;
+                    $used = 0;
+                    $gap = 0;
+                }
+
+                [$lines, $used, $gap] = $this->place($segment, $piece, $width, $lines, $used, $gap);
             }
         }
 
@@ -125,17 +136,23 @@ final class TextMetric
     }
 
     /**
-     * @param Piece $piece Text with no newline in it: {@see self::lines()} has split those out.
+     * One run of text with no newline in it, laid out onto the line being filled.
+     *
+     * The line count and the width used on the last line go in and come back out because
+     * the run before this one may have left the line part full, and a word too long for a
+     * line of its own is broken mid-word rather than being allowed to overflow sideways —
+     * a URL or an identifier in prose is ordinary and has to take the lines it needs.
+     *
+     * @param Piece $piece The run, for its size, face and weight. Its text has been split.
+     *
+     * @return array{0: int, 1: int, 2: int} The lines, the width used on the last of them,
+     *                                           and the whitespace waiting on that line.
      */
-    private function wrapped(array $piece, int $width): int
+    private function place(string $text, array $piece, int $width, int $lines, int $used, int $gap): array
     {
-        $lines = 1;
-        $used = 0;
-        $gap = 0;
-
         // The delimiters are captured rather than discarded so that indentation counts: a
         // code block indented four spaces starts four spaces in.
-        foreach (preg_split('/(\s+)/', $piece['text'], -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $chunk) {
+        foreach (preg_split('/(\s+)/', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $chunk) {
             $advance = $this->advance($chunk, $piece['size'], $piece['mono'], $piece['bold']);
 
             if (trim($chunk) === '') {
@@ -158,7 +175,7 @@ final class TextMetric
             }
         }
 
-        return $lines;
+        return [$lines, $used, $gap];
     }
 
     private function advance(string $text, int $size, bool $mono, bool $bold): int
