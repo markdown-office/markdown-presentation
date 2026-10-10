@@ -160,6 +160,12 @@ nothing had measured.
   `<a:tblHeader/>`, which repeats the row where a table splits across
   slides, is not written: PHPPresentation's `Row` carries no such flag, and a
   table clamped to one slide is not a table that splits.
+- **A link inside a heading or a quote is coloured as a link.** Before:
+  `$font ?? …` short-circuited the link branch, so a heading passed `dk1` for
+  every one of its runs and a quote `dk2` — and a link in either was painted
+  that colour, underlined but otherwise indistinguishable from the sentence
+  around it. After: the branch is asked about the link first, so `hlink` wins
+  over the block's own colour everywhere it applies.
 - **Two blocks no longer abut.** Every paragraph was written with
   `setSpacingBefore(0)` and `setSpacingAfter(0)`, which is right — the heights decide
   where the next block starts — but the gap that leaves was nowhere, so two

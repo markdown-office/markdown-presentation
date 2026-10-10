@@ -596,6 +596,29 @@ it('colours a link with the theme hyperlink colour', function () {
     expect($pptx->usesColour('#89b4fa'))->toBeTrue();
 });
 
+it('colours a link inside a heading with the hyperlink colour and not the heading\'s', function () {
+    // `minimal`, because its `hlink` is a colour nothing else in a deck reaches: under
+    // `corporate-dark` the hyperlink colour *is* the accent colour, so any assertion about
+    // "the hyperlink colour" is satisfied by a bullet. The heading passes `dk1` for every
+    // run and `$font ?? …` short-circuited the link branch, so a link in a heading was
+    // `dk1`: a clickable word in the same colour as the sentence around it.
+    $xml = renderDeck("---\ntheme: minimal\n---\n\nLead.\n\n## The [docs](https://example.com)\n")
+        ->part('ppt/slides/slide1.xml');
+
+    expect($xml)->toMatch('#<a:srgbClr val="3F6FB5">(?:(?!</a:rPr>).)*<a:hlinkClick#s')
+        ->and(substr_count($xml, '<a:srgbClr val="3F6FB5">'))->toBe(1);
+});
+
+it('colours a link inside a quote with the hyperlink colour and not the quote\'s', function () {
+    // The same short-circuit on the quote's `dk2`: a clickable word that is the same colour
+    // as the sentence around it is a word nobody clicks.
+    $xml = renderDeck("---\ntheme: minimal\n---\n\n> A [quote](https://example.com)\n")
+        ->part('ppt/slides/slide1.xml');
+
+    expect($xml)->toMatch('#<a:srgbClr val="3F6FB5">(?:(?!</a:rPr>).)*<a:hlinkClick#s')
+        ->and(substr_count($xml, '<a:srgbClr val="4A4A4A">'))->toBe(1);
+});
+
 it('writes an inline code span in the mono font at its own size', function () {
     $pptx = renderDeck("a `b` c\n");
 
