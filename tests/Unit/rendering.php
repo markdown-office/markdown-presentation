@@ -600,6 +600,41 @@ it('keeps the path a deck wrote where a reader can find it', function () {
         ->toContain(sprintf('descr="%s"', basename($png)));
 });
 
+it('writes no shape at a size the schema forbids', function () {
+    // `a:ext` is an `ST_PositiveCoordinate`. Eighty paragraphs fill the body box and then
+    // some, and the image below them was written as cx="-381000" cy="-95250", which
+    // PowerPoint either offers to repair or drops without saying so.
+    $png = png(40, 10);
+    $xml = renderDeck(str_repeat("Text.\n\n", 80) . sprintf("![wide](%s)\n", basename($png)))
+        ->part('ppt/slides/slide1.xml');
+
+    preg_match_all('#<a:ext cx="(-?\d+)" cy="(-?\d+)"#', $xml, $found, PREG_SET_ORDER);
+
+    expect($found)->not->toBe([]);
+
+    foreach ($found as [, $cx, $cy]) {
+        expect((int) $cx)->toBeGreaterThan(0)
+            ->and((int) $cy)->toBeGreaterThan(0);
+    }
+});
+
+it('keeps every shape of an overflowing slide inside the slide', function () {
+    // A column taller than its box used to run off the bottom of the slide entirely, which
+    // no amount of clamping inside the writer would have caught.
+    $png = png(40, 10);
+    $positions = renderDeck(str_repeat("Text.\n\n", 80) . sprintf("![wide](%s)\n", basename($png)))
+        ->positions();
+
+    expect($positions)->not->toBe([]);
+
+    foreach ($positions as $position) {
+        expect($position['x'])->toBeGreaterThanOrEqual(0.0)
+            ->and($position['y'])->toBeGreaterThanOrEqual(0.0)
+            ->and($position['x'] + $position['width'])->toBeLessThanOrEqual(960.0)
+            ->and($position['y'] + $position['height'])->toBeLessThanOrEqual(540.0);
+    }
+});
+
 it('resolves a relative image path against the directory it was given', function () {
     // A deck written on one machine and rendered on another resolves a relative path
     // against the wrong directory, so the directory is the renderer's and not a global.

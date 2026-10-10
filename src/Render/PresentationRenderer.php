@@ -510,9 +510,16 @@ final class PresentationRenderer
 
         foreach ($this->geometry->body($role) as $column => $box) {
             $y = $box->y;
+            $bottom = $box->y + $box->height;
 
             foreach ($this->visible($blocks, $columns, $step, $column) as $block) {
-                $height = $writer->height($block, $box->y + $box->height - $y);
+                // A column whose contents are taller than its box runs off the bottom of it,
+                // and an image spends the whole of the room left — so both the cursor and
+                // the height are held inside the box. A block that does not fit is drawn as
+                // small as the room allows rather than over whatever is under it.
+                $y = min($y, $bottom - SlideGeometry::MIN_SIZE);
+                $room = max(0, $bottom - $y);
+                $height = max(min($writer->height($block, $room), $room), SlideGeometry::MIN_SIZE);
                 $writer->write($slide, $block, new Box($box->x, $y, $box->width, $height), $height);
                 $y += $height;
             }

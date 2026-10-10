@@ -242,12 +242,20 @@ final class ShapeWriter
         $shape->setDescription($block->written);
 
         $this->place($shape, $box, $height);
-        $shape->setWidthAndHeight($box->width, $height);
+
+        // The room the block was given may have run out, so the box it is fitted to is
+        // clamped before the ratio is read off it: a zero dimension disables the
+        // proportional fit and hands the picture the negative room unchanged.
+        $width = max($box->width, SlideGeometry::MIN_SIZE);
+        $tall = max($height, SlideGeometry::MIN_SIZE);
+        $shape->setWidthAndHeight($width, $tall);
 
         // Centred on both axes, because the slack is only ever on one of them: an image that
-        // fills the box's width has a gap above and below and none at the sides.
-        $shape->setOffsetX($box->x + intdiv($box->width - $shape->getWidth(), 2))
-            ->setOffsetY($box->y + intdiv($height - $shape->getHeight(), 2));
+        // fills the box's width has a gap above and below and none at the sides. The offsets
+        // are floored at the box because `setWidthAndHeight()` rounds the losing dimension
+        // *up*, and centring that would push the picture past the block below it.
+        $shape->setOffsetX($box->x + max(0, intdiv($width - $shape->getWidth(), 2)))
+            ->setOffsetY($box->y + max(0, intdiv($tall - $shape->getHeight(), 2)));
 
         return $shape;
     }
@@ -325,9 +333,17 @@ final class ShapeWriter
         return $shape;
     }
 
+    /**
+     * The only place a shape is given its position and size, and the only place that
+     * clamps them: a block can be laid out past the bottom of the box it was given, and
+     * `a:off`/`a:ext` are signed and unsigned coordinates respectively.
+     */
     private function place(AbstractShape $shape, Box $box, int $height): void
     {
-        $shape->setOffsetX($box->x)->setOffsetY($box->y)->setWidth($box->width)->setHeight($height);
+        $shape->setOffsetX($box->x)
+            ->setOffsetY($box->y)
+            ->setWidth(max($box->width, SlideGeometry::MIN_SIZE))
+            ->setHeight(max($height, SlideGeometry::MIN_SIZE));
     }
 
     /**

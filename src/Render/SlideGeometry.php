@@ -39,12 +39,21 @@ final class SlideGeometry
     /**
      * The height of one table row, in pixels.
      *
-     * PHPPresentation's `Row` defaults to 38 and writes that as `<a:tr h>`, so a shape
-     * declaring fewer would be drawn taller than it was measured and every table would
-     * overlap whatever came after it. {@see \MarkdownPresentation\Render\ShapeWriter}
-     * sets it on every row it creates, so the two cannot drift apart again.
+     * PHPPresentation's `Row` defaults to 38 and writes that as `<a:tr h>`, which
+     * PowerPoint honours. {@see \MarkdownPresentation\Render\ShapeWriter} sets it on every
+     * row it creates so that number is the one on both sides.
      */
     public const TABLE_ROW = 38;
+
+    /**
+     * The smallest a shape may be written at.
+     *
+     * `a:ext` is an `ST_PositiveCoordinate`, so a negative width or height is not a small
+     * shape but an invalid one: PowerPoint offers to repair the file, or drops the shape
+     * without saying so. A block laid out past the bottom of its box asked for exactly that,
+     * because the room left went negative and both the size and the centring carried it on.
+     */
+    public const MIN_SIZE = 1;
 
     /** What a rule costs, in height, once the gap above it is counted. */
     public const RULE_HEIGHT = 16;
