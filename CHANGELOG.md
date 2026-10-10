@@ -160,6 +160,14 @@ nothing had measured.
   `<a:tblHeader/>`, which repeats the row where a table splits across
   slides, is not written: PHPPresentation's `Row` carries no such flag, and a
   table clamped to one slide is not a table that splits.
+- **A block that does not fit is clamped and reported.** Before: a slide with
+  more on it than fits was laid out as though it fitted — and whatever came
+  out was whatever came out. After: the block is drawn as small as the room
+  allows, `PresentationRenderer::overflows()` lists every block that had to be
+  clamped with the slide, step, column, height wanted and height left, and
+  `new PresentationRenderer(strict: true)` raises `ContentOverflow` instead, by
+  name, with the slide and the block in the message. The report is emptied by
+  each render rather than accumulated: a layout belongs to one deck.
 - **A link inside a heading or a quote is coloured as a link.** Before:
   `$font ?? …` short-circuited the link branch, so a heading passed `dk1` for
   every one of its runs and a quote `dk2` — and a link in either was painted

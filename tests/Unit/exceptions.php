@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\FencedFrontmatter;
 use MarkdownPresentation\Exception\ImageNotFound;
@@ -61,6 +62,7 @@ it('reports what a deck author can fix under the class that says so', function (
     // can fix by naming something else. Every type in this package is one or the
     // other today, and the day one is not, this says which it is.
     $authorFixable = [
+        ContentOverflow::class,
         FencedFrontmatter::class,
         ImageNotFound::class,
         MalformedFrontmatter::class,
@@ -95,7 +97,10 @@ it('names a slide and a file in every failure, because the fix is in the message
         ->and(MalformedTheme::unknownKey('themes/acme/theme.yml', 'colour', ['name'])->getMessage())
         ->toContain('themes/acme/theme.yml')
         ->and(ImageNotFound::at(2, 'logo.png', '/tmp/logo.png')->getMessage())
-        ->toContain('/tmp/logo.png');
+        ->toContain('/tmp/logo.png')
+        ->and(ContentOverflow::on(3, 2, 0, 'code', 1150, 396)->getMessage())
+        ->toContain('Slide 3')
+        ->and(ContentOverflow::on(3, 2, 0, 'code', 1150, 396)->getMessage())->toContain('code');
 });
 
 it('names the alternatives wherever a failure is a name the author can change', function (string $message, string $alternative) {

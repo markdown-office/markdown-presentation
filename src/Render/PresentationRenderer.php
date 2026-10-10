@@ -7,6 +7,7 @@ namespace MarkdownPresentation\Render;
 use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\Slide as SourceSlide;
 use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\ThemeNotFound;
@@ -84,26 +85,63 @@ final class PresentationRenderer
     private const FIRST_STEP = 1;
 
     /**
+     * Every block that did not fit its slide during the last render, in the order they were
+     * laid out.
+     *
+     * @var list<array{slide: int, step: int, column: int, block: string, wanted: int, available: int}>
+     */
+    private array $overflows = [];
+
+    /**
      * @param string $directory The directory a relative image path in the deck resolves
      *                          against, which is the directory the deck itself is in.
-    */
+     * @param bool   $strict    Whether a block that does not fit is {@see ContentOverflow}
+     *                          rather than clamped and recorded. Strict is for a caller that
+     *                          would rather have no file than a file with a slide on it that
+     *                          is missing something.
+     */
     public function __construct(
         private readonly string $directory = '.',
         private readonly ThemeResolver $themes = new ThemeResolver(),
         private readonly BlockParser $blocks = new BlockParser(),
         private readonly SlideGeometry $geometry = new SlideGeometry(),
+        private readonly bool $strict = false,
     ) {
     }
 
     /**
-     * @throws InvalidInput  When a slide names something this library cannot render.
-     * @throws ThemeNotFound When the deck names a theme that does not resolve.
-     * @throws Exception      When the file cannot be written.
+     * Every block the last render had to make smaller than it asked to be.
+     *
+     * A block that does not fit is clamped to the room left rather than drawn over whatever
+     * comes after it, which means the file itself says nothing about what was lost. This is
+     * where it is said: one entry per clamped block, naming the slide, the step and the
+     * column, how much height the block wanted and how much there was. A slide whose
+     * contents are taller than its box yields an entry for every block below the point
+     * where it ran out, which is the truth about a column that is simply full.
+     *
+     * Emptied by {@see self::render()} rather than accumulated, because a layout belongs to
+     * one deck: a caller converting several in a loop wants the last one's overflows, not
+     * all of them.
+     *
+     * @return list<array{slide: int, step: int, column: int, block: string, wanted: int, available: int}>
+     */
+    public function overflows(): array
+    {
+        return $this->overflows;
+    }
+
+    /**
+     * @throws InvalidInput     When a slide names something this library cannot render.
+     * @throws ThemeNotFound    When the deck names a theme that does not resolve.
+     * @throws ContentOverflow  When a block does not fit and the renderer is strict.
+     * @throws Exception         When the file cannot be written.
      *
      * @return string The path written.
-    */
+     */
     public function render(Deck $deck, string $path): string
     {
+        $this->overflows = [];
+
         foreach ($deck->slides() as $slide) {
             $this->check($slide);
         }
@@ -407,7 +445,7 @@ final class PresentationRenderer
                 );
             }
 
-            $this->stack($slide, $blocks, $step, $role, $writer);
+            $this->stack($slide, $blocks, $step, $role, $writer, $source->index() + 1);
         }
     }
 
@@ -504,8 +542,14 @@ final class PresentationRenderer
      *
      * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
     */
-    private function stack(WrittenSlide $slide, array $blocks, int $step, LayoutRole $role, ShapeWriter $writer): void
-    {
+    private function stack(
+        WrittenSlide $slide,
+        array $blocks,
+        int $step,
+        LayoutRole $role,
+        ShapeWriter $writer,
+        int $number,
+    ): void {
         $columns = $this->columns($blocks, $role);
 
         foreach ($this->geometry->body($role) as $column => $box) {
@@ -516,14 +560,47 @@ final class PresentationRenderer
                 // A column whose contents are taller than its box runs off the bottom of it,
                 // and an image spends the whole of the room left — so both the cursor and
                 // the height are held inside the box. A block that does not fit is drawn as
-                // small as the room allows rather than over whatever is under it.
+                // small as the room allows rather than over whatever is under it, and
+                // {@see self::overflow()} is what says that it had to be.
                 $y = min($y, $bottom - SlideGeometry::MIN_SIZE);
                 $room = max(0, $bottom - $y);
-                $height = max(min($writer->height($block, $box, $room), $room), SlideGeometry::MIN_SIZE);
+                $wanted = $writer->height($block, $box, $room);
+                $height = max(min($wanted, $room), SlideGeometry::MIN_SIZE);
+
+                if ($height < $wanted) {
+                    $this->overflow($number, $step, $column, $block->name(), $wanted, $room);
+                }
+
                 $writer->write($slide, $block, new Box($box->x, $y, $box->width, $height), $height);
                 $y += $height + SlideGeometry::BLOCK_GAP;
             }
         }
+    }
+
+    /**
+     * A block that did not fit, said out loud.
+     *
+     * Clamping without saying so is the one thing this library must not do: a slide with a
+     * block quietly squeezed into the last pixel renders as a deck, and nobody looking at it
+     * can tell what is missing. Strict mode raises instead, for a caller that would rather
+     * have no file.
+     *
+     * @throws ContentOverflow
+     */
+    private function overflow(int $slide, int $step, int $column, string $block, int $wanted, int $available): void
+    {
+        if ($this->strict) {
+            throw ContentOverflow::on($slide, $step, $column, $block, $wanted, $available);
+        }
+
+        $this->overflows[] = [
+            'slide' => $slide,
+            'step' => $step,
+            'column' => $column,
+            'block' => $block,
+            'wanted' => $wanted,
+            'available' => $available,
+        ];
     }
 
     /**

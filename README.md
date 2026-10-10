@@ -252,15 +252,85 @@ mapping can be read off `ppt/slides/slideN.xml` without the library:
 | A paragraph | `paragraph` | `**bold**`, `*italic*`, `` `code` `` and `[text](url)` are runs, not characters |
 | `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted; nesting is the indent |
 | ```` ```lang ```` | `code` | Mono font, filled with `lt2`, the language in the shape's description. No colouring |
-| `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has |
+| `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has. The header row is bold, filled with `lt2`, and the columns are as wide as what they hold |
 | `> a` | `quote` | Italic, in `dk2`, indented |
 | `***` | `rule` | A bar in `accent1`. `---` is a slide delimiter and never reaches here |
 | A line that is only `![alt](path)` | `image` | Fitted to its box, aspect kept, centred. A path that is not a file is a failure |
 
-Blocks stack down the body box, and each one starts where the one above it ended.
+Blocks stack down the body box, each one starting where the one above it ended with a gap
+between them.
+
+Every block is measured before it is drawn: `Render\TextMetric` counts the lines it will
+wrap to, from an advance-width table bundled in the package. It is an estimate and says so
+— the widths are Helvetica's, kerning is not modelled, and a theme naming a face of a
+different width is not detected — which is why every text shape is written `a:normAutofit`.
+The box keeps the height the layout gave it and the reader scales the type down to fit, so
+an estimate that came out a line short costs a little whitespace instead of drawing one
+block over the next.
 
 Code blocks are not coloured. Nothing here lexes a language, and the fence's info string
 is kept only so a reader unzipping the file can see which blocks named which language.
+
+### When a slide is too full
+
+A block taller than the room left for it is clamped — drawn as small as the room allows —
+rather than drawn over whatever is under it. That is the only safe thing to do, but it means
+the file says nothing about what was lost, so the renderer says it:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+$renderer = new PresentationRenderer();
+$renderer->render(
+    (new DeckParser())->parse("```\n" . str_repeat("line;\n", 60) . "```\n"),
+    sys_get_temp_dir() . '/deck.pptx',
+);
+
+foreach ($renderer->overflows() as $overflow) {
+    printf(
+        "slide %d step %d column %d: %s wants %dpx, %dpx left\n",
+        $overflow['slide'],
+        $overflow['step'],
+        $overflow['column'] + 1,
+        $overflow['block'],
+        $overflow['wanted'],
+        $overflow['available'],
+    );
+}
+```
+
+```text
+slide 1 step 1 column 1: code wants 1150px, 396px left
+```
+
+One entry per block that had to be clamped, so a slide whose contents are taller than its
+box reports every block below the point it ran out. The list is emptied by each
+`render()`: a layout belongs to one deck, so a caller converting several in a loop reads the
+last one's.
+
+A caller that would rather have no file than a file with a slide on it that is missing
+something asks for the strict renderer, and gets `ContentOverflow` naming the slide, the
+step, the column and the block:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\ContentOverflow;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+try {
+    (new PresentationRenderer(strict: true))->render(
+        (new DeckParser())->parse("```\n" . str_repeat("line;\n", 60) . "```\n"),
+        sys_get_temp_dir() . '/deck.pptx',
+    );
+} catch (ContentOverflow $failure) {
+    echo $failure->getMessage(), "\n";
+}
+```
+
+```text
+Slide 1, step 1, column 1: its code needs 1150px of height and 396px are left. Shorten it, put it on a slide of its own, or render without the strict check to have it clamped.
+```
 
 ### Layouts
 
