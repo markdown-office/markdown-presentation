@@ -249,7 +249,7 @@ mapping can be read off `ppt/slides/slideN.xml` without the library:
 | Markdown | Shape | Notes |
 | --- | --- | --- |
 | `# Heading` | `title`, then `heading` | The first heading becomes the title and is not drawn twice, whatever markup it carries |
-| A paragraph | `paragraph` | `**bold**`, `*italic*`, `` `code` `` and `[text](url)` are runs, not characters |
+| A paragraph | `paragraph` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters |
 | `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted; nesting is the indent |
 | ```` ```lang ```` | `code` | Mono font, filled with `lt2`, the language in the shape's description. No colouring |
 | `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has; a cell carries the same inline markup a paragraph does. The header row is bold, filled with `lt2`, and the columns are as wide as what they hold |
@@ -271,6 +271,12 @@ different width is not detected — which is why every text shape is written `a:
 The box keeps the height the layout gave it and the reader scales the type down to fit, so
 an estimate that came out a line short costs a little whitespace instead of drawing one
 block over the next.
+
+Emphasis is deliberately not CommonMark's. A delimiter that does not close is left as the
+characters it was written as — `2 * 3` and `**unclosed` are drawn as they are, because a deck
+that renders is worth more here than one that refuses a paragraph over an apostrophe. An
+underscore inside a word is not a delimiter, so `snake_case_name` is a name. The asterisks
+and backticks inside a code span are characters, so `` `**not bold**` `` is a code span.
 
 Code blocks are not coloured. Nothing here lexes a language, and the fence's info string
 is kept only so a reader unzipping the file can see which blocks named which language.

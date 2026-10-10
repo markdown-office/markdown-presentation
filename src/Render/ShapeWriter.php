@@ -610,6 +610,7 @@ final class ShapeWriter
                 ->setName($run->code ? $this->font('mono') : ($face ?? $this->font('body')))
                 ->setBold($run->bold || $bold)
                 ->setItalic($run->italic || $italic)
+                ->setStrikethrough($run->strike ? StyleFont::STRIKE_SINGLE : StyleFont::STRIKE_NONE)
                 // The link branch is asked first: `$font ?? …` short-circuited it, so a link
                 // inside a heading or a quote was drawn in the heading's `dk1` or the quote's
                 // `dk2` and looked like ordinary text that happened to be clickable.

@@ -335,6 +335,56 @@ it('reads bold, italic and code as separate runs', function () {
     ]);
 });
 
+it('reads a run of bold italic as one run carrying both', function () {
+    // The italic pattern matched the inner `**` first, so `***bold italic***` came out as
+    // `"*"`, `"bolditalic"` and `"* here"` — three runs with the delimiters printed on the
+    // slide and the space between the words gone.
+    expect((new InlineParser())->parse('***bold italic***'))->toEqual([
+        new Run('bold italic', bold: true, italic: true),
+    ]);
+});
+
+it('keeps the words around a run of bold italic', function () {
+    expect(array_map(
+        static fn (Run $run): string => $run->text,
+        (new InlineParser())->parse('a ***b*** c'),
+    ))->toBe(['a ', 'b', ' c']);
+});
+
+it('reads underscores as bold and italic the way asterisks are', function () {
+    expect((new InlineParser())->parse('__bold__ and _italic_'))->toEqual([
+        new Run('bold', bold: true),
+        new Run(' and '),
+        new Run('italic', italic: true),
+    ]);
+});
+
+it('reads two tildes as strikethrough', function () {
+    expect((new InlineParser())->parse('~~gone~~'))->toEqual([new Run('gone', strike: true)]);
+});
+
+it('leaves an underscore inside a word as the character it is', function () {
+    // CommonMark's rule, and the one that keeps a variable name a variable name: `_*_`
+    // between two word characters is not an emphasis delimiter.
+    expect((new InlineParser())->parse('a `snake_case` b'))->toEqual([
+        new Run('a '),
+        new Run('snake_case', code: true),
+        new Run(' b'),
+    ]);
+});
+
+it('does not read the underscores inside a code span as emphasis', function () {
+    expect((new InlineParser())->parse('`_not italic_`'))->toEqual([
+        new Run('_not italic_', code: true),
+    ]);
+});
+
+it('leaves an unclosed tilde pair as the characters they are', function () {
+    // The same rule as an unclosed asterisk: a deck that renders is worth more here than
+    // one that refuses a paragraph because of a typo.
+    expect((new InlineParser())->parse('~~unclosed'))->toEqual([new Run('~~unclosed')]);
+});
+
 it('reads a link as its text with a target', function () {
     expect((new InlineParser())->parse('[text](https://example.com)'))->toEqual([
         new Run('text', link: 'https://example.com'),

@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render;
 
 /**
- * The inline Markdown of one paragraph's text: emphasis, code spans and links.
+ * The inline Markdown of one paragraph's text: emphasis, code spans, strikethrough and
+ * links.
  *
  * Deliberately not a CommonMark inline parser. An emphasis delimiter that does not close
  * is left as the character it is, which is what a reader expects and what a strict parser
  * would refuse, and a deck that renders is worth more here than one that refuses a
- * paragraph because of an apostrophe.
+ * paragraph because of an apostrophe. What it does take from CommonMark is the rule that
+ * an underscore inside a word is not an emphasis delimiter: `snake_case_name` is a name and
+ * `snake_case_name_` is not the end of one.
 */
 final class InlineParser
 {
@@ -19,14 +22,20 @@ final class InlineParser
      * Each pattern and the kind of run it becomes, in the order a tie between two of them is
      * broken.
      *
-     * Code comes before bold so that the asterisks inside a code span are not read as emphasis;
-     * the rest are ordered by nothing in particular, because {@see self::next()} takes the
-     * leftmost match whatever order they are tried in.
+     * Code comes before bold so that the asterisks inside a code span are not read as emphasis,
+     * and each three-character delimiter comes before the two-character one it starts with, so
+     * `***x***` is one run rather than an italic run wrapped in two stray asterisks. The rest
+     * are ordered by nothing in particular, because {@see self::next()} takes the leftmost
+     * match whatever order they are tried in.
     */
     private const PATTERNS = [
         'code' => '/`([^`]+)`/',
+        'boldItalic' => '/(?<![*\w])\*\*\*([^*\n]+)\*\*\*(?![*\w])/',
         'bold' => '/\*\*([^*]+)\*\*/',
         'italic' => '/(?<![*\w])\*([^*\n]+)\*(?![*\w])/',
+        'strong' => '/(?<![\w_])__([^_\n]+)__(?![\w_])/',
+        'emphasis' => '/(?<![\w_])_([^_\n]+)_(?![\w_])/',
+        'strike' => '/~~([^~\n]+)~~/',
         'link' => '/\[([^\]\n]*)\]\(\s*([^)\s]*)(?:\s+"[^"]*")?\s*\)/',
     ];
 
@@ -122,7 +131,7 @@ final class InlineParser
     }
 
     /**
-     * @param 'code'|'bold'|'italic'|'link' $kind
+     * @param 'code'|'bold'|'boldItalic'|'emphasis'|'italic'|'link'|'strike'|'strong' $kind
     */
     private static function run(string $kind, string $text, string $target): Run
     {
@@ -130,6 +139,10 @@ final class InlineParser
             'code' => new Run($text, code: true),
             'bold' => new Run($text, bold: true),
             'italic' => new Run($text, italic: true),
+            'boldItalic' => new Run($text, bold: true, italic: true),
+            'strong' => new Run($text, bold: true),
+            'emphasis' => new Run($text, italic: true),
+            'strike' => new Run($text, strike: true),
             'link' => new Run($text, link: $target),
         };
     }

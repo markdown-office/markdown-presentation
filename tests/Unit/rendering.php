@@ -652,6 +652,35 @@ it('italics the run a deck italics', function () {
     expect(renderDeck("*italic*\n")->part('ppt/slides/slide1.xml'))->toContain('i="1"');
 });
 
+it('draws bold italic as bold and italic, with no asterisks on the slide', function () {
+    // The inner `**` used to match first, so the run came out as `"*"`, `"bolditalic"`
+    // and `"* here"`: the words run together and the delimiters are printed.
+    $pptx = renderDeck("***bold italic*** here\n");
+
+    expect($pptx->texts(1))->toBe(['bold italic', ' here'])
+        ->and($pptx->part('ppt/slides/slide1.xml'))->toMatch('#<a:rPr[^>]*\bb="1"[^>]*[^>]*\bi="1"#');
+});
+
+it('draws __bold__ and _italic_ as bold and italic', function () {
+    // Two runs with two weights between them, rather than five runs of underscores.
+    $pptx = renderDeck("__bold__ and _italic_\n");
+    $xml = $pptx->part('ppt/slides/slide1.xml');
+
+    expect($pptx->texts(1))->toBe(['bold', ' and ', 'italic'])
+        ->and(substr_count($xml, ' b="1"'))->toBe(1)
+        ->and(substr_count($xml, ' i="1"'))->toBe(1);
+});
+
+it('draws ~~struck~~ with a line through it', function () {
+    // PowerPoint carries strikethrough on the run's own font, and the writer always
+    // writes the attribute — `noStrike` on every other run — so the claim is the one run
+    // that says `sngStrike`.
+    $pptx = renderDeck("a ~~gone~~ b\n");
+
+    expect($pptx->texts(1))->toBe(['a ', 'gone', ' b'])
+        ->and(substr_count($pptx->part('ppt/slides/slide1.xml'), 'strike="sngStrike"'))->toBe(1);
+});
+
 it('leaves an unclosed emphasis marker as the character it is', function () {
     // A strict parser would refuse the whole paragraph over an apostrophe. A deck that
     // renders is worth more here, and the character the writer typed is on the slide.

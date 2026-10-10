@@ -208,6 +208,19 @@ nothing had measured.
   pipeline as any other text. `docProps/core.xml` is the exception and is
   deliberately so: `dc:title` is a metadata string with nothing on the other end
   to interpret emphasis, so it carries the stripped text.
+- **`***x***` is one run, and `__x__`, `_x_` and `~~x~~` are parsed at all.**
+  Before: four constructs — `` `code` ``, `**bold**`, `*italic*` and `[text](url)`.
+  The italic pattern matched the inner `**` of a `***bold italic***` before the bold
+  pattern could, so it came out as `"*"`, `"bolditalic"` and `"* here"`: the words
+  ran together and the delimiters were printed on the slide. `__bold__`, `_italic_`
+  and `~~strike~~` were not in the grammar at all and reached the slide as the
+  characters they were written as. After: each three-character delimiter is
+  matched before the two-character one it starts with, the other three are
+  parsed, and `Run` carries a `strike`, which the writer
+  writes as `strike="sngStrike"` on that run. Two rules are kept deliberately: the
+  asterisks and underscores inside a code span are characters, and an underscore
+  between two word characters is not a delimiter, so `snake_case_name` is a name.
+  Unclosed markup still renders as the characters it was written as.
 - **A table cell carries its inline markup.** Before: `BlockParser` handed the
   writer trimmed strings and `ShapeWriter` called `createTextRun()` on each one,
   so a cell could carry neither bold nor a link however its shape was written —

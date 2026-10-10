@@ -22,6 +22,7 @@ final class Run
         public readonly bool $italic = false,
         public readonly bool $code = false,
         public readonly ?string $link = null,
+        public readonly bool $strike = false,
     ) {
     }
 }
