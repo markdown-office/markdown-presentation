@@ -451,7 +451,12 @@ final class ShapeWriter
     {
         $converted = $block->converted;
         $shape = $converted === null ? $this->fromFile($slide, $block) : $this->fromBytes($slide, $converted);
-        $shape->setDescription($block->written);
+        // The alt text, because `descr` is what a screen reader reads out and what
+        // PowerPoint's alt-text pane shows. The written path is the fallback for a deck that
+        // named no alt: it is what the author recognises, and an empty description says
+        // nothing at all. The resolved path is in the relationship the picture was embedded
+        // from, which is where a reader looking for it belongs.
+        $shape->setDescription($block->alt === '' ? $block->written : $block->alt);
 
         $this->place($shape, $box, $height);
 

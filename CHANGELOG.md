@@ -221,6 +221,13 @@ nothing had measured.
   asterisks and underscores inside a code span are characters, and an underscore
   between two word characters is not a delimiter, so `snake_case_name` is a name.
   Unclosed markup still renders as the characters it was written as.
+- **An image's alt text is its alt text.** Before: the `![…]` was parsed and
+  stored on `Block\Image` and read by nothing — `ShapeWriter` wrote the *file
+  path* into `descr` instead, which is what a screen reader reads out and what
+  PowerPoint's alt-text pane shows. After: `descr` carries the alt text, and the
+  written path only where the deck named none, because an empty description says
+  nothing at all. The resolved path is in the relationship the picture was
+  embedded from, which is where a reader looking for it belongs.
 - **Four spaces of indent is one level, not two.** Before: `depth()` was
   `intdiv(indent, 2) + 1`, counted from column zero, so a sub-list written `-
   one` / `    - deep` — a tab's width, and what a model writes — came out at

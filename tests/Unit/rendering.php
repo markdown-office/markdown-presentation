@@ -822,10 +822,23 @@ it('centres an image that does not fill its box', function () {
         ->and($position['y'])->toBe(192.0);
 });
 
-it('keeps the path a deck wrote where a reader can find it', function () {
+it('keeps the alt text a deck wrote for a picture', function () {
+    // The alt text was parsed, stored on the block and never read: `descr` carried the
+    // file path instead, which is what a screen reader reads out and what PowerPoint's
+    // alt-text pane shows.
     $png = png(2, 2);
 
-    expect(renderDeck(sprintf("![a dot](%s)\n", basename($png)))->part('ppt/slides/slide1.xml'))
+    expect(renderDeck(sprintf("![A dot](%s)\n", basename($png)))->part('ppt/slides/slide1.xml'))
+        ->toContain('descr="A dot"')
+        ->not->toContain(sprintf('descr="%s"', basename($png)));
+});
+
+it('keeps the path a deck wrote where a picture has no alt text to say what it is', function () {
+    // An empty description says nothing at all, and the written path is the one thing about
+    // the picture the deck's own author recognises.
+    $png = png(2, 2);
+
+    expect(renderDeck(sprintf("![](%s)\n", basename($png)))->part('ppt/slides/slide1.xml'))
         ->toContain(sprintf('descr="%s"', basename($png)));
 });
 
