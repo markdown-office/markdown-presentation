@@ -5,6 +5,7 @@ declare(strict_types=1);
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownDirective;
+use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
@@ -36,7 +37,7 @@ use MarkdownPresentation\Tests\Support\Scratch;
 */
 function blocksOf(string $markdown): array
 {
-    return (new BlockParser())->parse($markdown, 1, Scratch::directory());
+    return (new BlockParser())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()));
 }
 
 /**

@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\ImageNotFound;
+use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
@@ -125,8 +126,10 @@ final class BlockParser
     /**
      * The blocks of one slide's content.
      *
-     * `$slide` and `$directory` are for the failures: an image that does not resolve and a
-     * step that goes backwards are both read out of a slide its author can go and find.
+     * `$slide` and `$directory` are for the failures, and `$files` is the policy behind half
+     * of them: an image that does not resolve, one that resolves outside the directories the
+     * caller allowed, and a step that goes backwards are all read out of a slide its author
+     * can go and find.
      *
      * The union rather than {@see Block}, because it is the whole of what this method
      * makes: a caller that adds a ninth kind of block has to say here that it is one.
@@ -138,7 +141,7 @@ final class BlockParser
      * @throws UnknownMarker
      * @throws UnsupportedImageFormat
     */
-    public function parse(string $content, int $slide, string $directory): array
+    public function parse(string $content, int $slide, string $directory, PathScope $files): array
     {
         $lines = explode("\n", str_replace("\r\n", "\n", $content));
 
@@ -212,7 +215,7 @@ final class BlockParser
 
             if (preg_match(self::IMAGE, trim($line), $image) === 1) {
                 $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = self::image($image, $slide, $directory, $step);
+                $blocks[] = $this->image($image, $slide, $directory, $files, $step);
 
                 continue;
             }
@@ -613,13 +616,30 @@ final class BlockParser
      * @throws ImageNotFound
      * @throws UnsupportedImageFormat
      */
-    private function image(array $image, int $slide, string $directory, int $step): Image
+    private function image(array $image, int $slide, string $directory, PathScope $files, int $step): Image
     {
         $written = $image[2];
-        $resolved = str_starts_with($written, '/') ? $written : rtrim($directory, '/') . '/' . $written;
 
-        if (!is_file($resolved)) {
-            throw ImageNotFound::at($slide, $written, $resolved);
+        if (PathScope::isUrl($written)) {
+            throw ImageNotFound::aUrl($slide, $written);
+        }
+
+        // Where a path is written *from* says nothing about whether it is allowed: what is
+        // allowed is where it lands. This joins the two spellings a deck can write, and the
+        // containment below is the same test whichever one it wrote.
+        $joined = str_starts_with($written, '/') ? $written : rtrim($directory, '/') . '/' . $written;
+
+        if (!is_file($joined)) {
+            throw ImageNotFound::at($slide, $written, $joined);
+        }
+
+        // `realpath()` rather than the path as written, because `..` and a symlink both walk
+        // out of a directory that a prefix test says they are inside, and a symlink is not
+        // something a deck meant either.
+        $resolved = PathScope::canonical($joined);
+
+        if ($resolved === null || !$files->holds($resolved)) {
+            throw ImageNotFound::outside($slide, $written, $resolved ?? $joined, $files->roots());
         }
 
         return new Image(

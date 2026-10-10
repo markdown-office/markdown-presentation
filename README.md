@@ -535,6 +535,42 @@ first constructor argument. A path that is not a file is a failure naming where 
 because PowerPoint embeds what is on disk and a missing image is a shape with no picture in
 it and no complaint from anywhere.
 
+**A path has to land inside that directory.** The path is resolved with `realpath()` and the
+result has to be under a directory the caller allowed, and the renderer's own directory is
+the first of them. The other two ways out — `../` and a symlink — are exactly the two a
+prefix test on the written path cannot see, which is why it is the resolved path that is
+tested:
+
+| Deck writes | Before | After |
+| --- | --- | --- |
+| `![](/etc/hosts)` | `ppt/media/hosts1` holding the file | a failure naming the file it found and the directories it may read |
+| `![](../secrets/creds.svg)` | the same, one directory up | the same failure |
+| `![](assets/link.svg)` where `link.svg` is a symlink to `/home/me/.ssh/id_rsa` | the target, verbatim | the same failure |
+
+An `.svg` is the sharp case, because SVG is text and is embedded byte for byte (see
+[Image formats](#image-formats)): reading somebody's `~/.aws/credentials` into a deck is one
+`![a](…)` away. The deck did not have to be trying — a deck written by a model, from a file
+it was given, is enough.
+
+A library of images a deck draws from by name rather than shipping is a real case, so the
+roots are a constructor argument. It is the program's decision, made before a deck is read:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+$deck = (new DeckParser())->parse("# One\n\n![a dot](/srv/brand/dot.png)\n");
+
+(new PresentationRenderer(__DIR__, imageRoots: ['/srv/brand']))->render(
+    $deck,
+    sys_get_temp_dir() . '/deck.pptx',
+);
+```
+
+What a deck writes is never a way to widen that list. A path naming a stream wrapper —
+`phar://`, `http://`, `file://` — is refused as well: PHP hands such a name to the wrapper it
+says, and a deck has no way to mean one by it.
+
 ```php
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Render\PresentationRenderer;

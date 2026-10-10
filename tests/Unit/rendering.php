@@ -12,6 +12,7 @@ use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
+use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
@@ -914,14 +915,81 @@ it('refuses to resolve an image against a directory it was not given', function 
         ->toThrow(ImageNotFound::class, 'It resolved to "' . $wrong . '/2x2.png"');
 });
 
-it('takes an absolute image path as it is', function () {
+it('refuses an absolute image path outside the directory the renderer was given', function () {
+    // This test used to read "takes an absolute image path as it is", and it asserted the
+    // vulnerability: a deck naming an absolute path was handed the file at that path whatever
+    // directory it was rendered from. Sixty-two bytes of deck naming a path turned into the
+    // contents of that file under `ppt/media/`, which for an `.svg` is text a reader opens.
+    // An absolute path is a spelling, not a permission, so it is resolved and then contained
+    // like every other one.
     $png = png(2, 2);
     $deck = (new DeckParser())->parse(sprintf("![a dot](%s)\n", $png));
     $path = Scratch::file('deck.pptx', '');
 
-    (new PresentationRenderer('/nowhere'))->render($deck, $path);
+    expect(fn () => (new PresentationRenderer('/nowhere'))->render($deck, $path))
+        ->toThrow(ImageNotFound::class, 'which is a file at "' . $png . '" rather than one this render may read');
+});
+
+it('refuses an image a deck walks out of its own directory with', function () {
+    // The same read written the way it is actually written: `../` rather than an absolute
+    // path, which is what a deck resolves a picture beside it with and what a deck an
+    // attacker edited resolves somebody else's credentials with.
+    $project = Scratch::directoryPath('project');
+    mkdir($project . '/outside');
+    mkdir($project . '/deck');
+    file_put_contents(
+        $project . '/outside/creds.svg',
+        '<svg xmlns="http://www.w3.org/2000/svg"><desc>AWS_SECRET_ACCESS_KEY</desc></svg>',
+    );
+    $deck = (new DeckParser())->parse("![a diagram](../outside/creds.svg)\n");
+    $path = Scratch::file('deck.pptx', '');
+    $directory = $project . '/deck';
+
+    expect(fn () => (new PresentationRenderer($directory))->render($deck, $path))
+        ->toThrow(ImageNotFound::class, 'which is a file at "' . $project . '/outside/creds.svg"')
+        // Nothing was written, so there is no package carrying the bytes either.
+        ->and(filesize($path))->toBe(0);
+});
+
+it('refuses a symlink that points out of the deck directory', function () {
+    // A prefix test would pass this one: the path the deck wrote is inside the directory, and
+    // the file it reaches is not. `realpath()` is what tells the two apart.
+    $secret = Scratch::directoryPath('outside');
+    file_put_contents($secret . '/creds.png', 'not a picture');
+    $directory = imageDirectory();
+    symlink($secret . '/creds.png', $directory . '/creds.png');
+    $path = Scratch::file('deck.pptx', '');
+
+    expect(fn () => (new PresentationRenderer($directory))->render((new DeckParser())->parse("![a dot](creds.png)\n"), $path))
+        ->toThrow(ImageNotFound::class, 'rather than one this render may read');
+});
+
+it('reads an image from a root the calling program allowed', function () {
+    // A curated image library is a real use case, so the constructor takes the directories
+    // as an argument: the decision is the program's, made before any deck is read, and never
+    // the deck's. Without this a deck that drew from a shared library could not be rendered
+    // at all.
+    $library = Scratch::directoryPath('library');
+    png(2, 2);
+    $resolved = PathScope::canonical(imageDirectory() . '/2x2.png');
+    copy($resolved, $library . '/dot.png');
+    $deck = (new DeckParser())->parse(sprintf("![a dot](%s)\n", $library . '/dot.png'));
+    $path = Scratch::file('deck.pptx', '');
+
+    (new PresentationRenderer('/nowhere', imageRoots: [$library]))->render($deck, $path);
 
     expect(Pptx::open($path)->shapeNames())->toBe(['image']);
+});
+
+it('refuses an image path that names a stream wrapper', function () {
+    // `phar://` is the sharp one: PHP hands the name to the wrapper it says, which unpacks an
+    // archive and serves what is inside it, and `http://` would turn a render into a request.
+    // A deck has no way to mean either by it, so the name is refused where it is written.
+    expect(fn () => renderDeck("![a dot](phar://payload.phar/dot.png)\n"))
+        ->toThrow(ImageNotFound::class, 'which is a URL rather than a path');
+
+    expect(fn () => renderDeck("![a dot](https://example.com/dot.png)\n"))
+        ->toThrow(ImageNotFound::class, 'which is a URL rather than a path');
 });
 
 it('refuses an image that is not a file, and says where it looked', function () {

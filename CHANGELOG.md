@@ -34,6 +34,45 @@ All notable changes to this project are documented here. The format follows
   while the four hundred and ninety-ninth is being written. Reading the blocks there rather
   than in `write()` also keeps each slide parsed once.
 
+- **A deck could read any file on the host into the download.** `BlockParser::image()`
+  resolved a picture by string concatenation:
+
+  ```php
+  $resolved = str_starts_with($written, '/') ? $written : rtrim($directory, '/') . '/' . $written;
+  ```
+
+  No `realpath()`, no containment. `../` walked out of the deck's own directory and an
+  absolute path was used verbatim, and `ImageConverter` decides a format from the extension
+  without opening the file, so any readable `*.svg`, `*.png`, `*.jpg` or `*.gif` was embedded
+  byte for byte. Reproduced end to end: a 62-byte deck naming
+  `![](/private/var/.../secret/creds.svg)` produced `ppt/media/creds1.svg` containing the host
+  file verbatim. SVG is the sharp case because SVG is arbitrary text a person then opens.
+
+  After: the path is resolved with `realpath()` and has to be under a directory the caller
+  allowed. `Filesystem\PathScope` is that rule, and `realpath()` rather than a prefix because
+  `..` and a symlink both walk out of a directory a string test says they are inside.
+
+  | Deck writes | Before | After |
+  | --- | --- | --- |
+  | `![](/etc/hosts)` | `ppt/media/hosts1`, verbatim | `ImageNotFound`: `... which is a file at "/private/etc/hosts" rather than one this render may read` |
+  | `![](../secrets/creds.svg)` | the same, one directory up | the same failure |
+  | a symlink inside the deck directory pointing out of it | the target, verbatim | the same failure |
+  | `![](phar://payload.phar/dot.png)` | joined onto the deck directory, refused as "not a file" | refused as a URL, which is what it is |
+
+  **Breaking**, and the deck that could no longer be rendered is the point: an absolute path,
+  a `../`, or a symlink out of the deck directory that resolved before is refused now. A
+  curated image library is a real case and is still reachable, as a constructor argument —
+  `new PresentationRenderer($directory, imageRoots: ['/srv/brand'])` — because that is the
+  calling program's decision rather than the deck's.
+
+  `tests/Unit/rendering.php` carried a test named *"takes an absolute image path as it is"*
+  which asserted the vulnerability: it rendered a deck naming `/…/2x2.png` with the renderer
+  pointed at `/nowhere` and expected the picture in the file. It is now *"refuses an absolute
+  image path outside the directory the renderer was given"*, with the other half of the
+  original assertion — a picture under an allowed root still embeds — kept as *"reads an image
+  from a root the calling program allowed"*. A test asserting the vulnerability is a test that
+  fails when the vulnerability is fixed, which is the wrong way round.
+
 - **A layout part was a name and nothing else.** Before: `themes/default/layouts.yml` mapped
   the portable roles onto Office's own layout names and the file recorded those names — and
   then wrote a layout part whose shape tree held nothing at all:

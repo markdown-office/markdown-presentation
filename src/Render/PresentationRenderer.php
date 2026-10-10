@@ -7,6 +7,7 @@ namespace MarkdownPresentation\Render;
 use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\Slide as SourceSlide;
 use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
@@ -112,13 +113,24 @@ final class PresentationRenderer
      */
     private array $overflows = [];
 
+    private readonly PathScope $files;
+
     /**
-     * @param string $directory The directory a relative image path in the deck resolves
-     *                          against, which is the directory the deck itself is in.
-     * @param bool   $strict    Whether a block that does not fit is {@see ContentOverflow}
-     *                          rather than clamped and recorded. Strict is for a caller that
-     *                          would rather have no file than a file with a slide on it that
-     *                          is missing something.
+     * @param string       $directory  The directory a relative image path in the deck
+     *                                 resolves against, which is the directory the deck
+     *                                 itself is in. It is also the first of the roots an
+     *                                 image may be read from: see {@see self::$files}.
+     * @param bool         $strict     Whether a block that does not fit is
+     *                                 {@see ContentOverflow} rather than clamped and
+     *                                 recorded. Strict is for a caller that would rather
+     *                                 have no file than a file with a slide on it that is
+     *                                 missing something.
+     * @param list<string> $imageRoots Further directories a deck may read a picture from,
+     *                                 for a library of images the deck draws from by name
+     *                                 rather than shipping. The caller's decision and never
+     *                                 the deck's: a deck that could widen this would be the
+     *                                 arbitrary path read this constructor argument exists
+     *                                 to stop.
      */
     public function __construct(
         private readonly string $directory = '.',
@@ -126,7 +138,9 @@ final class PresentationRenderer
         private readonly BlockParser $blocks = new BlockParser(),
         private readonly SlideGeometry $geometry = new SlideGeometry(),
         private readonly bool $strict = false,
+        array $imageRoots = [],
     ) {
+        $this->files = new PathScope([$this->directory, ...$imageRoots]);
     }
 
     /**
@@ -232,7 +246,12 @@ final class PresentationRenderer
         $slides = 0;
 
         foreach ($deck->slides() as $source) {
-            $read = $this->blocks->parse($source->content(), $source->index() + 1, $this->directory);
+            $read = $this->blocks->parse(
+                $source->content(),
+                $source->index() + 1,
+                $this->directory,
+                $this->files,
+            );
 
             $blocks[$source->index()] = $read;
 
