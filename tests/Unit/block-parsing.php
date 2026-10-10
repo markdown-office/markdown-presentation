@@ -141,10 +141,18 @@ it('reads a nested item as a deeper item', function () {
     expect(array_column($items, 'level'))->toBe([1, 2]);
 });
 
-it('reads four spaces of indent as two levels', function () {
+it('reads four spaces of indent as one level deeper', function () {
+    // Four spaces is four spaces: `intdiv(4, 2)` made it two levels, and a sub-list written
+    // with a tab's width of indent was drawn two levels down with nothing at the first.
     $items = blocksOf("- one\n    - deep\n")[0]->items;
 
-    expect(array_column($items, 'level'))->toBe([1, 3]);
+    expect(array_column($items, 'level'))->toBe([1, 2]);
+});
+
+it('closes the levels an item comes back out of', function () {
+    $items = blocksOf("- one\n  - nested\n    - deeper\n- back\n  - nested again\n")[0]->items;
+
+    expect(array_column($items, 'level'))->toBe([1, 2, 3, 1, 2]);
 });
 
 it('keeps the number the first ordered item was written with', function () {

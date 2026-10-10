@@ -221,6 +221,13 @@ nothing had measured.
   asterisks and underscores inside a code span are characters, and an underscore
   between two word characters is not a delimiter, so `snake_case_name` is a name.
   Unclosed markup still renders as the characters it was written as.
+- **Four spaces of indent is one level, not two.** Before: `depth()` was
+  `intdiv(indent, 2) + 1`, counted from column zero, so a sub-list written `-
+  one` / `    - deep` — a tab's width, and what a model writes — came out at
+  level three, skipping the level below the item it belongs to. After: a level
+  per step of indent, the way CommonMark reads it, with the levels open above
+  an item tracked as they open and close, so an item that comes back out of two
+  levels lands on the level it was written at.
 - **A list keeps the marker each of its items was written with.** Before:
   `ListBlock::$ordered` was one flag for the whole block, taken from the item the list
   started with, so `- a` / `1. b` / `- c` came out as three bullets. After: the

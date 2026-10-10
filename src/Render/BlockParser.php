@@ -491,8 +491,9 @@ final class BlockParser
         // relative to where the list began, so a sub-item does not swallow its own text.
         $base = strlen($first[1]);
         $number = self::number($first);
+        $open = [$base];
         $items = [[
-            'level' => self::depth($first[1]),
+            'level' => self::depth($open, $base),
             'runs' => $inline->parse($first[3]),
             'ordered' => $number !== null,
             'start' => $number,
@@ -507,7 +508,7 @@ final class BlockParser
             }
 
             if (preg_match(self::BULLET, $line, $next) === 1 || preg_match(self::ORDERED, $line, $next) === 1) {
-                $level = self::depth($next[1]);
+                $level = self::depth($open, strlen($next[1]));
                 $number = self::number($next);
                 $items[] = [
                     'level' => $level,
@@ -571,10 +572,27 @@ final class BlockParser
             : null;
     }
 
-    /** An item's indent as a nesting depth: every two spaces is one level. */
-    private static function depth(string $indent): int
+    /**
+     * The nesting depth this indent puts an item at, holding the levels open above it.
+     *
+     * A level per step rather than per two spaces, which is what CommonMark reads and what
+     * four spaces of indent means: `- a` followed by `    - b` is a list inside a list, not
+     * a list inside two lists. Counting the spaces made four of them skip a level, so a
+     * sub-list written at a tab's width was drawn two levels down with nothing at the first.
+     *
+     * @param list<int> $open The indents of the levels currently open, shallowest first.
+     */
+    private static function depth(array &$open, int $indent): int
     {
-        return intdiv(strlen($indent), 2) + 1;
+        while (count($open) > 1 && $indent < (int) end($open)) {
+            array_pop($open);
+        }
+
+        if ($indent > (int) end($open)) {
+            $open[] = $indent;
+        }
+
+        return count($open);
     }
 
     /**

@@ -426,6 +426,16 @@ it('nests a list item by its indent', function () {
     expect($pptx->part('ppt/slides/slide1.xml'))->toContain('marL="190500"');
 });
 
+it('nests a sub-list written four spaces in one level, not two', function () {
+    // `intdiv(indent, 2)` made four spaces two levels, so a sub-list written at a tab's
+    // width was drawn with a gutter nothing was drawn into above it. The item is one gutter
+    // in, so its margin is two gutters and not three.
+    $pptx = renderDeck("- one\n    - deep\n");
+
+    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('marL="381000"')
+        ->not->toContain('marL="571500"');
+});
+
 it('keeps a paragraph under a list item with it', function () {
     // A line indented under an item belongs to that item, which is CommonMark's rule and the
     // reason a wrapped list item does not become two items.
