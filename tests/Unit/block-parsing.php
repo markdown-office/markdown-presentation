@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
@@ -217,6 +218,88 @@ it('reads an image inside a paragraph as text', function () {
     imagepng(imagecreatetruecolor(2, 2), $png);
 
     expect(kindsOf(sprintf("see ![alt](%s) here\n", $png)))->toBe([Paragraph::class]);
+});
+
+it('refuses an HTML comment that is neither a step nor a note', function () {
+    // Drawn as a paragraph it became a slide with the literal text `<!-- v-if false -->` on
+    // it, which is a deck that renders the mistake rather than one that reports it.
+    expect(fn () => blocksOf("# One\n\n<!-- v-if false -->\n\nSecond.\n"))
+        ->toThrow(
+            UnknownDirective::class,
+            'Slide 1 has the HTML comment <!-- v-if false -->, which is neither a step nor a note. '
+            . 'A step is "<!-- v-click -->" on a line of its own, and a note is a comment after '
+            . 'the last line of a slide.',
+        );
+});
+
+it('refuses a comment in the middle of a slide', function () {
+    expect(fn () => blocksOf("# One\n\n<!-- mid -->\n\nSecond.\n"))
+        ->toThrow(UnknownDirective::class, 'has the HTML comment <!-- mid -->');
+});
+
+it('refuses a marker that shares its line with a word', function () {
+    // A step is honoured on a line of its own, so this is not a step anybody can say where it
+    // goes. Read as text it was a slide with `<!-- v-click -->` printed on it.
+    expect(fn () => blocksOf("# One\n\nFirst <!-- v-click -->\n\nSecond.\n"))
+        ->toThrow(UnknownDirective::class, 'has the HTML comment <!-- v-click -->');
+});
+
+it('quotes a comment written across several lines as one line', function () {
+    expect(fn () => blocksOf("# One\n\n<!--\nsomething\n-->\n\nSecond.\n"))
+        ->toThrow(UnknownDirective::class, 'has the HTML comment <!-- something -->');
+});
+
+it('refuses a comment that is never closed, naming what it found', function () {
+    expect(fn () => blocksOf("# One\n\n<!-- never closed\n\nSecond.\n"))
+        ->toThrow(UnknownDirective::class, 'has the HTML comment <!-- never closed');
+});
+
+it('refuses a Vue element, closing one included', function () {
+    expect(fn () => blocksOf("# One\n\n<v-click>Shown</v-click>\n"))
+        ->toThrow(
+            UnknownDirective::class,
+            'Slide 1 has the element "<v-click>", which is not something a slide draws. A step is '
+            . 'the comment "<!-- v-click -->" on a line of its own, and there is no other element.',
+        );
+});
+
+it('refuses an element carrying a v-* directive, which is written like ordinary HTML', function () {
+    expect(fn () => blocksOf("# One\n\n<div v-if=\"clicks\">Shown</div>\n"))
+        ->toThrow(UnknownDirective::class, 'has the element "<div v-if="clicks">"');
+});
+
+it('refuses a ::: container, naming the alternatives', function () {
+    expect(fn () => blocksOf("# One\n\n::: note\nSomething.\n:::\n"))
+        ->toThrow(
+            UnknownDirective::class,
+            'Slide 1 opens the container "::: note", which is not something a slide draws. Divide a '
+            . 'deck with a "---" line, write a section as a heading, and write a note as a quote: "> ".',
+        );
+});
+
+it('refuses a directive in a table row as loudly as one on a line of its own', function () {
+    // The whole slide is judged before it is parsed into blocks, so a directive that a block
+    // parser would have swallowed as a cell is refused rather than drawn as a cell.
+    expect(fn () => blocksOf("# One\n\n| A | B |\n| --- | --- |\n| <!-- v-if --> | x |\n"))
+        ->toThrow(UnknownDirective::class, 'has the HTML comment <!-- v-if -->');
+});
+
+it('leaves HTML that is not a directive as the text it is', function () {
+    // `<b>` is not in Slidev's vocabulary, so a deck that writes HTML is a deck saying
+    // something about HTML — which is text, and text is what a slide draws.
+    expect(kindsOf("A <b>bold</b> word.\n"))->toBe([Paragraph::class]);
+});
+
+it('leaves a comment inside a code block to the code block', function () {
+    // The ordinary way to show a comment rather than run it, which the failure message names.
+    $blocks = blocksOf("# One\n\n```html\n<!-- v-if -->\n```\n");
+
+    expect($blocks[1])->toBeInstanceOf(Code::class)
+        ->and($blocks[1]->lines)->toBe(['<!-- v-if -->']);
+});
+
+it('leaves a directive inside an unclosed code block to the code block too', function () {
+    expect(blocksOf("```\n<!-- v-if -->\n")[0])->toBeInstanceOf(Code::class);
 });
 
 it('reads plain text as one run with nothing emphasised', function () {

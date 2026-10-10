@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\ImageNotFound;
+use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Render\Block\Code;
@@ -69,6 +70,30 @@ final class BlockParser
     /** The info string of a fence, whose first word is the language. */
     private const LANGUAGE = '/\A(\S*)/';
 
+    /**
+     * An HTML comment: the whole of it where it is closed, and the rest of the line where
+     * it is not.
+     *
+     * A comment is refused wherever it stands rather than read as text, because the only two
+     * a slide carries are a step and the note after its last line, and both have been taken
+     * by the time the content reaches here.
+     */
+    private const COMMENT = '/<!--.*?-->|<!--.*?(?:\n|\z)/s';
+
+    /**
+     * An HTML tag: capture 1 is its name, capture 2 its attributes.
+     *
+     * Every tag, not only the ones that are refused, so that telling a directive from ordinary
+     * text is a question about the tag rather than a question about what was found.
+     */
+    private const TAG = '~</?([A-Za-z][A-Za-z0-9:._-]*)((?:\s[^<>]*)?)/?>~';
+
+    /** A `v-*` directive in a tag's attributes, which is what `v-if` is. */
+    private const ATTRIBUTE = '/\sv-[A-Za-z]/';
+
+    /** The line a container fence is opened on, which Slidev nests content in. */
+    private const CONTAINER = '/^[ \t]*:::[^\n]*/m';
+
     public function __construct(
         private readonly InlineParser $inline = new InlineParser(),
         private readonly ImageConverter $images = new ImageConverter(),
@@ -87,12 +112,19 @@ final class BlockParser
      * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
      *
      * @throws ImageNotFound
+     * @throws UnknownDirective
      * @throws UnknownMarker
      * @throws UnsupportedImageFormat
     */
     public function parse(string $content, int $slide, string $directory): array
     {
         $lines = explode("\n", str_replace("\r\n", "\n", $content));
+
+        // Before anything is read rather than as each line goes by, so that a slide is
+        // judged whole: a directive inside a table row or a wrapped list item is drawn no
+        // less literally than one standing on a line of its own.
+        self::refuse($slide, self::prose($lines));
+
         $blocks = [];
         $paragraph = [];
         $step = 1;
@@ -226,6 +258,79 @@ final class BlockParser
             : [false, null];
     }
 
+    /**
+     * The slide's own text, with the two things this library acts on left out of it.
+     *
+     * Code fences and step markers. A comment inside a fence is a line of code, and a deck
+     * quoting HTML in a code block is the ordinary way to show it — refusing there would be
+     * the loud failure pointed at the wrong line. A marker standing on a line of its own is
+     * the one comment the grammar acts on; one sharing its line with a word is not a marker,
+     * and what is left of that line is what the refusal below is looking at.
+     *
+     * @param list<string> $lines
+     */
+    private static function prose(array $lines): string
+    {
+        $prose = [];
+
+        for ($index = 0; $index < count($lines); $index++) {
+            if (preg_match(self::FENCE, $lines[$index], $fence) === 1) {
+                // To the closing fence, or to the end of the slide: an unclosed fence is code
+                // to the end of the slide, as {@see self::code()} reads it.
+                for ($index++; $index < count($lines); $index++) {
+                    if (preg_match(self::closes($fence), rtrim($lines[$index])) === 1) {
+                        break;
+                    }
+                }
+
+                continue;
+            }
+
+            if (preg_match(self::MARKER, $lines[$index]) === 1) {
+                continue;
+            }
+
+            $prose[] = $lines[$index];
+        }
+
+        return implode("\n", $prose);
+    }
+
+    /**
+     * The three spellings a slide can be written in that this library cannot draw.
+     *
+     * Comments first, then the elements, then the containers, and each message names the
+     * spelling that would have worked — which is the whole of what a refusal is for.
+     *
+     * @throws UnknownDirective
+     */
+    private static function refuse(int $slide, string $content): void
+    {
+        if (preg_match(self::COMMENT, $content, $comment) === 1) {
+            throw UnknownDirective::comment($slide, self::oneLine($comment[0]));
+        }
+
+        preg_match_all(self::TAG, $content, $tags, PREG_SET_ORDER);
+
+        foreach ($tags as $tag) {
+            // The name or an attribute: `<v-click>` and `<div v-if="x">` are the same
+            // directive, and the second one is written like ordinary HTML.
+            if (str_starts_with(strtolower($tag[1]), 'v-') || preg_match(self::ATTRIBUTE, $tag[2]) === 1) {
+                throw UnknownDirective::element($slide, $tag[0]);
+            }
+        }
+
+        if (preg_match(self::CONTAINER, $content, $fence) === 1) {
+            throw UnknownDirective::container($slide, self::oneLine($fence[0]));
+        }
+    }
+
+    /** A finding as one line, so a comment written across four of them can still be quoted. */
+    private static function oneLine(string $text): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', $text));
+    }
+
     private static function jump(int $slide, ?string $argument, int $step): int
     {
         if ($argument === null) {
@@ -259,7 +364,7 @@ final class BlockParser
     */
     private static function code(array $lines, int $index, array $fence, int $step): array
     {
-        $closing = '/\A {0,3}' . preg_quote($fence[1][0], '/') . '{' . strlen($fence[1]) . ',}[ \t]*\z/';
+        $closing = self::closes($fence);
         preg_match(self::LANGUAGE, trim($fence[2]), $language);
         $body = [];
 
@@ -276,6 +381,20 @@ final class BlockParser
         // An unclosed fence runs to the end of the slide. CommonMark's rule, and the one
         // that stops a single stray backtick from turning the rest of a deck into code.
         return [new Code($body, $language[1] ?? '', $step), count($lines) - 1];
+    }
+
+    /**
+     * The pattern a fence opened by `$fence` is closed with.
+     *
+     * One pattern for {@see self::code()} and {@see self::prose()}, because the two have to
+     * agree about where a code block ends: a block the second one still sees prose in is a
+     * block whose HTML the first one refuses.
+     *
+     * @param array{0: string, 1: string, 2: string} $fence
+     */
+    private static function closes(array $fence): string
+    {
+        return '/\A {0,3}' . preg_quote($fence[1][0], '/') . '{' . strlen($fence[1]) . ',}[ \t]*\z/';
     }
 
     /**

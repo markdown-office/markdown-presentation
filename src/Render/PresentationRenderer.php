@@ -55,6 +55,13 @@ use PhpOffice\PhpPresentation\Style\SchemeColor;
  *   no use for; mapping them onto shapes would be inventing a vocabulary nobody wrote down.
  *   A slot that does not exist still fails at {@see \MarkdownPresentation\Theme\ThemeLoader}
  *   time, so a typo in a `styles.yml` is never rendered as silence.
+ *
+ * And one it does: a directive in the body of a slide it cannot draw — a `v-*` element, a
+ * `:::` fence, a comment that is neither a step nor the note after the last line — is a
+ * failure from {@see \MarkdownPresentation\Render\BlockParser} rather than a shape carrying
+ * the directive's own text. That last one is the case this library exists for: a deck
+ * written by a model, a directive it does not know, and a slide with the directive printed
+ * on it reads as a rendered deck.
 */
 final class PresentationRenderer
 {

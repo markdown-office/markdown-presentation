@@ -89,6 +89,9 @@ it('names a slide and a file in every failure, because the fix is in the message
     // hunting is what the loud failure was for.
     expect(FencedFrontmatter::at(3)->getMessage())->toContain('Slide 3')
         ->and(MalformedFrontmatter::wrongType(4, 'title', 'a string')->getMessage())->toContain('slide 4')
+        ->and(UnknownDirective::comment(5, '<!-- v-if -->')->getMessage())->toContain('Slide 5')
+        ->and(UnknownDirective::element(6, '<v-click>')->getMessage())->toContain('Slide 6')
+        ->and(UnknownDirective::container(7, ':::')->getMessage())->toContain('Slide 7')
         ->and(MalformedTheme::unknownKey('themes/acme/theme.yml', 'colour', ['name'])->getMessage())
         ->toContain('themes/acme/theme.yml')
         ->and(ImageNotFound::at(2, 'logo.png', '/tmp/logo.png')->getMessage())
@@ -108,6 +111,18 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'a deck directive on a later slide' => [
         UnknownDirective::misplaced(4, 'theme')->getMessage(),
         'belongs in the frontmatter of slide 1',
+    ],
+    'a comment that is neither a step nor a note' => [
+        UnknownDirective::comment(3, '<!-- v-if false -->')->getMessage(),
+        'A step is "<!-- v-click -->" on a line of its own',
+    ],
+    'an element a slide cannot draw' => [
+        UnknownDirective::element(2, '<v-click>')->getMessage(),
+        'which is not something a slide draws',
+    ],
+    'a container fence a slide cannot draw' => [
+        UnknownDirective::container(4, '::: note')->getMessage(),
+        'Divide a deck with a "---" line',
     ],
     'a step that goes backwards' => [
         UnknownMarker::backwards(2, 1, 3)->getMessage(),
