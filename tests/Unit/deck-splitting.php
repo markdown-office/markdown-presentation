@@ -84,7 +84,8 @@ it('reads a block closed by a delimiter indented under three spaces as frontmatt
     // The three spaces a closing code fence is allowed, and the reason the closer is not
     // anchored at column zero: this deck would lose its frontmatter entirely, and where a
     // slide delimiter follows one, the block would swallow what came after and fold it into
-    // the title. Recorded as a deck in tests/fixtures/slidev/.
+    // the title. Recorded as the `closing delimiter indented` deck in
+    // tests/fixtures/slidev/, where Slidev's own parser agrees with this reading.
     $slide = split("---\ntitle: Deck\n  ---\n\n# One\n")[0];
 
     expect($slide['frontmatter'])->toBe(['title' => 'Deck'])
@@ -203,8 +204,8 @@ it('reads a trailing step marker as a marker rather than as a note', function ()
 });
 
 it('reads a trailing numbered step marker as a marker too', function (string $markdown) {
-    // Including the two forms that are not steps anybody can draw. Refusing them is the
-    // renderer's job and names the mistake; taking them as a note would hide it.
+    // Two of these are not steps this renderer can draw. Refusing them is its job and names
+    // the mistake; taking them as a note would hide it.
     expect(split($markdown)[0])->toMatchArray(['note' => null]);
 })->with([
     'named step' => "# One\n\n<!-- v-click=3 -->\n",

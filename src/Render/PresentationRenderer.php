@@ -321,12 +321,10 @@ final class PresentationRenderer
     {
         $properties = $presentation->getDocumentProperties();
 
-        // The deck's author if it names one, the theme's otherwise. The deck is the more
+        // The deck's author where it names one, the theme's otherwise. The deck is the more
         // specific of the two — it is the document, and the theme is the template it was
-        // written in — so a deck naming its own author is not credited to whoever wrote the
-        // theme. A theme's author is a default rather than a claim, which is why the name
-        // this falls back to is the library's own and not the theme's when the theme has
-        // none either.
+        // written in. A theme that names no author leaves the library's own name there, which
+        // is a statement about the file rather than about who made it.
         $author = $deck->frontmatterValue('author');
 
         $properties->setCreator($author === null
