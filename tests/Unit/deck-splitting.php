@@ -66,6 +66,40 @@ it('reads no frontmatter from a delimiter with a blank line after it', function 
     expect(split("# One\n\n---\n\n# Two\n")[1]['frontmatter'])->toBe([]);
 });
 
+it('reads a frontmatter block closed by a delimiter line, not by three dashes in a value', function () {
+    // Slidev matches three dashes *anywhere*, so the block ended at the middle of the value:
+    // `description` was `a` and `-b` opened the slide's body, with nothing to say so.
+    $slide = split("---\ndescription: a---b\n---\n\n# One\n")[0];
+
+    expect($slide['frontmatter'])->toBe(['description' => 'a---b'])
+        ->and($slide['content'])->toBe('# One');
+});
+
+it('reads a quoted value holding three dashes rather than refusing it as broken YAML', function () {
+    expect(split("---\ndescription: \"before --- after\"\n---\n\n# One\n")[0]['frontmatter'])
+        ->toBe(['description' => 'before --- after']);
+});
+
+it('reads a block closed by a delimiter indented under three spaces as frontmatter', function () {
+    // The three spaces a closing code fence is allowed, and the reason the closer is not
+    // anchored at column zero: this deck would lose its frontmatter entirely, and where a
+    // slide delimiter follows one, the block would swallow what came after and fold it into
+    // the title. Recorded as a deck in tests/fixtures/slidev/.
+    $slide = split("---\ntitle: Deck\n  ---\n\n# One\n")[0];
+
+    expect($slide['frontmatter'])->toBe(['title' => 'Deck'])
+        ->and($slide['title'])->toBe('Deck');
+});
+
+it('does not fold the rest of the deck into a value when the closer is indented', function () {
+    // The same deck with a slide delimiter after it. YAML folds a following line into the
+    // value above it, so a closer found too late reads as `title: "Deck ---"` and swallows
+    // the slide's own heading — a title nobody wrote, with nothing anywhere to say so.
+    $slide = split("---\ntitle: Deck\n  ---\n\n# One\n\n---\n\n# Two\n")[0];
+
+    expect($slide['frontmatter'])->toBe(['title' => 'Deck']);
+});
+
 it('treats a run of four dashes as a delimiter and not as an opener', function () {
     expect(contents("# One\n\n----\n\n# Two\n"))->toBe(['# One', '# Two']);
 });

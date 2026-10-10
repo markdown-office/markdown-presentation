@@ -40,8 +40,27 @@ final class DeckParser
      * slide. Slidev's `RE_FRONTMATTER`, with `.*` written as the class it matches:
      * a JavaScript dot stops at a carriage return as well as at a newline, so
      * `[^\r\n]*` is what the original means.
+     *
+     * The `^`, the `$` and the `m` flag are a deliberate divergence, and they are the whole
+     * of what a closer is here. Slidev matches three dashes *anywhere*, so `description: a---b`
+     * closed the block at the dashes in the middle of the value: the description was `a` and
+     * `-b` became the first line of the slide's body, with nothing anywhere to say so, and a
+     * quoted value holding `---` was not YAML at all. A delimiter is a line and a value is a
+     * value, so a closer is a line here too.
+     *
+     * Three spaces of indentation are allowed because that is what every other block
+     * construct here allows — see {@see self::closesFence()} — and anchoring the closer at
+     * column zero instead would trade this bug for two worse ones: a block closed by an
+     * indented `---` would stop being frontmatter at all, and where a slide delimiter
+     * followed one, the frontmatter would swallow the rest of the deck and fold it into a
+     * value of its own.
+     *
+     * The match now ends at the end of the closing line rather than three characters into it,
+     * which is what takes the rest of that line with it: the content of a slide starts after
+     * its delimiter, not inside it. The opener is unchanged, and a block with no `---` line in
+     * it is not a block this can find.
     */
-    private const FRONTMATTER = '/\A---[^\r\n]*\r?\n([\s\S]*?)---/';
+    private const FRONTMATTER = '/\A---[^\r\n]*\r?\n([\s\S]*?)^ {0,3}---[^\r\n]*$/m';
 
     /**
      * The body of a comment that is a step marker, without the `<!--` and `-->` around it.
