@@ -77,7 +77,9 @@ final class TemplateGeometry
      * than one that fails on the three.
      *
      * Two layouts with the same name would collide; the last one in the archive wins, which
-     * is what a reader of the file would see too.
+     * is what a reader of the file would see too. A layout that carries no name is filed
+     * under the empty string, which no theme can ask for: `ThemeLoader` refuses an empty
+     * layout name in a `layouts.yml`.
      *
      * @return array<string, array{title?: Box, body?: non-empty-list<Box>}>
      *
@@ -221,6 +223,8 @@ final class TemplateGeometry
         $offset = self::first($transform, self::DRAWINGML, 'off');
         $extent = self::first($transform, self::DRAWINGML, 'ext');
 
+        // No `a:xfrm` at all is how a placeholder says "wherever the master says", and that is
+        // what PowerPoint writes for a layout that does not move the one it inherited.
         if ($offset === null || $extent === null) {
             return null;
         }
@@ -228,8 +232,8 @@ final class TemplateGeometry
         $cx = (int) $extent->getAttribute('cx');
         $cy = (int) $extent->getAttribute('cy');
 
-        // No extent is how a placeholder says "wherever the master says", which is what
-        // PowerPoint writes for a layout that does not move its master's placeholder.
+        // The other way to state no position: an `a:xfrm` left behind by a shape that was
+        // dragged off the page. A deck laid out inside one gets a column a pixel wide.
         if ($cx < 1 || $cy < 1) {
             return null;
         }
@@ -289,8 +293,9 @@ final class TemplateGeometry
      * The master part a layout's relationships name, resolved against the layout's own.
      *
      * Read rather than guessed: a presentation may have more than one master and a layout of
-     * the second belongs to it. A layout whose relationships name none inherits nothing, and
-     * the empty path below reads as a part that is not there — the same answer.
+     * the second belongs to it. An empty answer is a layout whose relationships name no
+     * master — PowerPoint gives every layout exactly one — and it inherits nothing rather
+     * than this going looking for one.
      *
      * @throws MalformedTemplate
      */
