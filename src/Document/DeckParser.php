@@ -106,17 +106,21 @@ final class DeckParser
         // handle. A lone carriage return is not a line ending here or there.
         $lines = explode("\n", str_replace("\r\n", "\n", $markdown));
         $last = count($lines) - 1;
-            $slides = [];
+        $slides = [];
         $start = 0;
         $inHtmlComment = false;
-            for ($index = 0; $index <= $last; $index++) {
+
+        for ($index = 0; $index <= $last; $index++) {
             $line = $lines[$index];
             $trimmed = rtrim($line);
-                if ($inHtmlComment) {
+
+            if ($inHtmlComment) {
                 $inHtmlComment = self::commentContinues($line, true);
-                    continue;
+
+                continue;
             }
-                if (str_starts_with($trimmed, '---')) {
+
+            if (str_starts_with($trimmed, '---')) {
                 // An empty block is not a slide: Slidev's `slice()` returns without
                 // moving the start, and moving it would turn a deck written with a
                 // leading `---` frontmatter block into an empty slide in front of it.
@@ -124,51 +128,77 @@ final class DeckParser
                     $slides[] = self::slide($lines, $start, $index, count($slides));
                     $start = $index + 1;
                 }
-                    // A run of four dashes or more closes the slide without opening
+
+                // A run of four dashes or more closes the slide without opening
                 // frontmatter — `$trimmed[3] !== '-'` — and the line after has to
                 // carry something, or there is no block to read. `--- with a
                 // trailing word` does open one, which is why this tests the
                 // character rather than the line.
                 if (($trimmed[3] ?? '') !== '-' && trim($lines[$index + 1] ?? '') !== '') {
                     $start = $index;
-                        // Walk to the closing `---`, or to the end of the deck if it is
-                    // never closed: the same thing Slidev does, and the difference
-                    // is a slide with no frontmatter rather than an exception. The
-                    // loop's own increment steps past the closing line, so it is
-                    // read as part of the block rather than as a delimiter of its
-                    // own.
-                    for ($index++; $index <= $last && rtrim($lines[$index]) !== '---'; $index++) {
-                    }
+                    $index = self::closingDelimiter($lines, $index + 1, $last);
                 }
             } elseif (preg_match(self::FENCE_OPEN, $trimmed, $fence) === 1) {
-                // The closing fence is the same character, at least as long, indented
-                // by no more than the opening one, and carrying nothing else.
-                //
-                // A fence that is never closed runs to the end of the deck, which is
-                // what CommonMark says an unclosed fence is and what stops a `---`
-                // inside one from splitting the deck. Slidev leaves the index where it
-                // was, so every following line is read as ordinary content and the
-                // delimiter in it does split.
-                $closed = false;
-                    for ($cursor = $index + 1; $cursor <= $last; $cursor++) {
-                    if (self::closesFence($lines[$cursor], $fence[1][0], strlen($fence[1]))) {
-                        $index = $cursor;
-                        $closed = true;
-                            break;
-                    }
-                }
-                    if (!$closed) {
-                    $index = $last;
-                }
+                $index = self::closingFence($lines, $index, $last, $fence[1]);
             } else {
                 $inHtmlComment = self::commentContinues($line, false);
             }
         }
-            // A deck that ends on a delimiter has nothing after it to make a slide of.
+
+        // A deck that ends on a delimiter has nothing after it to make a slide of.
         if ($start <= $last) {
             $slides[] = self::slide($lines, $start, count($lines), count($slides));
         }
-            return new Deck($markdown, $slides);
+
+        return new Deck($markdown, $slides);
+    }
+
+    /**
+     * The line the frontmatter block opened before `$from` closes on, or one past the end
+     * of the deck when it never closes.
+     *
+     * One past the end rather than the last line, because the walk steps past whatever it
+     * is handed: the closer is then read as the last line of the block rather than as a
+     * delimiter of its own. That is also what makes a block which is never closed a slide
+     * with no frontmatter rather than an exception, which is what Slidev does with it.
+     *
+     * @param list<string> $lines
+     */
+    private static function closingDelimiter(array $lines, int $from, int $last): int
+    {
+        for ($index = $from; $index <= $last; $index++) {
+            if (rtrim($lines[$index]) === '---') {
+                return $index;
+            }
+        }
+
+        return $last + 1;
+    }
+
+    /**
+     * The line the fence opened at `$open` closes on, or the last line of the deck when it
+     * is never closed.
+     *
+     * The last line rather than one past it, so that a fence running to the end of the deck
+     * stops the walk rather than being read as one more line of it — a `---` inside an
+     * unclosed fence is code, and treating it as a delimiter would split the slide.
+     *
+     * The closing fence is the same character, at least as long, indented by no more than
+     * the opening one, and carrying nothing else. Slidev leaves the walk where it was when a
+     * fence never closes, so every following line is read as ordinary content and the
+     * delimiter in it does split.
+     *
+     * @param list<string> $lines
+     */
+    private static function closingFence(array $lines, int $open, int $last, string $fence): int
+    {
+        for ($index = $open + 1; $index <= $last; $index++) {
+            if (self::closesFence($lines[$index], $fence[0], strlen($fence))) {
+                return $index;
+            }
+        }
+
+        return $last;
     }
 
     /**
@@ -285,23 +315,22 @@ final class DeckParser
     {
         $end = strrpos($content, '-->');
 
-        if ($end === false || $end + 3 !== strlen($content)) {
-            return [$content, null];
-        }
+        $start = $end === false || $end + 3 !== strlen($content)
+            ? false
+            : strrpos(substr($content, 0, $end), '<!--');
 
-        $start = strrpos(substr($content, 0, $end), '<!--');
-
-        if ($start === false) {
-            return [$content, null];
-        }
-
-        $note = trim(substr($content, $start + 4, $end - $start - 4));
-
+        // Not a note: no comment, one that does not close the slide, a `-->` with no `<!--`
+        // before it, or one that is nothing but a step marker. The first three are the same
+        // answer, so they are asked as one question — a slide either has a trailing comment
+        // to take or it has the content it was written with.
+        //
         // A comment that is nothing but a step marker is that step. It runs to the end of
         // the slide because there is nothing after it, which is what makes it look like a
         // note, and taking it would drop the step the author wrote. Anything else is a note,
         // marker-shaped substring and all: a note that mentions `v-click` is a note.
-        if (preg_match('/\A' . self::MARKER_BODY . '\z/s', $note) === 1) {
+        $note = $start === false ? null : trim(substr($content, $start + 4, $end - $start - 4));
+
+        if ($note === null || preg_match('/\A' . self::MARKER_BODY . '\z/s', $note) === 1) {
             return [$content, null];
         }
 
@@ -403,28 +432,28 @@ final class DeckParser
         while ($cursor < $length) {
             if ($inside) {
                 $end = strpos($line, '-->', $cursor);
-
-                if ($end === false) {
-                    return true;
-                }
-
-                $inside = false;
-                $cursor = $end + 3;
             } else {
                 $start = strpos($line, '<!--', $cursor);
 
+                // Nothing opens on this line and nothing is open, so nothing is left open.
+                // This is the one answer the two halves below do not share.
                 if ($start === false) {
                     return false;
                 }
 
                 $end = strpos($line, '-->', $start + 4);
-
-                if ($end === false) {
-                    return true;
-                }
-
-                $cursor = $end + 3;
             }
+
+            // Shared on purpose: both halves have found the end of a comment, or have run
+            // out of line looking for one. A comment running off the end of the line is what
+            // the next line has to be read in, and saying so once is what keeps the two
+            // halves from disagreeing about it.
+            if ($end === false) {
+                return true;
+            }
+
+            $inside = false;
+            $cursor = $end + 3;
         }
 
         return $inside;
