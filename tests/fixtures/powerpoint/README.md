@@ -1,18 +1,20 @@
-# Two decks PowerPoint wrote
+# Three decks PowerPoint wrote
 
-Both `.pptx` files here were authored in Microsoft PowerPoint 16.113.4 on macOS, saved by it, and
+All the `.pptx` files here were authored in Microsoft PowerPoint 16.113.4 on macOS, saved by it, and
 are carried here unchanged apart from their authorship metadata. Nothing in them is written by
 this library: a deck this library produced would be a round trip of a deck, which is the thing
-these two are here to be different from.
+these are here to be different from.
 
 They are **not** themes. `themes/default`, `themes/minimal` and `themes/corporate-dark` stay
-library-owned, and neither of these files feeds them. These are read by tests and shown in the
-README as examples of what a person's own deck looks like from the inside.
+library-owned, and none of these files feeds them. Two are read by tests and shown in the README
+as examples of what a person's own deck looks like from the inside; the third is the oracle for
+`p:timing`.
 
 | File | Bytes | What it is |
 | --- | --- | --- |
 | `harbour-lights.pptx` | ~47 KB | The deck a person designs. |
 | `workshop.pptx` | ~37 KB | The deck a person just works in. |
+| `entrance-animation.pptx` | ~29 KB | The animation PowerPoint writes. |
 
 ## `harbour-lights.pptx` — a design
 
@@ -40,17 +42,34 @@ stock *Office Theme*, nothing renamed or recoloured. Twelve layouts. What makes 
   with no position of its own, to be inherited from the master. So do `Content with Caption` and,
   on the other deck, `Two Content`'s two columns.
 
+## `entrance-animation.pptx` — the oracle for `p:timing`
+
+Two slides on the stock *Office Theme*, and the only reason either is here is what is inside
+`<p:timing>`:
+
+- slide 1, **Title and Content**, with an `appear` entrance on click for the title and for the
+  body — two effects, and the smallest thing that is a build at all;
+- slide 2, **Title Only**, with three text boxes and three effects on click, the middle one a
+  `fade` — three effects, because the second and third of a chain are what cannot be reasoned
+  out from the first, and a `fade` in the middle of the chain shows what changes when the
+  effect does.
+
+Nothing else about this deck is interesting, and that is the point: it is the answer to "what
+does PowerPoint write", read off PowerPoint rather than off a description of the format. The
+findings it exists to settle are written down in `tests/Unit/timing.php`.
+
 ## What a reader is meant to take from them
 
 `TemplateGeometry` reads layouts, not slides, so almost everything wrong with a deck is invisible
-to it by construction. These two decks are carried anyway, because the layouts in a deck that is
-used are not the layouts anyone writes down, and the reader is only ever as good as the layouts it
-has seen. The bug they found is described in `tests/Unit/powerpoint-fixtures.php`.
+to it by construction. `harbour-lights.pptx` and `workshop.pptx` are carried anyway, because the
+layouts in a deck that is used are not the layouts anyone writes down, and the reader is only ever
+as good as the layouts it has seen. The bug they found is described in
+`tests/Unit/powerpoint-fixtures.php`.
 
 ## Rebuilding them
 
 ```
-tools/build-powerpoint-fixtures.sh
+tools/build-powerpoint-fixtures.sh [deck ...]
 ```
 
 Needs PowerPoint and nothing else beyond what the tests already need. It writes an empty stub for
@@ -58,6 +77,10 @@ PowerPoint to open, drives it through `build/*.applescript`, scrubs the result, 
 here. PowerPoint is required rather than optional: `make new slide` answers "class slide cannot be
 created", so the slides have to exist before it opens the file, and everything after that is its
 own work.
+
+Naming decks rebuilds only those. A deck PowerPoint writes is not byte-identical to the one it
+wrote last time — the timestamps in `docProps` move — so rebuilding all of them to change one
+leaves a diff in the others that says nothing.
 
 ## The authorship metadata
 

@@ -1,12 +1,16 @@
 #!/bin/bash
 #
-# Rebuilds the two PowerPoint decks this directory carries.
+# Rebuilds the PowerPoint decks this directory carries.
 #
-#   tools/build-powerpoint-fixtures.sh [--keep]
+#   tools/build-powerpoint-fixtures.sh [--keep] [deck ...]
 #
-# PowerPoint authors both files: this writes an empty stub for it to open, drives it through
-# AppleScript, and takes the name it wrote back out. See README.md for what each deck is and why
-# they are built rather than committed blind.
+# PowerPoint authors every one of them: this writes an empty stub for it to open, drives it
+# through AppleScript, and takes the name it wrote back out. See README.md for what each deck is
+# and why they are built rather than committed blind.
+#
+# Naming decks rebuilds only those. A deck PowerPoint writes is not byte-identical to the one it
+# wrote last time — the timestamps in `docProps` move — so rebuilding all of them to change one
+# leaves a diff in the other two that says nothing.
 #
 # Three things about PowerPoint on macOS are load-bearing here and are why this is a script and
 # not three commands:
@@ -30,6 +34,21 @@ WORK="${TMPDIR:-/tmp}/markdown-presentation-fixtures"
 PICTURE="$HERE/examples/markdown/assets/logo.png"
 
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+chosen=()
+for argument in "$@"; do
+	[[ "$argument" == "--keep" ]] && continue
+	chosen+=("$argument")
+done
+
+# A name that matches nothing rebuilds nothing and then reports success, which reads exactly like
+# a run that did what it was asked. `want` is what a name has to pass, so the check is here.
+for argument in "${chosen[@]}"; do
+	case "$argument" in
+		harbour-lights | workshop | entrance-animation) ;;
+		*) echo "No such deck: $argument. Known: harbour-lights, workshop, entrance-animation." >&2; exit 1 ;;
+	esac
+done
 
 if [[ ! -d '/Applications/Microsoft PowerPoint.app' ]]; then
 	echo "Microsoft PowerPoint is not installed; these fixtures are authored in it and cannot" >&2
@@ -84,10 +103,23 @@ author () {
 	echo "$deck: rebuilt"
 }
 
-author harbour-lights 5 12192000 6858000 harbour-lights.applescript || exit 1
+want () {
+	[[ ${#chosen[@]} -eq 0 ]] && return 0
+
+	local asked
+	for asked in "${chosen[@]}"; do
+		[[ "$asked" == "$1" ]] && return 0
+	done
+
+	return 1
+}
 
 # A4 rather than a slide shape: 9906000 x 6858000 EMU, which is what PowerPoint writes for it.
-author workshop 6 9906000 6858000 workshop.applescript || exit 1
+want harbour-lights && { author harbour-lights 5 12192000 6858000 harbour-lights.applescript || exit 1; }
+want workshop && { author workshop 6 9906000 6858000 workshop.applescript || exit 1; }
+
+# Two slides rather than the deck either of the others is: this one exists for its `<p:timing>`.
+want entrance-animation && { author entrance-animation 2 12192000 6858000 entrance-animation.applescript || exit 1; }
 
 pkill -9 -f "Microsoft PowerPoint" >/dev/null 2>&1
 rm -rf "$CONTAINER"
@@ -96,4 +128,4 @@ if [[ "${1:-}" != "--keep" ]]; then
 	rm -rf "$WORK"
 fi
 
-echo "Both decks are in tests/fixtures/powerpoint/."
+echo "The rebuilt decks are in tests/fixtures/powerpoint/."
