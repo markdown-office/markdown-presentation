@@ -9,6 +9,19 @@ use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 
 /**
+ * A one-column table whose only cell is `$z` characters of `z`.
+ *
+ * A function because the length is the claim: 500 characters wrap to four lines and a row is
+ * 38px plus 19px a line, 60 characters fit one column's width and 292 wrap to two. Spelling
+ * the shape out three times is how one of those numbers stops being what the comment above
+ * it says.
+ */
+function oneColumnTable(int $z): string
+{
+    return "| A |\n| --- |\n| " . str_repeat('z', $z) . " |\n";
+}
+
+/**
  * The advance-width model, asked of itself and then asked of a written file.
  *
  * The model is an approximation, and every decision in it — the reference face, the
@@ -191,7 +204,7 @@ it('measures a code line by its characters, so a long one wraps', function () {
 it('gives a table row the height of the lines its longest cell wraps to', function () {
     // The header is one line and takes a 38px row; the body cell is 3000px of type in a
     // column 880 wide, so four lines of 19px.
-    expect(measured("| A |\n| --- |\n| " . str_repeat('z', 500) . " |\n")->positionOf('table')['height'])
+    expect(measured(oneColumnTable(500))->positionOf('table')['height'])
         ->toBe(38 + 4 * 19.0);
 });
 
@@ -212,7 +225,7 @@ it('gives a table\'s columns the width of what they hold', function () {
     // every column whatever it says: a column whose header is one character and a column
     // whose cells are a sentence were drawn the same, and the narrow one wrapped to one
     // word a line while the wide one sat empty.
-    $markdown = "| A |\n| --- |\n| " . str_repeat('z', 60) . " |\n| b |\n";
+    $markdown = oneColumnTable(60) . "| b |\n";
     $widths = columnsOf($markdown);
 
     expect($widths[0])->toBe(880.0);
@@ -264,7 +277,7 @@ it('measures a table cell against the width its padding leaves', function () {
     // text does not have, and a cell whose last line is exactly that wide wraps — which is a
     // row taller than the text in it needs. 292 `z` are 1752px of type in an 880px column:
     // three lines once 12px of that column is padding, two without.
-    $markdown = "| A |\n| --- |\n| " . str_repeat('z', 292) . " |\n";
+    $markdown = oneColumnTable(292);
 
     expect(measured($markdown)->positionOf('table')['height'])->toBe(38.0 + 3 * 19.0);
 });

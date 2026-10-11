@@ -23,6 +23,18 @@ use MarkdownPresentation\Tests\Support\Scratch;
 /** The paragraph these decks are made too long out of, repeated by `str_repeat()`. */
 const FILLER = "Text.\n\n";
 
+/**
+ * Sixty lines of code in a fenced block, which is the block these decks overflow on.
+ *
+ * A function rather than a constant because the same sixty lines are wanted four times and
+ * the number that makes it overflow is the claim: 60 × 19px plus the insets does not fit a
+ * 396-pixel body box, and a shorter block would stop being the thing under test.
+ */
+function tallCodeBlock(): string
+{
+    return "```\n" . str_repeat("line;\n", 60) . "```\n";
+}
+
 /** Render a deck, returning the renderer, because the report is on the renderer. */
 function overflowing(string $markdown, bool $strict = false): PresentationRenderer
 {
@@ -39,7 +51,7 @@ it('reports nothing for a deck that fits its slides', function () {
 it('reports a block it had to make smaller, and how much smaller', function () {
     // Sixty lines of code at 12pt is 60 × 19px plus the insets, in a body box 396px tall.
     // It is drawn as small as the room allows, and this is where that is said out loud.
-    expect(overflowing("```\n" . str_repeat("line;\n", 60) . "```\n")->overflows())->toBe([[
+    expect(overflowing(tallCodeBlock())->overflows())->toBe([[
         'slide' => 1,
         'step' => 1,
         'column' => 0,
@@ -104,7 +116,7 @@ it('empties the report on each render rather than accumulating it', function () 
 it('refuses a deck that overflows when the renderer is strict', function () {
     // Strict is for a caller that would rather have no file than a file with a slide on it
     // that is missing something, and the message has to say which slide and what.
-    expect(fn () => overflowing("```\n" . str_repeat("line;\n", 60) . "```\n", strict: true))
+    expect(fn () => overflowing(tallCodeBlock(), strict: true))
         ->toThrow(
             ContentOverflow::class,
             'Slide 1, step 1, column 1: its code needs 1150px of height and 396px are left.',
@@ -117,7 +129,7 @@ it('writes no file when a strict render refuses the deck', function () {
     $path = Scratch::file('deck.pptx', '');
 
     expect(fn () => (new PresentationRenderer(strict: true))->render(
-        (new DeckParser())->parse("```\n" . str_repeat("line;\n", 60) . "```\n"),
+        (new DeckParser())->parse(tallCodeBlock()),
         $path,
     ))->toThrow(ContentOverflow::class);
 
@@ -127,5 +139,5 @@ it('writes no file when a strict render refuses the deck', function () {
 it('writes a file for a deck that overflows when the renderer is not strict', function () {
     // The pair with the one above: the file is the point of the non-strict renderer, and a
     // clamp that refused to write anything would be strict with extra steps.
-    expect(overflowing("```\n" . str_repeat("line;\n", 60) . "```\n")->overflows())->not->toBe([]);
+    expect(overflowing(tallCodeBlock())->overflows())->not->toBe([]);
 });

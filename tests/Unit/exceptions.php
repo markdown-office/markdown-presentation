@@ -27,6 +27,18 @@ use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Tests\Support\UnreadableArchive;
 
 /**
+ * The two paths the messages below name, and the reason they are paths rather than
+ * anything real.
+ *
+ * Every one of these failures is built by calling the constructor directly rather than by
+ * provoking it, so that the suite can assert on the message whatever the machine it runs on
+ * would have done. That is also why the paths cannot be the ones a render writes: a reader
+ * who sees `/tmp/deck.pptx` here should not go looking for the deck that made it.
+ */
+const DECK_PATH = '/tmp/deck.pptx';
+const LOGO_PATH = '/tmp/logo.png';
+
+/**
  * Every failure this library reports, found by reading the directory rather than by
  * a list written here.
  *
@@ -112,8 +124,8 @@ it('reports what a deck author can fix under the class that says so', function (
 it('reports a failure under one catch, whatever it is a failure of', function () {
     // The promise the README makes, asserted rather than described: one `catch` on the base
     // covers everything this library throws, including the failures that are not the deck's.
-    expect(UnreadablePackage::cannotOpen('/tmp/deck.pptx'))->toBeInstanceOf(Exception::class)
-        ->and(UnreadablePackage::cannotRead('/tmp/deck.pptx', 'ppt/notesSlides/notesSlide1.xml'))
+    expect(UnreadablePackage::cannotOpen(DECK_PATH))->toBeInstanceOf(Exception::class)
+        ->and(UnreadablePackage::cannotRead(DECK_PATH, 'ppt/notesSlides/notesSlide1.xml'))
         ->toBeInstanceOf(Exception::class);
 });
 
@@ -186,8 +198,8 @@ it('names a slide and a file in every failure, because the fix is in the message
         ->and(UnknownDirective::container(7, ':::')->getMessage())->toContain('Slide 7')
         ->and(MalformedTheme::unknownKey('themes/acme/theme.yml', 'colour', ['name'])->getMessage())
         ->toContain('themes/acme/theme.yml')
-        ->and(ImageNotFound::at(2, 'logo.png', '/tmp/logo.png')->getMessage())
-        ->toContain('/tmp/logo.png')
+        ->and(ImageNotFound::at(2, 'logo.png', LOGO_PATH)->getMessage())
+        ->toContain(LOGO_PATH)
         ->and(ContentOverflow::on(3, 2, 0, 'code', 1150, 396)->getMessage())
         ->toContain('Slide 3')
         ->and(ContentOverflow::on(3, 2, 0, 'code', 1150, 396)->getMessage())->toContain('code');
@@ -240,7 +252,7 @@ it('names the alternatives wherever a failure is a name the author can change', 
         'with no number',
     ],
     'an image that is not a file' => [
-        ImageNotFound::at(1, 'logo.png', '/tmp/logo.png')->getMessage(),
+        ImageNotFound::at(1, 'logo.png', LOGO_PATH)->getMessage(),
         'which is not a file',
     ],
     'an image no package can carry and nothing can decode' => [
@@ -248,7 +260,7 @@ it('names the alternatives wherever a failure is a name the author can change', 
         'Convert it to GIF, JPEG, PNG or SVG first',
     ],
     'a package this process cannot open at all' => [
-        UnreadablePackage::cannotOpen('/tmp/deck.pptx')->getMessage(),
+        UnreadablePackage::cannotOpen(DECK_PATH)->getMessage(),
         'It is not a package this PHP can read, or the process cannot write it.',
     ],
     'a link target that is a scheme a reader would act on' => [

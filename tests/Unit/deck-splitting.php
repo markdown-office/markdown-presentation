@@ -33,8 +33,21 @@ function contents(string $markdown): array
     return array_column(split($markdown), 'content');
 }
 
+/**
+ * The smallest deck there is two slides of, and the two slides it makes.
+ *
+ * Every test below is about where the split falls, so the deck has to be one where falling
+ * it somewhere else is visible. `# One` and `# Two` are the halves, kept as constants
+ * because half of these assertions *are* the comparison against them — spelling the two
+ * titles out on each side of a `toBe()` is a test that reads as though it were about the
+ * parser when it is about neither string.
+ */
+const TWO_SLIDES = "# One\n\n---\n\n# Two\n";
+const ONE = '# One';
+const TWO = '# Two';
+
 it('splits a deck on the delimiter line', function () {
-    expect(contents("# One\n\n---\n\n# Two\n"))->toBe(['# One', '# Two']);
+    expect(contents(TWO_SLIDES))->toBe([ONE, TWO]);
 });
 
 it('reads the deck frontmatter out of the first block, and keeps it on the slide', function () {
@@ -45,7 +58,7 @@ it('reads the deck frontmatter out of the first block, and keeps it on the slide
     // own accessors read it from there.
     expect($deck->frontmatter())->toBe(['title' => 'Deck', 'author' => 'Fabi'])
         ->and($deck->count())->toBe(2)
-        ->and($deck->slides()[0]->content())->toBe('# One')
+        ->and($deck->slides()[0]->content())->toBe(ONE)
         ->and($deck->slides()[1]->frontmatter())->toBe([]);
 });
 
@@ -63,7 +76,7 @@ it('reads a frontmatter block after the first slide too', function () {
 });
 
 it('reads no frontmatter from a delimiter with a blank line after it', function () {
-    expect(split("# One\n\n---\n\n# Two\n")[1]['frontmatter'])->toBe([]);
+    expect(split(TWO_SLIDES)[1]['frontmatter'])->toBe([]);
 });
 
 it('reads a frontmatter block closed by a delimiter line, not by three dashes in a value', function () {
@@ -72,7 +85,7 @@ it('reads a frontmatter block closed by a delimiter line, not by three dashes in
     $slide = split("---\ndescription: a---b\n---\n\n# One\n")[0];
 
     expect($slide['frontmatter'])->toBe(['description' => 'a---b'])
-        ->and($slide['content'])->toBe('# One');
+        ->and($slide['content'])->toBe(ONE);
 });
 
 it('reads a quoted value holding three dashes rather than refusing it as broken YAML', function () {
@@ -102,11 +115,11 @@ it('does not fold the rest of the deck into a value when the closer is indented'
 });
 
 it('treats a run of four dashes as a delimiter and not as an opener', function () {
-    expect(contents("# One\n\n----\n\n# Two\n"))->toBe(['# One', '# Two']);
+    expect(contents("# One\n\n----\n\n# Two\n"))->toBe([ONE, TWO]);
 });
 
 it('reads trailing whitespace on a delimiter as nothing', function () {
-    expect(contents("# One\n\n---   \n\n# Two\n"))->toBe(['# One', '# Two']);
+    expect(contents("# One\n\n---   \n\n# Two\n"))->toBe([ONE, TWO]);
 });
 
 it('leaves a thematic break alone when it is not a line of dashes', function () {
@@ -118,7 +131,7 @@ it('leaves a thematic break alone when it is not a line of dashes', function () 
 it('skips a fenced code block whole, so a delimiter inside one cannot split a slide', function () {
     $markdown = "# One\n\n```\n---\nnot a slide\n---\n```\n\n---\n\n# Two\n";
 
-    expect(contents($markdown))->toBe(["# One\n\n```\n---\nnot a slide\n---\n```", '# Two']);
+    expect(contents($markdown))->toBe(["# One\n\n```\n---\nnot a slide\n---\n```", TWO]);
 });
 
 it('lets a flush closer close an indented opener', function () {
@@ -174,7 +187,7 @@ it('reads a trailing HTML comment as the speaker note', function () {
     $deck = (new DeckParser())->parse("# One\n\n<!--\nthe note\n-->\n");
 
     expect($deck->slides()[0]->note())->toBe('the note')
-        ->and($deck->slides()[0]->content())->toBe('# One');
+        ->and($deck->slides()[0]->content())->toBe(ONE);
 });
 
 it('reads a frontmatter block holding nothing but a comment as an empty block', function () {
@@ -220,7 +233,7 @@ it('reads a note that only mentions a step marker as a note', function () {
     expect(split("# One\n\n<!-- click v-click again to reveal the rest -->\n")[0])
         ->toMatchArray([
             'note' => 'click v-click again to reveal the rest',
-            'content' => '# One',
+            'content' => ONE,
         ]);
 });
 
@@ -242,14 +255,14 @@ it('reads the heading level, and lets the frontmatter name one for a title that 
 });
 
 it('says where each slide sits in the source', function () {
-    $slides = split("# One\n\n---\n\n# Two\n");
+    $slides = split(TWO_SLIDES);
 
     expect([$slides[0]['start'], $slides[0]['end']])->toBe([0, 2])
         ->and([$slides[1]['start'], $slides[1]['end']])->toBe([3, 6]);
 });
 
 it('reads a deck written with CRLF line endings the same way', function () {
-    expect(contents("---\r\ntitle: Deck\r\n---\r\n\r\n# One\r\n\r\n---\r\n\r\n# Two\r\n"))->toBe(['# One', '# Two']);
+    expect(contents("---\r\ntitle: Deck\r\n---\r\n\r\n# One\r\n\r\n---\r\n\r\n# Two\r\n"))->toBe([ONE, TWO]);
 });
 
 it('reads an empty deck as one empty slide', function () {
@@ -268,7 +281,7 @@ it('reads the block after a delimiter as the slide it opened, delimiters include
 });
 
 it('reads an unterminated frontmatter block as a slide with no frontmatter', function () {
-    expect(contents("# One\n\n---\nlayout: blank\n"))->toBe(['# One', "---\nlayout: blank"]);
+    expect(contents("# One\n\n---\nlayout: blank\n"))->toBe([ONE, "---\nlayout: blank"]);
 });
 
 it('reads a frontmatter block that is not YAML as an error, naming the slide', function () {
@@ -313,7 +326,7 @@ it('reads an empty deck as having no frontmatter at all', function () {
 });
 
 it('hands back the Markdown it was given', function () {
-    $markdown = "# One\n\n---\n\n# Two\n";
+    $markdown = TWO_SLIDES;
 
     expect((new DeckParser())->parse($markdown)->raw())->toBe($markdown);
 });
@@ -328,5 +341,5 @@ it('describes the dialect it implements', function () {
         ->and($dialect)->toContain('`***` is one, and')
         ->and($dialect)->toContain('refused rather than read')
         ->and(contents("# One\n\n***\n\nMore\n"))->toHaveCount(1)
-        ->and(contents("# One\n\n---\n\n# Two\n"))->toHaveCount(2);
+        ->and(contents(TWO_SLIDES))->toHaveCount(2);
 });

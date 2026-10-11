@@ -11,6 +11,19 @@ use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Theme\LayoutRole;
 
+/**
+ * The placeholder key a body column is written under.
+ *
+ * `body 1` rather than `body`, because that is the key the format uses for the first column
+ * and every assertion below is about the file's own naming rather than about a column's
+ * position: `idx` is absent on a title, so a test that asked for "the title" and "the body"
+ * would be asking two different things.
+ */
+const BODY_ONE = 'body 1';
+
+/** The smallest deck that has a title and a body to put placeholders in. */
+const ONE_AND_TEXT = "# One\n\nText.\n";
+
 /*
  * What a layout part is for, read back off the file.
  *
@@ -37,8 +50,8 @@ function placeholderDeck(string $markdown): Pptx
 it('gives a layout part a placeholder for its title and one for its body', function () {
     // The name on the part was always there; this is the other half. Without a placeholder
     // there is nothing for a slide to refer to and nothing for Reset to restore.
-    expect(placeholderDeck("# One\n\nText.\n")->layoutPlaceholders())
-        ->toHaveKeys(['title', 'body 1']);
+    expect(placeholderDeck(ONE_AND_TEXT)->layoutPlaceholders())
+        ->toHaveKeys(['title', BODY_ONE]);
 });
 
 it('gives a two-column layout a body placeholder for each of its columns', function () {
@@ -46,13 +59,13 @@ it('gives a two-column layout a body placeholder for each of its columns', funct
     // place PowerPoint looks: `idx` 1 and `idx` 2.
     expect(placeholderDeck("---\nlayout: two-column\n---\n# One\n\nLeft.\n\n## Right\n\nRight side.\n")
         ->layoutPlaceholders())
-        ->toHaveKeys(['title', 'body 1', 'body 2']);
+        ->toHaveKeys(['title', BODY_ONE, 'body 2']);
 });
 
 it('writes a layout\'s placeholders where the slides are drawn', function () {
     // The claim *Reset* makes good on: restoring the layout's box has to restore the box the
     // slide already has, or every Reset in the application moves the type.
-    $pptx = placeholderDeck("# One\n\nText.\n");
+    $pptx = placeholderDeck(ONE_AND_TEXT);
     $placeholder = $pptx->layoutPlaceholders()['title'];
     $drawn = $pptx->positionOf('title');
 
@@ -67,8 +80,8 @@ it('gives each role\'s layout its own placeholders rather than one layout\'s', f
     // part the content slides are bound to, and every slide would inherit the wrong one.
     $pptx = placeholderDeck("---\nlayout: content\n---\n# One\n\nText.\n\n---\nlayout: two-column\n---\n# Two\n\nLeft.\n\n## Right\n\nRight side.\n");
 
-    expect(array_keys($pptx->layoutPlaceholders(1)))->toBe(['title', 'body 1'])
-        ->and(array_keys($pptx->layoutPlaceholders(2)))->toBe(['title', 'body 1', 'body 2'])
+    expect(array_keys($pptx->layoutPlaceholders(1)))->toBe(['title', BODY_ONE])
+        ->and(array_keys($pptx->layoutPlaceholders(2)))->toBe(['title', BODY_ONE, 'body 2'])
         ->and($pptx->layoutOf(1))->toBe('1')
         ->and($pptx->layoutOf(2))->toBe('2');
 });
@@ -76,7 +89,7 @@ it('gives each role\'s layout its own placeholders rather than one layout\'s', f
 it('points a slide\'s title at the layout\'s title placeholder', function () {
     // This is the step that makes the layout mean anything: type and index 0 on both sides,
     // which is how Office writes the pair.
-    expect(placeholderDeck("# One\n\nText.\n")->placeholderOf('title'))->toBe('type="title"');
+    expect(placeholderDeck(ONE_AND_TEXT)->placeholderOf('title'))->toBe('type="title"');
 });
 
 it('leaves a blank slide with nothing to refer to a title placeholder to', function () {
@@ -85,7 +98,7 @@ it('leaves a blank slide with nothing to refer to a title placeholder to', funct
     $pptx = placeholderDeck("---\nlayout: blank\n---\n\nJust body.\n");
 
     expect($pptx->placeholderOf('heading'))->toBeNull()
-        ->and(array_keys($pptx->layoutPlaceholders()))->toBe(['body 1']);
+        ->and(array_keys($pptx->layoutPlaceholders()))->toBe([BODY_ONE]);
 });
 
 it('leaves the body blocks of a slide out of it', function () {
@@ -100,7 +113,7 @@ it('leaves the body blocks of a slide out of it', function () {
     // must not be: a slide that Reset tidies is a slide whose body has jumped.
     $pptx = placeholderDeck("# One\n\nText.\n\n- An item.\n\n```php\n\$line = 1;\n```\n");
 
-    expect($pptx->layoutPlaceholders())->toHaveKey('body 1')
+    expect($pptx->layoutPlaceholders())->toHaveKey(BODY_ONE)
         ->and($pptx->placeholderOf('text'))->toBeNull()
         ->and($pptx->placeholderOf('code'))->toBeNull();
 });
@@ -110,7 +123,7 @@ it('leaves the type where the layout puts it when the title becomes a placeholde
     // the `normAutofit` and the insets and hands the shape back to the reader to resize. The
     // body properties are asserted because they are the mechanism, not because a pixel here
     // is easy to read off a file.
-    $slide = placeholderDeck("# One\n\nText.\n")->part('ppt/slides/slide1.xml');
+    $slide = placeholderDeck(ONE_AND_TEXT)->part('ppt/slides/slide1.xml');
 
     expect($slide)->toContain('<a:normAutofit/>')
         ->and($slide)->toContain('lIns="91440"')
@@ -165,7 +178,7 @@ it('leaves a title shape with nowhere to put the reference', function () {
 it('changes nothing the second time it runs', function () {
     $path = Scratch::file('twice.pptx', '');
 
-    (new PresentationRenderer())->render((new DeckParser())->parse("# One\n\nText.\n"), $path);
+    (new PresentationRenderer())->render((new DeckParser())->parse(ONE_AND_TEXT), $path);
 
     expect(PlaceholderPass::applyTo($path, new SlideGeometry(), [LayoutRole::Content]))->toBe(0);
 });

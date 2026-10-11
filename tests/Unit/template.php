@@ -23,10 +23,41 @@ use MarkdownPresentation\Theme\LayoutRole;
  * @phpstan-import-type Shape from Template
  */
 
-/** The theme beside the committed fixture, on its own. */
+/** Where the theme that ships a `template.pptx` is committed, and the file inside it. */
+const TEMPLATE_THEME = '/tests/fixtures/themes/templated';
+const TEMPLATED_PPTX = '/template.pptx';
+
+/**
+ * The layouts mapping a theme built for these tests writes, and the layout name it maps to.
+ *
+ * Both are constants rather than literals because every test below that builds a theme maps
+ * the same role onto the same layout: a test that mapped `content` somewhere else would be
+ * testing something else, and spelling it out each time is how that happens quietly.
+ */
+const CONTENT_LAYOUT = "layouts:\n  content: Title and Content\n";
+const TITLE_AND_CONTENT = 'Title and Content';
+
+/**
+ * The theme beside the committed fixture, on its own.
+ */
 function templatedTheme(): string
 {
-    return dirname(__DIR__, 2) . '/tests/fixtures/themes/templated';
+    return dirname(__DIR__, 2) . TEMPLATE_THEME;
+}
+
+/**
+ * A deck written against `$theme`, as the frontmatter that points at one.
+ *
+ * A function rather than a constant because every deck below opens with the same
+ * `"---\ntheme: "` and some of them carry a `layout:` in between, which is spelled as the
+ * frontmatter's body rather than as a second argument at each call site.
+ *
+ * @param string $frontmatter Anything to put beside `theme:` — a `layout:` and nothing
+ *                            else, or '' for a deck that names none.
+ */
+function themed(string $theme, string $frontmatter = '', string $body = "# One\n\nText.\n"): string
+{
+    return "---\ntheme: " . $theme . "\n" . $frontmatter . "---\n" . $body;
 }
 
 /**
@@ -68,18 +99,18 @@ it('scales a template\'s page onto the one this library writes', function () {
     // 720 of the pixels a `Box` counts in. Dividing by the 9525 EMU a pixel would put every
     // one of its placeholders off the right and the bottom of a 960-wide slide; scaling by the
     // ratio of the two pages puts them where its designer put them.
-    $boxes = (new TemplateGeometry(templatedTheme() . '/template.pptx'))->boxes();
+    $boxes = (new TemplateGeometry(templatedTheme() . TEMPLATED_PPTX))->boxes();
 
-    expect($boxes['Title and Content']['title']->x)->toBe(66)
-        ->and($boxes['Title and Content']['title']->y)->toBe(54)
-        ->and($boxes['Title and Content']['title']->width)->toBe(828)
-        ->and($boxes['Title and Content']['body'][0]->height)->toBe(324);
+    expect($boxes[TITLE_AND_CONTENT]['title']->x)->toBe(66)
+        ->and($boxes[TITLE_AND_CONTENT]['title']->y)->toBe(54)
+        ->and($boxes[TITLE_AND_CONTENT]['title']->width)->toBe(828)
+        ->and($boxes[TITLE_AND_CONTENT]['body'][0]->height)->toBe(324);
 });
 
 it('orders a layout\'s columns by the index they carry', function () {
     // The fixture writes *Two Content*'s second column first, because a reader that took
     // them in the order the file lists them would put the right column where the left one goes.
-    $columns = (new TemplateGeometry(templatedTheme() . '/template.pptx'))->boxes()['Two Content']['body'];
+    $columns = (new TemplateGeometry(templatedTheme() . TEMPLATED_PPTX))->boxes()['Two Content']['body'];
 
     expect($columns[0]->x)->toBe(66)
         ->and($columns[1]->x)->toBe(500)
@@ -90,7 +121,7 @@ it('takes a placeholder a layout does not place from its master', function () {
     // *Two Content* states no position for its title, which is what PowerPoint writes for a
     // layout that does not move the title it inherited. The master puts it at 365125 EMU down
     // a 6858000 EMU page, which is 29 pixels down a 540-pixel one.
-    $boxes = (new TemplateGeometry(templatedTheme() . '/template.pptx'))->boxes();
+    $boxes = (new TemplateGeometry(templatedTheme() . TEMPLATED_PPTX))->boxes();
 
     expect($boxes['Two Content']['title']->y)->toBe(29)
         ->and($boxes['Two Content']['title']->height)->toBe(104);
@@ -99,21 +130,21 @@ it('takes a placeholder a layout does not place from its master', function () {
 it('leaves out a placeholder it cannot draw in', function () {
     // A slide number is a placeholder too. Laid out as body text it would be a column of
     // nothing on every slide.
-    expect((new TemplateGeometry(templatedTheme() . '/template.pptx'))->boxes()['Title and Content'])
+    expect((new TemplateGeometry(templatedTheme() . TEMPLATED_PPTX))->boxes()[TITLE_AND_CONTENT])
         ->toHaveKeys(['title', 'body']);
 });
 
 it('leaves a layout with nothing in it saying nothing at all', function () {
     // Office's own *Blank* has no placeholders, so a role mapped to it keeps the geometry the
     // library puts it at rather than inheriting an empty column.
-    expect((new TemplateGeometry(templatedTheme() . '/template.pptx'))->boxes())
+    expect((new TemplateGeometry(templatedTheme() . TEMPLATED_PPTX))->boxes())
         ->not->toHaveKey('Blank');
 });
 
 it('draws a slide in the geometry its theme\'s template states', function () {
     // The claim that makes a template worth shipping: the layout part and the slide agree,
     // so *Reset* restores what the slide already has.
-    $pptx = templatedDeck("---\ntheme: " . templatedTheme() . "\n---\n# One\n\nText.\n");
+    $pptx = templatedDeck(themed(templatedTheme()));
     $placeholder = $pptx->layoutPlaceholders()['title'];
 
     expect($pptx->positionOf('title'))->toEqual($placeholder)
@@ -122,7 +153,7 @@ it('draws a slide in the geometry its theme\'s template states', function () {
 
 it('draws both columns of a two-column slide where the template puts them', function () {
     $shapes = templatedDeck(
-        "---\ntheme: " . templatedTheme() . "\nlayout: two-column\n---\n# Both\n\nLeft.\n\n## Right\n\nRight side.\n",
+        themed(templatedTheme(), "layout: two-column\n", "# Both\n\nLeft.\n\n## Right\n\nRight side.\n"),
     )->positions();
 
     expect($shapes[1]['x'])->toBe(66.0)
@@ -133,7 +164,7 @@ it('draws both columns of a two-column slide where the template puts them', func
 it('draws a run of paragraphs in the box the template gives the body', function () {
     // The frame is the shape a column's text is drawn in, so a template that moves the column
     // moves the frame with it — the geometry is the template's, whatever is drawn in it.
-    $pptx = templatedDeck("---\ntheme: " . templatedTheme() . "\n---\n# One\n\nFirst.\n\nSecond.\n\nThird.\n");
+    $pptx = templatedDeck(themed(templatedTheme(), '', "# One\n\nFirst.\n\nSecond.\n\nThird.\n"));
     $body = $pptx->layoutPlaceholders()['body 1'];
     $frame = $pptx->positionOf('text');
 
@@ -146,10 +177,10 @@ it('draws a run of paragraphs in the box the template gives the body', function 
 it('leaves a role whose layout the template does not have where the library puts it', function () {
     // The precedence: a template fills in the roles it covers and says nothing about the rest.
     // *Section Header* is mapped and absent, which is the same as not mapping it at all.
-    $boxes = (new TemplateGeometry(templatedTheme() . '/template.pptx'))->boxes();
+    $boxes = (new TemplateGeometry(templatedTheme() . TEMPLATED_PPTX))->boxes();
 
     expect($boxes)->not->toHaveKey('Section Header')
-        ->and(templatedDeck("---\ntheme: " . templatedTheme() . "\nlayout: section\n---\n# One\n\nText.\n")
+        ->and(templatedDeck(themed(templatedTheme(), "layout: section\n"))
             ->positionOf('title')['y'])
         ->toBe((float) (new SlideGeometry())->title(LayoutRole::Section)['box']->y);
 });
@@ -159,7 +190,7 @@ it('keeps the type a title is drawn at where the library puts it', function () {
     // system rather than a layout, and adopting one would resize every deck that shipped a
     // template. The box moved and the size did not, which is the whole of what a template is
     // allowed to do.
-    $pptx = templatedDeck("---\ntheme: " . templatedTheme() . "\n---\n# One\n\nText.\n");
+    $pptx = templatedDeck(themed(templatedTheme()));
 
     expect($pptx->fontSize('title'))->toBe((float) (new SlideGeometry())->title(LayoutRole::Content)['size'])
         ->and($pptx->positionOf('title')['x'])->toBe(66.0);
@@ -177,7 +208,7 @@ it('clamps against the box the template gives rather than the one the library wo
     $plain = $renderer->overflows();
 
     $renderer->render(
-        (new DeckParser())->parse("---\ntheme: " . templatedTheme() . "\n---\n" . $nine),
+        (new DeckParser())->parse(themed(templatedTheme(), '', $nine)),
         Scratch::file('templated.pptx', ''),
     );
 
@@ -200,14 +231,14 @@ it('refuses a template that does not say how big its slides are', function () {
     // cannot place anything. `p:sldSz` is optional in the schema and this is what that costs.
     $theme = ThemeDirectory::create([
         'theme.yml' => "name: Sizeless\n",
-        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'layouts.yml' => CONTENT_LAYOUT,
         // The contents, not the path: this copies a file into a theme directory rather than
         // naming one.
         'template.pptx' => file_get_contents(builtTemplate(page: ['cx' => 0, 'cy' => 0])),
     ]);
 
     expect(fn () => (new PresentationRenderer())->render(
-        (new DeckParser())->parse("---\ntheme: {$theme}\n---\n# One\n\nText.\n"),
+        (new DeckParser())->parse(themed($theme)),
         Scratch::file('deck.pptx', ''),
     ))->toThrow(MalformedTemplate::class, 'says nothing about how big its slides are');
 });
@@ -215,7 +246,7 @@ it('refuses a template that does not say how big its slides are', function () {
 it('refuses a template with a part it cannot read', function () {
     $theme = ThemeDirectory::create([
         'theme.yml' => "name: Broken\n",
-        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'layouts.yml' => CONTENT_LAYOUT,
     ]);
 
     $zip = new ZipArchive();
@@ -224,7 +255,7 @@ it('refuses a template with a part it cannot read', function () {
     $zip->close();
 
     expect(fn () => (new PresentationRenderer())->render(
-        (new DeckParser())->parse("---\ntheme: {$theme}\n---\n# One\n\nText.\n"),
+        (new DeckParser())->parse(themed($theme)),
         Scratch::file('deck.pptx', ''),
     ))->toThrow(MalformedTemplate::class, 'no readable part at ppt/presentation.xml');
 });
@@ -235,9 +266,9 @@ it('leaves a layout that inherits from nothing where the library puts it', funct
     // the library puts it at — rather than this reading a master it was never told about.
     $theme = ThemeDirectory::create([
         'theme.yml' => "name: Orphaned\n",
-        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'layouts.yml' => CONTENT_LAYOUT,
         'template.pptx' => file_get_contents(builtTemplate(
-            [['name' => 'Title and Content', 'shapes' => [['type' => 'title']]]],
+            [['name' => TITLE_AND_CONTENT, 'shapes' => [['type' => 'title']]]],
             layoutHasMaster: false,
         )),
     ]);
@@ -245,7 +276,7 @@ it('leaves a layout that inherits from nothing where the library puts it', funct
     $path = Scratch::file('orphaned.pptx', '');
 
     (new PresentationRenderer())->render(
-        (new DeckParser())->parse("---\ntheme: {$theme}\n---\n# One\n\nText.\n"),
+        (new DeckParser())->parse(themed($theme)),
         $path,
     );
 
@@ -274,7 +305,7 @@ it('ignores a placeholder it cannot place anywhere', function () {
     // States no position and there is no master to inherit one from: nothing to say, rather
     // than a column one pixel wide.
     $path = builtTemplate(
-        [['name' => 'Title and Content', 'shapes' => [['type' => 'body', 'idx' => 1]]]],
+        [['name' => TITLE_AND_CONTENT, 'shapes' => [['type' => 'body', 'idx' => 1]]]],
         layoutHasMaster: false,
     );
 
@@ -285,7 +316,7 @@ it('ignores a placeholder whose box has been dragged off the page', function () 
     // A template does carry these: a shape dragged away leaves an `a:xfrm` full of zeroes
     // behind, and no deck should be laid out inside one.
     $path = builtTemplate(
-        [['name' => 'Title and Content', 'shapes' => [
+        [['name' => TITLE_AND_CONTENT, 'shapes' => [
             ['type' => 'body', 'idx' => 1, 'x' => 0, 'y' => 0, 'cx' => 0, 'cy' => 0],
         ]]],
         layoutHasMaster: false,

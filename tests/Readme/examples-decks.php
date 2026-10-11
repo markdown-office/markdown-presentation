@@ -52,6 +52,16 @@ function builtDeck(string $name): array
 const PICTURE_DECK = '07-images.md';
 const FULL_BLEED_LAYOUT = 'Full Bleed Picture';
 
+/**
+ * The deck four of the tests below convert, which is the one carrying every block kind.
+ *
+ * Named because it is the deck those four assertions are about — unclosed emphasis, list
+ * nesting, an ordered list's start, a title with markup — rather than a fixture that happens
+ * to be convenient. Renaming the file would otherwise break four tests with a message about
+ * a missing deck instead of one about the gallery.
+ */
+const KITCHEN_SINK = '01-kitchen-sink.md';
+
 $root = dirname(__DIR__, 2);
 $readme = (string) file_get_contents($root . '/examples/README.md');
 
@@ -100,7 +110,7 @@ it('converts each deck that is not the rejected one', function (string $name) {
     expect($pptx->slideCount())->toBeGreaterThan(0)
         ->and($pptx->slideText(1))->not->toBe('');
 })->with([
-    '01-kitchen-sink.md',
+    KITCHEN_SINK,
     '02-layout-roles.md',
     '04-frontmatter.md',
     '05-steps.md',
@@ -124,7 +134,7 @@ it('refuses the deck whose conversion is the failure it exists to demonstrate', 
 });
 
 it('leaves emphasis that does not close exactly as it was written', function () {
-    [$pptx] = builtDeck('01-kitchen-sink.md');
+    [$pptx] = builtDeck(KITCHEN_SINK);
 
     // Refusing a deck over a stray asterisk is a deck nobody can show, so the unclosed
     // forms are text.
@@ -134,7 +144,7 @@ it('leaves emphasis that does not close exactly as it was written', function () 
 });
 
 it('nests four spaces of indent one level and not two', function () {
-    [$pptx] = builtDeck('01-kitchen-sink.md');
+    [$pptx] = builtDeck(KITCHEN_SINK);
 
     // A list is paragraphs of a text frame and its indentation lives on those paragraphs, so
     // the left edges of the shapes say nothing. What matters is how many indent steps the
@@ -167,7 +177,7 @@ it('nests four spaces of indent one level and not two', function () {
 });
 
 it('starts an ordered list at the number the deck wrote', function () {
-    [$pptx] = builtDeck('01-kitchen-sink.md');
+    [$pptx] = builtDeck(KITCHEN_SINK);
     $slide = 2;
 
     expect($pptx->part('ppt/slides/slide' . $slide . '.xml'))->toContain('startAt="7"');

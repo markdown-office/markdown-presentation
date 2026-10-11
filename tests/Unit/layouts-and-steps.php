@@ -501,10 +501,25 @@ it('leaves a full-bleed picture where the library puts it rather than where the 
  */
 function steppedDeck(int $slides, int $steps): string
 {
-    $slide = sprintf("# One\n\n<!-- v-click=%d -->\n\nText.\n", $steps);
+    $slide = steppedSlide($steps);
 
     return str_repeat($slide . "\n---\n\n", $slides - 1) . $slide;
 }
+
+/**
+ * One slide of {@see steppedDeck()}, with `$steps` numbered steps in it.
+ *
+ * Split out because the ceiling on a step and the deck written over the ceiling are the
+ * same slide at two different numbers, and a reader of the second who cannot see the first
+ * has to work out that `MAX_STEP` is the same shape as the `2` above it.
+ */
+function steppedSlide(int $steps): string
+{
+    return sprintf("# One\n\n<!-- v-click=%d -->\n\nText.\n", $steps);
+}
+
+/** A slide whose one `<!-- v-click -->` splits it in two, which is the smallest build-up. */
+const ONE_STEP = "# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n";
 
 it('writes one slide for a slide with no steps', function () {
     expect(slideDeck("# One\n\nText.\n")->slideCount())->toBe(1);
@@ -513,11 +528,11 @@ it('writes one slide for a slide with no steps', function () {
 it('writes a slide per step a v-click names', function () {
     // PowerPoint has no "press a key to reveal this", so the build-up becomes the slides a
     // presenter would click through anyway.
-    expect(slideDeck("# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n")->slideCount())->toBe(2);
+    expect(slideDeck(ONE_STEP)->slideCount())->toBe(2);
 });
 
 it('reveals each step on its own slide and keeps the earlier ones', function () {
-    $pptx = slideDeck("# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n");
+    $pptx = slideDeck(ONE_STEP);
 
     expect($pptx->texts(1))->toBe(['One', 'First.'])
         ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.']);
@@ -552,7 +567,7 @@ it('refuses a v-click step larger than one slide could carry', function () {
     // the ceiling plus one, not the twenty-digit one, so the suite cannot be the thing that
     // hangs -- and the message quotes the number back rather than the `PHP_INT_MAX` it
     // saturated to.
-    expect(fn () => slideDeck(sprintf("# One\n\n<!-- v-click=%d -->\n\nText.\n", BlockParser::MAX_STEP + 1)))
+    expect(fn () => slideDeck(steppedSlide(BlockParser::MAX_STEP + 1)))
         ->toThrow(UnknownMarker::class, sprintf('Slide 1 has a v-click step "%d"', BlockParser::MAX_STEP + 1));
 });
 
@@ -567,7 +582,7 @@ it('renders a slide whose build-up is as long as one slide may carry', function 
     // The other side of the ceiling: a build-up that is long is not refused, so the bound
     // cannot be met by drawing fewer steps than the deck wrote. Bounded on the way there,
     // because the point is the number the marker accepts rather than the size of the file.
-    expect(slideDeck(sprintf("# One\n\n<!-- v-click=%d -->\n\nText.\n", BlockParser::MAX_STEP))->slideCount())
+    expect(slideDeck(steppedSlide(BlockParser::MAX_STEP))->slideCount())
         ->toBe(BlockParser::MAX_STEP);
 });
 
@@ -620,7 +635,7 @@ it('gives every step of one source slide the same layout', function () {
 });
 
 it('names every step of a slide after the slide of the deck it came from', function () {
-    $pptx = slideDeck("# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n");
+    $pptx = slideDeck(ONE_STEP);
 
     expect($pptx->part('ppt/slides/slide1.xml'))->toContain('<p:cSld name="slide 1"')
         ->and($pptx->part('ppt/slides/slide2.xml'))->toContain('<p:cSld name="slide 1"');

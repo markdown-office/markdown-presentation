@@ -10,6 +10,21 @@ use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\UnreadableArchive;
 
+/**
+ * The extension every render below is written under, and the directory their decks resolve
+ * images against.
+ *
+ * Both named because every test here renders a deck the same way and the arrangement is not
+ * what any of them is about; spelling it at each of the eight sites is how a test ends up
+ * rendering against a different directory from the one beside it.
+ */
+const DECK = '.pptx';
+const EXAMPLES = '/examples/markdown';
+
+/** Where a speaker note lives in the package, and the one part of it the pass rewrites. */
+const NOTES_SLIDES = 'ppt/notesSlides/';
+const FIRST_NOTES_SLIDE = NOTES_SLIDES . 'notesSlide1.xml';
+
 $root = dirname(__DIR__, 2);
 
 /**
@@ -25,9 +40,9 @@ function notesSlidesOf(string $markdown): array
     // A filename, not a digest: it tells one deck's render apart from another's in the
     // system temporary directory and nothing ever reads it back. xxh3 says that; md5, which
     // was here doing the same work, said something this use of it was not.
-    $path = sys_get_temp_dir() . '/mdp-note-' . hash('xxh3', $markdown) . '.pptx';
+    $path = sys_get_temp_dir() . '/mdp-note-' . hash('xxh3', $markdown) . DECK;
 
-    (new PresentationRenderer($root . '/examples/markdown'))->render(
+    (new PresentationRenderer($root . EXAMPLES))->render(
         (new DeckParser())->parse($markdown),
         $path,
     );
@@ -39,7 +54,7 @@ function notesSlidesOf(string $markdown): array
     for ($index = 0; $index < $zip->numFiles; $index++) {
         $name = (string) $zip->getNameIndex($index);
 
-        if (str_starts_with($name, 'ppt/notesSlides/') && str_ends_with($name, '.xml')) {
+        if (str_starts_with($name, NOTES_SLIDES) && str_ends_with($name, '.xml')) {
             $notes[$name] = (string) $zip->getFromIndex($index);
         }
     }
@@ -82,9 +97,9 @@ it('writes the colour map once, whatever the deck asks for', function () {
 });
 
 it('leaves a deck with no notes exactly as the writer wrote it', function () use ($root) {
-    $path = sys_get_temp_dir() . '/mdp-none-' . hash('xxh3', 'no notes') . '.pptx';
+    $path = sys_get_temp_dir() . '/mdp-none-' . hash('xxh3', 'no notes') . DECK;
 
-    (new PresentationRenderer($root . '/examples/markdown'))->render(
+    (new PresentationRenderer($root . EXAMPLES))->render(
         (new DeckParser())->parse("# One\n\nNo note on this one.\n"),
         $path,
     );
@@ -139,9 +154,9 @@ it('writes no part back as zero bytes, whatever the archive could not read', fun
     // the end of the file is refused on all of them. So the reader here is one this test
     // writes — the refusal `tests/Unit/exceptions.php` asserts — and what is asserted is
     // the part of it that holds on every build either way.
-    $path = sys_get_temp_dir() . '/mdp-whole-' . hash('xxh3', 'whole') . '.pptx';
+    $path = sys_get_temp_dir() . '/mdp-whole-' . hash('xxh3', 'whole') . DECK;
 
-    (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
+    (new PresentationRenderer(dirname(__DIR__, 2) . EXAMPLES))->render(
         (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
         $path,
     );
@@ -150,7 +165,7 @@ it('writes no part back as zero bytes, whatever the archive could not read', fun
     // run over one that already patched a notes slide rather than one that found nothing.
     expect(NotesColourMapPass::applyTo($path))->toBe(0);
 
-    $archive = new UnreadableArchive('ppt/notesSlides/notesSlide1.xml');
+    $archive = new UnreadableArchive(FIRST_NOTES_SLIDE);
     $archive->open($path);
 
     expect(fn () => NotesColourMapPass::applyTo($path, $archive))->toThrow(UnreadablePackage::class);
@@ -163,7 +178,7 @@ it('writes no part back as zero bytes, whatever the archive could not read', fun
         $sizes[(string) $after->getNameIndex($index)] = (int) $after->statIndex($index)['size'];
     }
 
-    $notes = $after->getFromName('ppt/notesSlides/notesSlide1.xml');
+    $notes = $after->getFromName(FIRST_NOTES_SLIDE);
     $after->close();
     @unlink($path);
 
@@ -187,9 +202,9 @@ it('leaves a part it does not understand alone', function () {
 });
 
 it('runs twice without adding the element a second time', function () {
-    $path = sys_get_temp_dir() . '/mdp-twice-' . hash('xxh3', 'twice') . '.pptx';
+    $path = sys_get_temp_dir() . '/mdp-twice-' . hash('xxh3', 'twice') . DECK;
 
-    (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
+    (new PresentationRenderer(dirname(__DIR__, 2) . EXAMPLES))->render(
         (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
         $path,
     );
@@ -209,9 +224,9 @@ it('writes each notes slide once, however many slides carry one', function () {
         . "<!-- two -->\n\n---\n\n# Three\n\nThe third.\n\n<!-- three -->\n";
 
     $root = dirname(__DIR__, 2);
-    $path = sys_get_temp_dir() . '/mdp-once-' . hash('xxh3', 'once') . '.pptx';
+    $path = sys_get_temp_dir() . '/mdp-once-' . hash('xxh3', 'once') . DECK;
 
-    (new PresentationRenderer($root . '/examples/markdown'))->render(
+    (new PresentationRenderer($root . EXAMPLES))->render(
         (new DeckParser())->parse($deck),
         $path,
     );
@@ -230,7 +245,7 @@ it('writes each notes slide once, however many slides carry one', function () {
     $twice = array_filter($seen, static fn (int $count): bool => $count > 1);
     $notes = array_filter(
         array_keys($seen),
-        static fn (string $name): bool => str_starts_with($name, 'ppt/notesSlides/'),
+        static fn (string $name): bool => str_starts_with($name, NOTES_SLIDES),
     );
 
     expect($twice)->toBe([])->and($notes)->toHaveCount(3);

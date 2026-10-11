@@ -21,17 +21,27 @@ function secretFile(string $prefix = 'outside'): string
 {
     $directory = Scratch::directoryPath($prefix);
 
-    file_put_contents($directory . '/creds.svg', '<svg xmlns="http://www.w3.org/2000/svg"><desc>secret</desc></svg>');
+    file_put_contents($directory . '/' . SECRET, '<svg xmlns="http://www.w3.org/2000/svg"><desc>secret</desc></svg>');
 
-    return $directory . '/creds.svg';
+    return $directory . '/' . SECRET;
 }
+
+/**
+ * The file the tests below walk towards, named rather than spelled at each of them.
+ *
+ * A file *name* rather than a path, because most of these assertions are about a sibling of
+ * it — `../creds.svg`, `./creds.svg`, `deck-elsewhere/creds.svg` — and a reader checking that
+ * a path escapes its root has to compare the names as well as the shape. It is joined to a
+ * directory rather than being a whole path for the same reason.
+ */
+const SECRET = 'creds.svg';
 
 it('resolves a path to the file it really is', function () {
     $path = secretFile();
 
     expect(PathScope::canonical($path))->toBe(realpath($path))
-        ->and(PathScope::canonical(dirname($path) . '/./creds.svg'))->toBe(realpath($path))
-        ->and(PathScope::canonical(dirname($path) . '/../' . basename(dirname($path)) . '/creds.svg'))
+        ->and(PathScope::canonical(dirname($path) . '/./' . SECRET))->toBe(realpath($path))
+        ->and(PathScope::canonical(dirname($path) . '/../' . basename(dirname($path)) . '/' . SECRET))
         ->toBe(realpath($path));
 });
 
@@ -51,7 +61,7 @@ it('holds what is inside a root', function () {
     $scope = deckScope(dirname($path));
 
     expect($scope->holds($path))->toBeTrue()
-        ->and($scope->holds(dirname($path) . '/creds.svg'))->toBeTrue();
+        ->and($scope->holds(dirname($path) . '/' . SECRET))->toBeTrue();
 });
 
 it('holds a root itself, so a caller may allow one file rather than a directory', function () {
@@ -66,16 +76,16 @@ it('does not hold a sibling whose name begins with the root', function () {
     $project = Scratch::directoryPath('project');
     mkdir($project . '/deck');
     mkdir($project . '/deck-elsewhere');
-    file_put_contents($project . '/deck-elsewhere/creds.svg', '<svg/>');
+    file_put_contents($project . '/deck-elsewhere/' . SECRET, '<svg/>');
 
-    expect(deckScope($project . '/deck')->holds($project . '/deck-elsewhere/creds.svg'))->toBeFalse();
+    expect(deckScope($project . '/deck')->holds($project . '/deck-elsewhere/' . SECRET))->toBeFalse();
 });
 
 it('does not hold a path that walks out of the root', function () {
     $path = secretFile();
     $scope = deckScope(Scratch::directoryPath('deck'));
 
-    expect($scope->holds(dirname(dirname($path)) . '/outside/creds.svg'))->toBeFalse();
+    expect($scope->holds(dirname(dirname($path)) . '/outside/' . SECRET))->toBeFalse();
 });
 
 it('does not hold a symlink whose target is outside', function () {
@@ -83,7 +93,7 @@ it('does not hold a symlink whose target is outside', function () {
     // the pair a prefix test on the written path cannot tell. The scope takes the resolved
     // path, so the link itself is what is refused.
     $path = secretFile();
-    $link = Scratch::directoryPath('deck') . '/creds.svg';
+    $link = Scratch::directoryPath('deck') . '/' . SECRET;
     symlink($path, $link);
     $scope = deckScope(dirname($link));
 
@@ -123,7 +133,7 @@ it('names a stream wrapper for what it is', function () {
         ->and(PathScope::isUrl('https://example.com/dot.png'))->toBeTrue()
         ->and(PathScope::isUrl('compress.zlib://dot.png'))->toBeTrue()
         ->and(PathScope::isUrl('/etc/hosts'))->toBeFalse()
-        ->and(PathScope::isUrl('../creds.svg'))->toBeFalse()
-        ->and(PathScope::isUrl('creds.svg'))->toBeFalse()
-        ->and(PathScope::isUrl('C:\\creds.svg'))->toBeFalse();
+        ->and(PathScope::isUrl('../' . SECRET))->toBeFalse()
+        ->and(PathScope::isUrl(SECRET))->toBeFalse()
+        ->and(PathScope::isUrl('C:\\' . SECRET))->toBeFalse();
 });
