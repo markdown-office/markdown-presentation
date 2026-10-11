@@ -24,7 +24,7 @@ function notesSlidesOf(string $markdown): array
     $path = sys_get_temp_dir() . '/mdp-note-' . md5($markdown) . '.pptx';
 
     (new PresentationRenderer($root . '/examples/markdown'))->render(
-        new DeckParser()->parse($markdown),
+        (new DeckParser())->parse($markdown),
         $path,
     );
 
@@ -81,7 +81,7 @@ it('leaves a deck with no notes exactly as the writer wrote it', function () use
     $path = sys_get_temp_dir() . '/mdp-none-' . md5('no notes') . '.pptx';
 
     (new PresentationRenderer($root . '/examples/markdown'))->render(
-        new DeckParser()->parse("# One\n\nNo note on this one.\n"),
+        (new DeckParser())->parse("# One\n\nNo note on this one.\n"),
         $path,
     );
 
@@ -139,7 +139,7 @@ it('refuses rather than writing back a notes slide it could not read', function 
     $path = sys_get_temp_dir() . '/mdp-corrupt-' . md5('corrupt') . '.pptx';
 
     (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
-        new DeckParser()->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
+        (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
         $path,
     );
 
@@ -202,7 +202,7 @@ it('runs twice without adding the element a second time', function () {
     $path = sys_get_temp_dir() . '/mdp-twice-' . md5('twice') . '.pptx';
 
     (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
-        new DeckParser()->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
+        (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
         $path,
     );
 
@@ -224,7 +224,7 @@ it('writes each notes slide once, however many slides carry one', function () {
     $path = sys_get_temp_dir() . '/mdp-once-' . md5('once') . '.pptx';
 
     (new PresentationRenderer($root . '/examples/markdown'))->render(
-        new DeckParser()->parse($deck),
+        (new DeckParser())->parse($deck),
         $path,
     );
 

@@ -36,7 +36,7 @@ function builtDeck(string $name): array
     // The renderer is handed the directory the deck is in, because that is what a relative
     // image path in it resolves against.
     (new PresentationRenderer($root . '/examples/markdown'))->render(
-        new DeckParser()->parse($source),
+        (new DeckParser())->parse($source),
         $path,
     );
 
@@ -108,7 +108,7 @@ it('refuses the deck whose conversion is the failure it exists to demonstrate', 
     // where the deck is refused.
     expect(function () use ($root, $source): void {
         (new PresentationRenderer($root . '/examples/markdown'))->render(
-            new DeckParser()->parse($source),
+            (new DeckParser())->parse($source),
             sys_get_temp_dir() . '/mdp-rejected.pptx',
         );
     })->toThrow(UnknownDirective::class);
