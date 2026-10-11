@@ -184,7 +184,9 @@ it('says which file a theme came from', function () {
 })->throws(MalformedTheme::class, 'In "themes/acme/theme.yml": "colorz" is not a key of a theme');
 
 it('lists the layout roles a deck may write', function () {
-    expect(LayoutRole::names())->toBe(['title', 'content', 'two-column', 'section', 'blank'])
+    expect(LayoutRole::names())->toBe([
+        'title', 'content', 'two-column', 'section', 'blank', 'image-text', 'image-title', 'image-slide',
+    ])
         ->and(LayoutRole::from('two-column'))->toBe(LayoutRole::TwoColumn)
         ->and(LayoutRole::tryFrom('Two Content'))->toBeNull();
 });

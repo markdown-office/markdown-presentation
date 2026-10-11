@@ -54,10 +54,13 @@ final class TemplateGeometry
 
     /**
      * `subTitle` is a column because that is what it is on the layout a `title` role maps
-     * to, and `obj` because a template's content placeholder is as often one of those as a
-     * `body`.
+     * to, `obj` because a template's content placeholder is as often one of those as a
+     * `body`, and `pic` because the layouts this library gives a picture to carry the
+     * picture in one of their body columns — a template's *Picture Left* is two `body`
+     * placeholders under another name, and reading only the ones called `body` would take
+     * its text column and leave its picture column behind.
      */
-    private const BODY_TYPES = ['body', 'subTitle', 'obj'];
+    private const BODY_TYPES = ['body', 'subTitle', 'obj', 'pic'];
 
     /**
      * @param string $path The theme's `template.pptx`.
@@ -73,7 +76,7 @@ final class TemplateGeometry
      * *Blank* has no placeholders at all, and a role that maps to one keeps the geometry
      * {@see SlideGeometry} puts it at. That is the precedence — a template fills in the roles
      * it covers and says nothing about the rest — and it is the rule `layouts.yml` already
-     * follows, where a theme that maps two of the five roles is a theme that works rather
+     * follows, where a theme that maps two roles is a theme that works rather
      * than one that fails on the three.
      *
      * Two layouts with the same name would collide; the last one in the archive wins, which

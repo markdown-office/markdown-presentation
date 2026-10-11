@@ -13,7 +13,9 @@ use MarkdownPresentation\Render\BlockParser;
 use MarkdownPresentation\Render\Box;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SlideGeometry;
+use MarkdownPresentation\Render\TemplateGeometry;
 use MarkdownPresentation\Theme\LayoutRole;
+use MarkdownPresentation\Tests\Support\Doctest;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
@@ -53,8 +55,8 @@ it('gives a slide the layout its role maps to', function () {
 });
 
 it('builds one layout per role the deck uses, and no others', function () {
-    // A theme that maps two of the five roles would otherwise fail on the three its deck
-    // never asked for, which is not the same failure as a deck asking for one it did not map.
+    // A theme that maps only some roles would otherwise fail on the ones its deck never asked
+    // for, which is not the same failure as a deck asking for one it did not map.
     $pptx = slideDeck("---\nlayout: title\n---\n# One\n\n---\nlayout: blank\n---\n# Two\n");
 
     expect($pptx->layoutNames())->toBe([1 => 'Title Slide', 2 => 'Blank']);
@@ -72,7 +74,7 @@ it('refuses a layout role that is not one, and names the ones there are', functi
         ->toThrow(
             UnknownLayoutRole::class,
             'Slide 1 names the layout "three-column", which is not a layout role. '
-            . 'The roles are: title, content, two-column, section, blank.',
+            . 'The roles are: title, content, two-column, section, blank, image-text, image-title, image-slide.',
         );
 });
 
@@ -94,13 +96,13 @@ it('refuses a layout that is not a string, and names the roles', function () {
     expect(fn () => slideDeck("---\nlayout:\n  name: nested\n---\n# One\n"))
         ->toThrow(
             MalformedFrontmatter::class,
-            'has a "layout" that is not a layout role — one of: title, content, two-column, section, blank.',
+            'has a "layout" that is not a layout role — one of: title, content, two-column, section, blank, image-text, image-title, image-slide.',
         );
 });
 
 it('refuses a layout that is only whitespace, and names the roles', function () {
     expect(fn () => slideDeck("---\nlayout: \"  \"\n---\n# One\n"))
-        ->toThrow(MalformedFrontmatter::class, 'one of: title, content, two-column, section, blank');
+        ->toThrow(MalformedFrontmatter::class, 'one of: title, content, two-column, section, blank, image-text, image-title, image-slide');
 });
 
 it('names the slide whose layout is not one', function () {
@@ -141,7 +143,7 @@ it('takes a role\'s title and body from a template where one covers it', functio
 });
 
 it('leaves the roles a template says nothing about where the library puts them', function () {
-    // A template with two of the five layouts is a theme that works, not one that fails on
+    // A template that maps only some layouts is a theme that works, not one that fails on
     // the three its deck never asked for — the rule `layouts.yml` already follows.
     $geometry = (new SlideGeometry())->with(['content' => ['body' => [new Box(0, 0, 10, 10)]]]);
 
@@ -175,14 +177,17 @@ it('keeps the body of a blank layout from where a title would have ended', funct
         ->toBeLessThan($geometry->body(LayoutRole::Content)[0]->y);
 });
 
-it('gives a two-column layout two body boxes and every other role one', function () {
+it('gives the two-column roles two body boxes and every other role one', function () {
+    // Two roles divide a slide into columns; everything else stacks one block under another.
     $geometry = new SlideGeometry();
+    $one = [LayoutRole::Title, LayoutRole::Content, LayoutRole::Section, LayoutRole::Blank, LayoutRole::ImageTitle, LayoutRole::ImageSlide];
 
     expect($geometry->body(LayoutRole::TwoColumn))->toHaveCount(2)
-        ->and($geometry->body(LayoutRole::Content))->toHaveCount(1)
-        ->and($geometry->body(LayoutRole::Title))->toHaveCount(1)
-        ->and($geometry->body(LayoutRole::Section))->toHaveCount(1)
-        ->and($geometry->body(LayoutRole::Blank))->toHaveCount(1);
+        ->and($geometry->body(LayoutRole::ImageText))->toHaveCount(2);
+
+    foreach ($one as $role) {
+        expect($geometry->body($role))->toHaveCount(1);
+    }
 });
 
 it('puts the two columns of a two-column layout side by side and the same width', function () {
@@ -201,12 +206,13 @@ it('shifts a heading down the slide as it gets deeper', function () {
         ->and($geometry->headingSize(3))->toBeGreaterThan($geometry->headingSize(6));
 });
 
-it('stops shrinking a heading at the sixth level', function () {
-    // Markdown has six levels; a heading deeper than that has nothing left to shrink to, and
-    // failing on it would be refusing a document CommonMark accepts.
+it('stops shrinking a heading at the deepest level the scale names', function () {
+    // A heading deeper than the scale runs takes the smallest size there is rather than
+    // failing, which is what keeps a document CommonMark accepts from being refused.
     $geometry = new SlideGeometry();
 
-    expect($geometry->headingSize(7))->toBe($geometry->headingSize(6));
+    expect($geometry->headingSize(6))->toBe($geometry->headingSize(5))
+        ->and($geometry->headingSize(7))->toBe($geometry->headingSize(5));
 });
 
 it('reads a named level as the depth a title of that level would be drawn at', function () {
@@ -327,6 +333,138 @@ it('keeps both columns of a two-column layout the same height', function () {
         static fn ($box): int => $box->height,
         $geometry->body(LayoutRole::TwoColumn),
     )))->toHaveCount(1);
+});
+
+/*
+ * The three picture layouts. Each is a role the template can carry rather than drawing of its
+ * own, so what is asserted is what reaches the file: the layout part is named the way the
+ * theme names it, it carries the placeholders for the boxes the slides are drawn in, and the
+ * boxes are the ones {@see SlideGeometry} puts the role at.
+ */
+
+it('divides an image-text layout into a picture column and a text column', function () {
+    // The claim that makes it an image layout rather than a two-column one: the picture gets
+    // the wider column, because the reader looks at it first.
+    [$picture, $text] = (new SlideGeometry())->body(LayoutRole::ImageText);
+
+    expect($picture->width)->toBeGreaterThan($text->width)
+        ->and($picture->x + $picture->width)->toBeLessThan($text->x);
+});
+
+it('separates the columns of an image-text layout by the same gutter as everything else', function () {
+    // A gap of its own would be a second indentation to keep in step with this one.
+    [$picture, $text] = (new SlideGeometry())->body(LayoutRole::ImageText);
+
+    expect($text->x - $picture->x - $picture->width)->toBe(SlideGeometry::GUTTER);
+});
+
+it('gives the two columns of an image-text layout the same height and the same top', function () {
+    [$picture, $text] = (new SlideGeometry())->body(LayoutRole::ImageText);
+
+    expect($picture->height)->toBe($text->height)
+        ->and($picture->y)->toBe($text->y);
+});
+
+it('splits an image-text slide at the first heading of the second level', function () {
+    // The same rule `two-column` divides by, so the layout a deck names is the one it gets:
+    // picture and text before the `##` on the left, everything after it on the right.
+    $shapes = slideDeck("---\nlayout: image-text\n---\n# Both\n\nLeft.\n\n## Right\n\nRight side.\n")->positions();
+
+    expect($shapes[1]['x'])->toBeLessThan($shapes[2]['x'])
+        ->and($shapes[2]['x'])->toBe($shapes[3]['x']);
+});
+
+it('gives an image-text layout a title box and a body placeholder for each of its columns', function () {
+    $pptx = slideDeck("---\nlayout: image-text\n---\n# One\n\nLeft.\n\n## Right\n\nRight side.\n");
+
+    expect($pptx->layoutNames())->toBe([1 => 'Picture Left'])
+        ->and(array_keys($pptx->layoutPlaceholders()))->toBe(['title', 'body 1', 'body 2']);
+});
+
+it('gives an image-title layout a headline and a body tall enough to be worth looking at', function () {
+    // A picture that is only as tall as a content slide's body would make the role a content
+    // slide with an image in it; the headline is what the layout is for.
+    $geometry = new SlideGeometry();
+    [$body] = $geometry->body(LayoutRole::ImageTitle);
+
+    expect($geometry->title(LayoutRole::ImageTitle))->not->toBeNull()
+        ->and($body->height)->toBeGreaterThan($geometry->body(LayoutRole::Content)[0]->height);
+});
+
+it('writes an image-title layout named the way the theme names it, with a title placeholder', function () {
+    $pptx = slideDeck("---\nlayout: image-title\n---\n# One\n\nText.\n");
+
+    expect($pptx->layoutNames())->toBe([1 => 'Picture with Caption'])
+        ->and(array_keys($pptx->layoutPlaceholders()))->toBe(['title', 'body 1'])
+        ->and($pptx->placeholderOf('title'))->toBe('type="title"');
+});
+
+it('gives an image slide the whole page, with no margin to keep', function () {
+    // Full bleed, which is the whole of what separates this role from `blank`: the picture
+    // goes to the edge of the page rather than stopping at the margin.
+    [$body] = (new SlideGeometry())->body(LayoutRole::ImageSlide);
+
+    expect($body->x)->toBe(0)
+        ->and($body->y)->toBe(0)
+        ->and($body->width)->toBe(SlideGeometry::WIDTH)
+        ->and($body->height)->toBe(SlideGeometry::HEIGHT);
+});
+
+it('leaves an image slide with no title box, whatever its layout is called', function () {
+    // A picture alone is the layout; a headline drawn over it would not be the picture alone,
+    // and the template's own layout naming it is not a reason to draw one.
+    expect((new SlideGeometry())->title(LayoutRole::ImageSlide))->toBeNull();
+});
+
+it('writes an image slide whose layout carries only a body placeholder', function () {
+    $pptx = slideDeck("---\nlayout: image-slide\n---\n\nJust a picture.\n");
+
+    expect($pptx->layoutNames())->toBe([1 => 'Full Bleed Picture'])
+        ->and(array_keys($pptx->layoutPlaceholders()))->toBe(['body 1']);
+});
+
+it('draws a title named in the frontmatter as a heading on an image slide', function () {
+    // The same answer `blank` gives, because there is no box to draw it in either way.
+    $pptx = slideDeck("---\nlayout: image-slide\ntitle: Named\n---\n\nBody.\n");
+
+    expect($pptx->shapeNames())->toBe(['heading', 'paragraph'])
+        ->and($pptx->texts(1))->toBe(['Named', 'Body.']);
+});
+
+it('answers the title box question the same way whichever side asks it', function () {
+    // Two places answer it — the role and the geometry — and a disagreement between them would
+    // draw a title a role says it has no box for.
+    foreach (LayoutRole::cases() as $role) {
+        expect((new SlideGeometry())->title($role) !== null)->toBe($role->hasTitleBox());
+    }
+});
+
+it('leaves a template that covers the picture layouts free to place them', function () {
+    // The precedence rule, on the roles that carry pictures: a template's *Picture Left* says
+    // where its two columns are, and the deck is drawn there rather than where
+    // {@see SlideGeometry} would put them.
+    $geometry = (new TemplateGeometry(Doctest::root() . '/tests/fixtures/themes/templated/template.pptx'))->boxes();
+    [$picture, $text] = $geometry['Picture Left']['body'];
+
+    expect($picture->x)->toBeLessThan($text->x)
+        ->and($geometry['Picture Left']['title']->y)->toBeLessThan($picture->y);
+});
+
+it('takes a picture placeholder as one of a template\'s columns', function () {
+    // A template's picture is not a `body` placeholder, and reading only the ones called
+    // `body` would take its text column and leave its picture column behind.
+    expect((new TemplateGeometry(Doctest::root() . '/tests/fixtures/themes/templated/template.pptx'))->boxes()['Picture Left']['body'])
+        ->toHaveCount(2);
+});
+
+it('leaves a full-bleed picture where the library puts it rather than where the template does', function () {
+    // The template's own full-bleed layout carries a title placeholder, and adopting it would
+    // give a role with no title box one — the same rule `blank` already follows.
+    $geometry = (new SlideGeometry())->with([
+        'image-slide' => ['title' => new Box(0, 0, 10, 10), 'body' => [new Box(0, 0, 10, 10)]],
+    ]);
+
+    expect($geometry->title(LayoutRole::ImageSlide))->toBeNull();
 });
 
 /**

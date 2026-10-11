@@ -74,6 +74,15 @@ final class SlideGeometry
     public const TABLE_COLUMN = 80;
 
     /**
+     * The height of the headline band of an `image-title` layout, in pixels.
+     *
+     * One line of a 28-point title — {@see lineHeight()} — rather than the two a content
+     * slide's title box is given room for. The headline here introduces a picture rather than
+     * sitting above a paragraph, and every pixel of the band is a pixel of picture.
+     */
+    public const HEADLINE = 45;
+
+    /**
      * The air inside a table cell, on the left and on the right.
      *
      * PHPPresentation writes a cell's `a:bodyPr` with no `lIns`/`rIns` at all, and
@@ -111,7 +120,7 @@ final class SlideGeometry
     /** The multiple of a line's own height that one line of text is drawn at. */
     private const LINE_SPACING = 1.2;
 
-    /** A heading one level deeper than a content slide's title, down to the sixth. */
+    /** A heading one level deeper than a content slide's title, down to the fifth. */
     private const HEADING_SIZES = [22, 20, 18, 16, 14];
 
     /**
@@ -133,9 +142,9 @@ final class SlideGeometry
     /**
      * A copy whose named roles take their boxes from a template.
      *
-     * Merged rather than replacing what this already knows, so a template that covers two of
-     * the five roles leaves the other three where this class puts them — the same rule
-     * `layouts.yml` follows, where a theme mapping two of the five is a theme that works.
+     * Merged rather than replacing what this already knows, so a template that covers only some
+     * of the roles leaves the rest where this class puts them — the same rule
+     * `layouts.yml` follows, where a theme that maps two of them is a theme that works.
      *
      * @param array<string, array{title?: Box, body?: non-empty-list<Box>}> $boxes
      */
@@ -147,10 +156,12 @@ final class SlideGeometry
     /**
      * The title box of a role, the size of its type in points, and the alignment it uses.
      *
-     * Null for `blank`, which has no title: a blank layout that drew one would not be blank,
-     * and the way to put a title on such a slide is to write a heading in its body. That
-     * answer is this class's rather than a template's — a template whose `blank` layout
-     * happens to carry a title placeholder does not turn the role into one that has a title.
+     * Null for a role with no title box — `blank` and `image-slide` — which is
+     * {@see LayoutRole::hasTitleBox()} asked from here. A layout that drew a title anyway
+     * would not be the layout it is, and the way to put a title on such a slide is to write
+     * a heading in its body. That answer is this class's rather than a template's: a
+     * template whose `blank` layout happens to carry a title placeholder does not turn the
+     * role into one that has a title.
      *
      * @return ?array{box: Box, size: int, alignment: string}
     */
@@ -158,9 +169,13 @@ final class SlideGeometry
     {
         $title = match ($role) {
             LayoutRole::Title => ['box' => new Box(self::MARGIN, 180, self::BODY_WIDTH, 120), 'size' => 40, 'alignment' => 'l'],
-            LayoutRole::Content, LayoutRole::TwoColumn => ['box' => new Box(self::MARGIN, 24, self::BODY_WIDTH, 72), 'size' => 28, 'alignment' => 'l'],
+            LayoutRole::Content, LayoutRole::TwoColumn, LayoutRole::ImageText => ['box' => new Box(self::MARGIN, 24, self::BODY_WIDTH, 72), 'size' => 28, 'alignment' => 'l'],
+            // One line, not a wrapping block: the headline here introduces a picture rather
+            // than sitting above a paragraph, and the height it takes is the height of a line
+            // of it. {@see self::HEADLINE} is what the body is measured from.
+            LayoutRole::ImageTitle => ['box' => new Box(self::MARGIN, 24, self::BODY_WIDTH, self::HEADLINE), 'size' => 28, 'alignment' => 'l'],
             LayoutRole::Section => ['box' => new Box(self::MARGIN, 200, self::BODY_WIDTH, 140), 'size' => 44, 'alignment' => 'ctr'],
-            LayoutRole::Blank => null,
+            LayoutRole::Blank, LayoutRole::ImageSlide => null,
         };
 
         if ($title === null) {
@@ -173,32 +188,68 @@ final class SlideGeometry
     }
 
     /**
-     * The body boxes of a role, in reading order. `two-column` gives two because that is what
-     * it is for; every other role gives one.
+     * The body boxes of a role, in reading order. `two-column` and `image-text` give two
+     * because that is what they are for; every other role gives one.
      *
      * @return non-empty-list<Box>
     */
     public function body(LayoutRole $role): array
     {
         return $this->boxes[$role->value]['body'] ?? match ($role) {
-            LayoutRole::TwoColumn => [
-                new Box(self::MARGIN, 104, intdiv(self::BODY_WIDTH - self::GUTTER, 2), 396),
-                new Box(self::MARGIN + intdiv(self::BODY_WIDTH + self::GUTTER, 2), 104, intdiv(self::BODY_WIDTH - self::GUTTER, 2), 396),
-            ],
+            LayoutRole::TwoColumn => $this->columns(1, 1),
+            // The picture leads and the text follows it, so the wider column goes to the
+            // picture: a reader looks at the image first, and text set into the narrower one
+            // beside it is text beside a picture rather than a picture beside text.
+            LayoutRole::ImageText => $this->columns(3, 2),
             LayoutRole::Title => [new Box(self::MARGIN, 320, self::BODY_WIDTH, 180)],
             LayoutRole::Section => [new Box(self::MARGIN, 360, self::BODY_WIDTH, 140)],
             // A blank layout has no title, so its body starts at the margin and gets the whole
             // height — which is the only thing that distinguishes it from a content slide.
             LayoutRole::Blank => [new Box(self::MARGIN, self::MARGIN, self::BODY_WIDTH, self::HEIGHT - 2 * self::MARGIN)],
             LayoutRole::Content => [new Box(self::MARGIN, 104, self::BODY_WIDTH, 396)],
+            // A headline sits in the band a content slide's does, and the picture takes what
+            // is left of the page under it — which is the whole of what separates this from a
+            // content slide: a shorter headline, and everything below it belongs to the picture.
+            LayoutRole::ImageTitle => [new Box(
+                self::MARGIN,
+                24 + self::HEADLINE + self::BLOCK_GAP,
+                self::BODY_WIDTH,
+                self::HEIGHT - self::MARGIN - (24 + self::HEADLINE + self::BLOCK_GAP),
+            )],
+            // Full bleed: a slide whose whole content is one picture has no margin to keep, and
+            // the gutter that separates two columns has nothing left to separate.
+            LayoutRole::ImageSlide => [new Box(0, 0, self::WIDTH, self::HEIGHT)],
         };
+    }
+
+    /**
+     * Two columns across the body width, in the ratio `$left`:`$right`, separated by
+     * {@see self::GUTTER} and both running from under a content slide's title to the bottom
+     * margin.
+     *
+     * The same {@see self::GUTTER} every other indentation here uses, so two columns are as
+     * far apart as a bullet is from its text rather than a gap of their own. The right column
+     * takes the remainder rather than its own share of the total, because a column ending a
+     * pixel short of the margin is a ragged edge nothing on the page explains.
+     *
+     * @return non-empty-list<Box>
+     */
+    private function columns(int $left, int $right): array
+    {
+        $available = self::BODY_WIDTH - self::GUTTER;
+        $left = intdiv($available * $left, $left + $right);
+
+        return [
+            new Box(self::MARGIN, 104, $left, self::HEIGHT - 104 - self::MARGIN),
+            new Box(self::MARGIN + $left + self::GUTTER, 104, $available - $left, self::HEIGHT - 104 - self::MARGIN),
+        ];
     }
 
     /**
      * The size of a heading in a slide's body, by its depth.
      *
-     * The sixth is the last entry, so a heading deeper than the Markdown has levels for
-     * would take the smallest size there is rather than fail.
+     * The last entry is the smallest, so a heading deeper than the scale runs
+     * takes the smallest size there is rather than failing.
     */
     public function headingSize(int $level): int
     {

@@ -73,7 +73,7 @@ it('refuses a layouts.yml role that is not a role, and names the roles that are'
         'theme.yml' => "name: Acme\n",
         'layouts.yml' => "layouts:\n  two-columns: Two Content\n",
     ]));
-})->throws(UnknownLayoutRole::class, '"two-columns" is not a layout role. The roles are: title, content, two-column, section, blank');
+})->throws(UnknownLayoutRole::class, '"two-columns" is not a layout role. The roles are: title, content, two-column, section, blank, image-text, image-title, image-slide');
 
 it('refuses a key beside the mappings that is not one', function () use ($loader) {
     $loader->load(ThemeDirectory::create([
@@ -165,7 +165,7 @@ it('refuses a layout name that is not a role at all', function () use ($loader) 
     $loaded = $loader->load(ThemeDirectory::minimal('acme'));
 
     $loaded->layout('Two Content');
-})->throws(UnknownLayoutRole::class, '"Two Content" is not a layout role. The roles are: title, content, two-column, section, blank');
+})->throws(UnknownLayoutRole::class, '"Two Content" is not a layout role. The roles are: title, content, two-column, section, blank, image-text, image-title, image-slide');
 
 it('turns a role into the layout name of the theme\'s own template', function () use ($loader) {
     $loaded = $loader->load(ThemeDirectory::create([

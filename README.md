@@ -420,15 +420,54 @@ on a column of a slide and there is nothing else to go on. A deck that never wri
 the left column and leaves the right empty, which is honest: it asked for two columns and
 wrote one.
 
-The five roles are `title`, `content`, `two-column`, `section` and `blank`. Only the ones a
-deck uses are built, so a theme that maps two of the five does not fail on the three nobody
-asked for.
+The eight roles are `title`, `content`, `two-column`, `section`, `blank`, `image-text`,
+`image-title` and `image-slide`. Only the ones a deck uses are built, so a theme that maps two
+of them does not fail on the six nobody asked for.
 
 `blank` has no title box — that is what makes it blank — so a slide using it carries its title
 as a heading: the one in its body if it wrote one, and the one its frontmatter named if it did
 not. `level:` governs whichever of the two it is, at the same depth it would govern a body
 heading. The alternative, refusing a `title:` on a blank slide, would refuse a perfectly good
 deck over the one thing the library does draw perfectly well there.
+
+The three picture layouts are roles in exactly that sense — a theme maps each to a layout name,
+a template can supply the boxes for each, and *Reset* restores them:
+
+| Role | What it is for | Columns | Title box |
+| --- | --- | --- | --- |
+| `image-text` | A picture beside a block of text | Two, the picture in the wider one | Yes |
+| `image-title` | A large picture under a headline | One | Yes |
+| `image-slide` | The picture alone, full bleed | One, the whole page | No |
+
+`image-text` divides at the first `##` exactly as `two-column` does, so the picture — everything
+above the heading — is the left column. Its two columns are separated by the same gutter a
+bullet is from its text, not by a gap of its own.
+
+`image-title` gives its headline a band one line tall rather than the two a content slide's
+title box is given room for, because every pixel of that band is a pixel of picture.
+
+`image-slide` has no title box and no margin either: its body box is the whole page, so the
+picture is fitted to the page rather than to a box inside it. A title named on one is drawn as
+a heading in the body, which is `blank`'s answer for the same reason.
+
+```php
+use MarkdownPresentation\Render\SlideGeometry;
+use MarkdownPresentation\Theme\LayoutRole;
+
+$geometry = new SlideGeometry();
+[$picture, $text] = $geometry->body(LayoutRole::ImageText);
+
+printf(
+    "%dpx picture, %dpx text, %dpx apart\n",
+    $picture->width,
+    $text->width,
+    $text->x - $picture->x - $picture->width,
+);
+```
+
+```text
+516px picture, 344px text, 20px apart
+```
 
 ### Placeholders
 
@@ -448,8 +487,9 @@ view, and what makes a layout other than a blank rectangle in the layout picker.
 layout's placeholders are written at are the boxes the slides are drawn in, so *Reset*
 restores the geometry the slide already had and moves nothing.
 
-`two-column` gets two body placeholders, `idx="1"` and `idx="2"`; every other role gets one.
-`blank` gets no title placeholder, because it has no title box — that is what makes it blank.
+`two-column` and `image-text` get two body placeholders, `idx="1"` and `idx="2"`; every other
+role gets one. `blank` and `image-slide` get no title placeholder, because neither has a title
+box — that is what makes `blank` blank and what makes `image-slide` the picture alone.
 
 A slide's body is a stack of differently shaped blocks — a table, a picture, a code block —
 and none of them is a placeholder: promoting one would make *Reset* move that block and leave
@@ -494,7 +534,7 @@ Three rules decide what a template is allowed to change:
 - **A template fills in the roles it covers and says nothing about the rest.** A layout it
   does not have, and a layout it has with no placeholders in it — Office's own *Blank* — leave
   that role where `SlideGeometry` puts it. This is the same rule `layouts.yml` follows, where a
-  theme mapping three of the five roles is a theme that works.
+  theme mapping some of the roles is a theme that works.
 - **A template places; it does not typeset.** Sizes and alignments stay with `SlideGeometry`,
   because a template states them in a *master*'s `p:txStyles` — a whole typographic system,
   not a layout — and adopting one would resize the type of every deck that shipped a template.
@@ -1006,13 +1046,13 @@ echo implode(', ', $theme->roles()), "\n";
 
 ```text
 Two Content
-title, content, two-column, section, blank
+title, content, two-column, section, blank, image-text, image-title, image-slide
 ```
 
 The roles are `title`, `content`, `two-column`, `section` and `blank`. A name that is
 not one of them, and a role the theme does not map, are both failures that name the
 alternatives — because the author of the deck can act on that and nobody else can.
-Here a theme whose template has only two of the five:
+Here a theme whose template maps only two roles:
 
 ```php
 use MarkdownPresentation\Exception\UnknownLayoutRole;
@@ -1030,7 +1070,7 @@ foreach (['three-column', 'section'] as $role) {
 ```
 
 ```text
-"three-column" is not a layout role. The roles are: title, content, two-column, section, blank.
+"three-column" is not a layout role. The roles are: title, content, two-column, section, blank, image-text, image-title, image-slide.
 The theme "Sparse" maps no "section" layout. It maps: title, content.
 ```
 

@@ -396,9 +396,9 @@ final class PresentationRenderer
     /**
      * The roles the deck's slides use, in first-seen order and each of them once.
      *
-     * Only the roles that are used are built. A theme that maps two of the five would
-     * otherwise fail on the three its deck never asked for, which is not the same failure as
-     * a deck that asks for one it did not map.
+     * Only the roles that are used are built. A theme that maps some of them would
+     * otherwise fail on the ones its deck never asked for, which is not the same failure as a
+     * deck that asks for one it did not map.
      *
      * Compared on the role's value rather than with `array_unique`, which casts each element
      * to a string and an enum cannot be cast to one.
@@ -818,6 +818,10 @@ final class PresentationRenderer
      * that never writes one fills the left column and leaves the right empty, which is
      * honest: it asked for two columns and wrote one.
      *
+     * Both two-column roles divide the same way, so `image-text` reads as the layout it is
+     * named after: the picture and the text before the `##` on the left, everything after it
+     * on the right.
+     *
      * Decided once for the whole slide rather than per column, because a block that opens the
      * second column belongs to the second column, and a per-column walk that decided
      * otherwise after collecting it drew it in both.
@@ -832,7 +836,7 @@ final class PresentationRenderer
         $current = 0;
 
         foreach ($blocks as $block) {
-            if ($role === LayoutRole::TwoColumn && $current === 0 && $this->opensSecondColumn($block)) {
+            if ($this->splits($role) && $current === 0 && $this->opensSecondColumn($block)) {
                 $current = 1;
             }
 
@@ -866,6 +870,18 @@ final class PresentationRenderer
     private function opensSecondColumn(Block $block): bool
     {
         return $block instanceof Heading && $block->level === 2;
+    }
+
+    /**
+     * Whether a role's blocks are divided between two columns at all.
+     *
+     * Asked of the geometry rather than read off a list of roles, because the boxes are the
+     * fact: a template that gives a role two body boxes has made it two columns whatever the
+     * role is called, and one that gives it one has not.
+     */
+    private function splits(LayoutRole $role): bool
+    {
+        return count($this->geometry->body($role)) > 1;
     }
 
     /**

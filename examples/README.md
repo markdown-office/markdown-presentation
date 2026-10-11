@@ -23,7 +23,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does |
 | `05-steps.md` | `05-steps.pptx` | `<!-- v-click -->` steps, cumulative |
 | `06-tables.md` | `06-tables.pptx` | Table alignment, a bold filled header, widths from content |
-| `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column |
+| `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column, and the three layouts built around one: `image-text`, `image-title` and `image-slide` |
 | `08-code.md` | `08-code.pptx` | Code blocks |
 | `09-inline-markup.md` | `09-inline-markup.pptx` | A `title:` carrying `**bold**` and `*italic*` |
 | `10-rejected.md` | **nothing** | Conditional content the way Slidev writes it |
@@ -49,6 +49,13 @@ A few of these are here because the render is the only honest evidence:
 - **`02`, the `blank` slide.** `blank` has no title box — that is what makes it
   blank — so a frontmatter `title:` there is drawn as a heading in the body
   instead. A `##` in that body keeps its own depth and comes out smaller.
+- **`07`, the `image-text` slide.** The picture is in the *wider* column and the
+  text in the narrower one, because a reader looks at the image first. It
+  divides at the first `##` exactly as `two-column` does.
+- **`07`, the `image-slide` slide.** The picture is the slide: no headline, and
+  no margin either — the box it is fitted to is the whole page. The logo is
+  square and the page is not, so the picture keeps its own proportions inside
+  that box and the air either side of it is the shape not filling it.
 - **`03-themes-corporate-dark`.** The only one of the three with a dark page,
   and the only one whose text is painted in the theme's light token rather than
   its dark one. Nothing else about it differs: the same `theme.yml` colours, the

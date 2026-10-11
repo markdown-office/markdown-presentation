@@ -1,9 +1,9 @@
-# The layout names Office's own template uses, which is what a `.pptx` saved from a
-# blank PowerPoint contains. A theme that ships a template of its own names that
-# one's layouts here instead, and the portable roles are unchanged.
 layouts:
   title: Title Slide
   content: Title and Content
   two-column: Two Content
   section: Section Header
   blank: Blank
+  image-text: Picture Left
+  image-title: Picture with Caption
+  image-slide: Full Bleed Picture
