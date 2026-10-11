@@ -292,7 +292,12 @@ final class SlideGeometry
             // The picture leads and the text follows it, so the wider column goes to the
             // picture: a reader looks at the image first, and text set into the narrower one
             // beside it is text beside a picture rather than a picture beside text.
-            LayoutRole::ImageText => $this->columns($top, 3, 2),
+            //
+            // Even rather than the 3:2 a picture would like, though: {@see ShapeWriter} estimates
+            // wrapping from a table of Helvetica's widths and a theme's own face is wider, so a
+            // column narrow enough to need the estimate to be exactly right is a column where
+            // two paragraphs are drawn on top of each other. 5:4 leaves the estimate slack.
+            LayoutRole::ImageText => $this->columns($top, 5, 4),
             LayoutRole::Title => [new Box($margin, $this->band(8), $width, $this->band(4.5))],
             LayoutRole::Section => [new Box($margin, $this->band(9), $width, $this->band(3.5))],
             // A blank layout has no title, so its body starts at the margin and gets the whole

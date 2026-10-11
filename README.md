@@ -441,7 +441,10 @@ a template can supply the boxes for each, and *Reset* restores them:
 
 `image-text` divides at the first `##` exactly as `two-column` does, so the picture — everything
 above the heading — is the left column. Its two columns are separated by the same gutter a
-bullet is from its text, not by a gap of its own.
+bullet is from its text, not by a gap of its own, and the text column is wider than a picture's
+share of the page would suggest: `ShapeWriter` estimates wrapping from a table of Helvetica's
+widths and a theme's own face is wider than that, so a column narrow enough to need the
+estimate to be exactly right is a column where two paragraphs are drawn on top of one another.
 
 `image-title` gives its headline a band one line tall rather than the two a content slide's
 title box is given room for, because every pixel of that band is a pixel of picture.
@@ -466,7 +469,7 @@ printf(
 ```
 
 ```text
-516px picture, 344px text, 20px apart
+477px picture, 383px text, 20px apart
 ```
 
 ### Placeholders
@@ -861,6 +864,13 @@ themes/corporate-dark/
 ├── README.md        optional   attribution
 └── LICENSE          optional
 ```
+
+The tools that come with the library are in `tools/`:
+
+| Tool | What it is |
+| --- | --- |
+| `tools/phpstan.sh` | Fetches the analyser by checksum and runs it at the level `phpstan.neon.dist` configures |
+| `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: nothing in the test suite needs it, because CI has no PowerPoint |
 
 Three themes ship with the library, and they are three different decks rather than one deck in
 three swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
@@ -1336,6 +1346,50 @@ that is not one, a `v-click` step that does not go forwards, an image that is no
 and an image no `.pptx` can carry. Those messages are listed one by one in
 `tests/Unit/exceptions.php`, which finds the exception classes by reading the directory
 rather than by a list that would quietly stop being true.
+
+### Rendering in the real PowerPoint
+
+Everything above is checked against the parts of the file this library wrote. There is no
+other implementation to check a render against, and LibreOffice — which `examples/build.php`
+uses for its previews — is a *different* implementation of the same format, so it renders what
+it believes the format means rather than what PowerPoint means.
+
+For the one question that asks for PowerPoint itself, `tools/render-with-powerpoint.applescript`
+opens each deck in Microsoft PowerPoint and exports it to PDF:
+
+```
+osascript tools/render-with-powerpoint.applescript examples/out/*.pptx --out build/powerpoint
+```
+
+It is a developer tool and nothing in the test suite requires it: continuous integration has no
+PowerPoint, and a test that needed one would be a test that could only be run on one person's
+machine. Every step either produces the file it promised or exits non-zero with the reason —
+a deck that opened and exported nothing is a failure, and so is a directory that cannot be
+written, a deck that is not there and a `--out` that is missing.
+
+Three things about it are worth knowing before running it:
+
+- **It stages each deck inside PowerPoint's own sandbox container.** Office applications are
+  sandboxed and refuse to read a path the user has not granted them with error `-9074`, so the
+  deck is copied in, exported there and copied back out. The scratch directory is removed on
+  every path through the script, including every failure.
+- **It closes only the decks it opened.** A deck somebody had open before the script ran is
+  still open afterwards.
+- **It can fail because PowerPoint is in a bad state.** `-9074` from a deck already staged
+  inside the container means PowerPoint could not open *any* document — most often a window it
+  had not finished starting. Quitting PowerPoint and running it again is the fix, and the
+  script says so rather than reporting a permission problem.
+
+`build/` is the output directory in the command above, and it is git-ignored. Nothing this
+writes lands in a deck.
+
+### Word is not an alternative
+
+`/Applications/Microsoft Word.app` is Microsoft 365 Word, and Word cannot open a
+presentation. A `.pptx` is OOXML from Office 2007 and Word was never a PowerPoint product, so
+it would import the file through a lossy converter and report nothing about whether the deck
+is valid. PowerPoint is the only application on this machine that will tell the truth about
+whether these decks open.
 
 ## How this page is checked
 

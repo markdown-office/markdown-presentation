@@ -31,6 +31,11 @@
 /coverage.xml
 /clover.xml
 
+# Where tools/render-with-powerpoint.applescript is told to write the PDFs it exports
+# from PowerPoint. Ignored rather than left out of the repository's own list of build
+# output, because a PDF of somebody's deck is not something a library should ever
+# have to carry.
+
 # Editors and operating systems.
 .DS_Store
 .idea/
@@ -39,3 +44,9 @@
 *~
 # Everything the examples build produces.
 /examples/out/
+
+# PDFs exported by PowerPoint, wherever a caller asked for them to land inside this
+# checkout. A PDF of a deck is a rendering of somebody's content and has no place in
+# a library's history.
+/build/
+/powerpoint/

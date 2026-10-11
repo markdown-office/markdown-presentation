@@ -351,6 +351,29 @@ it('divides an image-text layout into a picture column and a text column', funct
         ->and($picture->x + $picture->width)->toBeLessThan($text->x);
 });
 
+it('leaves an image-text layout\'s text column wide enough for the estimate to be wrong', function () {
+    // Both of a picture's columns are laid out from an estimate of how many lines its text
+    // wraps to, and the estimate reads a table of Helvetica's widths against a face that is
+    // usually wider. Where the estimate is short the two paragraphs are drawn on top of one
+    // another, and LibreOffice's preview does not show it — PowerPoint's own render does.
+    [$picture, $text] = (new SlideGeometry())->body(LayoutRole::ImageText);
+
+    // The ratio is 5:4 rather than the 3:2 a picture would prefer, and this is what holds it
+    // there. {@see ShapeWriter} lays a column out from a table of Helvetica's widths and a
+    // theme's own face is wider than Helvetica, so the text column has to be wide enough that
+    // being wrong by a word does not put a paragraph on top of the one above it. Where it is
+    // not, two paragraphs are drawn over one another — which LibreOffice's preview does not
+    // show and PowerPoint's own render does.
+    //
+    // Five ninths of what the two columns share is a shade under half the body, and that is
+    // the number: a 3:2 split would leave the text on two fifths, which is where the overlap
+    // was found. Stated against the share rather than as a width in pixels so that the bound
+    // moves with the theme's margin rather than becoming a number chosen after the fact.
+    expect($text->width * 5)->toBeGreaterThan(
+        (new SlideGeometry())->body(LayoutRole::Content)[0]->width * 2,
+    );
+});
+
 it('separates the columns of an image-text layout by the same gutter as everything else', function () {
     // A gap of its own would be a second indentation to keep in step with this one.
     [$picture, $text] = (new SlideGeometry())->body(LayoutRole::ImageText);

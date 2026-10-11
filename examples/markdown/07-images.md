@@ -56,12 +56,11 @@ layout: image-text
 
 ## The text beside the picture
 
-The picture takes the **wider** column and the text the narrower one, because a
-reader looks at the image first. The two are separated by the same gutter a
-bullet is from its text.
+The picture takes the **wider** column, because a reader looks at it first.
+The two are separated by the same gutter a bullet is from its text.
 
 `image-text` divides at the first `##` exactly as `two-column` does, so the
-picture — everything above this heading — is the left column.
+picture above is the left column.
 
 ---
 layout: image-title
