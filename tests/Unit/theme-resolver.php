@@ -18,9 +18,7 @@ function resolverIn(string $workingDirectory): ThemeResolver
 }
 
 it('finds a theme beside the deck first', function () {
-    $resolver = resolverIn(ThemeDirectory::create([
-        'themes/acme/theme.yml' => "name: Acme\n",
-    ], 'working'));
+    $resolver = resolverIn(ThemeDirectory::withAcme());
 
     expect($resolver->resolve('acme')->theme()->name())->toBe('Acme');
 });
@@ -45,9 +43,7 @@ it('refuses a theme path outside the directories the resolver was given', functi
 });
 
 it('resolves a relative path against the deck, not against the process', function () {
-    $resolver = resolverIn(ThemeDirectory::create([
-        'themes/acme/theme.yml' => "name: Acme\n",
-    ], 'working'));
+    $resolver = resolverIn(ThemeDirectory::withAcme());
 
     expect($resolver->resolve('./themes/acme')->theme()->name())->toBe('Acme');
 });
@@ -125,19 +121,16 @@ it('refuses a theme name that is a URL rather than a path', function () {
 });
 
 it('lists every theme that resolves, so an unknown name can name them', function () {
-    $resolver = resolverIn(ThemeDirectory::create([
-        'themes/acme/theme.yml' => "name: Acme\n",
+    $resolver = resolverIn(ThemeDirectory::withAcme([
         'themes/zeta/theme.yml' => "name: Zeta\n",
         'themes/not-a-theme/readme.md' => 'no manifest here',
-    ], 'working'));
+    ]));
 
     expect($resolver->available())->toBe(['acme', 'builtin', 'zeta']);
 });
 
 it('fails with every theme that does resolve, rather than falling back to one', function () {
-    $resolver = resolverIn(ThemeDirectory::create([
-        'themes/acme/theme.yml' => "name: Acme\n",
-    ], 'working'));
+    $resolver = resolverIn(ThemeDirectory::withAcme());
 
     $resolver->resolve('corprate-dark');
 })->throws(ThemeNotFound::class, 'There is no theme named "corprate-dark". Available: acme, builtin');
