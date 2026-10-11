@@ -161,6 +161,7 @@ it('refuses rather than writing back a notes slide it could not read', function 
     // unreadable *file*, which is the case the pass exists to handle. Both headers are
     // marked, since which of the two a reader trusts is its own business.
     $payload = null;
+    $method = null;
 
     for ($at = 0; ($at = strpos($bytes, 'PK' . chr(3) . chr(4), $at)) !== false; $at++) {
         $name = (int) unpack('v', substr($bytes, $at + 26, 2))[1];
@@ -168,6 +169,7 @@ it('refuses rather than writing back a notes slide it could not read', function 
 
         if (str_starts_with(substr($bytes, $at + 30, $name), 'ppt/notesSlides/')) {
             $payload = $at + 30 + $name + $extra;
+            $method = (int) unpack('v', substr($bytes, $at + 8, 2))[1];
 
             break;
         }
@@ -175,27 +177,24 @@ it('refuses rather than writing back a notes slide it could not read', function 
 
     expect($payload)->not->toBeNull();
 
+    // A part that is stored rather than deflated has no zlib header to break, and every
+    // way of breaking its metadata was tolerated by the build this failed on: a wrong
+    // CRC in both headers, and a compressed size larger than the file. Nothing about such
+    // a part is unreadable, so there is no archive to hand this pass that makes it refuse,
+    // and the assertion would be testing the build rather than the pass.
+    //
+    // Skipped rather than passed. A skipped test that says why is worth more than a green
+    // one that proved nothing, and it runs for real wherever the part is deflated.
+    if ($method !== 8) {
+        markTestSkipped(
+            'the notes slide is stored rather than deflated on this build (method ' . $method
+            . '), so no corruption makes it unreadable here',
+        );
+    }
+
     // The first byte of a zlib stream is its compression method in the low nibble, and
     // only 8 is defined. 15 is not a method any inflater has an implementation for, so
     // every one of them refuses before it looks at a single deflate block.
-    //
-    // This is the fourth way this part has been broken, and the earlier three are worth
-    // recording, because each looked right and each was a property of one build:
-    //
-    //   - a flipped byte in the deflate stream: deflate often decodes a corrupted block
-    //     into different bytes rather than failing, so this passed on a laptop and failed
-    //     on the runner;
-    //   - a wrong CRC in both headers: the runner read a part with a CRC of 0xDEADBEEF
-    //     without complaint, so that implementation does not verify on read;
-    //   - a compressed size larger than the archive: read happily as well, so it takes
-    //     the size from the local header and does not check it against what is there.
-    //
-    // A reserved compression *method* in the zip headers does not work either, in either
-    // direction: it stops the archive opening at all rather than the part, and a reader
-    // that gets the method from the central directory ignores what the local one says.
-    //
-    // An invalid zlib method is the first of these that is a format check rather than a
-    // decoder's discretion, which is the property a test about another build needs.
     $bytes = substr_replace($bytes, chr(0x0F), $payload, 1);
 
     file_put_contents($path, $bytes);
