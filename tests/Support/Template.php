@@ -28,6 +28,26 @@ final class Template
     private const DML = 'http://schemas.openxmlformats.org/drawingml/2006/main';
     private const REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
 
+    /**
+     * The declaration every part of the package carries.
+     *
+     * Written out in one place because a package is only well formed if its parts agree:
+     * a template whose master declares itself with a different encoding from its layouts is
+     * a file PowerPoint may well open and a reader may well disagree about, and the test
+     * that builds it would be asserting against its own inconsistency rather than against
+     * anything PowerPoint wrote.
+     */
+    private const DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+
+    /**
+     * Where a master, and every layout that inherits from it, finds the theme.
+     *
+     * One target because PowerPoint writes one: a layout with a master of its own names the
+     * theme twice, as two relationships to the same part, and a template whose second one
+     * pointed somewhere else would be testing the builder rather than the reader.
+     */
+    private const THEME = '../theme/theme1.xml';
+
     /** A stock 16:9 PowerPoint page, which is 1280 × 720 of the pixels a `Box` counts in. */
     public const PAGE = ['cx' => 12192000, 'cy' => 6858000];
 
@@ -56,7 +76,7 @@ final class Template
         }
 
         $zip->addFromString('ppt/presentation.xml', sprintf(
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            self::DECLARATION
             . '<p:presentation xmlns:p="%s" xmlns:a="%s"><p:sldSz cx="%d" cy="%d"/></p:presentation>',
             self::PML,
             self::DML,
@@ -70,14 +90,14 @@ final class Template
         ));
         $zip->addFromString(
             'ppt/slideMasters/_rels/slideMaster1.xml.rels',
-            self::relationships(self::link('rId1', 'theme', '../theme/theme1.xml')),
+            self::relationships(self::link('rId1', 'theme', self::THEME)),
         );
 
         foreach ($layouts as $number => $layout) {
             $zip->addFromString(
                 sprintf('ppt/slideLayouts/slideLayout%d.xml', $number + 1),
                 sprintf(
-                    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                    self::DECLARATION
                     . '<p:sldLayout xmlns:p="%s" xmlns:a="%s"><p:cSld name="%s"><p:spTree>%s</p:spTree></p:cSld></p:sldLayout>',
                     self::PML,
                     self::DML,
@@ -89,8 +109,8 @@ final class Template
                 sprintf('ppt/slideLayouts/_rels/slideLayout%d.xml.rels', $number + 1),
                 self::relationships($layoutHasMaster
                     ? self::link('rId1', 'slideMaster', '../slideMasters/slideMaster1.xml')
-                        . self::link('rId2', 'theme', '../theme/theme1.xml')
-                    : self::link('rId1', 'theme', '../theme/theme1.xml')),
+                        . self::link('rId2', 'theme', self::THEME)
+                    : self::link('rId1', 'theme', self::THEME)),
             );
         }
 
@@ -112,7 +132,7 @@ final class Template
     private static function relationships(string $body): string
     {
         return sprintf(
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            self::DECLARATION
             . '<Relationships xmlns="%s">%s</Relationships>',
             self::REL,
             $body,
@@ -122,7 +142,7 @@ final class Template
     private static function part(string $element, string $shapes): string
     {
         return sprintf(
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            self::DECLARATION
             . '<%s xmlns:p="%s" xmlns:a="%s"><p:cSld><p:spTree>%s</p:spTree></p:cSld></%s>',
             $element,
             self::PML,

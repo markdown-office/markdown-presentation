@@ -19,6 +19,16 @@ use ZipArchive;
 */
 final class Pptx
 {
+    /**
+     * The `cNvPr` a shape is named by.
+     *
+     * Matched in three places because a shape is found by its name wherever it sits — the
+     * shapes of a whole slide, the shape a placeholder question is asked about, and the
+     * geometry read off a named one. They have to agree: a name read one way here and
+     * another there is a test asserting about a shape the file does not carry.
+     */
+    private const SHAPE_NAME = '/<p:cNvPr id="\d+" name="([^"]*)"/';
+
     private function __construct(
         private readonly string $path,
     ) {
@@ -88,7 +98,7 @@ final class Pptx
     */
     public function shapeNames(int $slide = 1): array
     {
-        preg_match_all('/<p:cNvPr id="\d+" name="([^"]*)"/', $this->part("ppt/slides/slide{$slide}.xml"), $names);
+        preg_match_all(self::SHAPE_NAME, $this->part("ppt/slides/slide{$slide}.xml"), $names);
 
         // The first belongs to the shape tree the format requires every slide to carry, and
         // is not a shape of the deck.
@@ -265,7 +275,7 @@ final class Pptx
     public function placeholderOf(string $name, int $slide = 1): ?string
     {
         foreach (preg_split('#(?=<p:sp>|<p:graphicFrame>|<p:pic>)#', $this->part("ppt/slides/slide{$slide}.xml")) ?: [] as $shape) {
-            if (preg_match('/<p:cNvPr id="\d+" name="([^"]*)"/', $shape, $found) !== 1 || $found[1] !== $name) {
+            if (preg_match(self::SHAPE_NAME, $shape, $found) !== 1 || $found[1] !== $name) {
                 continue;
             }
 
@@ -374,7 +384,7 @@ final class Pptx
             // The split matches `<p:spPr>` as readily as `<p:sp>`, so a fragment that is only
             // a fragment has no name of its own and is skipped rather than borrowing the next
             // shape's.
-            if (preg_match('/<p:cNvPr id="\d+" name="([^"]*)"/', $shape, $name) !== 1 || $name[1] === '') {
+            if (preg_match(self::SHAPE_NAME, $shape, $name) !== 1 || $name[1] === '') {
                 continue;
             }
 

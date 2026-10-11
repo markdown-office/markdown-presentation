@@ -31,6 +31,9 @@ use MarkdownPresentation\Filesystem\PathScope;
  */
 final class ThemeResolver
 {
+    /** Where a theme sits under the working directory, and beside the library's own source. */
+    private const THEMES = '/themes';
+
     private readonly string $builtinDirectory;
 
     private readonly PathScope $files;
@@ -50,7 +53,7 @@ final class ThemeResolver
     ) {
         // The themes that ship beside `src/`, so a package installed anywhere
         // resolves its own themes without being told where they are.
-        $this->builtinDirectory = $builtinDirectory ?? dirname(__DIR__, 2) . '/themes';
+        $this->builtinDirectory = $builtinDirectory ?? dirname(__DIR__, 2) . self::THEMES;
         $this->files = new PathScope([$this->workingDirectory, $this->builtinDirectory, ...$roots]);
     }
 
@@ -72,7 +75,7 @@ final class ThemeResolver
             ));
         }
 
-        foreach ([$this->workingDirectory . '/themes', $this->builtinDirectory] as $root) {
+        foreach ($this->roots() as $root) {
             if (is_dir($directory = $root . '/' . $name)) {
                 return $this->loader->load($this->directory($name, $directory));
             }
@@ -109,6 +112,20 @@ final class ThemeResolver
     }
 
     /**
+     * The directories a name is looked for under, the working directory first.
+     *
+     * One list because a name has to resolve the same way whether it is being looked up or
+     * enumerated: a name the resolver would accept and not list is a name a failure message
+     * leaves the reader to guess at.
+     *
+     * @return list<string>
+     */
+    private function roots(): array
+    {
+        return [$this->workingDirectory . self::THEMES, $this->builtinDirectory];
+    }
+
+    /**
      * Every theme name that resolves, local and built-in together, sorted: a name
      * resolves to one of them and the reader of the list cannot tell which, so
      * listing one kind ahead of the other would say something untrue.
@@ -119,7 +136,7 @@ final class ThemeResolver
     {
         $names = [];
 
-        foreach ([$this->workingDirectory . '/themes', $this->builtinDirectory] as $root) {
+        foreach ($this->roots() as $root) {
             if (!is_dir($root)) {
                 continue;
             }
