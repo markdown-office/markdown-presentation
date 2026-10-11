@@ -219,6 +219,11 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a styles.yml value reaches the shapes' => 'styles.yml value is applied',
     'a directive nobody acts on is passed over' => 'an unknown directive is ignored',
     'a v-click marker closing a list item is honoured' => 'a marker closing a list item',
+    // The old spellings, as claims rather than as syntax: `CHANGELOG.md` has to be able to
+    // name what a deck used to be written in, so a phrase that only says "<!-- v-click"
+    // would fire on the history that documents the change rather than on a wrong page.
+    'this format still takes an html comment as a step' => 'A step is the comment',
+    'a trailing html comment is still the note' => 'an HTML comment that runs to the end of a slide',
     'an image is embedded whatever format it is in' => 'embedded unchanged, whatever format the deck named it in',
     'the package cannot write a pptx' => 'it renders nothing',
     'a deck has no other way to name who made it' => 'the deck has no other way to say who made it',

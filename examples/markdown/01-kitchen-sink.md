@@ -53,7 +53,8 @@ $deck = (new DeckParser())->parse($markdown);
 
 ***
 
-<!--
-A comment that runs to the end of a slide comes off the content and lands in the
-notes pane. Nothing above it changed.
--->
+::note
+A note comes off the content and lands in the notes pane. Nothing above it
+changed.
+::
+

@@ -170,7 +170,7 @@ it('refuses a package with a part it cannot read', function () {
     // CRC nor a compressed size past the end of the file is refused on all of them.
     $path = Scratch::file('unreadable.pptx', '');
     (new PresentationRenderer())->render(
-        (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
+        (new DeckParser())->parse("# One\n\nThe slide.\n\n::note\na note\n::\n"),
         $path,
     );
 
@@ -221,7 +221,7 @@ it('names the alternatives wherever a failure is a name the author can change', 
     ],
     'a comment that is neither a step nor a note' => [
         UnknownDirective::comment(3, '<!-- v-if false -->')->getMessage(),
-        'A step is "<!-- v-click -->" on a line of its own',
+        'A step is "::click" on a line of its own',
     ],
     'an element a slide cannot draw' => [
         UnknownDirective::element(2, '<v-click>')->getMessage(),
@@ -229,7 +229,19 @@ it('names the alternatives wherever a failure is a name the author can change', 
     ],
     'a container fence a slide cannot draw' => [
         UnknownDirective::container(4, '::: note')->getMessage(),
-        'Divide a deck with a "---" line',
+        'Three colons open a step region as ":::click"',
+    ],
+    'a note nothing closes' => [
+        UnknownDirective::unclosedNote(3)->getMessage(),
+        'A note is "::note" on a line of its own',
+    ],
+    'a region nothing closes' => [
+        UnknownMarker::unclosed(2)->getMessage(),
+        'A region ends at a ":::" on a line of its own',
+    ],
+    'a closer with nothing to close' => [
+        UnknownMarker::strayCloser(1)->getMessage(),
+        'A region opens at ":::click"',
     ],
     'a step that goes backwards' => [
         UnknownMarker::backwards(2, 1, 3)->getMessage(),

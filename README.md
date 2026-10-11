@@ -130,7 +130,12 @@ The first block is the deck's frontmatter. It is the first slide's, not a
 block of its own: a deck that opens with a `---` block and then a slide
 is one slide carrying both, and `Deck::frontmatter()` returns its keys.
 
-A speaker note is an HTML comment that runs to the end of a slide.
+`::click` and `:::click` are left in the content; they are the renderer's
+step markers, not the splitter's.
+
+A speaker note is `::note` on a line of its own, its text, and a
+closing `::`. A `::note` nothing closes is part of the slide's text,
+and the renderer refuses it rather than drawing it.
 
 Two shapes are refused rather than read:
 
@@ -185,13 +190,13 @@ splits the slide after all.
 
 ### Speaker notes
 
-An HTML comment that runs to the end of a slide is its speaker note, and comes off
-the content:
+A `::note` block is a slide's speaker note, and comes off the content. `::note`
+and the closing `::` each have to be on a line of their own:
 
 ```php
 use MarkdownPresentation\Document\DeckParser;
 
-$deck = (new DeckParser())->parse("# One\n\n<!--\nRead this out loud.\n-->\n");
+$deck = (new DeckParser())->parse("# One\n\n::note\nRead this out loud.\n::\n");
 
 echo $deck->slides()[0]->note(), "\n";
 echo $deck->slides()[0]->content(), "\n";
@@ -687,15 +692,37 @@ loses its body box.
 
 ### Steps
 
-`<!-- v-click -->` on a line of its own opens a step. PowerPoint has no "press a key to
-reveal this", so the build-up becomes the slides a presenter would click through, each
-revealing everything the one before it had:
+Two colons for a boundary, three for a region:
+
+| Written | Means |
+| --- | --- |
+| `::click` | everything after it is the next step |
+| `::click=3` | everything after it is step three |
+| `:::click` … `:::` | everything between them is one step of its own |
+| `::note` … `::` | a speaker note, taken off the slide |
+
+PowerPoint has no "press a key to reveal this", so a build-up becomes the slides a presenter
+would click through, each revealing everything the one before it had:
+
+```markdown
+Always visible from the first step.
+
+::click
+
+The second thing, on the next click.
+
+::click
+
+The third thing, on the click after that.
+```
 
 ```php
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Render\PresentationRenderer;
 
-$deck = (new DeckParser())->parse("# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n");
+$deck = (new DeckParser())->parse(
+    "# One\n\nFirst.\n\n::click\n\nSecond.\n\n::click\n\nThird.\n",
+);
 $path = sys_get_temp_dir() . '/deck.pptx';
 (new PresentationRenderer())->render($deck, $path);
 
@@ -709,21 +736,48 @@ for ($i = 0; $i < $zip->numFiles; $i++) {
 }
 
 echo count(preg_grep('#^ppt/slides/slide\d+\.xml$#', $parts)), " slides\n";
-echo str_contains($zip->getFromName('ppt/slides/slide1.xml'), 'Second.') ? 'too soon' : 'not yet', "\n";
-echo str_contains($zip->getFromName('ppt/slides/slide2.xml'), 'Second.') ? 'then' : 'never', "\n";
+
+foreach ([1, 2, 3] as $slide) {
+    echo 'slide ', $slide, ': ', implode(', ', array_filter([
+        str_contains($zip->getFromName("ppt/slides/slide{$slide}.xml"), 'First.') ? 'First.' : null,
+        str_contains($zip->getFromName("ppt/slides/slide{$slide}.xml"), 'Second.') ? 'Second.' : null,
+        str_contains($zip->getFromName("ppt/slides/slide{$slide}.xml"), 'Third.') ? 'Third.' : null,
+    ])), "\n";
+}
 ```
 
 ```text
-2 slides
-not yet
-then
+3 slides
+slide 1: First.
+slide 2: First., Second.
+slide 3: First., Second., Third.
 ```
 
-`<!-- v-click=3 -->` names step three outright. A step number that does not go forwards, a
-`v-click=` with nothing after the equals, and a step that is not a number are all failures.
-A marker at the end of a list item is refused rather than ignored: honouring one would mean
-splitting a single list block into several, which is a different feature from the one claimed
-here, so the refusal names the mistake instead of drawing the comment on the slide.
+`::click=3` names step three outright, and a region opener takes the same argument:
+
+```markdown
+::click
+
+The second thing.
+
+::click
+
+:::click
+
+The third thing, written as a region.
+
+:::
+```
+
+A region is the boundary and its fences in one: everything between them is read at the step its
+opener names, through the same counter a bare marker moves, so a build-up can be written as the
+parts it is made of. A `:::` with nothing to close, and a `::note` with nothing to close it, are
+failures naming the spelling that would have worked.
+
+A step number that does not go forwards, a `::click=` with nothing after the equals, and a step
+that is not a number are all failures. So is a marker at the end of a list item: honouring one
+would mean splitting a single list block into several, which is a different feature from the one
+claimed here, so the refusal names the mistake instead of drawing the marker on the slide.
 
 ### How many steps a deck may have
 
@@ -737,7 +791,7 @@ the second:
 
 Both exist because a step *is* a slide: every step of a build-up is written as a `.pptx`
 part with its shapes, its rels and its entry in `[Content_Types].xml`, and the Markdown
-asking for them is kilobytes. `<!-- v-click=2147483647 -->` is 27 bytes and asks for two
+asking for them is kilobytes. `::click=2147483647` is 16 bytes and asks for two
 billion of them, and a twenty-digit number saturates the cast to `PHP_INT_MAX` — which is why
 the cast is refused rather than trusted. Both are refused by name, with the number that would
 have worked in the message.
@@ -986,12 +1040,13 @@ file where a whole one was expected.
 
 ### In the body of a slide
 
-Slidev's in-slide vocabulary is closed here too. A step comment, a `v-*` element and a `:::`
-container fence are the three shapes Slidev nests content in, and none of the other two lands
-where a person would read prose — so both are failures naming the spelling that would have
-worked, rather than shapes carrying the directive's own text. A plain HTML tag is none of
-those and is still text: `<b>` is not a directive, and this library has no opinion about what
-a deck says about HTML.
+This format is Markdown and two pairs of colons. Slidev nests content in a step comment, a
+`v-*` element and a `:::` container fence, and neither of the other two lands where a person
+would read prose — so both are failures naming the spelling that would have worked, rather
+than shapes carrying the directive's own text. An HTML comment is refused too, because a step
+is `::click` here and a comment is a deck written for a tool whose step marker this one does
+not read. A plain HTML tag is none of those and is still text: `<b>` is not a directive, and
+this library has no opinion about what a deck says about HTML.
 
 ```php
 use MarkdownPresentation\Document\DeckParser;
@@ -1011,8 +1066,8 @@ foreach ([":::note\nHello.\n:::\n", "<v-click>Hello.</v-click>\n"] as $slide) {
 ```
 
 ```text
-Slide 1 opens the container ":::note", which is not something a slide draws. Divide a deck with a "---" line, write a section as a heading, and write a note as a quote: "> ".
-Slide 1 has the element "<v-click>", which is not something a slide draws. A step is the comment "<!-- v-click -->" on a line of its own, and there is no other element.
+Slide 1 opens the container ":::note", which is not something a slide draws. Three colons open a step region as ":::click" and close it as ":::"; divide a deck with a "---" line, write a section as a heading, and write a note as a quote: "> ".
+Slide 1 has the element "<v-click>", which is not something a slide draws. A step is "::click" on a line of its own, and there is no other element.
 ```
 
 ## Themes

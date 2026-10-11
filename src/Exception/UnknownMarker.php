@@ -5,19 +5,19 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Exception;
 
 /**
- * A `v-click` marker this library cannot act on.
+ * A `::click` marker this library cannot act on.
  *
  * A step this renderer drops would leave a deck whose slides do not say what the author
- * wrote, so every way of getting it wrong — a number that goes backwards, a marker
- * whose argument is not a number — are refused with the form that would have worked. So
- * is a number larger than one slide could carry, because a step is a slide.
-*/
+ * wrote, so every way of getting it wrong — a number that goes backwards, a marker whose
+ * argument is not a number, a region nothing closes — are refused with the form that would
+ * have worked. So is a number larger than one slide could carry, because a step is a slide.
+ */
 final class UnknownMarker extends InvalidInput
 {
     public static function backwards(int $slide, int $number, int $previous): self
     {
         return new self(sprintf(
-            'Slide %d has a v-click step %d after step %d. Steps run forwards: write each step number once, in order.',
+            'Slide %d has a step %d after step %d. Steps run forwards: write each step number once, in order.',
             $slide,
             $number,
             $previous,
@@ -32,8 +32,8 @@ final class UnknownMarker extends InvalidInput
     public static function tooLarge(int $slide, string $argument, int $maximum): self
     {
         return new self(sprintf(
-            'Slide %d has a v-click step "%s", which is past the %d steps one slide may carry: every step is '
-            . 'written as a slide of its own. Write "<!-- v-click -->" for the next step, or name one up to %d.',
+            'Slide %d has a step "%s", which is past the %d steps one slide may carry: every step is '
+            . 'written as a slide of its own. Write "::click" for the next step, or name one up to %d.',
             $slide,
             $argument,
             $maximum,
@@ -44,8 +44,8 @@ final class UnknownMarker extends InvalidInput
     public static function notANumber(int $slide, string $argument): self
     {
         return new self(sprintf(
-            'Slide %d has a v-click step "%s", which is not a number. Write "<!-- v-click -->" for the next step, '
-            . 'or "<!-- v-click=2 -->" for a named one.',
+            'Slide %d has a step "%s", which is not a number. Write "::click" for the next step, '
+            . 'or "::click=2" for a named one.',
             $slide,
             $argument,
         ));
@@ -54,7 +54,37 @@ final class UnknownMarker extends InvalidInput
     public static function empty(int $slide): self
     {
         return new self(sprintf(
-            'Slide %d has a "<!-- v-click= -->" step marker with no number. Write "<!-- v-click -->" for the next step.',
+            'Slide %d has a "::click=" step marker with no number. Write "::click" for the next step.',
+            $slide,
+        ));
+    }
+
+    /**
+     * A `:::` that closes nothing.
+     *
+     * Refused rather than drawn as the text of a paragraph: three colons on a slide read as
+     * a marker, and a deck that meant a region and wrote only the end of one has said which
+     * of the two it meant by writing the mark up.
+     */
+    public static function strayCloser(int $slide): self
+    {
+        return new self(sprintf(
+            'Slide %d has a ":::" that closes nothing. A region opens at ":::click" and closes at a '
+            . '":::" on a line of its own; a step is "::click".',
+            $slide,
+        ));
+    }
+
+    /**
+     * A `:::click` region nothing closes.
+     *
+     * Refused rather than read to the end of the slide, because everything after it would
+     * then be one step and a deck that meant three would be a deck of one.
+     */
+    public static function unclosed(int $slide): self
+    {
+        return new self(sprintf(
+            'Slide %d opens a ":::click" region that nothing closes. A region ends at a ":::" on a line of its own.',
             $slide,
         ));
     }

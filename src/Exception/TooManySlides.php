@@ -21,7 +21,7 @@ final class TooManySlides extends InvalidInput
     public static function in(int $slides, int $maximum): self
     {
         return new self(sprintf(
-            'This deck asks for %d slides, and one presentation may carry %d. Every "<!-- v-click -->" is '
+            'This deck asks for %d slides, and one presentation may carry %d. Every "::click" is '
             . 'written as a slide of its own: give the deck fewer steps, or split it.',
             $slides,
             $maximum,

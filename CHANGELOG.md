@@ -6,6 +6,49 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Steps are `::click`, regions are `:::click`, and notes are `::note`.** **Breaking.** A deck
+  written with `<!-- v-click -->` no longer builds: an HTML comment is now refused with a
+  message naming the two spellings this format does have. Nothing else about a deck changes.
+
+  | Was | Now |
+  | --- | --- |
+  | `<!-- v-click -->` on a line of its own | `::click` on a line of its own |
+  | `<!-- v-click=3 -->` | `::click=3` |
+  | — | `:::click` … `:::` — everything between is one step of its own |
+  | an HTML comment after a slide's last line | `::note` … `::` |
+
+  A region is new, and is what `BlockParser` refused with "honouring that here would mean
+  splitting one list block into several, which is a different feature". It is that feature:
+  the opener names its step through the same `jump()` a bare marker uses and the contents are
+  read by the same walk, so there is one step counter and the two forms cannot drift. Two
+  colons and three cannot collide — `::click` is not `:::click` in either direction — which
+  is asserted rather than reasoned about in the suite.
+
+  A region nothing closes, a `:::` with nothing to close, and a `::note` nothing closes are
+  all failures naming the spelling that would have worked, rather than a deck drawn one step
+  short or three colons printed on a slide.
+
+  `Document\DeckParser::MARKER_BODY` is **gone**. It was the shape of a comment that is a
+  step, and there is no comment that is a step any more. `Document\DeckParser::dialect()`
+  answers differently too, and is a doctested example on the README.
+
+  Notes are `::note` … `::` rather than a trailing comment for one reason: leaving them as
+  comments would make "no HTML in this format" unsatisfiable. A note now has explicit fences,
+  so `DeckParser` tracks it across lines the way it tracked a comment — a `---` or a fence
+  inside one cannot split the deck — and two notes on one slide are one note carrying both,
+  because a `.pptx` slide has one notes pane.
+
+  **This is the one decision in the change the library did not force**, and it is a flag
+  rather than a certainty: `::note` was chosen because a pair of colons reads as a pair of
+  colons and nothing else does. `:::` was already three of them and now means a region
+  closer, so a note that wanted the same shape would have had to share it.
+
+  Six decks in `tests/fixtures/slidev/` now diverge from the real Slidev parser that did not
+  before, and four new entries are in `divergences.json` with the reason. The recording is
+  untouched: it is what Slidev did, and this is where the two differ.
+
 ### Fixed
 
 - **Six claims in the README were false.** Each was checked by running the thing rather than by

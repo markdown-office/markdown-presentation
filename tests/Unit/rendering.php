@@ -296,7 +296,7 @@ it('leaves a slide without a title unnamed rather than calling it something', fu
 });
 
 it('writes a speaker note as its own part', function () {
-    $pptx = renderDeck("# One\n\n<!--\nRead this out loud.\n-->\n");
+    $pptx = renderDeck("# One\n\n::note\nRead this out loud.\n::\n");
 
     expect($pptx->parts())->toContain(NOTES_ONE)
         ->and($pptx->part(NOTES_ONE))->toContain('Read this out loud.');
@@ -1545,14 +1545,14 @@ it('refuses a directive in the body of a later slide before it writes anything',
     // wherever on the deck it stands, and a deck that has written two slides of its three
     // is the half-finished file the promise is about.
     //
-    // The comment is mid-slide on purpose. A comment after a slide's last line is its
-    // speaker note, which the dialect has always said it is, and `<!-- v-if false -->` in
-    // the notes pane is a presenter reading out what the deck wrote.
+    // The HTML comment is mid-slide on purpose. A `::note` at the end of a slide is its
+    // speaker note, and this format has no other use for a comment, so this one is the
+    // directive that has no spelling of its own.
     $path = Scratch::file('deck.pptx', '');
 
     try {
         (new PresentationRenderer())->render(
-            (new DeckParser())->parse("# One\n\n---\n\n# Two\n\n---\n\n<!-- v-if false -->\n\nThree.\n"),
+            (new DeckParser())->parse("# One\n\n---\n\n# Two\n\n---\n\n<!-- v-if=\"clicks\" -->\n"),
             $path,
         );
     } catch (UnknownDirective) {

@@ -15,7 +15,9 @@ namespace MarkdownPresentation\Exception;
  *
  * The body of a slide is closed on the same terms. Slidev's in-slide vocabulary is the step
  * comment, the `v-*` elements and the `:::` container fences, and any of the other two lands
- * where a person would read prose. Every one of them used to be painted onto the slide as the
+ * where a person would read prose. This format has replaced the step comment with `::click`,
+ * so a comment here is a deck written for a tool whose step marker this one does not read.
+ * Every one of them used to be painted onto the slide as the
  * literal text of the directive, which is the worst of both outcomes: the deck renders, and
  * what it renders is the mistake. A plain HTML tag is not in that vocabulary and is still
  * text — `<b>` is not a directive, and this library has no opinion about what a deck says
@@ -51,19 +53,19 @@ final class UnknownDirective extends InvalidInput
     }
 
     /**
-     * An HTML comment in a slide's content that is neither a step nor its last line.
+     * An HTML comment in a slide's content.
      *
-     * A step is honoured on a line of its own, so a marker carrying text is this rather than
-     * a marker: `<!-- v-click -->` after a word is a deck asking for a step nobody can say
-     * where it goes, and refusing is the whole of the difference from drawing the comment on
-     * the slide.
+     * This format has no HTML in it, so a comment is a deck written for another tool: a
+     * step is `::click` and a note is `::note`, and both have been taken by the time the
+     * content reaches here. Drawing one as text is the failure this message exists to stop,
+     * because a slide carrying a Slidev marker reads as a rendered slide.
      */
     public static function comment(int $slide, string $comment): self
     {
         return new self(sprintf(
-            'Slide %d has the HTML comment %s, which is neither a step nor a note. A step is '
-            . '"<!-- v-click -->" on a line of its own, and a note is a comment after the last '
-            . 'line of a slide. To show a comment rather than run it, write it in a fenced code block.',
+            'Slide %d has the HTML comment %s, which is not something a slide carries. A step is '
+            . '"::click" on a line of its own and a note is "::note", its text, and a closing "::". '
+            . 'To show HTML rather than run it, write it in a fenced code block.',
             $slide,
             $comment,
         ));
@@ -78,23 +80,41 @@ final class UnknownDirective extends InvalidInput
     public static function element(int $slide, string $tag): self
     {
         return new self(sprintf(
-            'Slide %d has the element "%s", which is not something a slide draws. A step is the '
-            . 'comment "<!-- v-click -->" on a line of its own, and there is no other element.',
+            'Slide %d has the element "%s", which is not something a slide draws. A step is '
+            . '"::click" on a line of its own, and there is no other element.',
             $slide,
             $tag,
         ));
     }
 
     /**
-     * A `:::` container fence, which Slidev nests content in.
+     * A `:::` line that is neither a `:::click` region nor the `:::` that closes one.
      */
     public static function container(int $slide, string $fence): self
     {
         return new self(sprintf(
-            'Slide %d opens the container "%s", which is not something a slide draws. Divide a '
-            . 'deck with a "---" line, write a section as a heading, and write a note as a quote: "> ".',
+            'Slide %d opens the container "%s", which is not something a slide draws. Three colons '
+            . 'open a step region as ":::click" and close it as ":::"; divide a deck with a "---" '
+            . 'line, write a section as a heading, and write a note as a quote: "> ".',
             $slide,
             $fence,
+        ));
+    }
+
+    /**
+     * A `::note` whose closing `::` is not on the slide.
+     *
+     * A note is taken off the content by {@see \MarkdownPresentation\Document\DeckParser}
+     * before it gets here, so the one reaching the renderer is one nothing closed. Reading
+     * the rest of the slide as its note would put text in the notes pane that the deck
+     * wrote as prose.
+     */
+    public static function unclosedNote(int $slide): self
+    {
+        return new self(sprintf(
+            'Slide %d opens a "::note" that nothing closes. A note is "::note" on a line of its own, '
+            . 'its text, and a closing "::" on a line of its own.',
+            $slide,
         ));
     }
 }

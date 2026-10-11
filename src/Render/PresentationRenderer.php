@@ -56,7 +56,7 @@ use PhpOffice\PhpPresentation\Slide\SlideLayout;
  *   time, so a typo in a `styles.yml` is never rendered as silence.
  *
  * And one it does: a directive in the body of a slide it cannot draw — a `v-*` element, a
- * `:::` fence, a comment that is neither a step nor the note after the last line — is a
+ * `:::` fence, an HTML comment, an unclosed `::note` — is a
  * failure from {@see \MarkdownPresentation\Render\BlockParser} rather than a shape carrying
  * the directive's own text. That last one is the case this library exists for: a deck
  * written by a model, a directive it does not know, and a slide with the directive printed
@@ -85,7 +85,7 @@ final class PresentationRenderer
     /** The theme a deck that names none gets. */
     public const DEFAULT_THEME = 'default';
 
-    /** The step a slide with no `v-click` in it is drawn at. */
+    /** The step a slide with no marker in it is drawn at. */
     private const FIRST_STEP = 1;
 
     /**

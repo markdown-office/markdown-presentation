@@ -62,24 +62,24 @@ final class DeckParser
     */
     private const FRONTMATTER = '/\A---[^\r\n]*\r?\n([\s\S]*?)^ {0,3}---[^\r\n]*$/m';
 
-    /**
-     * The body of a comment that is a step marker, without the `<!--` and `-->` around it.
-     *
-     * {@see \MarkdownPresentation\Render\BlockParser} matches the same shape against a whole
-     * line, and {@see self::takeNote()} matches it against the comment alone, so the two
-     * cannot disagree about whether `<!-- v-click -->` is a note. A deck whose last line is
-     * a marker is the case that needs them to: the note is taken before anything is parsed
-     * into blocks, so a marker read as a note leaves the deck a step short and writes the
-     * marker into the notes pane.
-     *
-     * Capture 1 is the step, and nothing here looks at it: `<!-- v-click=two -->` is not a
-     * step this library can draw either, and refusing it where it would have been drawn
-     * names the mistake instead of hiding it in the notes pane.
-     */
-    public const MARKER_BODY = '[ \t]*v-click[ \t]*(?:=[ \t]*(.*?)[ \t]*)?';
-
     /** An opening YAML code fence, which Slidev would read as frontmatter. */
     private const FENCED_YAML = '/\A[ \t]*`{3,}[ \t]*(?:yaml|yml)\b/';
+
+    /** A note opener: `::note` and nothing else on the line. */
+    private const OPENS_NOTE = '/\A[ \t]*::note[ \t]*\z/';
+
+    /** The line a note closes on: `::` and nothing else. */
+    private const CLOSES_NOTE = '/\A[ \t]*::[ \t]*\z/';
+
+    /**
+     * A whole note, from its opener to the `::` that closes it at the end of the slide.
+     *
+     * Capture 1 is everything before the opener and capture 2 the note itself. The closer
+     * is anchored to the end rather than to the first `::` line, so a deck with two of them
+     * has one note carrying both — a `.pptx` slide has one notes pane, and two notes is a
+     * deck asking for something the format has one of.
+     */
+    private const NOTE = '/\A([\s\S]*?)^[ \t]*::note[ \t]*\n([\s\S]*?)^[ \t]*::[ \t]*\z/m';
     /**
      * The opening fence of a code block: three or more backticks or three or more
      * tildes, indented by no more than three spaces.
@@ -109,6 +109,7 @@ final class DeckParser
         $slides = [];
         $start = 0;
         $inHtmlComment = false;
+        $inNote = false;
 
         $index = 0;
 
@@ -120,6 +121,16 @@ final class DeckParser
         while ($index <= $last) {
             $line = $lines[$index];
             $trimmed = rtrim($line);
+
+            // Ahead of the comment, and for the same reason: a note is text the deck wrote
+            // for the notes pane, and a `---` inside one is a line of that text rather than
+            // a delimiter.
+            if ($inNote) {
+                $inNote = preg_match(self::CLOSES_NOTE, $trimmed) !== 1;
+                $index++;
+
+                continue;
+            }
 
             if ($inHtmlComment) {
                 $inHtmlComment = self::commentContinues($line, true);
@@ -148,6 +159,8 @@ final class DeckParser
                 }
             } elseif (preg_match(self::FENCE_OPEN, $trimmed, $fence) === 1) {
                 $index = self::closingFence($lines, $index, $last, $fence[1]);
+            } elseif (preg_match(self::OPENS_NOTE, $trimmed) === 1) {
+                $inNote = true;
             } else {
                 $inHtmlComment = self::commentContinues($line, false);
             }
@@ -249,7 +262,12 @@ final class DeckParser
             block of its own: a deck that opens with a `---` block and then a slide
             is one slide carrying both, and `Deck::frontmatter()` returns its keys.
 
-            A speaker note is an HTML comment that runs to the end of a slide.
+            `::click` and `:::click` are left in the content; they are the renderer's
+            step markers, not the splitter's.
+
+            A speaker note is `::note` on a line of its own, its text, and a
+            closing `::`. A `::note` nothing closes is part of the slide's text,
+            and the renderer refuses it rather than drawing it.
 
             Two shapes are refused rather than read:
 
@@ -316,35 +334,25 @@ final class DeckParser
     }
 
     /**
-     * The note is an HTML comment that runs to the end of the slide, and only that:
-     * a comment in the middle of a slide is part of its text.
+     * The note is a `::note` block and its closing `::`, and only that: an opener with
+     * nothing closing it is part of the slide's text, which is what
+     * {@see \MarkdownPresentation\Render\BlockParser} refuses it for.
      *
      * @return array{0: string, 1: ?string} The content without the note, and the note.
     */
     private static function takeNote(string $content): array
     {
-        $end = strrpos($content, '-->');
-
-        $start = $end === false || $end + 3 !== strlen($content)
-            ? false
-            : strrpos(substr($content, 0, $end), '<!--');
-
-        // Not a note: no comment, one that does not close the slide, a `-->` with no `<!--`
-        // before it, or one that is nothing but a step marker. The first three are the same
-        // answer, so they are asked as one question — a slide either has a trailing comment
-        // to take or it has the content it was written with.
-        //
-        // A comment that is nothing but a step marker is that step. It runs to the end of
-        // the slide because there is nothing after it, which is what makes it look like a
-        // note, and taking it would drop the step the author wrote. Anything else is a note,
-        // marker-shaped substring and all: a note that mentions `v-click` is a note.
-        $note = $start === false ? null : trim(substr($content, $start + 4, $end - $start - 4));
-
-        if ($note === null || preg_match('/\A' . self::MARKER_BODY . '\z/s', $note) === 1) {
+        if (preg_match(self::NOTE, $content, $match, PREG_OFFSET_CAPTURE) !== 1) {
             return [$content, null];
         }
 
-        return [rtrim(substr($content, 0, $start)), $note === '' ? null : $note];
+        // Capture 1 starts at the subject, which is where `\A` puts the whole match, so the
+        // opener is its *end* rather than its offset: subtracting the prefix from a zero
+        // leaves an empty slide.
+        $opener = $match[1][1] + strlen($match[1][0]);
+        $note = trim($match[2][0]);
+
+        return [rtrim(substr($content, 0, $opener)), $note === '' ? null : $note];
     }
 
     /**
