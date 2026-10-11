@@ -5,10 +5,27 @@
 // second list to keep in step, and the decks cannot drift apart from what Slidev
 // was asked.
 import { readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { parseSync } from './core.runnable.ts'
 
-const fixture = readFileSync(process.argv[2], 'utf8')
+// Where this repository is, from this file: `tools/slidev-parity/` is two directories up.
+const root = path.resolve(fileURLToPath(new URL('../..', import.meta.url)))
+
+// The recording is written back to whatever the argument names, so the argument is held
+// to where it may point rather than trusted. `regenerate.sh` passes the one file this is
+// for; another path inside the repository is the caller's business, and one outside it is
+// not something a recording script acts on.
+const argument = process.argv[2] ?? ''
+const relative = path.relative(root, path.resolve(argument))
+
+if (relative.startsWith('..') || path.isAbsolute(relative)) {
+  console.error(`Refusing to write outside the repository: ${argument}`)
+  process.exit(2)
+}
+
+const fixture = readFileSync(argument, 'utf8')
 const recorded = JSON.parse(fixture)
 
 recorded.slides = Object.fromEntries(recorded.decks.map(({ name, markdown }) => {
@@ -27,5 +44,5 @@ recorded.slides = Object.fromEntries(recorded.decks.map(({ name, markdown }) => 
   }]
 }))
 
-writeFileSync(process.argv[2], `${JSON.stringify(recorded, null, 1)}\n`)
+writeFileSync(argument, `${JSON.stringify(recorded, null, 1)}\n`)
 console.log(`Recorded ${recorded.decks.length} decks.`)
