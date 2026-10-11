@@ -319,6 +319,37 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`PresentationRenderer` did three jobs.** Twenty-seven methods, of which six were neither
+  parsing a deck nor drawing a slide:
+
+  - **`save()` is `Render\DeckWriter::save()`.** One caller, the only method that touched
+    `IOFactory`, and the only one that invoked the two passes over the written package.
+    `PlaceholderPass` and `NotesColourMapPass` are two `final` classes in the same directory
+    that exist to be exactly that shape, and this is the third instance of a pattern the
+    directory established twice.
+  - **`slideMaster`, `master`, `layouts`, `properties` and `text` are `Render\MasterLayouts`.**
+    The first three were the sole users of seven PHPPresentation imports between them, and
+    `text()` was a `private static` with three callers inside one method.
+
+  Nineteen, six and one. `php:S1448` is closed on the renderer.
+
+  Two of the seven did not fit the same seam and were folded instead. `checkRole()` had one
+  caller three lines away and is now the branch it was; `opensSecondColumn()` was a
+  one-line predicate with one caller and is now the condition it guards. Six moved out and
+  two folded is twenty-one, which is still over the ceiling — the point is that each of the
+  eight was a thing a reader could not have named from the file.
+
+  `MAX_SLIDES` stays, and `$overflows` stays: both are the renderer's own state, reset and
+  appended by `render()` and `overflow()` and read by the public `overflows()`. The sink
+  travels with the methods that write it or it has to be passed in and back out again, which
+  is worse than keeping it.
+
+  Every line of both extractions was already asserted through the renderer — the notes
+  colour map in `tests/Unit/notes-colour-map.php`, the layout placeholders in
+  `tests/Unit/placeholders.php`, the page size in `tests/Unit/rendering.php` and the refusal
+  for a path whose directory is not there in the same file — so this is a refactor with no
+  new test, and 764 passing is the evidence it changed no behaviour.
+
 - **`Theme` was one class doing two jobs.** Six of its twenty-three methods read a `theme.yml`
   and nothing else: `mapping`, `readDark`, `readColours`, `readFonts`, `text` and
   `colourNames`. They are now `Theme\ThemeMapping`, on the same seam `Style` already draws from
