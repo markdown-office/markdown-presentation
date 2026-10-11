@@ -708,19 +708,32 @@ it('leaves the theme\'s own gap between two paragraphs of one frame', function (
         ->and(preg_match_all('#<a:spcAft>#', $xml))->toBe(2);
 });
 
-it('measures a frame the way PowerPoint lays it out, which is a gap after every line', function () {
-    // PowerPoint puts a paragraph's spacing after every line of the frame rather than after
-    // the paragraph it was written on, so three paragraphs of two lines each are six lines
-    // and five gaps. Measured per paragraph — the natural reading, and the wrong one — the
-    // frame would be two gaps short, and PowerPoint does not shrink the type to fit the box
-    // it was given, so the text would be drawn over whatever the layout put below it.
+it('measures a frame the way PowerPoint lays it out, which is a gap after every break', function () {
+    // PowerPoint spends a paragraph's spacing after every break the text contains — a newline
+    // inside a paragraph, or the mark between two of them — and not after a line the text
+    // merely wrapped onto. Read out of the PDF PowerPoint exported: a paragraph of four
+    // source lines that its face wrapped to seven came back with a gap after each of the
+    // three newlines and none after any of the four times it wrapped.
+    //
+    // Three paragraphs written on one line each and wrapped to two apiece are therefore six
+    // lines and two gaps, not six lines and five: a frame measured with a gap after every
+    // line is a frame three gaps taller than the text in it, and everything below it that
+    // much further down the slide.
     $pptx = renderDeck(str_repeat(
         "A paragraph of ordinary prose that has to wrap because it is long enough to fill the width of a body box more than twice over, and then some.\n\n",
         3,
     ));
 
-    expect($pptx->positionOf('text')['height'])->toBe(216.0)
+    expect($pptx->positionOf('text')['height'])->toBe(180.0)
         ->and(substr_count($pptx->part('ppt/slides/slide1.xml'), '<a:p>'))->toBe(3);
+});
+
+it('counts a line break inside a paragraph as a break and a line both', function () {
+    // The other half, and the case a per-paragraph measurement gets wrong: a paragraph the
+    // writer broke across source lines carries a newline per break, PowerPoint puts the gap
+    // after every one of them, and a frame measured on the paragraphs alone is a gap short
+    // for each — which is text drawn over whatever the layout put below the frame.
+    expect(renderDeck("One\nTwo\nThree\n")->positionOf('text')['height'])->toBe(102.0);
 });
 
 it('leaves the gap between two paragraphs out of the frame\'s height twice', function () {

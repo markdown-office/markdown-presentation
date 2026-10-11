@@ -173,24 +173,39 @@ final class ShapeWriter
     }
 
     /**
-     * The height of a frame: its paragraphs one after another, with the theme's own gap
-     * between them.
+     * The height of a frame: its lines, and the gap after every break among them.
      *
-     * The gap is the one the layout spends between two shapes of a column, moved into the one
-     * shape the paragraphs now share — counted once here and written there as
-     * {@see SlideGeometry::paragraphSpace()}, which is what stops the two from being spent
-     * twice over a frame that is a gap taller than the text in it.
+     * The gap between two paragraphs of a frame is the theme's own block gap, written as
+     * their spacing after ({@see SlideGeometry::paragraphSpace()}), and PowerPoint spends it
+     * after every break the text contains — a newline inside a paragraph, or the mark between
+     * two paragraphs — rather than only between paragraphs. Measured rather than assumed, by
+     * asking PowerPoint to lay a frame out and report the height it came back with, and by
+     * reading the line positions out of the PDF it exported: a paragraph written over four
+     * source lines and wrapped to seven by its face came back with a gap after each of its
+     * three newlines and none after any of the four times it wrapped.
+     *
+     * So a break is a newline in the text or a paragraph mark, and a line the text merely
+     * wrapped onto carries no gap. That is also what {@see TextMetric::lines()} counts, which
+     * is what keeps the two halves of this from drifting apart: a newline is one more line
+     * *and* one more gap, and counting one without the other leaves the frame a gap short of
+     * the text in it.
      */
     private function textHeight(TextFrame $frame, int $width): int
     {
+        $paragraphs = $frame->paragraphs();
         $lines = 0;
+        $breaks = count($paragraphs) - 1;
 
-        foreach ($frame->paragraphs() as $entry) {
+        foreach ($paragraphs as $entry) {
             $lines += $this->entryLines($entry, $width);
+
+            foreach ($this->entryRuns($entry) as $run) {
+                $breaks += substr_count($run->text, "\n");
+            }
         }
 
         return $lines * $this->geometry->lineHeight($this->bodySize())
-            + ($lines - 1) * $this->geometry->style()->blockGap();
+            + $breaks * $this->geometry->style()->blockGap();
     }
 
     /**
@@ -200,17 +215,25 @@ final class ShapeWriter
      */
     private function entryLines(Paragraph|array $entry, int $width): int
     {
-        if ($entry instanceof Paragraph) {
-            return $this->runLines($entry->runs, $width, $this->bodySize());
-        }
-
         // A list item's text starts a gutter in for its marker, and one gutter more for each
         // level, which is the width the text above it was measured in too.
         return $this->runLines(
-            $entry['runs'],
-            $width - $entry['level'] * $this->geometry->style()->gutter(),
+            $this->entryRuns($entry),
+            $entry instanceof Paragraph ? $width : $width - $entry['level'] * $this->geometry->style()->gutter(),
             $this->bodySize(),
         );
+    }
+
+    /**
+     * The runs of one paragraph of a frame, which is a paragraph or an item of a list.
+     *
+     * @param FrameParagraph $entry
+     *
+     * @return list<Run>
+     */
+    private function entryRuns(Paragraph|array $entry): array
+    {
+        return $entry instanceof Paragraph ? $entry->runs : $entry['runs'];
     }
 
     private function tableHeight(Table $block, Box $box): int
