@@ -31,6 +31,68 @@ use MarkdownPresentation\Tests\Support\Scratch;
 /** A two-item ordered list, which three tests below are about. */
 const ORDERED_LIST = "1. one\n2. two\n";
 
+/** The parts a reader looks in, named because the assertion is about one of them. */
+const SLIDE_ONE = 'ppt/slides/slide1.xml';
+const SLIDE_TWO = 'ppt/slides/slide2.xml';
+const MASTER_ONE = 'ppt/slideMasters/slideMaster1.xml';
+const NOTES_ONE = 'ppt/notesSlides/notesSlide1.xml';
+const CONTENT_TYPES = '[Content_Types].xml';
+const CORE = 'docProps/core.xml';
+const PRESENTATION = 'ppt/presentation.xml';
+
+/** The decks several tests below convert, named rather than spelled at each call site. */
+const ONE_SLIDE = "# One\n";
+const TWO_SLIDES = "# One\n\n---\n\n# Two\n";
+const THEMATIC_BREAK = "***\n";
+const TABLE = "| A | B |\n| --- | --- |\n| 1 | 2 |\n";
+
+/**
+ * The two themes the colour tests below compare, each as a deck that asks for it.
+ *
+ * A pair rather than two constants because the comparison is the point: a claim that a
+ * colour *differs* between the themes is a claim about both of them, and reading one of the
+ * two off a constant while the other is spelled out is how half a comparison goes stale.
+ */
+const MINIMAL_SLIDE = "---\ntheme: minimal\n---\n\n# One\n";
+const DARK_SLIDE = "---\ntheme: corporate-dark\n---\n\n# One\n";
+
+/**
+ * `minimal`'s accent, which is what its hyperlink colour and a drawn rule both are.
+ *
+ * One constant because the two assertions are about the same fact: a rule that stops being
+ * the accent and a link that stops being the accent are the same defect.
+ */
+const MINIMAL_ACCENT = '#89b4fa';
+
+/** The image the picture tests below write, and the two shapes a `.pptx` embeds one as. */
+const CREDENTIAL_PNG = '/creds.png';
+const MEDIA_PART = '#^ppt/media/#';
+
+/**
+ * The decks that carry one block, as the writer takes them.
+ *
+ * `%s` is the image's file name: a deck names a picture by what it is called in the
+ * directory it resolves against, and the tests build that directory themselves.
+ */
+const A_DOT = '![a dot](%s)' . "\n";
+const WIDE_PICTURE = '![wide](%s)' . "\n";
+
+/**
+ * `minimal`'s hyperlink colour, in the run that carries a link.
+ *
+ * Matched whole rather than as `usesColour()` does, because "the colour is in the file" and
+ * "the colour is on the run that is clickable" are different claims — a rule drawn in the
+ * same colour satisfies the first and not the second, which is the whole reason these
+ * three tests name a theme where those two colours differ.
+ */
+const HLINK_RUN = '#<a:srgbClr val="3F6FB5">(?:(?!</a:rPr>).)*<a:hlinkClick#s';
+
+/** What a run says when the writer has emphasised it, as `a:rPr` carries it. */
+const BOLD_RUN = 'b="1"';
+
+/** Why a build with no WebP encoder skips, said the same way each time. */
+const NO_WEBP = 'This GD build cannot write a WebP.';
+
 /**
  * Render a deck and open what came out, in one step — every test below needs both and
  * writing them out each time would bury the assertion in the arrangement.
@@ -137,25 +199,25 @@ function ico(): string
 }
 
 it('writes a file that is a readable zip with a presentation part', function () {
-    $pptx = renderDeck("# One\n");
+    $pptx = renderDeck(ONE_SLIDE);
 
-    expect($pptx->parts())->toContain('ppt/presentation.xml')
-        ->and($pptx->parts())->toContain('ppt/slides/slide1.xml');
+    expect($pptx->parts())->toContain(PRESENTATION)
+        ->and($pptx->parts())->toContain(SLIDE_ONE);
 });
 
 it('gives a slide every part PowerPoint needs to open it', function () {
     // The parts a presentation is made of, named because a missing one is a file that
     // PowerPoint refuses rather than a test that fails.
-    $pptx = renderDeck("# One\n");
+    $pptx = renderDeck(ONE_SLIDE);
 
     foreach ([
-        '[Content_Types].xml',
+        CONTENT_TYPES,
         '_rels/.rels',
         'ppt/_rels/presentation.xml.rels',
-        'ppt/slideMasters/slideMaster1.xml',
+        MASTER_ONE,
         'ppt/slideLayouts/slideLayout1.xml',
         'ppt/theme/theme1.xml',
-        'ppt/slides/slide1.xml',
+        SLIDE_ONE,
     ] as $part) {
         expect($pptx->parts())->toContain($part);
     }
@@ -164,8 +226,8 @@ it('gives a slide every part PowerPoint needs to open it', function () {
 it('declares every slide in the content types', function () {
     // A slide part the package does not declare is invisible to PowerPoint, so a deck can
     // have slides on disk and still open with none of them.
-    $pptx = renderDeck("# One\n\n---\n\n# Two\n");
-    $types = $pptx->part('[Content_Types].xml');
+    $pptx = renderDeck(TWO_SLIDES);
+    $types = $pptx->part(CONTENT_TYPES);
 
     expect($types)->toContain('/ppt/slides/slide1.xml')
         ->and($types)->toContain('/ppt/slides/slide2.xml')
@@ -177,7 +239,7 @@ it('writes one slide per slide of the deck', function () {
 });
 
 it('writes the slides in the order the deck reads them', function () {
-    $pptx = renderDeck("# One\n\n---\n\n# Two\n");
+    $pptx = renderDeck(TWO_SLIDES);
 
     expect($pptx->texts(1))->toContain('One')
         ->and($pptx->texts(2))->toContain('Two');
@@ -186,14 +248,14 @@ it('writes the slides in the order the deck reads them', function () {
 it('gives the slide the size the geometry is written against', function () {
     // 16:9. SlideGeometry counts in pixels, so a number here is a number in the renderer,
     // and a change of slide size that the geometry does not know about breaks the mapping.
-    $pptx = renderDeck("# One\n");
+    $pptx = renderDeck(ONE_SLIDE);
 
-    expect($pptx->part('ppt/presentation.xml'))->toContain('<p:sldSz cx="9144000" cy="5143500"');
+    expect($pptx->part(PRESENTATION))->toContain('<p:sldSz cx="9144000" cy="5143500"');
 });
 
 it('takes the deck metadata as the document properties', function () {
     $pptx = renderDeck("---\ntitle: The deck\ndescription: About it\n---\n\n# One\n");
-    $core = $pptx->part('docProps/core.xml');
+    $core = $pptx->part(CORE);
 
     expect($core)->toContain('<dc:title>The deck</dc:title>')
         ->and($core)->toContain('<dc:description>About it</dc:description>');
@@ -204,16 +266,16 @@ it('credits the deck that names an author, rather than the theme it was written 
     // author whatever the deck said, so a deck written by one person and rendered in another
     // person's theme was credited to the theme's author.
     $pptx = renderDeck("---\ntheme: corporate-dark\nauthor: Fabi\n---\n\n# One\n");
-    $core = $pptx->part('docProps/core.xml');
+    $core = $pptx->part(CORE);
 
     expect($core)->toContain('<dc:creator>Fabi</dc:creator>')
         ->and($core)->not->toContain('markdown-office');
 });
 
 it('credits the theme author for a deck that names none', function () {
-    $pptx = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n");
+    $pptx = renderDeck(DARK_SLIDE);
 
-    expect($pptx->part('docProps/core.xml'))->toContain('<dc:creator>markdown-office</dc:creator>');
+    expect($pptx->part(CORE))->toContain('<dc:creator>markdown-office</dc:creator>');
 });
 
 it('refuses an author that is not a string, rather than rendering a number as a name', function () {
@@ -224,28 +286,28 @@ it('refuses an author that is not a string, rather than rendering a number as a 
 it('writes a slide name that says which slide of the deck it came from', function () {
     // The name is what a presenter sees in the slide sorter, and "slide 2" is the one thing
     // that is true of both steps of a stepped slide.
-    $pptx = renderDeck("# One\n\n---\n\n# Two\n");
+    $pptx = renderDeck(TWO_SLIDES);
 
-    expect($pptx->part('ppt/slides/slide2.xml'))->toContain('<p:cSld name="slide 2"');
+    expect($pptx->part(SLIDE_TWO))->toContain('<p:cSld name="slide 2"');
 });
 
 it('leaves a slide without a title unnamed rather than calling it something', function () {
     $pptx = renderDeck("Just text, no heading.\n");
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->not->toContain('<p:cSld name=');
+    expect($pptx->part(SLIDE_ONE))->not->toContain('<p:cSld name=');
 });
 
 it('writes a speaker note as its own part', function () {
     $pptx = renderDeck("# One\n\n<!--\nRead this out loud.\n-->\n");
 
-    expect($pptx->parts())->toContain('ppt/notesSlides/notesSlide1.xml')
-        ->and($pptx->part('ppt/notesSlides/notesSlide1.xml'))->toContain('Read this out loud.');
+    expect($pptx->parts())->toContain(NOTES_ONE)
+        ->and($pptx->part(NOTES_ONE))->toContain('Read this out loud.');
 });
 
 it('writes no note for a slide that has none', function () {
-    $pptx = renderDeck("# One\n");
+    $pptx = renderDeck(ONE_SLIDE);
 
-    expect($pptx->parts())->not->toContain('ppt/notesSlides/notesSlide1.xml');
+    expect($pptx->parts())->not->toContain(NOTES_ONE);
 });
 
 it('keeps a deck with no slides as one empty slide', function () {
@@ -257,7 +319,7 @@ it('keeps a deck with no slides as one empty slide', function () {
 });
 
 it('reports a path there is no directory for', function () {
-    $deck = (new DeckParser())->parse("# One\n");
+    $deck = (new DeckParser())->parse(ONE_SLIDE);
     $path = Scratch::directory() . '/no/such/directory/deck.pptx';
 
     expect(fn () => (new PresentationRenderer())->render($deck, $path))
@@ -265,14 +327,14 @@ it('reports a path there is no directory for', function () {
 });
 
 it('says where it wrote the file', function () {
-    $deck = (new DeckParser())->parse("# One\n");
+    $deck = (new DeckParser())->parse(ONE_SLIDE);
     $path = Scratch::file('deck.pptx', '');
 
     expect((new PresentationRenderer())->render($deck, $path))->toBe($path);
 });
 
 it('renders a heading as a title shape, not as a paragraph', function () {
-    expect(renderDeck("# One\n")->shapeNames())->toBe(['title']);
+    expect(renderDeck(ONE_SLIDE)->shapeNames())->toBe(['title']);
 });
 
 it('writes the heading once, in the title box', function () {
@@ -292,7 +354,7 @@ it('writes a heading carrying inline markup once, and as markup rather than as c
 
     expect($pptx->shapeNames())->toBe(['title', 'text'])
         ->and($pptx->texts(1))->toBe(['Release ', 'v2', ' notes', 'Body.'])
-        ->and($pptx->part('ppt/slides/slide1.xml'))->toContain('b="1"');
+        ->and($pptx->part(SLIDE_ONE))->toContain(BOLD_RUN);
 });
 
 it('writes the title heading once even where a paragraph comes before it', function () {
@@ -327,7 +389,7 @@ it('writes the deck title into the document properties as text, without its mark
     // The properties part is metadata: nothing on the other end of dc:title interprets a
     // pair of asterisks, and it is read in file browsers and search results rather than on
     // a slide.
-    $core = renderDeck("---\ntitle: Ops **runbook**\n---\n\n# One\n")->part('docProps/core.xml');
+    $core = renderDeck("---\ntitle: Ops **runbook**\n---\n\n# One\n")->part(CORE);
 
     expect($core)->toContain('<dc:title>Ops runbook</dc:title>')
         ->and($core)->not->toContain('**');
@@ -384,8 +446,8 @@ it('numbers an ordered list rather than bulleting it', function () {
     // though nothing is missing.
     $pptx = renderDeck(ORDERED_LIST);
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:buAutoNum type="arabicPeriod"/>')
-        ->and($pptx->part('ppt/slides/slide1.xml'))->not->toContain('<a:buChar');
+    expect($pptx->part(SLIDE_ONE))->toContain('<a:buAutoNum type="arabicPeriod"/>')
+        ->and($pptx->part(SLIDE_ONE))->not->toContain('<a:buChar');
 });
 
 it('starts an ordered list at the number the deck names', function () {
@@ -394,7 +456,7 @@ it('starts an ordered list at the number the deck names', function () {
     // The number is `startAt`, and PHPPresentation writes the start of a numbering on every
     // paragraph of it the way PowerPoint does — both paragraphs say three, and the second
     // counts on to four rather than beginning a numbering of its own.
-    $xml = renderDeck("3. three\n4. four\n")->part('ppt/slides/slide1.xml');
+    $xml = renderDeck("3. three\n4. four\n")->part(SLIDE_ONE);
 
     expect($xml)->toContain('<a:buAutoNum type="arabicPeriod" startAt="3"/>')
         ->and(substr_count($xml, 'startAt="3"'))->toBe(2);
@@ -403,13 +465,13 @@ it('starts an ordered list at the number the deck names', function () {
 it('leaves a list that starts at one with no start of its own', function () {
     // The other half of the claim above: `startAt` on a list that begins at one would say
     // the deck renumbered from one, which is what a reader takes `startAt="1"` to mean.
-    expect(renderDeck(ORDERED_LIST)->part('ppt/slides/slide1.xml'))->not->toContain('startAt');
+    expect(renderDeck(ORDERED_LIST)->part(SLIDE_ONE))->not->toContain('startAt');
 });
 
 it('numbers a nested ordered list as a list of its own', function () {
     // Without a level of its own the sub-list is the same numbering as the one above it, so
     // `1.` under `1.` comes out as `2.`
-    $xml = renderDeck("1. one\n  1. sub\n2. two\n")->part('ppt/slides/slide1.xml');
+    $xml = renderDeck("1. one\n  1. sub\n2. two\n")->part(SLIDE_ONE);
 
     expect(substr_count($xml, '<a:buAutoNum'))->toBe(3)
         ->and(substr_count($xml, 'lvl="1"'))->toBe(1)
@@ -420,20 +482,20 @@ it('numbers a nested ordered list as a list of its own', function () {
 it('draws a list that mixes bullets and numbers with the marker each item was written with', function () {
     // A deck that switches marker mid-list meant it: the numbers are not an accident of the
     // first item's.
-    $xml = renderDeck("- a\n1. b\n- c\n")->part('ppt/slides/slide1.xml');
+    $xml = renderDeck("- a\n1. b\n- c\n")->part(SLIDE_ONE);
 
     expect(substr_count($xml, '<a:buChar char="•"/>'))->toBe(2)
         ->and(substr_count($xml, '<a:buAutoNum type="arabicPeriod"/>'))->toBe(1);
 });
 
 it('bullets a list that is not numbered', function () {
-    expect(renderDeck("- one\n- two\n")->part('ppt/slides/slide1.xml'))->toContain('<a:buChar char="•"/>');
+    expect(renderDeck("- one\n- two\n")->part(SLIDE_ONE))->toContain('<a:buChar char="•"/>');
 });
 
 it('nests a list item by its indent', function () {
     $pptx = renderDeck("- one\n  - nested\n");
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('marL="190500"');
+    expect($pptx->part(SLIDE_ONE))->toContain('marL="190500"');
 });
 
 it('nests a sub-list written four spaces in one level, not two', function () {
@@ -442,7 +504,7 @@ it('nests a sub-list written four spaces in one level, not two', function () {
     // in, so its margin is two gutters and not three.
     $pptx = renderDeck("- one\n    - deep\n");
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('marL="381000"')
+    expect($pptx->part(SLIDE_ONE))->toContain('marL="381000"')
         ->not->toContain('marL="571500"');
 });
 
@@ -464,7 +526,7 @@ it('writes the code in the mono font the theme names', function () {
     // deck written in a theme that cares.
     $pptx = renderDeck("---\ntheme: minimal\n---\n\n```\nplain\n```\n");
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:latin typeface="Menlo"/>');
+    expect($pptx->part(SLIDE_ONE))->toContain('<a:latin typeface="Menlo"/>');
 });
 
 it('fills the code shape with the colour the theme paints its panels in', function () {
@@ -483,15 +545,15 @@ it('keeps the language a fence names where a reader can find it', function () {
     // nothing the file records.
     $pptx = renderDeck("```php\necho 1;\n```\n");
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('descr="php"');
+    expect($pptx->part(SLIDE_ONE))->toContain('descr="php"');
 });
 
 it('keeps an empty language out of the description', function () {
-    expect(renderDeck("```\nplain\n```\n")->part('ppt/slides/slide1.xml'))->toContain('descr=""');
+    expect(renderDeck("```\nplain\n```\n")->part(SLIDE_ONE))->toContain('descr=""');
 });
 
 it('takes only the first word of a fence info string as the language', function () {
-    expect(renderDeck("```php showLineNumbers\necho 1;\n```\n")->part('ppt/slides/slide1.xml'))
+    expect(renderDeck("```php showLineNumbers\necho 1;\n```\n")->part(SLIDE_ONE))
         ->toContain('descr="php"');
 });
 
@@ -506,11 +568,11 @@ it('renders an unclosed fence as code to the end of the slide', function () {
 });
 
 it('renders a pipe table as a table shape', function () {
-    expect(renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n")->shapeNames())->toBe(['table']);
+    expect(renderDeck(TABLE)->shapeNames())->toBe(['table']);
 });
 
 it('writes every cell of a table', function () {
-    $pptx = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n");
+    $pptx = renderDeck(TABLE);
 
     expect($pptx->texts(1))->toBe(['A', 'B', '1', '2']);
 });
@@ -523,7 +585,7 @@ it('writes a table cell carrying markup as runs', function () {
     $pptx = renderDeck("| A |\n| --- |\n| **Name** and `id` |\n");
 
     expect($pptx->texts(1))->toBe(['A', 'Name', ' and ', 'id'])
-        ->and($pptx->part('ppt/slides/slide1.xml'))
+        ->and($pptx->part(SLIDE_ONE))
         ->toMatch('#<a:r>\s*<a:rPr[^>]*\bb="1"[^>]*>.*?</a:rPr>\s*<a:t><!\[CDATA\[Name\]\]></a:t>#s')
         ->toMatch('#<a:r>\s*<a:rPr[^>]*>(?:(?!</a:rPr>).)*<a:latin typeface="[^"]*"/>(?:(?!</a:rPr>).)*</a:rPr>\s*<a:t><!\[CDATA\[id\]\]></a:t>#s');
 });
@@ -534,7 +596,7 @@ it('writes a link in a table cell as a link', function () {
     $pptx = renderDeck("| A |\n| --- |\n| [lk](https://example.com) |\n");
 
     expect($pptx->texts(1))->toBe(['A', 'lk'])
-        ->and($pptx->part('ppt/slides/slide1.xml'))
+        ->and($pptx->part(SLIDE_ONE))
         ->toMatch('#<a:hlinkClick[^>]*/>(?:(?!</a:r>).)*<a:t><!\[CDATA\[lk\]\]></a:t>#s');
 });
 
@@ -544,16 +606,16 @@ it('aligns a column the way its alignment row says', function () {
     $right = renderDeck("| A |\n| ---: |\n| 1 |\n");
     $centre = renderDeck("| A |\n| :---: |\n| 1 |\n");
 
-    expect($right->part('ppt/slides/slide1.xml'))->toContain('algn="r"')
-        ->and($centre->part('ppt/slides/slide1.xml'))->toContain('algn="ctr"');
+    expect($right->part(SLIDE_ONE))->toContain('algn="r"')
+        ->and($centre->part(SLIDE_ONE))->toContain('algn="ctr"');
 });
 
 it('leaves a column left when its alignment row says nothing', function () {
-    expect(renderDeck("| A |\n| --- |\n| 1 |\n")->part('ppt/slides/slide1.xml'))->toContain('algn="l"');
+    expect(renderDeck("| A |\n| --- |\n| 1 |\n")->part(SLIDE_ONE))->toContain('algn="l"');
 });
 
 it('reads a table with no outer pipes', function () {
-    expect(renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n")->texts(1))->toBe(['A', 'B', '1', '2']);
+    expect(renderDeck(TABLE)->texts(1))->toBe(['A', 'B', '1', '2']);
 });
 
 it('reads a table whose cells are written without padding', function () {
@@ -564,20 +626,20 @@ it('bolds a table\'s header row and fills it, because nothing else marks one out
     // Every row was `sz="1200"` in `dk1`, so a header row and a body row were the same
     // line of type. `a:tblPr firstRow` is the flag PowerPoint's own table styles hang a
     // header treatment on, and the weight and fill are that treatment spelled out.
-    $xml = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n")->part('ppt/slides/slide1.xml');
+    $xml = renderDeck(TABLE)->part(SLIDE_ONE);
 
     expect($xml)->toContain('<a:tblPr firstRow="1"/>')
-        ->and(substr_count($xml, 'b="1"'))->toBe(2)
+        ->and(substr_count($xml, BOLD_RUN))->toBe(2)
         ->and(substr_count($xml, '<a:srgbClr val="E7E6E6">'))->toBe(2);
 });
 
 it('leaves a table\'s body rows at the body weight', function () {
     // A header that is bold because every row is bold is not a header, so the assertion is
     // the ratio: two bold runs out of the four the table has.
-    $xml = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n")->part('ppt/slides/slide1.xml');
+    $xml = renderDeck(TABLE)->part(SLIDE_ONE);
 
     expect(substr_count($xml, '<a:rPr '))->toBe(4)
-        ->and(substr_count($xml, 'b="1"'))->toBe(2);
+        ->and(substr_count($xml, BOLD_RUN))->toBe(2);
 });
 
 it('writes a table as tall as the rows it writes', function () {
@@ -587,7 +649,7 @@ it('writes a table as tall as the rows it writes', function () {
     $pptx = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n");
 
     expect($pptx->positionOf('table')['height'])->toBe(3.0 * 38.0)
-        ->and($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:tr h="361950">');
+        ->and($pptx->part(SLIDE_ONE))->toContain('<a:tr h="361950">');
 });
 
 it('starts the block after a table below the rows the table writes', function () {
@@ -622,14 +684,14 @@ it('indents a block quote from the margin', function () {
 it('renders a thematic break as a rule rather than dropping it', function () {
     // `***` is a thematic break in this dialect — `---` is a slide delimiter and never
     // reaches here — so a line the author wrote is drawn rather than ignored.
-    expect(renderDeck("***\n")->shapeNames())->toBe(['rule']);
+    expect(renderDeck(THEMATIC_BREAK)->shapeNames())->toBe(['rule']);
 });
 
 it('writes a rule as a bar rather than as text', function () {
     // Centred in a 16px slot, two pixels thick, and the body's full width. A `< 5.0` would
     // have passed for a rule written at a negative height, which is the shape of the bug this
     // whole branch is about.
-    $position = renderDeck("***\n")->positionOf('rule');
+    $position = renderDeck(THEMATIC_BREAK)->positionOf('rule');
     $slot = SlideGeometry::RULE_HEIGHT;
     $top = (new SlideGeometry())->body(LayoutRole::Content)[0]->y;
 
@@ -644,20 +706,20 @@ it('writes a rule as a rectangle rather than as whatever an auto shape defaults 
     // PHPPresentation's AutoShape is a heart until told otherwise, so a rule drawn without
     // saying so is a heart on the slide. Asserting the negative is what makes it bite: every
     // text box on the slide is already a `rect`, so asserting that would pass either way.
-    $xml = renderDeck("***\n")->part('ppt/slides/slide1.xml');
+    $xml = renderDeck(THEMATIC_BREAK)->part(SLIDE_ONE);
 
     expect($xml)->toContain('<a:prstGeom prst="rect">')
         ->and($xml)->not->toContain('prst="heart"');
 });
 
 it('writes a rule with no outline, because a line around a line is a second line', function () {
-    expect(renderDeck("***\n")->part('ppt/slides/slide1.xml'))->toContain('<a:ln w="9525">');
+    expect(renderDeck(THEMATIC_BREAK)->part(SLIDE_ONE))->toContain('<a:ln w="9525">');
 });
 
 it('fills a rule with the theme accent colour', function () {
     $pptx = renderDeck("---\ntheme: corporate-dark\n---\n\n***\n");
 
-    expect($pptx->fillOf('rule'))->toBe('#89b4fa');
+    expect($pptx->fillOf('rule'))->toBe(MINIMAL_ACCENT);
 });
 
 it('draws a run of paragraphs as one shape of text', function () {
@@ -672,7 +734,7 @@ it('writes each paragraph of a frame as its own paragraph in the file', function
     // a shape boundary is not.
     $pptx = renderDeck("First.\n\nSecond.\n\nThird.\n");
 
-    expect(substr_count($pptx->part('ppt/slides/slide1.xml'), '<a:p>'))->toBe(3)
+    expect(substr_count($pptx->part(SLIDE_ONE), '<a:p>'))->toBe(3)
         ->and($pptx->texts(1))->toBe(['First.', 'Second.', 'Third.']);
 });
 
@@ -703,7 +765,7 @@ it('leaves the theme\'s own gap between two paragraphs of one frame', function (
     // The gap a reader sees between two paragraphs is now written into the frame rather than
     // taken out of the column between two boxes, and it is the same number either way:
     // `a:spcAft` in hundredths of a point, on every paragraph that has another under it.
-    $xml = renderDeck("First.\n\nSecond.\n")->part('ppt/slides/slide1.xml');
+    $xml = renderDeck("First.\n\nSecond.\n")->part(SLIDE_ONE);
 
     // 12px of block gap is 9pt at 96 dpi, and the two paragraphs of the frame carry one gap
     // between them: the first, and not the second.
@@ -728,7 +790,7 @@ it('measures a frame the way PowerPoint lays it out, which is a gap after every 
     ));
 
     expect($pptx->positionOf('text')['height'])->toBe(180.0)
-        ->and(substr_count($pptx->part('ppt/slides/slide1.xml'), '<a:p>'))->toBe(3);
+        ->and(substr_count($pptx->part(SLIDE_ONE), '<a:p>'))->toBe(3);
 });
 
 it('counts a line break inside a paragraph as a break and a line both', function () {
@@ -756,7 +818,7 @@ it('renders inline emphasis as a run rather than as the characters', function ()
 });
 
 it('bolds the run a deck bolds', function () {
-    expect(renderDeck("**bold**\n")->part('ppt/slides/slide1.xml'))->toContain('b="1"');
+    expect(renderDeck("**bold**\n")->part(SLIDE_ONE))->toContain(BOLD_RUN);
 });
 
 it('shrinks a text box that overflows rather than growing it over the block below', function () {
@@ -764,18 +826,18 @@ it('shrinks a text box that overflows rather than growing it over the block belo
     // a frame measured one line short then grows onto whatever is under it. The measurement
     // is an estimate, so a mis-estimate has to be recoverable, and shrinking the type is the
     // direction that does not draw over another shape.
-    $xml = renderDeck("Text.\n\nMore text.\n")->part('ppt/slides/slide1.xml');
+    $xml = renderDeck("Text.\n\nMore text.\n")->part(SLIDE_ONE);
 
     expect(substr_count($xml, '<a:normAutofit/>'))->toBe(1)
         ->and($xml)->not->toContain('<a:spAutoFit/>');
 });
 
 it('shrinks a title that does not fit its box as well', function () {
-    expect(renderDeck("# One\n\nText.\n")->part('ppt/slides/slide1.xml'))->toContain('<a:normAutofit/>');
+    expect(renderDeck("# One\n\nText.\n")->part(SLIDE_ONE))->toContain('<a:normAutofit/>');
 });
 
 it('italics the run a deck italics', function () {
-    expect(renderDeck("*italic*\n")->part('ppt/slides/slide1.xml'))->toContain('i="1"');
+    expect(renderDeck("*italic*\n")->part(SLIDE_ONE))->toContain('i="1"');
 });
 
 it('draws bold italic as bold and italic, with no asterisks on the slide', function () {
@@ -784,13 +846,13 @@ it('draws bold italic as bold and italic, with no asterisks on the slide', funct
     $pptx = renderDeck("***bold italic*** here\n");
 
     expect($pptx->texts(1))->toBe(['bold italic', ' here'])
-        ->and($pptx->part('ppt/slides/slide1.xml'))->toMatch('#<a:rPr[^>]*\bb="1"[^>]*[^>]*\bi="1"#');
+        ->and($pptx->part(SLIDE_ONE))->toMatch('#<a:rPr[^>]*\bb="1"[^>]*[^>]*\bi="1"#');
 });
 
 it('draws __bold__ and _italic_ as bold and italic', function () {
     // Two runs with two weights between them, rather than five runs of underscores.
     $pptx = renderDeck("__bold__ and _italic_\n");
-    $xml = $pptx->part('ppt/slides/slide1.xml');
+    $xml = $pptx->part(SLIDE_ONE);
 
     expect($pptx->texts(1))->toBe(['bold', ' and ', 'italic'])
         ->and(substr_count($xml, ' b="1"'))->toBe(1)
@@ -804,7 +866,7 @@ it('draws ~~struck~~ with a line through it', function () {
     $pptx = renderDeck("a ~~gone~~ b\n");
 
     expect($pptx->texts(1))->toBe(['a ', 'gone', ' b'])
-        ->and(substr_count($pptx->part('ppt/slides/slide1.xml'), 'strike="sngStrike"'))->toBe(1);
+        ->and(substr_count($pptx->part(SLIDE_ONE), 'strike="sngStrike"'))->toBe(1);
 });
 
 it('leaves an unclosed emphasis marker as the character it is', function () {
@@ -819,7 +881,7 @@ it('writes a link as its text with a target', function () {
     $pptx = renderDeck("[the docs](https://example.com)\n");
 
     expect($pptx->texts(1))->toBe(['the docs'])
-        ->and($pptx->part('ppt/slides/slide1.xml'))->toContain('r:id=');
+        ->and($pptx->part(SLIDE_ONE))->toContain('r:id=');
 });
 
 it('colours a link with the theme hyperlink colour', function () {
@@ -828,9 +890,9 @@ it('colours a link with the theme hyperlink colour', function () {
     // deck with one bullet and no link at all satisfies `usesColour()` — as does a deck
     // with nothing on it but a rule.
     $xml = renderDeck("---\ntheme: minimal\n---\n\n[docs](https://example.com)\n")
-        ->part('ppt/slides/slide1.xml');
+        ->part(SLIDE_ONE);
 
-    expect($xml)->toMatch('#<a:srgbClr val="3F6FB5">(?:(?!</a:rPr>).)*<a:hlinkClick#s');
+    expect($xml)->toMatch(HLINK_RUN);
 });
 
 it('colours a link inside a heading with the hyperlink colour and not the heading\'s', function () {
@@ -840,9 +902,9 @@ it('colours a link inside a heading with the hyperlink colour and not the headin
     // run and `$font ?? …` short-circuited the link branch, so a link in a heading was
     // `dk1`: a clickable word in the same colour as the sentence around it.
         $xml = renderDeck("---\ntheme: minimal\n---\n\n# Lead\n\n## The [docs](https://example.com)\n")
-            ->part('ppt/slides/slide1.xml');
+            ->part(SLIDE_ONE);
 
-    expect($xml)->toMatch('#<a:srgbClr val="3F6FB5">(?:(?!</a:rPr>).)*<a:hlinkClick#s')
+    expect($xml)->toMatch(HLINK_RUN)
         ->and(substr_count($xml, '<a:srgbClr val="3F6FB5">'))->toBe(1);
 });
 
@@ -850,29 +912,29 @@ it('colours a link inside a quote with the hyperlink colour and not the quote\'s
     // The same short-circuit on the quote's `dk2`: a clickable word that is the same colour
     // as the sentence around it is a word nobody clicks.
     $xml = renderDeck("---\ntheme: minimal\n---\n\n> A [quote](https://example.com)\n")
-        ->part('ppt/slides/slide1.xml');
+        ->part(SLIDE_ONE);
 
-    expect($xml)->toMatch('#<a:srgbClr val="3F6FB5">(?:(?!</a:rPr>).)*<a:hlinkClick#s')
+    expect($xml)->toMatch(HLINK_RUN)
         ->and(substr_count($xml, '<a:srgbClr val="4A4A4A">'))->toBe(1);
 });
 
 it('writes an inline code span in the mono font at its own size', function () {
     $pptx = renderDeck("a `b` c\n");
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('sz="1200"');
+    expect($pptx->part(SLIDE_ONE))->toContain('sz="1200"');
 });
 
 it('renders a line that is nothing but an image as an image', function () {
     $png = png(2, 2);
 
-    expect(renderDeck(sprintf("![a dot](%s)\n", basename($png)))->shapeNames())->toBe(['image']);
+    expect(renderDeck(sprintf(A_DOT, basename($png)))->shapeNames())->toBe(['image']);
 });
 
 it('embeds the image the deck names', function () {
     $png = png(2, 2);
-    $pptx = renderDeck(sprintf("![a dot](%s)\n", basename($png)));
+    $pptx = renderDeck(sprintf(A_DOT, basename($png)));
 
-    expect(preg_grep('#^ppt/media/#', $pptx->parts()))->not->toBe([]);
+    expect(preg_grep(MEDIA_PART, $pptx->parts()))->not->toBe([]);
 });
 
 it('scales an image to fit its box and keeps its shape', function () {
@@ -881,7 +943,7 @@ it('scales an image to fit its box and keeps its shape', function () {
     // while. The claim is that the picture took the box's width and came back the height
     // its own 4:1 gives it: 880 out of 880 × 396, so 220, centred in the 176 left over.
     $png = png(40, 10);
-    $position = renderDeck(sprintf("![wide](%s)\n", basename($png)))->positionOf('image');
+    $position = renderDeck(sprintf(WIDE_PICTURE, basename($png)))->positionOf('image');
 
     expect($position['x'])->toBe(40.0)
         ->and($position['y'])->toBe(192.0)
@@ -894,7 +956,7 @@ it('centres an image that does not fill its box', function () {
     // horizontal would leave it hard against the top of the region, which is what the slack
     // being vertical means: 104 + 176 / 2 is 192.
     $png = png(40, 10);
-    $position = renderDeck(sprintf("![wide](%s)\n", basename($png)))->positionOf('image');
+    $position = renderDeck(sprintf(WIDE_PICTURE, basename($png)))->positionOf('image');
 
     expect($position['x'])->toBe(40.0)
         ->and($position['y'])->toBe(192.0);
@@ -906,7 +968,7 @@ it('keeps the alt text a deck wrote for a picture', function () {
     // alt-text pane shows.
     $png = png(2, 2);
 
-    expect(renderDeck(sprintf("![A dot](%s)\n", basename($png)))->part('ppt/slides/slide1.xml'))
+    expect(renderDeck(sprintf("![A dot](%s)\n", basename($png)))->part(SLIDE_ONE))
         ->toContain('descr="A dot"')
         ->not->toContain(sprintf('descr="%s"', basename($png)));
 });
@@ -916,7 +978,7 @@ it('keeps the path a deck wrote where a picture has no alt text to say what it i
     // the picture the deck's own author recognises.
     $png = png(2, 2);
 
-    expect(renderDeck(sprintf("![](%s)\n", basename($png)))->part('ppt/slides/slide1.xml'))
+    expect(renderDeck(sprintf("![](%s)\n", basename($png)))->part(SLIDE_ONE))
         ->toContain(sprintf('descr="%s"', basename($png)));
 });
 
@@ -925,8 +987,8 @@ it('writes no shape at a size the schema forbids', function () {
     // some, and the image below them was written as cx="-381000" cy="-95250", which
     // PowerPoint either offers to repair or drops without saying so.
     $png = png(40, 10);
-    $xml = renderDeck(str_repeat("Text.\n\n", 80) . sprintf("![wide](%s)\n", basename($png)))
-        ->part('ppt/slides/slide1.xml');
+    $xml = renderDeck(str_repeat("Text.\n\n", 80) . sprintf(WIDE_PICTURE, basename($png)))
+        ->part(SLIDE_ONE);
 
     preg_match_all('#<a:ext cx="(-?\d+)" cy="(-?\d+)"#', $xml, $found, PREG_SET_ORDER);
 
@@ -942,7 +1004,7 @@ it('keeps every shape of an overflowing slide inside the slide', function () {
     // A column taller than its box used to run off the bottom of the slide entirely, which
     // no amount of clamping inside the writer would have caught.
     $png = png(40, 10);
-    $positions = renderDeck(str_repeat("Text.\n\n", 80) . sprintf("![wide](%s)\n", basename($png)))
+    $positions = renderDeck(str_repeat("Text.\n\n", 80) . sprintf(WIDE_PICTURE, basename($png)))
         ->positions();
 
     expect($positions)->not->toBe([]);
@@ -986,7 +1048,7 @@ it('refuses an absolute image path outside the directory the renderer was given'
     // An absolute path is a spelling, not a permission, so it is resolved and then contained
     // like every other one.
     $png = png(2, 2);
-    $deck = (new DeckParser())->parse(sprintf("![a dot](%s)\n", $png));
+    $deck = (new DeckParser())->parse(sprintf(A_DOT, $png));
     $path = Scratch::file('deck.pptx', '');
 
     expect(fn () => (new PresentationRenderer('/nowhere'))->render($deck, $path))
@@ -1018,9 +1080,9 @@ it('refuses a symlink that points out of the deck directory', function () {
     // A prefix test would pass this one: the path the deck wrote is inside the directory, and
     // the file it reaches is not. `realpath()` is what tells the two apart.
     $secret = Scratch::directoryPath('outside');
-    file_put_contents($secret . '/creds.png', 'not a picture');
+    file_put_contents($secret . CREDENTIAL_PNG, 'not a picture');
     $directory = imageDirectory();
-    symlink($secret . '/creds.png', $directory . '/creds.png');
+    symlink($secret . CREDENTIAL_PNG, $directory . CREDENTIAL_PNG);
     $path = Scratch::file('deck.pptx', '');
 
     expect(fn () => (new PresentationRenderer($directory))->render((new DeckParser())->parse("![a dot](creds.png)\n"), $path))
@@ -1036,7 +1098,7 @@ it('reads an image from a root the calling program allowed', function () {
     png(2, 2);
     $resolved = PathScope::canonical(imageDirectory() . '/2x2.png');
     copy($resolved, $library . '/dot.png');
-    $deck = (new DeckParser())->parse(sprintf("![a dot](%s)\n", $library . '/dot.png'));
+    $deck = (new DeckParser())->parse(sprintf(A_DOT, $library . '/dot.png'));
     $path = Scratch::file('deck.pptx', '');
 
     (new PresentationRenderer('/nowhere', imageRoots: [$library]))->render($deck, $path);
@@ -1097,7 +1159,7 @@ it('opens a picture as large as it says it will', function () {
         substr($png, 0, 16) . pack('NN', $side, $side) . substr($png, 24),
     );
 
-    expect(array_values(preg_grep('#^ppt/media/#', renderDeck("![a dot](four-k.png)\n")->parts()))[0])->toEndWith('.png');
+    expect(array_values(preg_grep(MEDIA_PART, renderDeck("![a dot](four-k.png)\n")->parts()))[0])->toEndWith('.png');
 });
 
 it('embeds a picture in a format a .pptx cannot carry as a PNG', function () {
@@ -1108,13 +1170,13 @@ it('embeds a picture in a format a .pptx cannot carry as a PNG', function () {
     $webp = convertible('webp', 40, 20);
 
     if ($webp === null) {
-        $this->markTestSkipped('This GD build cannot write a WebP.');
+        $this->markTestSkipped(NO_WEBP);
     }
 
     $pptx = renderDeck("![a dot](dot.webp)\n");
 
-    expect(array_values(preg_grep('#^ppt/media/#', $pptx->parts())))->not->toBe([])
-        ->and(array_values(preg_grep('#^ppt/media/#', $pptx->parts()))[0])->toEndWith('.png')
+    expect(array_values(preg_grep(MEDIA_PART, $pptx->parts())))->not->toBe([])
+        ->and(array_values(preg_grep(MEDIA_PART, $pptx->parts()))[0])->toEndWith('.png')
         ->and($pptx->shapeNames())->toBe(['image']);
 });
 
@@ -1124,10 +1186,10 @@ it('declares no media type a .pptx has no part for', function () {
     $webp = convertible('webp', 40, 20);
 
     if ($webp === null) {
-        $this->markTestSkipped('This GD build cannot write a WebP.');
+        $this->markTestSkipped(NO_WEBP);
     }
 
-    expect(renderDeck("![a dot](dot.webp)\n")->part('[Content_Types].xml'))
+    expect(renderDeck("![a dot](dot.webp)\n")->part(CONTENT_TYPES))
         ->not->toContain('image/webp')
         ->toContain('ContentType="image/png"');
 });
@@ -1140,7 +1202,7 @@ it('converts a BMP rather than writing a content type for one', function () {
         $this->markTestSkipped('This GD build cannot write a BMP.');
     }
 
-    expect(renderDeck("![a dot](dot.bmp)\n")->part('[Content_Types].xml'))
+    expect(renderDeck("![a dot](dot.bmp)\n")->part(CONTENT_TYPES))
         ->not->toContain('image/bmp')
         ->and(renderDeck("![a dot](dot.bmp)\n")->shapeNames())->toBe(['image']);
 });
@@ -1152,7 +1214,7 @@ it('keeps a converted image its own shape rather than stretching it to the box',
     $webp = convertible('webp', 40, 10);
 
     if ($webp === null) {
-        $this->markTestSkipped('This GD build cannot write a WebP.');
+        $this->markTestSkipped(NO_WEBP);
     }
 
     $position = renderDeck("![wide](dot.webp)\n")->positionOf('image');
@@ -1165,10 +1227,10 @@ it('leaves an image the package already carries exactly as it was', function () 
     // The negative of the conversion, and the one that says the check is a check: the part
     // in the package is the file the deck named, byte for byte.
     $png = png(40, 20);
-    $pptx = renderDeck(sprintf("![a dot](%s)\n", basename($png)));
+    $pptx = renderDeck(sprintf(A_DOT, basename($png)));
 
     expect($pptx->shapeNames())->toBe(['image'])
-        ->and($pptx->part(array_values(preg_grep('#^ppt/media/#', $pptx->parts()))[0]))
+        ->and($pptx->part(array_values(preg_grep(MEDIA_PART, $pptx->parts()))[0]))
         ->toBe((string) file_get_contents($png));
 });
 
@@ -1185,8 +1247,8 @@ it('still embeds an SVG as an SVG', function () {
 
     $pptx = renderDeck("![a mark](mark.svg)\n");
 
-    expect(array_values(preg_grep('#^ppt/media/#', $pptx->parts()))[0])->toEndWith('.svg')
-        ->and($pptx->part('[Content_Types].xml'))->toContain('ContentType="image/svg+xml"');
+    expect(array_values(preg_grep(MEDIA_PART, $pptx->parts()))[0])->toEndWith('.svg')
+        ->and($pptx->part(CONTENT_TYPES))->toContain('ContentType="image/svg+xml"');
 });
 
 it('refuses a format nothing here can decode, and names what would work', function () {
@@ -1223,7 +1285,7 @@ it('refuses a file that measures but cannot be decoded, which is a half-finished
     $webp = convertible('webp', 120, 90);
 
     if ($webp === null) {
-        $this->markTestSkipped('This GD build cannot write a WebP.');
+        $this->markTestSkipped(NO_WEBP);
     }
 
     file_put_contents(
@@ -1272,7 +1334,7 @@ it('reads a title attribute off an image and leaves it out of the path', functio
 it('gives the colour scheme the theme twelve slots', function () {
     // The colour scheme is the whole reason a theme's colours belong in a `.pptx`: PowerPoint
     // reads it to decide what `accent1` means everywhere in the file.
-    $scheme = renderDeck("# One\n")->colourScheme();
+    $scheme = renderDeck(ONE_SLIDE)->colourScheme();
 
     expect(array_keys($scheme))->toBe([
         'dk1', 'lt1', 'dk2', 'lt2',
@@ -1282,11 +1344,11 @@ it('gives the colour scheme the theme twelve slots', function () {
 });
 
 it('writes the theme colours into the colour scheme', function () {
-    $scheme = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n")->colourScheme();
+    $scheme = renderDeck(DARK_SLIDE)->colourScheme();
 
     expect($scheme['dk1'])->toBe('#1e1e2e')
-        ->and($scheme['accent1'])->toBe('#89b4fa')
-        ->and($scheme['hlink'])->toBe('#89b4fa');
+        ->and($scheme['accent1'])->toBe(MINIMAL_ACCENT)
+        ->and($scheme['hlink'])->toBe(MINIMAL_ACCENT);
 });
 
 it('paints the master background with the colour the theme paints its page in', function () {
@@ -1296,8 +1358,8 @@ it('paints the master background with the colour the theme paints its page in', 
     //
     // `lt1` on a light theme and `dk1` on a dark one. `corporate-dark` was `lt1` here —
     // a near-white page under a name that says dark — and `dark: true` is what moved it.
-    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
-    $light = renderDeck("---\ntheme: minimal\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
+    $dark = renderDeck(DARK_SLIDE)->part(MASTER_ONE);
+    $light = renderDeck(MINIMAL_SLIDE)->part(MASTER_ONE);
 
     expect($dark)->toMatch('#<p:bg>.*?<a:srgbClr val="1E1E2E".*?</p:bg>#s')
         ->and($light)->toMatch('#<p:bg>.*?<a:srgbClr val="FFFFFF".*?</p:bg>#s');
@@ -1307,13 +1369,13 @@ it('maps a dark theme\'s page and text the other way round', function () {
     // `bg1="lt1"` says the page is painted with the *light* token, which is the whole
     // defect: a theme whose `dk1` is near-black came out a near-white page. PowerPoint's
     // own dark themes keep the palette and swap the map, and this is that swap.
-    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
+    $dark = renderDeck(DARK_SLIDE)->part(MASTER_ONE);
 
     expect($dark)->toContain('<p:clrMap bg1="dk1" tx1="lt1" bg2="dk2" tx2="lt2"');
 });
 
 it('leaves a light theme\'s colour map where it was', function () {
-    $light = renderDeck("---\ntheme: minimal\n---\n\n# One\n")->part('ppt/slideMasters/slideMaster1.xml');
+    $light = renderDeck(MINIMAL_SLIDE)->part(MASTER_ONE);
 
     expect($light)->toContain('<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2"');
 });
@@ -1322,20 +1384,20 @@ it('writes a dark theme\'s body text in the light token', function () {
     // The map alone does not do this. A colour reaching a shape is written as a literal
     // `a:srgbClr` and the map is never consulted for it, so a dark theme whose map was
     // swapped and whose shapes were not is a dark page with near-black text on it.
-    $slide = renderDeck("---\ntheme: corporate-dark\n---\n\nSome text.\n")->part('ppt/slides/slide1.xml');
+    $slide = renderDeck("---\ntheme: corporate-dark\n---\n\nSome text.\n")->part(SLIDE_ONE);
 
     expect($slide)->toMatch('#<a:r>\s*<a:rPr[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="CDD6F4">#')
         ->and($slide)->not->toContain('val="1E1E2E"');
 });
 
 it('writes a light theme\'s body text in the dark token', function () {
-    $slide = renderDeck("---\ntheme: minimal\n---\n\nSome text.\n")->part('ppt/slides/slide1.xml');
+    $slide = renderDeck("---\ntheme: minimal\n---\n\nSome text.\n")->part(SLIDE_ONE);
 
     expect($slide)->toMatch('#<a:r>\s*<a:rPr[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="1A1A1A">#');
 });
 
 it('writes a dark theme\'s title and headings in the light token', function () {
-    $slide = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n\n## Two\n")->part('ppt/slides/slide1.xml');
+    $slide = renderDeck("---\ntheme: corporate-dark\n---\n\n# One\n\n## Two\n")->part(SLIDE_ONE);
 
     expect($slide)->toMatch('#<a:r>\s*<a:rPr[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="CDD6F4">#');
 });
@@ -1343,8 +1405,8 @@ it('writes a dark theme\'s title and headings in the light token', function () {
 it('writes a dark theme\'s quote in the second light token rather than the second dark one', function () {
     // `dk2` is #181825, which on the #1E1E2E page it is quoted against is the page
     // again. The quote is legible or it is not, so the slot follows the theme.
-    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n> quoted\n")->part('ppt/slides/slide1.xml');
-    $light = renderDeck("---\ntheme: minimal\n---\n\n> quoted\n")->part('ppt/slides/slide1.xml');
+    $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n> quoted\n")->part(SLIDE_ONE);
+    $light = renderDeck("---\ntheme: minimal\n---\n\n> quoted\n")->part(SLIDE_ONE);
 
     expect($dark)->toContain('<a:srgbClr val="BAC2DE">')
         ->and($dark)->not->toContain('val="181825"')
@@ -1353,7 +1415,7 @@ it('writes a dark theme\'s quote in the second light token rather than the secon
 
 it('fills a dark theme\'s code block with a colour its text can be read on', function () {
     $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n```\nplain\n```\n");
-    $slide = $dark->part('ppt/slides/slide1.xml');
+    $slide = $dark->part(SLIDE_ONE);
 
     // The fill is `dk2` and the code is `lt2`: the same two slots a light theme uses the
     // other way round. Read off the run rather than off the part, because the colour
@@ -1364,7 +1426,7 @@ it('fills a dark theme\'s code block with a colour its text can be read on', fun
 
 it('fills a dark theme\'s table header with a colour its text can be read on', function () {
     $xml = renderDeck("---\ntheme: corporate-dark\n---\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n")
-        ->part('ppt/slides/slide1.xml');
+        ->part(SLIDE_ONE);
 
     // The header row carries `dk2` and its type `lt1`. The count is per cell, because
     // that is where the fill is written, and a fill that reached one cell of two would
@@ -1378,8 +1440,8 @@ it('paints a dark theme\'s bullets and rule in the accent, which the swap leaves
     // one kind of colour that follows the theme without being changed by `dark:`.
     $dark = renderDeck("---\ntheme: corporate-dark\n---\n\n- one\n\n***\n");
 
-    expect($dark->fillOf('rule'))->toBe('#89b4fa')
-        ->and($dark->part('ppt/slides/slide1.xml'))->toMatch('#<a:buClr>\s*<a:srgbClr val="89B4FA">#');
+    expect($dark->fillOf('rule'))->toBe(MINIMAL_ACCENT)
+        ->and($dark->part(SLIDE_ONE))->toMatch('#<a:buClr>\s*<a:srgbClr val="89B4FA">#');
 });
 
 it('leaves a light theme\'s colours where the map says they are', function () {
@@ -1387,7 +1449,7 @@ it('leaves a light theme\'s colours where the map says they are', function () {
     // the shape colours rather than into the theme: `minimal` says nothing about
     // darkness and has to come out exactly as it did.
     $light = renderDeck("---\ntheme: minimal\n---\n\n| A |\n| --- |\n| 1 |\n\n> quoted\n\n```\nx\n```\n");
-    $slide = $light->part('ppt/slides/slide1.xml');
+    $slide = $light->part(SLIDE_ONE);
 
     expect($light->fillOf('code'))->toBe('#f5f5f5')
         ->and($slide)->toContain('<a:srgbClr val="F5F5F5">')
@@ -1398,21 +1460,21 @@ it('leaves a light theme\'s colours where the map says they are', function () {
 it('writes body text in the theme body font', function () {
     $pptx = renderDeck("---\ntheme: minimal\n---\n\nSome text.\n");
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:latin typeface="Georgia"/>');
+    expect($pptx->part(SLIDE_ONE))->toContain('<a:latin typeface="Georgia"/>');
 });
 
 it('writes the title in the theme heading font', function () {
     // A theme whose heading and body fonts differ is a theme that is not doing its job if the
     // title is drawn in the body font.
-    $pptx = renderDeck("---\ntheme: minimal\n---\n\n# One\n");
+    $pptx = renderDeck(MINIMAL_SLIDE);
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:latin typeface="Georgia"/>');
+    expect($pptx->part(SLIDE_ONE))->toContain('<a:latin typeface="Georgia"/>');
 });
 
 it('takes the default theme for a deck that names none', function () {
     // The absence of a directive, not a fallback from a directive that failed — a named theme
     // that does not resolve is still refused.
-    expect(renderDeck("# One\n")->colourScheme()['accent1'])->toBe('#4472c4');
+    expect(renderDeck(ONE_SLIDE)->colourScheme()['accent1'])->toBe('#4472c4');
 });
 
 it('refuses a theme that does not resolve, and names the ones that do', function () {
