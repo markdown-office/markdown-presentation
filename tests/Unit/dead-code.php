@@ -260,3 +260,20 @@ it('declares a constant in one test file at most', function () {
     // 1 — which is the worst way to find out.
     expect(constantDeclarations())->toBe([]);
 });
+
+it('says in the code why ShapeWriter is not split', function () {
+    // The one class where `php:S1448` is open on purpose, so the reason has to be somewhere
+    // a person deciding whether to split it will actually read — which is the class itself,
+    // and not this file. A finding that stays red with no argument next to it reads as an
+    // oversight, and the next person to see it will either fix it or silence it.
+    $doc = (string) file_get_contents(Doctest::root() . '/src/Render/ShapeWriter.php');
+
+    expect($doc)->toContain('php:S1448');
+
+    // And the argument has to be the crossings rather than a count, because a count is wrong
+    // the moment one method moves and a name is not. Each of these is read by the measure
+    // half of the class and by the draw half.
+    foreach (['columns()', 'rowHeights()', 'HEADER_ROW', 'bodySize()'] as $crossing) {
+        expect($doc)->toContain($crossing);
+    }
+});

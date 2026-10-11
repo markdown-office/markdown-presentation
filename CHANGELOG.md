@@ -806,6 +806,20 @@ measured; and places where what the deck said did not survive into the file.
 
 ### Notes
 
+- **`ShapeWriter` is not split and `php:S1448` stays open on it.** Thirty-seven methods is the
+  one finding this release leaves red, and it is left red on purpose: `columns()` and
+  `rowHeights()` are each read by the half of the class that measures a table and the half that
+  draws it, `HEADER_ROW` by both, and `bodySize()` by the frame's height, a paragraph's line
+  count and the runs both draw. Those are four places a split has to cut, and each is a place
+  where the seam runs through a fact two methods must agree on — the failure is a table whose
+  drawn cells do not match the room they were measured for, which is the same silent gap as
+  the one measure-and-draw kept in one object to prevent.
+
+  The reason is now in the class docblock, where somebody deciding whether to split it will
+  read it, and `tests/Unit/dead-code.php` checks it is still there: a finding that stays red
+  with no argument next to it reads as an oversight, and the next person to see it will either
+  fix it or silence it.
+
 - `accent1` is still written as `a:srgbClr` and not as an `a:schemeClr` naming the slot, so
   re-theming a deck in PowerPoint changes the swatches its colour picker offers and does not
   restyle the bullets, rules and text already on the slides. This is not fixable here:
