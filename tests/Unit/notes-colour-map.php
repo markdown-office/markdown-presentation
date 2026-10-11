@@ -200,10 +200,17 @@ it('refuses rather than writing back a notes slide it could not read', function 
         );
     }
 
-    // The first byte of a zlib stream is its compression method in the low nibble, and
-    // only 8 is defined. 15 is not a method any inflater has an implementation for, so
-    // every one of them refuses before it looks at a single deflate block.
-    $bytes = substr_replace($bytes, chr(0x0F), $payload, 1);
+    // libzip writes raw deflate, with no zlib wrapper, so there is no compression method in
+    // this byte to invalidate -- the low three bits are BFINAL and BTYPE, and BTYPE of 3 is
+    // reserved. That is the first corruption tried here that is a format check rather than
+    // a decoder's discretion: every inflate rejects a reserved block type, wherever it is.
+    //
+    // Setting all three is not the same as flipping the byte. A flipped byte is one wrong
+    // value the decoder may absorb -- deflate will often decode a damaged block into
+    // different bytes rather than fail, which is why the first version of this test passed
+    // on a laptop and failed on the runner, and why a wrong CRC and an impossible
+    // compressed size were not enough either: the runner read both of those happily.
+    $bytes[$payload] = chr(ord($bytes[$payload]) | 0x07);
 
     file_put_contents($path, $bytes);
 
