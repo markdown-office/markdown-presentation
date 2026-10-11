@@ -50,3 +50,6 @@
 # a library's history.
 /build/
 /powerpoint/
+
+# Parallel agent worktrees
+.worktrees/
