@@ -155,8 +155,14 @@ final class BlockParser
         $paragraph = [];
         $step = 1;
 
-        for ($index = 0; $index < count($lines); $index++) {
+        $index = 0;
+
+        // A `while` rather than a `for` because a code block, a table and a list each move
+        // the walk themselves, and a `for` whose counter the body writes to is a loop whose
+        // step depends on what it is stepping over.
+        while ($index < count($lines)) {
             $line = $lines[$index];
+            $index++;
 
             [$isMarker, $argument] = self::marker($line);
 
@@ -205,8 +211,10 @@ final class BlockParser
             }
 
             // A code block, a pipe table and a list each reach past the line that opens them,
-            // so each hands back the line its last line is on and the walk resumes there.
-            [$spanning, $index] = $this->spanning($lines, $index, $slide, $directory, $files, $step);
+            // so each hands back the line its last line is on and the walk resumes there. The
+            // line was stepped over above, so this is where it ends rather than where it began.
+            [$spanning, $end] = $this->spanning($lines, $index - 1, $step);
+            $index = $end + 1;
 
             if ($spanning !== null) {
                 $this->flush($blocks, $quote, $paragraph, $step);
@@ -258,35 +266,26 @@ final class BlockParser
      * @param list<string> $lines
      *
      * @return array{0: Code|Table|ListBlock|null, 1: int}
-     *
-     * @throws ImageNotFound
-     * @throws UnsupportedImageFormat
      */
-    private function spanning(
-        array $lines,
-        int $index,
-        int $slide,
-        string $directory,
-        PathScope $files,
-        int $step,
-    ): array {
+    private function spanning(array $lines, int $index, int $step): array
+    {
         $line = $lines[$index];
 
-        if (preg_match(self::FENCE, $line, $fence) === 1) {
-            return self::code($lines, $index, $fence, $step);
-        }
+        // The three are asked in one expression rather than as three guards because they are
+        // one question — "does this line open a block that reaches past itself?" — and each
+        // answer is the block read, which is a different shape from the next one's.
+        $block = match (true) {
+            preg_match(self::FENCE, $line, $fence) === 1 => self::code($lines, $index, $fence, $step),
+            str_contains($line, '|') && preg_match(self::ALIGNMENT_ROW, $lines[$index + 1] ?? '') === 1
+                => $this->table($lines, $index, $step),
+            // A bullet and an ordered item are one block kind: paragraphs of the same frame,
+            // with `self::list()` reading the indent off whichever pattern matched.
+            preg_match(self::BULLET, $line, $item) === 1 || preg_match(self::ORDERED, $line, $item) === 1
+                => self::list($lines, $index, $this->inline, $item, $step),
+            default => null,
+        };
 
-        if (str_contains($line, '|') && preg_match(self::ALIGNMENT_ROW, $lines[$index + 1] ?? '') === 1) {
-            return $this->table($lines, $index, $step);
-        }
-
-        // One block kind either way: a bullet and an ordered item are paragraphs of the same
-        // frame, and `self::list()` reads the indent off whichever pattern matched.
-        if (preg_match(self::BULLET, $line, $item) === 1 || preg_match(self::ORDERED, $line, $item) === 1) {
-            return self::list($lines, $index, $this->inline, $item, $step);
-        }
-
-        return [null, $index];
+        return $block ?? [null, $index];
     }
 
     /**
@@ -322,18 +321,20 @@ final class BlockParser
     {
         $prose = [];
 
-        for ($index = 0; $index < count($lines); $index++) {
+        $index = 0;
+
+        while ($index < count($lines)) {
             if (preg_match(self::FENCE, $lines[$index], $fence) === 1) {
-                $index = self::closingFence($lines, $index, $fence);
+                $index = self::closingFence($lines, $index, $fence) + 1;
 
                 continue;
             }
 
-            if (preg_match(self::MARKER, $lines[$index]) === 1) {
-                continue;
+            if (preg_match(self::MARKER, $lines[$index]) !== 1) {
+                $prose[] = $lines[$index];
             }
 
-            $prose[] = $lines[$index];
+            $index++;
         }
 
         return implode("\n", $prose);
@@ -372,8 +373,12 @@ final class BlockParser
      */
     private static function refuse(int $slide, string $content): void
     {
+        // A finding as one line, so a comment written across four of them can still be
+        // quoted. A local rather than a method of its own: `refuse()` is its only caller.
+        $oneLine = static fn (string $text): string => trim((string) preg_replace('/\s+/', ' ', $text));
+
         if (preg_match(self::COMMENT, $content, $comment) === 1) {
-            throw UnknownDirective::comment($slide, self::oneLine($comment[0]));
+            throw UnknownDirective::comment($slide, $oneLine($comment[0]));
         }
 
         preg_match_all(self::TAG, $content, $tags, PREG_SET_ORDER);
@@ -387,14 +392,8 @@ final class BlockParser
         }
 
         if (preg_match(self::CONTAINER, $content, $fence) === 1) {
-            throw UnknownDirective::container($slide, self::oneLine($fence[0]));
+            throw UnknownDirective::container($slide, $oneLine($fence[0]));
         }
-    }
-
-    /** A finding as one line, so a comment written across four of them can still be quoted. */
-    private static function oneLine(string $text): string
-    {
-        return trim((string) preg_replace('/\s+/', ' ', $text));
     }
 
     private static function jump(int $slide, ?string $argument, int $step): int

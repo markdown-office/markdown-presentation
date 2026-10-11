@@ -110,12 +110,20 @@ final class DeckParser
         $start = 0;
         $inHtmlComment = false;
 
-        for ($index = 0; $index <= $last; $index++) {
+        $index = 0;
+
+        // A `while` rather than a `for` because a frontmatter block and a fenced code block
+        // each decide for themselves where the walk resumes, and a `for` whose counter the
+        // body writes to is a loop whose step depends on what it is stepping over. The step
+        // is at the foot of the body for the same reason: it runs after a block that has
+        // moved `$index` on, exactly as the `for`'s would have.
+        while ($index <= $last) {
             $line = $lines[$index];
             $trimmed = rtrim($line);
 
             if ($inHtmlComment) {
                 $inHtmlComment = self::commentContinues($line, true);
+                $index++;
 
                 continue;
             }
@@ -143,6 +151,8 @@ final class DeckParser
             } else {
                 $inHtmlComment = self::commentContinues($line, false);
             }
+
+            $index++;
         }
 
         // A deck that ends on a delimiter has nothing after it to make a slide of.
