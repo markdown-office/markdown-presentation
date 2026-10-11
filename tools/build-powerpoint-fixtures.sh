@@ -104,11 +104,12 @@ author () {
 }
 
 want () {
+	local wanted=$1
 	[[ ${#chosen[@]} -eq 0 ]] && return 0
 
 	local asked
 	for asked in "${chosen[@]}"; do
-		[[ "$asked" == "$1" ]] && return 0
+		[[ "$asked" == "$wanted" ]] && return 0
 	done
 
 	return 1
