@@ -82,6 +82,8 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the page behind every slide is always lt1' => 'becomes the page behind every slide',
     'accent1 paints the headings' => 'rules, bullets, headings',
     'a theme that ships a template has its layouts ignored' => 'A theme\'s `template.pptx` is not opened',
+    'a theme differs from another only in its colours' => 'Nothing else about it differs',
+    'the heading scale runs down to the sixth level' => 'stops shrinking a heading at the sixth level',
 ]);
 
 it('has no decorative dividers in it', function () {

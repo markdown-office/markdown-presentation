@@ -1,3 +1,7 @@
+# A dark briefing deck read on a projector in a room with the lights down. Everything about it
+# is bigger than the default and nothing about it is lighter: wide margins, a heavy rule, the
+# largest body type of the three, and a heading in the accent rather than in the ink the body
+# text is — which is the one treatment that reads at the back of a room.
 name: Corporate Dark
 description: Dark corporate deck for technical briefings.
 author: markdown-office
@@ -19,3 +23,16 @@ fonts:
   heading: Inter
   body: Roboto
   mono: JetBrains Mono
+style:
+  margin: 48
+  gutter: 24
+  block: 16
+  rule: 4
+  body: 18
+  title: 32
+  cover: 46
+  section: 50
+  headings: [26, 23, 21, 19, 17]
+  leading: 1.32
+  heading-weight: bold
+  heading-ink: accent

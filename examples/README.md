@@ -19,7 +19,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | --- | --- | --- |
 | `01-kitchen-sink.md` | `01-kitchen-sink.pptx` | Every construct at once: emphasis, `code`, strikethrough, links, nested lists, an ordered list starting at 7, an aligned table with markup in its cells, a two-line quote, code, a rule, and a trailing comment becoming a speaker note |
 | `02-layout-roles.md` | `02-layout-roles.pptx` | All five layout roles, one per slide |
-| `03-themes.md` | three files | The same deck in `default`, `corporate-dark` and `minimal`, changed by nothing but the `theme:` line, so the three can be compared side by side — and the middle one is the one that shows what `dark: true` in a `theme.yml` does |
+| `03-themes.md` | three files | The same deck in `default`, `corporate-dark` and `minimal`, changed by nothing but the `theme:` line — so the three can be put side by side and compared. They differ in type scale, margins, rule weight and heading treatment, not only in palette |
 | `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does |
 | `05-steps.md` | `05-steps.pptx` | `<!-- v-click -->` steps, cumulative |
 | `06-tables.md` | `06-tables.pptx` | Table alignment, a bold filled header, widths from content |
@@ -56,9 +56,15 @@ A few of these are here because the render is the only honest evidence:
   no margin either — the box it is fitted to is the whole page. The logo is
   square and the page is not, so the picture keeps its own proportions inside
   that box and the air either side of it is the shape not filling it.
+- **`03`, the same slide in each of the three themes.** The difference is not
+  the palette. `default` is Office's colours at the library's own scale with a
+  40px margin and a 2px rule; `minimal` is a serif deck with 64px margins, a
+  1px rule and headings in their own face's reading weight rather than a
+  synthesised bold; `corporate-dark` is 48px margins, an 18pt body, a 4px rule
+  and headings in the accent. Look at slide five of each: it is the same
+  sentence in all three and the pages around it are not the same page.
 - **`03-themes-corporate-dark`.** The only one of the three with a dark page,
   and the only one whose text is painted in the theme's light token rather than
-  its dark one. Nothing else about it differs: the same `theme.yml` colours, the
-  same twelve slots, `bg1` and `tx1` swapped.
+  its dark one.
 - **`09`.** The title is `Ops **runbook**: what *changed*` and is drawn with the
   emphasis, once, and is not repeated in the body.

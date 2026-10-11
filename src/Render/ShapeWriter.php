@@ -84,11 +84,11 @@ final class ShapeWriter
             $block instanceof Image => $room,
             $block instanceof Quote => $this->runLines(
                 $block->runs,
-                $width - SlideGeometry::GUTTER,
+                $width - $this->geometry->style()->gutter(),
                 SlideGeometry::QUOTE_SIZE,
             ) * $this->geometry->lineHeight(SlideGeometry::QUOTE_SIZE),
-            $block instanceof Paragraph => $this->runLines($block->runs, $width, SlideGeometry::BODY_SIZE)
-                * $this->geometry->lineHeight(SlideGeometry::BODY_SIZE),
+            $block instanceof Paragraph => $this->runLines($block->runs, $width, $this->bodySize())
+                * $this->geometry->lineHeight($this->bodySize()),
         };
     }
 
@@ -102,6 +102,27 @@ final class ShapeWriter
     private function textWidth(Box $box): int
     {
         return max(SlideGeometry::MIN_SIZE, $box->width - 2 * SlideGeometry::INSET_X);
+    }
+
+    /**
+     * The size a paragraph and a list item are drawn at, in points.
+     *
+     * Asked of the theme rather than stated here, because the type scale is a theme's decision
+     * and a size a caller cannot change without a file rewrite is not one.
+     */
+    private function bodySize(): int
+    {
+        return $this->geometry->style()->body();
+    }
+
+    /**
+     * The ink a heading is painted in: the theme's accent, or the ink the body text is in.
+     */
+    private function headingInk(): Color
+    {
+        return $this->geometry->style()->headingUsesAccent()
+            ? $this->colour('accent1')
+            : $this->ink();
     }
 
     /**
@@ -158,12 +179,12 @@ final class ShapeWriter
         foreach ($block->items as $item) {
             $lines += $this->runLines(
                 $item['runs'],
-                $this->textWidth($box) - $item['level'] * SlideGeometry::GUTTER,
-                SlideGeometry::BODY_SIZE,
+                $this->textWidth($box) - $item['level'] * $this->geometry->style()->gutter(),
+                $this->bodySize(),
             );
         }
 
-        return $lines * $this->geometry->lineHeight(SlideGeometry::BODY_SIZE);
+        return $lines * $this->geometry->lineHeight($this->bodySize());
     }
 
     private function tableHeight(Table $block, Box $box): int
@@ -293,7 +314,7 @@ final class ShapeWriter
     {
         $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
-        $this->runs($shape->getActiveParagraph(), $block->runs, SlideGeometry::BODY_SIZE);
+        $this->runs($shape->getActiveParagraph(), $block->runs, $this->bodySize());
 
         return $shape;
     }
@@ -302,8 +323,8 @@ final class ShapeWriter
     {
         $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
-        $shape->setOffsetX($box->x + SlideGeometry::GUTTER);
-        $shape->setWidth($box->width - SlideGeometry::GUTTER);
+        $shape->setOffsetX($box->x + $this->geometry->style()->gutter());
+        $shape->setWidth($box->width - $this->geometry->style()->gutter());
 
         $this->runs(
             $shape->getActiveParagraph(),
@@ -326,8 +347,8 @@ final class ShapeWriter
             $shape->getActiveParagraph(),
             $block->runs,
             $size,
-            bold: true,
-            font: $this->ink(),
+            bold: $this->geometry->style()->headingIsBold(),
+            font: $this->headingInk(),
             face: $this->font('heading'),
         );
 
@@ -358,10 +379,10 @@ final class ShapeWriter
             // position.
             $paragraph->getAlignment()->setLevel($item['level'] - 1);
             $paragraph->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $paragraph->getAlignment()->setMarginLeft($item['level'] * SlideGeometry::GUTTER);
-            $paragraph->getAlignment()->setIndent(-SlideGeometry::GUTTER);
+            $paragraph->getAlignment()->setMarginLeft($item['level'] * $this->geometry->style()->gutter());
+            $paragraph->getAlignment()->setIndent(-$this->geometry->style()->gutter());
 
-            $this->runs($paragraph, $item['runs'], SlideGeometry::BODY_SIZE);
+            $this->runs($paragraph, $item['runs'], $this->bodySize());
         }
 
         return $shape;
@@ -525,10 +546,14 @@ final class ShapeWriter
         // PHPPresentation's AutoShape defaults to a heart, so a thematic break left unset is
         // a heart on the slide rather than a line.
         $shape->setType(AutoShape::TYPE_RECTANGLE);
+        // The bar is centred in the room the rule occupies, and its thickness is the theme's:
+        // a hairline under a serif deck and a heavy one under a corporate one are the same
+        // shape at two weights.
+        $weight = $this->geometry->style()->ruleWeight();
         $shape->setOffsetX($box->x)
-            ->setOffsetY($box->y + intdiv(SlideGeometry::RULE_HEIGHT, 2))
+            ->setOffsetY($box->y + intdiv(SlideGeometry::RULE_HEIGHT - $weight, 2))
             ->setWidth($box->width)
-            ->setHeight(2);
+            ->setHeight($weight);
         $shape->getFill()->setFillType(Fill::FILL_SOLID)->setStartColor($this->colour('accent1'));
         $shape->getBorder()->setLineStyle(Border::LINE_NONE);
 
@@ -556,7 +581,7 @@ final class ShapeWriter
             $shape->getActiveParagraph(),
             $runs,
             $size,
-            bold: true,
+            bold: $this->geometry->style()->headingIsBold(),
             font: $this->ink(),
             face: $this->font('heading'),
         );

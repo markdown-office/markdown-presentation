@@ -854,7 +854,7 @@ and nothing is a PHP class:
 
 ```
 themes/corporate-dark/
-├── theme.yml        required   colours, fonts, metadata
+├── theme.yml        required   colours, fonts, type scale, metadata
 ├── styles.yml       optional   Word style-slot overrides
 ├── layouts.yml      optional   semantic role → template layout name
 ├── template.pptx    optional   PowerPoint template: where the layouts put their boxes
@@ -862,10 +862,15 @@ themes/corporate-dark/
 └── LICENSE          optional
 ```
 
-Three themes ship with the library — `default`, `corporate-dark` and `minimal`. Here
-is one of them, which is the file on disk:
+Three themes ship with the library, and they are three different decks rather than one deck in
+three swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
+which is the file on disk:
 
 ```yaml path=themes/corporate-dark/theme.yml
+# A dark briefing deck read on a projector in a room with the lights down. Everything about it
+# is bigger than the default and nothing about it is lighter: wide margins, a heavy rule, the
+# largest body type of the three, and a heading in the accent rather than in the ink the body
+# text is — which is the one treatment that reads at the back of a room.
 name: Corporate Dark
 description: Dark corporate deck for technical briefings.
 author: markdown-office
@@ -887,6 +892,19 @@ fonts:
   heading: Inter
   body: Roboto
   mono: JetBrains Mono
+style:
+  margin: 48
+  gutter: 24
+  block: 16
+  rule: 4
+  body: 18
+  title: 32
+  cover: 46
+  section: 50
+  headings: [26, 23, 21, 19, 17]
+  leading: 1.32
+  heading-weight: bold
+  heading-ink: accent
 ```
 
 The colours are DrawingML's twelve. The longer spellings an earlier draft of the
@@ -1073,6 +1091,60 @@ foreach (['three-column', 'section'] as $role) {
 "three-column" is not a layout role. The roles are: title, content, two-column, section, blank, image-text, image-title, image-slide.
 The theme "Sparse" maps no "section" layout. It maps: title, content.
 ```
+
+### Type scale and rhythm
+
+`style:` is the part of a theme that decides what a slide looks like rather than what colour
+it is. Without it three themes are the same deck in three swatches: the same type at the same
+sizes, the same margins, the same gaps, and a reader who saw all three would remember the
+palette and nothing else.
+
+| Key | What it decides | Unit |
+| --- | --- | --- |
+| `margin` | The space left all the way round the page. Every band on the slide is a multiple of it, so widening the margin moves the title, the body and the gap between them together | px |
+| `gutter` | The gap that separates rather than encloses: two columns, a bullet from its text, one level of a list from the one above | px |
+| `block` | The gap left between two blocks in a column | px |
+| `rule` | How thick a thematic break's bar is drawn. The room it occupies is the layout's, not the theme's | px |
+| `body` | The size body text and list items are drawn at | pt |
+| `title` | The size a content slide's title is drawn at | pt |
+| `cover` | The size the title layout's title is drawn at | pt |
+| `section` | The size a section layout's title is drawn at | pt |
+| `headings` | The size a heading in a body is drawn at, by depth, shallowest first. A scale that runs out keeps its last size rather than failing | pt, a list |
+| `leading` | The multiple of a line's own height one line is drawn at | a number |
+| `heading-weight` | `bold`, or `regular` for the heading face's own reading weight | a word |
+| `heading-ink` | `ink` for the colour the body text is in, or `accent` for the theme's accent | a word |
+
+Every key is optional and takes the library's own value where a file does not mention it, so
+a theme that names one thing — a wider margin, a heavier rule — and leaves the rest alone is a
+theme that works:
+
+```php
+use Symfony\Component\Yaml\Yaml;
+use MarkdownPresentation\Theme\Theme;
+
+$theme = Theme::fromArray(Yaml::parse("name: Wide\nstyle:\n  margin: 64\n  heading-ink: accent\n"));
+$style = $theme->style();
+
+printf("%dpx margin, %dpt body, %dpx rule\n", $style->margin(), $style->body(), $style->ruleWeight());
+printf("body: %dpt  title: %dpt  headings: %s\n", $style->body(), $style->title(), implode('/', $style->headings()));
+```
+
+```text
+64px margin, 16pt body, 2px rule
+body: 16pt  title: 28pt  headings: 22/20/18/16/14
+```
+
+Two things are deliberately *not* in it. The code and table sizes stay with the library, because
+a table is legible at twelve points whatever the body text is set at and tying the two together
+would make a deck with a large body unreadable in its own tables. And a **title's** ink is the
+body ink whatever `heading-ink` says, because `heading-ink` is about a heading *in a body*; a
+slide whose title were a different colour from its own text would read as two decks.
+
+The three shipped themes are deliberately far apart on every one of these axes, which is what
+makes the three files in `examples/out/03-themes-*.pptx` comparable: `default` is Office's
+palette at the library's own scale, `corporate-dark` is larger and heavier throughout with its
+headings in the accent, and `minimal` is a serif deck with the widest margins, a hairline rule
+and headings in their own face's reading weight rather than a synthesised bold.
 
 ### Style slots
 

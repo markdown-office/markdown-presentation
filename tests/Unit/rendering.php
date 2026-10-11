@@ -11,6 +11,8 @@ use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
+use MarkdownPresentation\Render\SlideGeometry;
+use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\ImageConverter;
@@ -618,14 +620,18 @@ it('renders a thematic break as a rule rather than dropping it', function () {
 });
 
 it('writes a rule as a bar rather than as text', function () {
-    // Two pixels at the top of a 16px slot, and the body's full width. A `< 5.0` would have
-    // passed for a rule written at a negative height, which is the shape of the bug this
+    // Centred in a 16px slot, two pixels thick, and the body's full width. A `< 5.0` would
+    // have passed for a rule written at a negative height, which is the shape of the bug this
     // whole branch is about.
     $position = renderDeck("***\n")->positionOf('rule');
+    $slot = SlideGeometry::RULE_HEIGHT;
+    $top = (new SlideGeometry())->body(LayoutRole::Content)[0]->y;
 
     expect($position['height'])->toBe(2.0)
         ->and($position['width'])->toBe(880.0)
-        ->and($position['y'])->toBe(112.0);
+        // As much air above the bar as below it, which is what a rule dividing two blocks is
+        // for. Centring it on the slot rather than on half of it is the whole difference.
+        ->and($position['y'] - $top)->toBe((float) (($slot - 2) / 2));
 });
 
 it('writes a rule as a rectangle rather than as whatever an auto shape defaults to', function () {

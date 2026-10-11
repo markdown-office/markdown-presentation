@@ -189,7 +189,9 @@ final class PresentationRenderer
         $presentation->getLayout()->setDocumentLayout(DocumentLayout::LAYOUT_SCREEN_16X9);
 
         $used = $this->usedRoles($roles);
-        $geometry = $this->geometry->with($this->template($theme, $used));
+        // The theme's type scale and spacing first, then the boxes a template gives for the
+        // roles it covers: a template places, and placing is the later of the two answers.
+        $geometry = new SlideGeometry(style: $theme->theme()->style())->with($this->template($theme, $used));
         $layouts = $this->layouts($this->slideMaster($presentation), $theme, $used);
         $this->properties($presentation, $deck, $theme);
 
@@ -779,7 +781,7 @@ final class PresentationRenderer
                 }
 
                 $writer->write($slide, $block, new Box($box->x, $y, $box->width, $height), $height);
-                $y += $height + SlideGeometry::BLOCK_GAP;
+                $y += $height + $geometry->style()->blockGap();
             }
         }
     }
