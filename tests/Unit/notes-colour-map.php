@@ -160,26 +160,43 @@ it('refuses rather than writing back a notes slide it could not read', function 
     // The archive stays structurally valid, so this is an unreadable *part* and not an
     // unreadable *file*, which is the case the pass exists to handle. Both headers are
     // marked, since which of the two a reader trusts is its own business.
-    $impossible = pack('V', 0x00FFFFFF);
-    $wrongCrc = pack('V', 0xDEADBEEF);
-
-    for ($at = 0; ($at = strpos($bytes, 'PK' . chr(1) . chr(2), $at)) !== false; $at++) {
-        $name = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
-
-        if (str_starts_with(substr($bytes, $at + 46, $name), 'ppt/notesSlides/')) {
-            $bytes = substr_replace(substr_replace($bytes, $impossible, $at + 20, 4), $wrongCrc, $at + 16, 4);
-        }
-    }
+    $payload = null;
 
     for ($at = 0; ($at = strpos($bytes, 'PK' . chr(3) . chr(4), $at)) !== false; $at++) {
         $name = (int) unpack('v', substr($bytes, $at + 26, 2))[1];
+        $extra = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
 
         if (str_starts_with(substr($bytes, $at + 30, $name), 'ppt/notesSlides/')) {
-            $bytes = substr_replace(substr_replace($bytes, $impossible, $at + 18, 4), $wrongCrc, $at + 14, 4);
+            $payload = $at + 30 + $name + $extra;
 
             break;
         }
     }
+
+    expect($payload)->not->toBeNull();
+
+    // The first byte of a zlib stream is its compression method in the low nibble, and
+    // only 8 is defined. 15 is not a method any inflater has an implementation for, so
+    // every one of them refuses before it looks at a single deflate block.
+    //
+    // This is the fourth way this part has been broken, and the earlier three are worth
+    // recording, because each looked right and each was a property of one build:
+    //
+    //   - a flipped byte in the deflate stream: deflate often decodes a corrupted block
+    //     into different bytes rather than failing, so this passed on a laptop and failed
+    //     on the runner;
+    //   - a wrong CRC in both headers: the runner read a part with a CRC of 0xDEADBEEF
+    //     without complaint, so that implementation does not verify on read;
+    //   - a compressed size larger than the archive: read happily as well, so it takes
+    //     the size from the local header and does not check it against what is there.
+    //
+    // A reserved compression *method* in the zip headers does not work either, in either
+    // direction: it stops the archive opening at all rather than the part, and a reader
+    // that gets the method from the central directory ignores what the local one says.
+    //
+    // An invalid zlib method is the first of these that is a format check rather than a
+    // decoder's discretion, which is the property a test about another build needs.
+    $bytes = substr_replace($bytes, chr(0x0F), $payload, 1);
 
     file_put_contents($path, $bytes);
 
