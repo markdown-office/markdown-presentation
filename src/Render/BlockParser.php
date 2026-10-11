@@ -37,9 +37,9 @@ final class BlockParser
      * A step is a slide: every step of a build-up is written as a `.pptx` part of its own,
      * with its shapes, its rels and its entry in `[Content_Types].xml`. The Markdown that
      * asks for them is kilobytes, so nothing else bounds `<!-- v-click=2147483647 -->` —
-     * measured on this package, 32 bytes of deck render 500 slides in a tenth of a second,
+     * measured on this package, 20 bytes of deck render 500 slides in a tenth of a second,
      * and `v-click=99999999999999999999` saturates the cast to `PHP_INT_MAX` and asks for
-     * two billion, which hangs the process rather than failing it.
+     * two billion, which is why {@see self::jump()} refuses the argument rather than casting it.
      *
      * 500 is two orders of magnitude above any build-up a person writes — a slide with five
      * hundred clicks on it is not a slide — and the whole ceiling renders in about a tenth

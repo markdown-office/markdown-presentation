@@ -8,6 +8,28 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **Six claims in the README were false.** Each was checked by running the thing rather than by
+  reading the page, and each is now held in `tests/Unit/dead-code.php` so it cannot come back.
+  The phrases are named there rather than quoted here: this file is read by the same guard.
+
+  | Was | Now |
+  | --- | --- |
+  | five layout roles, where the example thirty lines above printed all eight | all eight |
+  | a paragraph's spacing following every wrapped line | following every *break* — a newline or a paragraph mark, never a wrap. Reversed by `f9d1642`; the README was never updated, and this is the one that matters, because it told a reader a frame is taller than the library draws it |
+  | a step marker closing a list item being quietly ignored | refused, naming the mistake. The Notes below said this line wanted rewording; here it is |
+  | a byte count two sizes too large, in the README and in `MAX_STEP`'s own docblock | the real one, and this entry's attribution corrected |
+  | a twenty-digit step written in the present tense as hanging the process | refused at `jump()`. Past tense: hanging was the behaviour before the ceiling |
+  | every colour reaching a shape through the master's colour map | not every: `heading-ink: accent` paints a heading `accent1`, and bullets and rules take `accent1` outright |
+
+  `:::` was refused by `UnknownDirective::container()` and documented nowhere on the page. It is
+  now, beside the frontmatter's closed directive list, with an example that runs.
+
+- **The claims guard was case-sensitive, so the README walked past it.** The ban on a marker
+  closing a list item sat directly beneath a README sentence that began the same phrase with a
+  capital, and `str_contains()` matched only the lowercase one. Every sentence a claim lives in
+  begins with a capital often enough that this is not a rare accident; it is the shape of prose.
+  Matching folds the case now.
+
 - **A template's *Title and Content* lost its body.** `TemplateGeometry` keyed a placeholder by
   the `type` attribute as written, so PowerPoint's ordinary content placeholder — written
   `<p:ph idx="1"/>`, with no `type`, because `body` is the default the schema gives it — was
@@ -26,7 +48,7 @@ All notable changes to this project are documented here. The format follows
   the two decks in `tests/fixtures/powerpoint/`, which PowerPoint authored and saved, both
   fail without it.
 
-- **32 bytes of deck asked for half a billion slides.** `<!-- v-click=500 -->` rendered 500
+- **27 bytes of deck asked for two billion slides.** `<!-- v-click=500 -->` rendered 500
   slides in 0.1s and 0.6MB, and the relationship is linear, so
   `<!-- v-click=2147483647 -->` asked for 2.1 billion. On 64-bit,
   `v-click=99999999999999999999` saturates `(int)` to `PHP_INT_MAX`, and the loop
@@ -297,6 +319,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **How this library is developed moved to `CONTRIBUTING.md`.** Conformance, the rendering
+  slice, rendering in the real PowerPoint and why Word is not an alternative were ~130 lines
+  of the README that answer "how do I work on this" rather than "what does it do", and the
+  page's contract is that its examples run — which is worth more on a shorter page. The README
+  keeps four lines and a link; `tests/Unit/dead-code.php` reads the new file as well, so a
+  claim that moves out cannot get wrong over there. `Templates` and `Using your own deck as the
+  template` are one section now rather than two, and kept every example and every claim they
+  had. No doctested case was lost: `tests/Readme/` was 56 cases before and is 57 now.
+
 - **A run of paragraphs and lists is one shape, because editing one box is what a
   PowerPoint user does.** Every Markdown block used to be written as a shape of its own, so
   a slide whose body was three paragraphs and a list carried four or five text boxes side by
@@ -323,27 +354,25 @@ All notable changes to this project are documented here. The format follows
   other of its two places, and counted once rather than twice.
 
 - **A frame is measured the way PowerPoint lays its paragraphs out, which is not where the
-  spacing is written.** PowerPoint puts a paragraph's spacing after every line of the frame
-  rather than after the paragraph it was written on, so a paragraph that wraps to three lines
-  is three lines of leading plus two gaps. Measured rather than assumed, by asking PowerPoint
-  to lay a frame out and report the height it came back with: a frame of three paragraphs of
-  three lines came back 63.6pt taller with 9pt written on two of them, which is seven gaps of
-  9pt and not the two a reader would expect. The same holds for `spcBef`, for spacing
-  inherited from a list style rather than written on the paragraph, and for a line spacing
-  written as a percentage or as a point measure — so it is the spacing, not how it is written.
-  LibreOffice applies the same file per paragraph.
+  spacing is written.** PowerPoint spends a paragraph's spacing after every *break* the text
+  contains — a newline inside a paragraph, or the mark between two paragraphs — and not after
+  a line the text merely wrapped onto. Measured rather than assumed, by asking PowerPoint to
+  lay a frame out and report the height it came back with, and by reading the line positions
+  out of the PDF it exported: a paragraph written over four source lines and wrapped to seven
+  by its face came back with a gap after each of its three newlines and none after any of the
+  four times it wrapped.
 
-  `ShapeWriter::height()` therefore measures a frame with a gap after every line but the last.
-  Measured per paragraph it was a line short for every line that wrapped in it, and
+  `ShapeWriter::height()` therefore counts a break per break rather than a line per line.
   PowerPoint does not shrink the type to fit the box it was given — the `normAutofit` this
-  library writes does not shrink at load — so the text was drawn over whatever the layout put
-  below the frame, which is the one failure this change exists to remove.
+  library writes does not shrink at load — so a frame measured a gap out is a frame whose
+  text is drawn over whatever the layout put below it, which is the one failure this change
+  exists to remove.
 
-  The cost is that body text is looser inside a frame than it was as a shape per paragraph,
-  and a slide that used to fit may not: four of the example decks now clamp where they did
-  not. The renderer says so through the overflow report rather than overlapping. A frame that
-  does not fit is one clamped shape and one entry in that report, where there used to be an
-  entry per block.
+  An earlier draft of this entry claimed the gap followed every *line*, which is what a deck
+  written in a face that wraps looks like and is not what PowerPoint does: Georgia wraps and
+  Calibri does not, so per-line and per-break agree on every unwrapped line and diverge on
+  every wrapped one. `tests/Unit/rendering.php` now asserts the arithmetic either way, and
+  `tests/Unit/dead-code.php` holds the sentence so it cannot come back.
 
 - **The refusal for an unreadable notes slide could only be tested on some machines.** The
   test that proves the pass refuses rather than writing a part back as zero bytes corrupted

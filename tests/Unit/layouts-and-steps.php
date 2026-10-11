@@ -561,12 +561,12 @@ it('refuses a v-click equals with no number', function () {
 });
 
 it('refuses a v-click step larger than one slide could carry', function () {
-    // The measured attack: 32 bytes of deck naming `v-click=2147483647` asked for two
-    // billion slides, and `v-click=99999999999999999999` saturates the cast to
-    // `PHP_INT_MAX` and hangs the process rather than failing it. The step number written is
-    // the ceiling plus one, not the twenty-digit one, so the suite cannot be the thing that
-    // hangs -- and the message quotes the number back rather than the `PHP_INT_MAX` it
-    // saturated to.
+    // The measured attack: 27 bytes of deck naming `v-click=2147483647` asked for two
+    // billion slides, and `v-click=99999999999999999999` saturated the cast to
+    // `PHP_INT_MAX`, which is the value this refuses rather than trusts. The step number
+    // written is the ceiling plus one, not the twenty-digit one, so the suite cannot be the
+    // thing that asks for two billion -- and the message quotes the number back rather than
+    // the `PHP_INT_MAX` it saturated to.
     expect(fn () => slideDeck(steppedSlide(BlockParser::MAX_STEP + 1)))
         ->toThrow(UnknownMarker::class, sprintf('Slide 1 has a v-click step "%d"', BlockParser::MAX_STEP + 1));
 });

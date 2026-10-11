@@ -304,13 +304,14 @@ The gap between two paragraphs is the theme's own `block:` spacing, written into
 other of its two places, and counted once rather than twice.
 
 One thing about that gap is worth knowing, because it is measured rather than assumed:
-**PowerPoint puts a paragraph's spacing after every line of the frame, not only after the
-paragraph it was written on.** A paragraph that wraps to three lines is therefore three lines
-of leading plus two gaps. The frame is measured the way PowerPoint lays it out — a gap after
-every line but the last — so what it holds is exactly what it was given room for and nothing
-can be drawn over it. The cost is that body text is looser inside a frame than it was as a
-shape per paragraph, and a slide that used to fit may not; the renderer says so rather than
-overlapping (see [When a slide is too full](#when-a-slide-is-too-full)).
+**PowerPoint spends a paragraph's spacing after every break the text contains — a newline
+inside a paragraph, or the mark between two paragraphs — and not after a line the text merely
+wrapped onto.** Three paragraphs written on one line each and wrapped to two apiece are
+therefore six lines and two gaps, not six lines and five. The frame is measured that way, so
+what it holds is exactly what it was given room for and nothing can be drawn over it. A
+paragraph the writer broke across four source lines and its face wrapped to seven carries a
+gap after each of its three newlines and none after any of the four wraps, which is also what
+makes a per-line measurement wrong by however many lines a deck happens to wrap onto.
 
 A frame of text that does not fit its slide is clamped to the room left and reported as one
 shape, because one is what it is.
@@ -590,7 +591,8 @@ Those numbers are pixels of the 960 × 540 slide this library writes, and they c
 template whose own page is 12192000 × 6858000 EMU — a stock 16:9 PowerPoint slide, 1280 × 720
 of the pixels a box counts in. Each axis is scaled by the ratio of the template's page to this
 one, so a placeholder keeps the position its designer chose rather than being divided by a
-constant that only fits this library's own page.
+constant that only fits this library's own page. A deck on A4 rather than 16:9 works for the
+same reason.
 
 Three rules decide what a template is allowed to change:
 
@@ -612,15 +614,13 @@ number are placeholders too and are left out rather than laid out as body text.
 A template that cannot be read is a named failure — `Exception\MalformedTemplate` — rather
 than a theme that quietly renders as though it had not said where its geometry comes from.
 
-### Using your own deck as the template
+#### Using your own deck as the template
 
-A `template.pptx` does not have to be a `.potx` or come from PowerPoint's gallery. Any deck you
-have will do, as long as you point `layouts.yml` at the layout names *your* deck carries and
-copy it into the theme directory under the name `template.pptx`.
-
-The deck this library was tested against is carried in the repository, authored and saved by
-Microsoft PowerPoint itself, so every step below is shown against a real file rather than a
-description of one. Here is what it says:
+Any deck will do — it does not have to be a `.potx` or come from PowerPoint's gallery. Copy it
+into the theme directory as `template.pptx`, next to the `layouts.yml` that names which of its
+layouts each role gets. The deck this library was tested against is carried in the repository,
+authored and saved by PowerPoint itself, so this is a real file rather than a description of
+one:
 
 ```php
 use MarkdownPresentation\Render\TemplateGeometry;
@@ -654,7 +654,7 @@ writes. *Two Content* has two columns, so a `two-column` slide gets two; *Pictur
 numbers its picture placeholder `idx="1"` and its caption `idx="2"`, so the picture goes in the
 first column and the caption under it.
 
-To use it, the theme directory is the template plus the two files that name it:
+So the theme directory is the template plus the two files that name it:
 
 ```
 themes/harbour/
@@ -674,39 +674,16 @@ layouts:
   image-title: Picture with Caption
 ```
 
-A deck then names the theme and gets laid out in it, with the layout parts in the written file
-carrying the same names, so *Reset* in PowerPoint restores the geometry rather than moving it:
+Copy those names from the slide master view rather than the ribbon: they are usually the same
+and are not guaranteed to be, and a deck saved on a German installation writes
+`Titel und Inhalt` for the layout this one calls `Title and Content`.
 
-```markdown
----
-theme: ../../themes/harbour
----
-
-# Harbour Lights
-
-Text in the box your deck's *Title and Content* puts it in.
-```
-
-Four things go wrong often enough to be worth saying, and all four were hit while building the
-fixtures above:
-
-- **The name is the interface.** `layouts.yml` matches the `name` a layout part carries in
-  PowerPoint's file, not the label shown in the ribbon. They are usually the same and are not
-  guaranteed to be: Facet's layouts are named `Title and Content`, and a deck saved on a German
-  installation writes `Titel und Inhalt` for the same layout. Open your deck, look at the slide
-  master, and copy what is there.
-- **The page is scaled, not divided.** A template's boxes are a fraction of *its* page, so each
-  axis is scaled by the ratio of that page to the 960 × 540 this library writes. A deck on A4
-  rather than 16:9 works, and its boxes come out at the right proportion — which is what the
-  second fixture in `tests/fixtures/powerpoint/` is for.
-- **A placeholder written `<p:ph idx="1"/>` is a body.** PowerPoint leaves the `type` out where
-  the schema's default applies, and `idx` alone is what identifies it. A template reader has to
-  apply that default before matching a placeholder to the one of the same index on the master,
-  or *Title and Content* silently loses its body box.
-- **A placeholder with no position takes its master's.** PowerPoint writes this for a layout
-  that does not move the placeholder it inherited, and for every footer, date and slide number
-  in every layout. The first is read through; the rest are left out rather than laid out as
-  body text, because a date is a placeholder this library has no feature for.
+Two things about reading a template go wrong often enough to be worth saying, and both were hit
+while building the fixtures above. **The page is scaled, not divided**, which is why A4 works at
+all. And **a placeholder written `<p:ph idx="1"/>` is a body**: PowerPoint leaves the `type` out
+where the schema's default applies, and `idx` alone is what identifies it, so a reader that
+matches `type` as written inherits nothing from the master and *Title and Content* silently
+loses its body box.
 
 ### Steps
 
@@ -744,8 +721,9 @@ then
 
 `<!-- v-click=3 -->` names step three outright. A step number that does not go forwards, a
 `v-click=` with nothing after the equals, and a step that is not a number are all failures.
-A marker closing a list item is not honoured: that would mean splitting one list into several,
-which is a different feature from the one claimed here.
+A marker at the end of a list item is refused rather than ignored: honouring one would mean
+splitting a single list block into several, which is a different feature from the one claimed
+here, so the refusal names the mistake instead of drawing the comment on the slide.
 
 ### How many steps a deck may have
 
@@ -759,10 +737,10 @@ the second:
 
 Both exist because a step *is* a slide: every step of a build-up is written as a `.pptx`
 part with its shapes, its rels and its entry in `[Content_Types].xml`, and the Markdown
-asking for them is kilobytes. `<!-- v-click=2147483647 -->` is 32 bytes and asks for two
-billion of them; a twenty-digit number saturates the cast to `PHP_INT_MAX` and hangs the
-process rather than failing it. Both are refused by name, with the number that would have
-worked in the message.
+asking for them is kilobytes. `<!-- v-click=2147483647 -->` is 27 bytes and asks for two
+billion of them, and a twenty-digit number saturates the cast to `PHP_INT_MAX` — which is why
+the cast is refused rather than trusted. Both are refused by name, with the number that would
+have worked in the message.
 
 The second is not the first restated. A deck of forty slides with twenty steps each is
 inside every per-slide check and still asks for 800 written slides, so the total is counted
@@ -1006,6 +984,37 @@ Every slide is checked before anything is built, so a deck whose fourth slide na
 directive nobody reads fails before it has written a byte rather than leaving a half-finished
 file where a whole one was expected.
 
+### In the body of a slide
+
+Slidev's in-slide vocabulary is closed here too. A step comment, a `v-*` element and a `:::`
+container fence are the three shapes Slidev nests content in, and none of the other two lands
+where a person would read prose — so both are failures naming the spelling that would have
+worked, rather than shapes carrying the directive's own text. A plain HTML tag is none of
+those and is still text: `<b>` is not a directive, and this library has no opinion about what
+a deck says about HTML.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+foreach ([":::note\nHello.\n:::\n", "<v-click>Hello.</v-click>\n"] as $slide) {
+    try {
+        (new PresentationRenderer())->render(
+            (new DeckParser())->parse($slide),
+            sys_get_temp_dir() . '/deck.pptx',
+        );
+    } catch (Exception $failure) {
+        echo $failure->getMessage(), "\n";
+    }
+}
+```
+
+```text
+Slide 1 opens the container ":::note", which is not something a slide draws. Divide a deck with a "---" line, write a section as a heading, and write a note as a quote: "> ".
+Slide 1 has the element "<v-click>", which is not something a slide draws. A step is the comment "<!-- v-click -->" on a line of its own, and there is no other element.
+```
+
 ## Themes
 
 A theme is a **directory**, and only `theme.yml` is required. Nothing is compiled
@@ -1122,10 +1131,16 @@ dk2 fills a panel, lt2 paints the quiet type
 
 Those four are the master's colour map — `bg1`, `tx1`, `bg2`, `tx2` — asked of the
 theme rather than read off the master, so a shape and the master that paints it
-cannot disagree about which slot is which. Everything that reaches a shape reaches
-it through them: body text, headings, titles and table cells in `tx1`; quotes and a
-code block's own text in `tx2`; a code block and a table's header row filled with
-`bg2`; the page behind every slide in `bg1`.
+cannot disagree about which slot is which. Most of what reaches a shape reaches it
+through them: body text, titles and table cells in `tx1`; quotes and a code block's
+own text in `tx2`; a code block and a table's header row filled with `bg2`; the page
+behind every slide in `bg1`.
+
+Two things do not, and a theme sees both. A heading is painted `accent1` rather than
+`tx1` where `style:` sets `heading-ink: accent`, and a bullet and a thematic break's
+bar are painted `accent1` outright. That is what the colour scheme is for: PHPPresentation
+writes every colour as a literal `a:srgbClr`, so re-theming the deck in PowerPoint
+restyles the picker's swatches and not the shapes already on the slides.
 
 A flag that is not a boolean is a failure, because a theme written `dark: yes` would
 otherwise render light with nothing saying so:
@@ -1234,10 +1249,9 @@ Two Content
 title, content, two-column, section, blank, image-text, image-title, image-slide
 ```
 
-The roles are `title`, `content`, `two-column`, `section` and `blank`. A name that is
-not one of them, and a role the theme does not map, are both failures that name the
-alternatives — because the author of the deck can act on that and nobody else can.
-Here a theme whose template maps only two roles:
+A name that is not one of them, and a role the theme does not map, are both failures
+that name the alternatives — because the author of the deck can act on that and nobody
+else can. Here a theme whose template maps only two roles:
 
 ```php
 use MarkdownPresentation\Exception\UnknownLayoutRole;
@@ -1429,134 +1443,14 @@ try {
 
 ## Conformance
 
-Splitting is derived from `parseSync` in `slidev/packages/parser/src/core.ts`, pinned
-at commit `11fe3f79`. Every deck in `tests/fixtures/slidev/expected.json` was run
-through that real parser and recorded, so parity is checked against the thing rather
-than against a reading of it. `tools/slidev-parity/regenerate.sh` re-records it.
+Splitting is checked against the real Slidev parser rather than a reading of it: every deck
+in `tests/fixtures/slidev/expected.json` was run through `parseSync` at a pinned commit and
+recorded, and each of the divergences this library takes deliberately is written down with
+its reason. Rendering has no such oracle, so every claim it makes is a test asserting on a
+part of the file it wrote.
 
-```
-94 decks · 77 split identically · 17 declared divergences
-```
-
-The 17 are in `tests/fixtures/slidev/divergences.json`, each with the reason and the
-output this library produces instead. The test fails if a declared divergence stops
-being one, so a strictness cannot quietly change.
-
-What is kept, because it is the grammar worth having:
-
-| Behaviour | Kept |
-| --- | --- |
-| `---` closes a slide | yes |
-| `***` works as a thematic break inside a slide | yes |
-| Deck frontmatter only at the top; later blocks are per-slide | yes |
-| Speaker notes as trailing HTML comments | yes |
-
-What is not, because Slidev gets it wrong rather than choosing differently:
-
-| Behaviour | Slidev | Here |
-| --- | --- | --- |
-| `~~~` as a fence | not a fence | a fence |
-| Closing fence indented less than the opener | does not close | closes |
-| Closing fence carrying anything after it | closes the block | does not |
-| A fence that is never closed | leaves the block; a `---` inside splits the deck | runs to the end of the deck |
-
-The last one is the one that matters. A missing backtick is a typo, and under
-Slidev's rule it silently splits the deck and leaves the next slide opening with a
-literal `---`. These four are CommonMark implemented incorrectly, not a dialect worth
-preserving, so taking them would have cost a correctness bug for the sake of a parity
-number.
-
-The remaining divergences are all strictness, all one-way: malformed YAML, a
-frontmatter block that is not a mapping, a `title` or `level` of the wrong type, and
-a slide opening with a fenced ```` ```yaml ```` block. Those refuse rather than guess.
-
-### The rendering slice
-
-Splitting has an oracle. Rendering has none — there is no other implementation to be
-parity-checked against — so every claim it makes is checked against a part of the file it
-wrote, and each row below is a test in `tests/Unit/rendering.php` or
-`tests/Unit/layouts-and-steps.php`.
-
-Nothing compares two `.pptx`. A zip stores two-second timestamps in every entry and
-`docProps/core.xml` carries `dcterms:created` and `dcterms:modified`, so two correct
-renders of one deck differ; the parts are what a test reads.
-
-| Claim | Read off |
-| --- | --- |
-| One slide part per slide of the deck, and every one declared | `[Content_Types].xml`, `ppt/slides/` |
-| One slide per step, each revealing the steps before it | `ppt/slides/slideN.xml` |
-| A `layout:` role becomes a slide layout part named by the theme | `ppt/slideLayouts/`, `ppt/slides/_rels/` |
-| One shape per run of text and per block of every other kind, named after it | `<p:cNvPr name="…">` |
-| The theme's twelve colours become the colour scheme | `ppt/theme/theme1.xml` |
-| A dark theme swaps the colour map, and its shapes follow it | `ppt/slideMasters/slideMaster1.xml`, `ppt/slides/slideN.xml` |
-| The theme's `heading`, `body` and `mono` reach the runs that use them | `<a:latin typeface="…">` |
-| `styles.yml` reaches no shape, because a `.pptx` has no use for a `.docx` style id | — |
-
-The last row is the only one asserted by what is *absent*. `styles.yml` is not read, and
-a slot that does not exist still fails when the theme is loaded, so a typo in one is never
-rendered as silence — which is a test, but a test of the theme loader rather than of a
-rendered file.
-
-Reading has the opposite problem, and it is where the fixtures earn their place. Everything
-above is checked against files this library wrote, which agree with the reader about every
-convention that matters. `tests/fixtures/powerpoint/` holds two decks that PowerPoint itself
-authored and saved — one designed, one on A4 with a table on a layout that has no table in it —
-and `tests/Unit/powerpoint-fixtures.php` reads those instead. A reader that has only ever seen
-this library's own templates is a reader nobody has shown works on a file a person made, and the
-first of those tests is the bug that proved the point: PowerPoint writes *Title and Content*'s
-content placeholder as a bare `<p:ph idx="1"/>`, so a reader matching the `type` attribute as
-written inherited nothing from the master and left the layout with a title box and no body.
-
-What the renderer refuses is refused loudly, and each refusal names what would have
-worked instead: a directive nobody reads, a theme that does not resolve, a layout role
-that is not one, a `v-click` step that does not go forwards, an image that is not a file,
-and an image no `.pptx` can carry. Those messages are listed one by one in
-`tests/Unit/exceptions.php`, which finds the exception classes by reading the directory
-rather than by a list that would quietly stop being true.
-
-### Rendering in the real PowerPoint
-
-Everything above is checked against the parts of the file this library wrote. There is no
-other implementation to check a render against, and LibreOffice — which `examples/build.php`
-uses for its previews — is a *different* implementation of the same format, so it renders what
-it believes the format means rather than what PowerPoint means.
-
-For the one question that asks for PowerPoint itself, `tools/render-with-powerpoint.applescript`
-opens each deck in Microsoft PowerPoint and exports it to PDF:
-
-```
-osascript tools/render-with-powerpoint.applescript examples/out/*.pptx --out build/powerpoint
-```
-
-It is a developer tool and nothing in the test suite requires it: continuous integration has no
-PowerPoint, and a test that needed one would be a test that could only be run on one person's
-machine. Every step either produces the file it promised or exits non-zero with the reason —
-a deck that opened and exported nothing is a failure, and so is a directory that cannot be
-written, a deck that is not there and a `--out` that is missing.
-
-Three things about it are worth knowing before running it:
-
-- **It stages each deck inside PowerPoint's own sandbox container.** Office applications are
-  sandboxed and refuse to read a path the user has not granted them with error `-9074`, so the
-  deck is copied in, exported there and copied back out. The scratch directory is removed on
-  every path through the script, including every failure.
-- **It closes only the decks it opened.** A deck somebody had open before the script ran is
-  still open afterwards.
-- **It can fail because PowerPoint is in a bad state.** `-9074` from a deck already staged
-  inside the container means PowerPoint could not open *any* document — most often a window it
-  had not finished starting. Quitting PowerPoint and running it again is the fix, and the
-  script says so rather than reporting a permission problem.
-
-`build/` is the output directory in the command above, and it is git-ignored. Nothing this
-writes lands in a deck.
-
-### Word is not an alternative
-
-`/Applications/Microsoft Word.app` is Microsoft 365 Word, and Word cannot open a
-presentation. A `.pptx` is OOXML from Office 2007 and Word was never a PowerPoint product, so
-it would import the file through a lossy converter and report nothing about whether the deck
-is valid. PowerPoint is the only application on this machine that will tell the truth about
-whether these decks open.
+[CONTRIBUTING.md](./CONTRIBUTING.md) says what the check is, which strictnesses were taken
+and why, and what a change has to pass.
 
 ## How this page is checked
 

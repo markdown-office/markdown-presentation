@@ -149,7 +149,7 @@ function sourcesWithClaim(string $claim): array
                 continue;
             }
 
-            if (str_contains((string) file_get_contents($file->getPathname()), $claim)) {
+            if (holdsClaim((string) file_get_contents($file->getPathname()), $claim)) {
                 $found[] = $area . '/' . $file->getFilename();
             }
         }
@@ -160,6 +160,20 @@ function sourcesWithClaim(string $claim): array
     sort($pages);
 
     return array_merge($found, $pages);
+}
+
+/**
+ * Whether a text holds a phrase, whatever case it is written in.
+ *
+ * Folding the case is what makes this a guard rather than a lookup: the sentence a claim
+ * lives in begins with a capital often enough that a case-sensitive `str_contains()` misses
+ * it, and a guard that can be walked past by starting a sentence is not a guard. The
+ * README's "A marker closing a list item is not honoured" sat under a ban on "a marker
+ * closing a list item" for exactly this reason, through a release of a suite that passed.
+ */
+function holdsClaim(string $text, string $claim): bool
+{
+    return str_contains(mb_strtolower($text), mb_strtolower($claim));
 }
 
 /**
@@ -176,8 +190,8 @@ function pagesWithClaim(string $claim): array
     $root = Doctest::root();
     $found = [];
 
-    foreach ([$root . '/README.md', $root . '/CHANGELOG.md'] as $page) {
-        if (str_contains((string) file_get_contents($page), $claim)) {
+    foreach ([$root . '/README.md', $root . '/CHANGELOG.md', $root . '/CONTRIBUTING.md'] as $page) {
+        if (is_file($page) && holdsClaim((string) file_get_contents($page), $claim)) {
             $found[] = basename($page);
         }
     }
@@ -187,7 +201,7 @@ function pagesWithClaim(string $claim): array
         'examples/markdown/' => glob($root . '/examples/markdown/*.md') ?: [],
     ] as $prefix => $pages) {
         foreach ($pages as $page) {
-            if (str_contains((string) file_get_contents($page), $claim)) {
+            if (holdsClaim((string) file_get_contents($page), $claim)) {
                 $found[] = $prefix . basename($page);
             }
         }
@@ -213,6 +227,10 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a theme that ships a template has its layouts ignored' => 'A theme\'s `template.pptx` is not opened',
     'a theme differs from another only in its colours' => 'Nothing else about it differs',
     'the heading scale runs down to the sixth level' => 'stops shrinking a heading at the sixth level',
+    'the roles are the five a deck needs most' => 'The roles are `title`, `content`, `two-column`, `section` and `blank`',
+    'a frame carries a gap after every line it wrapped onto' => 'after every line of the frame',
+    'a heading is painted in the theme accent and reaches the shape as a literal hex' => 'Everything that reaches a shape reaches',
+    'the ceiling story reads as still hanging' => 'hangs the process rather than failing it',
 ]);
 
 it('has no decorative dividers in it', function () {
