@@ -183,6 +183,8 @@ it('refuses rather than writing back a notes slide it could not read', function 
 
     expect($payload)->not->toBeNull();
 
+    fwrite(STDERR, "\n===DIAG===\n" . describeLayout($bytes) . "===ENDDIAG===\n");
+
     // A part that is stored rather than deflated has no zlib header to break, and every
     // way of breaking its metadata was tolerated by the build this failed on: a wrong
     // CRC in both headers, and a compressed size larger than the file. Nothing about such
@@ -288,3 +290,47 @@ it('writes each notes slide once, however many slides carry one', function () {
 
     expect($twice)->toBe([])->and($notes)->toHaveCount(3);
 });
+
+/**
+ * Every local file header in the archive, so a failing run says what the bytes are
+ * rather than what this file assumed they were. Temporary diagnostic.
+ */
+function describeLayout(string $bytes): string
+{
+    $out = '';
+
+    for ($at = 0; ($at = strpos($bytes, 'PK' . chr(3) . chr(4), $at)) !== false; $at++) {
+        $flags = (int) unpack('v', substr($bytes, $at + 6, 2))[1];
+        $method = (int) unpack('v', substr($bytes, $at + 8, 2))[1];
+        $name = (int) unpack('v', substr($bytes, $at + 26, 2))[1];
+        $extra = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
+        $part = substr($bytes, $at + 30, $name);
+        $payload = $at + 30 + $name + $extra;
+
+        if (!str_starts_with($part, 'ppt/notesSlides/')) {
+            continue;
+        }
+
+        $out .= sprintf(
+            "  local@%-7d %-42s method=%-2d flags=0x%04x payload=%-7d first8=%s\n",
+            $at,
+            $part,
+            $method,
+            $flags,
+            $payload,
+            bin2hex(substr($bytes, $payload, 8)),
+        );
+    }
+
+    for ($at = 0; ($at = strpos($bytes, 'PK' . chr(1) . chr(2), $at)) !== false; $at++) {
+        $method = (int) unpack('v', substr($bytes, $at + 10, 2))[1];
+        $name = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
+        $part = substr($bytes, $at + 46, $name);
+
+        if (str_starts_with($part, 'ppt/notesSlides/')) {
+            $out .= sprintf("  centr@%-7d %-42s method=%d\n", $at, $part, $method);
+        }
+    }
+
+    return $out . '  file size = ' . strlen($bytes) . "\n";
+}
