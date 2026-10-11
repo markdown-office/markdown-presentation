@@ -40,7 +40,6 @@ function powerpointFixtures(): string
  * are the whole interface between the two, and a theme that spells one differently stops matching
  * with nothing to say so. Spelled once here rather than at every place a test happens to need one.
  */
-const TITLE_AND_CONTENT = 'Title and Content';
 const PICTURE_WITH_CAPTION = 'Picture with Caption';
 
 /** The manifest of the theme built around the deck PowerPoint designed. */

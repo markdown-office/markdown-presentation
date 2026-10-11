@@ -16,6 +16,59 @@ use MarkdownPresentation\Tests\Support\Doctest;
  */
 
 /**
+ * Every file under the given directories, as paths relative to the project root.
+ *
+ * @param list<string> $areas
+ *
+ * @return list<string>
+ */
+function filesUnder(array $areas): array
+{
+    $files = [];
+
+    foreach ($areas as $area) {
+        $found = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator(Doctest::root() . '/' . $area, FilesystemIterator::SKIP_DOTS),
+        );
+
+        foreach ($found as $file) {
+            if ($file->isFile()) {
+                $files[] = $area . '/' . $file->getFilename();
+            }
+        }
+    }
+
+    return $files;
+}
+
+/**
+ * Where each top-level constant of a test file is declared.
+ *
+ * Pest includes every test file into one global namespace, so a constant two of them
+ * declare is one constant declared twice — which PHP warns about on every run and says
+ * will be an error in PHP 9. Nothing about the run says so: PHPUnit turns the warning into
+ * a non-zero exit with every test passing and, under pcov, with no coverage table either.
+ *
+ * @return array<string, list<string>> Constant name to the files declaring it.
+ */
+function constantDeclarations(): array
+{
+    $declared = [];
+
+    foreach (array_merge(['tests/Pest.php'], filesUnder(testSuiteDirectories())) as $file) {
+        foreach (file(Doctest::root() . '/' . $file) ?: [] as $line) {
+            if (preg_match('/^const\s+([A-Za-z_][A-Za-z_0-9]*)\s*=/', $line, $name) === 1) {
+                $declared[$name[1]][] = $file;
+            }
+        }
+    }
+
+    ksort($declared);
+
+    return array_filter($declared, static fn (array $files): bool => count($files) > 1);
+}
+
+/**
  * The lines of every PHP file under the given directories that `$pattern` matches.
  *
  * One walk for the two tests below that are otherwise the same shape, because a policy
@@ -180,4 +233,12 @@ it('imports nothing from the global namespace in a test file', function () {
     // has no namespace, so the import resolves to the class the bare name already
     // meant — which is the thing that costs the coverage report.
     expect(linesMatching(testSuiteDirectories(), '#^use\s+\w+\s*;#'))->toBe([]);
+});
+
+it('declares a constant in one test file at most', function () {
+    // The other half of the rule above, and the same failure: a `const` is global exactly as
+    // an unqualified name is, so two files declaring one is a redeclaration. This was found
+    // by the coverage job rather than by the suite — 757 tests passing and the run exiting
+    // 1 — which is the worst way to find out.
+    expect(constantDeclarations())->toBe([]);
 });

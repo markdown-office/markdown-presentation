@@ -34,15 +34,9 @@ function contents(string $markdown): array
 }
 
 /**
- * The smallest deck there is two slides of, and the two slides it makes.
- *
- * Every test below is about where the split falls, so the deck has to be one where falling
- * it somewhere else is visible. `# One` and `# Two` are the halves, kept as constants
- * because half of these assertions *are* the comparison against them — spelling the two
- * titles out on each side of a `toBe()` is a test that reads as though it were about the
- * parser when it is about neither string.
+ * The two slides {@see TWO_SLIDES} is made of, kept as constants because half of these
+ * assertions *are* the comparison against them.
  */
-const TWO_SLIDES = "# One\n\n---\n\n# Two\n";
 const ONE = '# One';
 const TWO = '# Two';
 

@@ -35,7 +35,6 @@ const TEMPLATED_PPTX = '/template.pptx';
  * testing something else, and spelling it out each time is how that happens quietly.
  */
 const CONTENT_LAYOUT = "layouts:\n  content: Title and Content\n";
-const TITLE_AND_CONTENT = 'Title and Content';
 
 /**
  * The theme beside the committed fixture, on its own.

@@ -32,7 +32,6 @@ use MarkdownPresentation\Tests\Support\Scratch;
 const ORDERED_LIST = "1. one\n2. two\n";
 
 /** The parts a reader looks in, named because the assertion is about one of them. */
-const SLIDE_ONE = 'ppt/slides/slide1.xml';
 const SLIDE_TWO = 'ppt/slides/slide2.xml';
 const MASTER_ONE = 'ppt/slideMasters/slideMaster1.xml';
 const NOTES_ONE = 'ppt/notesSlides/notesSlide1.xml';
@@ -42,7 +41,6 @@ const PRESENTATION = 'ppt/presentation.xml';
 
 /** The decks several tests below convert, named rather than spelled at each call site. */
 const ONE_SLIDE = "# One\n";
-const TWO_SLIDES = "# One\n\n---\n\n# Two\n";
 const THEMATIC_BREAK = "***\n";
 const TABLE = "| A | B |\n| --- | --- |\n| 1 | 2 |\n";
 

@@ -24,15 +24,6 @@ use MarkdownPresentation\Tests\Support\Scratch;
  */
 
 /**
- * The part a one-slide deck's numbers are written into.
- *
- * Every test here reads what a theme changed by looking at this part, so it is spelled once: a
- * deck that failed to build would otherwise leave all of them reading a missing part, and a
- * missing part and a part with the wrong number in it are not the same failure.
- */
-const SLIDE_ONE = 'ppt/slides/slide1.xml';
-
-/**
  * A theme with one `style:` key set, and everything else at the library's own numbers.
  *
  * A `colors:` key may be passed alongside, and is passed through to {@see Theme::fromArray}

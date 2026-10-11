@@ -34,3 +34,21 @@ function deckScope(string $directory, array $roots = []): PathScope
 {
     return new PathScope([$directory, ...$roots]);
 }
+
+/**
+ * The part every test about the first slide's contents reads, the deck two of them
+ * convert, and the layout a `layouts.yml` maps a content slide to.
+ *
+ * `TWO_SLIDES` is the smallest deck there is two slides of. Every test about where a split
+ * falls needs one where falling it somewhere else is visible, and the two titles are the
+ * halves most of those assertions are compared against.
+ *
+ * Here rather than in either file that needs them, because a Pest test file is included
+ * into one global namespace: a constant declared in two of them is the *same* constant
+ * declared twice — PHP warns about it on every run and says it will be an error in PHP 9.
+ */
+const SLIDE_ONE = 'ppt/slides/slide1.xml';
+
+const TWO_SLIDES = "# One\n\n---\n\n# Two\n";
+
+const TITLE_AND_CONTENT = 'Title and Content';
