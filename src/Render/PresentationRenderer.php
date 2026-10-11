@@ -191,7 +191,11 @@ final class PresentationRenderer
         $used = $this->usedRoles($roles);
         // The theme's type scale and spacing first, then the boxes a template gives for the
         // roles it covers: a template places, and placing is the later of the two answers.
-        $geometry = new SlideGeometry(style: $theme->theme()->style())->with($this->template($theme, $used));
+        // The parentheses are load-bearing, not decoration: `new X()->y()` on one expression
+        // is PHP 8.4 syntax, and `composer.json` promises 8.2, where it does not parse. Written
+        // without them this file cannot be loaded at all, so every test that renders a deck
+        // fails on the 8.2 job and nothing local says why.
+        $geometry = (new SlideGeometry(style: $theme->theme()->style()))->with($this->template($theme, $used));
         $layouts = $this->layouts($this->slideMaster($presentation), $theme, $used);
         $this->properties($presentation, $deck, $theme);
 
