@@ -319,6 +319,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`Theme` was one class doing two jobs.** Six of its twenty-three methods read a `theme.yml`
+  and nothing else: `mapping`, `readDark`, `readColours`, `readFonts`, `text` and
+  `colourNames`. They are now `Theme\ThemeMapping`, on the same seam `Style` already draws from
+  `StyleMapping` — the bounds belong to the file and the value object never sees one. Seventeen
+  and eight methods, and `php:S1448` is closed on the class.
+
+  `ALIASES` is consulted by two callers and lives with the file rather than being copied: the
+  accessor `colour()` asks `ThemeMapping::slot()`, because a caller may hold either spelling of
+  a slot and that map is a fact about what a file may say. `COLOURS` and `FONTS` did **not**
+  travel, deliberately: they name what `Theme::colours()` and `fonts()` are keyed by, and the
+  renderer writes the colour scheme straight off `Theme::COLOURS`, so moving them would have
+  meant either breaking that or keeping a second copy. `Theme::COLOURS` is the one list and
+  `ThemeMapping` holds a file to it.
+
+  `Theme::__construct()` is now public, which is what `StyleMapping::read()` has always been
+  able to do with `Style`: a theme built in code is held to the types alone, and a theme
+  written in one is where the bounds apply.
+
 - **How this library is developed moved to `CONTRIBUTING.md`.** Conformance, the rendering
   slice, rendering in the real PowerPoint and why Word is not an alternative were ~130 lines
   of the README that answer "how do I work on this" rather than "what does it do", and the

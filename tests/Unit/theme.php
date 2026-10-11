@@ -5,8 +5,10 @@ declare(strict_types=1);
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Tests\Support\Contrast;
 use MarkdownPresentation\Theme\LayoutRole;
+use MarkdownPresentation\Theme\Style;
 use MarkdownPresentation\Theme\StyleSlots;
 use MarkdownPresentation\Theme\Theme;
+use MarkdownPresentation\Theme\ThemeMapping;
 
 /**
  * The palette the theme tests below spell out, which is `corporate-dark`'s.
@@ -203,6 +205,26 @@ it('refuses a description that is not a string', function () {
 it('says which file a theme came from', function () {
     Theme::fromArray(['name' => 'Typo', 'colorz' => []], 'themes/acme/theme.yml');
 })->throws(MalformedTheme::class, 'In "themes/acme/theme.yml": "colorz" is not a key of a theme');
+
+it('reads a file through the mapping and holds no bounds of its own', function () {
+    // The seam `Style` draws from `StyleMapping`, now drawn again: the spellings a
+    // `theme.yml` may use and the bounds one puts on a file belong to the reader, and
+    // `Theme` answers only about a theme it holds. A `Theme` built in code is held to the
+    // types alone, exactly as a `Style` built in code is — which is what lets the two be
+    // the same shape of thing.
+    expect(ThemeMapping::slot('dark1'))->toBe(Theme::DK1)
+        ->and(ThemeMapping::slot('accent1'))->toBe('accent1')
+        ->and(ThemeMapping::KEYS)->toContain('name', 'colors', 'fonts', 'style')
+        ->and(ThemeMapping::read(['name' => 'Straight'])->name())->toBe('Straight');
+
+    // A `Theme` constructed directly takes whatever it is given, and is not the file's
+    // business to police: this is the half of the seam that has no reader on the other side.
+    $built = new Theme('Built', null, null, false, [], [], Style::defaults());
+
+    expect($built->name())->toBe('Built')
+        ->and($built->colours())->toBe([])
+        ->and($built->colour('accent1'))->toBeNull();
+});
 
 it('lists the layout roles a deck may write', function () {
     expect(LayoutRole::names())->toBe([
