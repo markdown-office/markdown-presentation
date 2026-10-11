@@ -26,8 +26,8 @@ declare(strict_types=1);
  * who made the deck, is a fixture that must not be committed.
  */
 
-require dirname(__DIR__, 4) . '/vendor/autoload.php';
-require __DIR__ . '/FixtureFailed.php';
+require_once dirname(__DIR__, 4) . '/vendor/autoload.php';
+require_once __DIR__ . '/FixtureFailed.php';
 
 /**
  * The elements that name a person or an organisation, by the part they live in.

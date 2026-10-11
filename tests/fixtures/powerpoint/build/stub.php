@@ -17,8 +17,8 @@ declare(strict_types=1);
  * with — the design, the layouts, the placeholders, the type — is PowerPoint's own.
  */
 
-require dirname(__DIR__, 4) . '/vendor/autoload.php';
-require __DIR__ . '/FixtureFailed.php';
+require_once dirname(__DIR__, 4) . '/vendor/autoload.php';
+require_once __DIR__ . '/FixtureFailed.php';
 
 const PRESENTATIONML = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 const DRAWINGML = 'http://schemas.openxmlformats.org/drawingml/2006/main';

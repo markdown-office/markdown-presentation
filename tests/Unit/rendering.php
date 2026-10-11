@@ -28,6 +28,9 @@ use MarkdownPresentation\Tests\Support\Scratch;
   * assertion is on a part, which is what {@see Pptx} is for.
  */
 
+/** A two-item ordered list, which three tests below are about. */
+const ORDERED_LIST = "1. one\n2. two\n";
+
 /**
  * Render a deck and open what came out, in one step — every test below needs both and
  * writing them out each time would bury the assertion in the arrangement.
@@ -373,13 +376,13 @@ it('renders a bullet list as paragraphs of the same frame', function () {
 });
 
 it('renders an ordered list as paragraphs of the same frame', function () {
-    expect(renderDeck("1. one\n2. two\n")->shapeNames())->toBe(['text']);
+    expect(renderDeck(ORDERED_LIST)->shapeNames())->toBe(['text']);
 });
 
 it('numbers an ordered list rather than bulleting it', function () {
     // A list written `1. 2. 3.` that comes out as three bullets reads as a mistake even
     // though nothing is missing.
-    $pptx = renderDeck("1. one\n2. two\n");
+    $pptx = renderDeck(ORDERED_LIST);
 
     expect($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:buAutoNum type="arabicPeriod"/>')
         ->and($pptx->part('ppt/slides/slide1.xml'))->not->toContain('<a:buChar');
@@ -400,7 +403,7 @@ it('starts an ordered list at the number the deck names', function () {
 it('leaves a list that starts at one with no start of its own', function () {
     // The other half of the claim above: `startAt` on a list that begins at one would say
     // the deck renumbered from one, which is what a reader takes `startAt="1"` to mean.
-    expect(renderDeck("1. one\n2. two\n")->part('ppt/slides/slide1.xml'))->not->toContain('startAt');
+    expect(renderDeck(ORDERED_LIST)->part('ppt/slides/slide1.xml'))->not->toContain('startAt');
 });
 
 it('numbers a nested ordered list as a list of its own', function () {

@@ -20,6 +20,9 @@ use MarkdownPresentation\Tests\Support\Scratch;
  * not notice it happening.
  */
 
+/** The paragraph these decks are made too long out of, repeated by `str_repeat()`. */
+const FILLER = "Text.\n\n";
+
 /** Render a deck, returning the renderer, because the report is on the renderer. */
 function overflowing(string $markdown, bool $strict = false): PresentationRenderer
 {
@@ -54,7 +57,7 @@ it('reports every shape a full column left no room for, not only the first', fun
     // run of paragraphs is one shape now, so forty of them are one entry and forty paragraphs
     // on their own would prove nothing about the ones below the point the column ran out.
     $overflows = overflowing(
-        str_repeat("Text.\n\n", 30) . "```\nline;\n```\n\n" . str_repeat("More.\n\n", 30),
+        str_repeat(FILLER, 30) . "```\nline;\n```\n\n" . str_repeat("More.\n\n", 30),
     )->overflows();
 
     expect(count($overflows))->toBeGreaterThan(1)
@@ -64,7 +67,7 @@ it('reports every shape a full column left no room for, not only the first', fun
 it('reports one entry for a run of paragraphs, because it is one shape', function () {
     // The other half: forty paragraphs that do not fit are one shape that did not fit, and an
     // entry for each of them would say forty things were missing where one is.
-    expect(overflowing(str_repeat("Text.\n\n", 40))->overflows())->toHaveCount(1);
+    expect(overflowing(str_repeat(FILLER, 40))->overflows())->toHaveCount(1);
 });
 
 it('names the slide and the step a block overflowed on', function () {
@@ -72,7 +75,7 @@ it('names the slide and the step a block overflowed on', function () {
     // second block arrives — so "slide 1" on its own does not say which drawing of that
     // slide ran out of room.
     $overflows = overflowing(
-        "# One\n\n" . str_repeat("Text.\n\n", 20) . "<!-- v-click -->\n\n" . str_repeat("More.\n\n", 20),
+        "# One\n\n" . str_repeat(FILLER, 20) . "<!-- v-click -->\n\n" . str_repeat("More.\n\n", 20),
     )->overflows();
 
     expect(array_column($overflows, 'slide'))->toBe(array_fill(0, count($overflows), 1))
@@ -92,7 +95,7 @@ it('reports the column a block overflowed in', function () {
 it('empties the report on each render rather than accumulating it', function () {
     // A layout belongs to one deck: a caller converting several in a loop wants the last
     // one's overflows, not all of them.
-    $renderer = overflowing(str_repeat("Text.\n\n", 40));
+    $renderer = overflowing(str_repeat(FILLER, 40));
     $renderer->render((new DeckParser())->parse("Fits.\n"), Scratch::file('deck.pptx', ''));
 
     expect($renderer->overflows())->toBe([]);
