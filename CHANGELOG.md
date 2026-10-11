@@ -277,6 +277,24 @@ All notable changes to this project are documented here. The format follows
   `NotesColourMapPass` should be deleted once this package takes that release, rather than
   kept as a second implementation of a fix upstream then owns.
 
+- **The refusal for an unreadable notes slide could only be tested on some machines.** The
+  test that proves the pass refuses rather than writing a part back as zero bytes corrupted
+  a real `.pptx` and relied on the build's inflater giving up on it. It does not, everywhere:
+  the archive is byte-for-byte identical on the two machines and only the willingness to
+  report differs — a reserved deflate block type is refused by one zlib and decoded into
+  different bytes by another, and neither a wrong CRC nor a compressed size past the end of
+  the file is refused on all of them. So the php 8.2 job was red on `main` over a property of
+  a third-party library rather than of this one.
+
+  The corruption is gone. The refusal is now driven by a `ZipArchive` subclass whose
+  `getFromIndex()` answers `false` for one part, which is what the archive's own reader
+  documents for an entry it cannot produce and which the pass cannot tell apart from one.
+  A separate test keeps the property that does hold everywhere — after a run over a real
+  package, no part of it is a zero-byte entry.
+
+  `NotesColourMapPass::applyTo()` takes an optional `ZipArchive` as its second argument for
+  this. It defaults to opening the path as before, so every existing call is unchanged.
+
 ### Notes
 
 - **Exception messages repeat absolute server paths, and that is a choice.** Not a finding

@@ -40,14 +40,22 @@ final class NotesColourMapPass
      * A deck with no notes has nothing to fix and is not touched at all, so a file with
      * no speaker notes in it comes out the way the writer wrote it.
      *
+     * @param ZipArchive|null $archive An archive to work in rather than one this opens.
+     *        It is how a test reaches the refusal below, and it has to be a real file
+     *        behind the reader: `ZipArchive::$numFiles` is a read-only property of the
+     *        internal class that a subclass cannot redeclare, so a stand-in archive reports
+     *        no parts to walk. A damaged payload is not a substitute — whether one refuses
+     *        to inflate is the builder's own business, and a reader that answers `false`
+     *        because it was told to is the same refusal everywhere.
+     *
      * @throws UnreadablePackage When the presentation cannot be opened for writing, or a
      *         notes slide cannot be read out of it. Both are the caller's rather than the
      *         deck's, and neither is a failure a deck author can fix by naming something
      *         else — which is why this is not an {@see \MarkdownPresentation\Exception\InvalidInput}.
      */
-    public static function applyTo(string $path): int
+    public static function applyTo(string $path, ?ZipArchive $archive = null): int
     {
-        $zip = new ZipArchive();
+        $zip = $archive ?? new ZipArchive();
 
         if ($zip->open($path) !== true) {
             throw UnreadablePackage::cannotOpen($path);
