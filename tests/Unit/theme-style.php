@@ -7,6 +7,7 @@ use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SlideGeometry;
 use MarkdownPresentation\Theme\Style;
+use MarkdownPresentation\Theme\StyleMapping;
 use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeResolver;
 use MarkdownPresentation\Theme\LayoutRole;
@@ -89,7 +90,7 @@ it('gives a theme that names no style the library\'s own numbers', function () {
     // The reason the defaults are the numbers they are: a deck written before a theme could
     // say otherwise has to render the same way afterwards, or choosing a theme would resize
     // every deck that shipped one.
-    expect(styledTheme([])->style()->toArray())->toBe(Style::defaults()->toArray())
+    expect(StyleMapping::write(styledTheme([])->style()))->toBe(StyleMapping::write(Style::defaults()))
         ->and(Style::defaults()->margin())->toBe(SlideGeometry::MARGIN)
         ->and(Style::defaults()->body())->toBe(SlideGeometry::BODY_SIZE);
 });
@@ -177,11 +178,52 @@ it('reads the heading treatment as the two questions a renderer asks of it', fun
 it('writes the style back the way a theme.yml writes it', function () {
     // The round trip is what lets a theme be written once and read back, which is how the
     // examples' three copies of one deck stay comparable.
-    $style = styledTheme(['margin' => 48, 'heading-ink' => 'accent', 'heading-weight' => 'regular'])->style();
+    $written = StyleMapping::write(styledTheme(['margin' => 48, 'heading-ink' => 'accent', 'heading-weight' => 'regular'])->style());
 
-    expect($style->toArray()['margin'])->toBe(48)
-        ->and($style->toArray()['heading-ink'])->toBe('accent')
-        ->and($style->toArray()['heading-weight'])->toBe('regular');
+    expect($written['margin'])->toBe(48)
+        ->and($written['heading-ink'])->toBe('accent')
+        ->and($written['heading-weight'])->toBe('regular');
+});
+
+it('takes a heading treatment as the two questions rather than as the file\'s words', function () {
+    // A word a caller invents — `headingWeight: 'heavy'` — is a value no file can express, and
+    // writing one back turns it quietly into one that can: a style that reports a regular
+    // heading and writes `regular` are not the same answer the caller gave. Two booleans
+    // cannot be spelled wrongly.
+    $style = new Style(headingIsBold: false, headingUsesAccent: true);
+    $written = StyleMapping::write($style);
+
+    expect($style->headingIsBold())->toBeFalse()
+        ->and($style->headingUsesAccent())->toBeTrue()
+        ->and($written['heading-weight'])->toBe('regular')
+        ->and($written['heading-ink'])->toBe('accent');
+});
+
+it('writes every key a style: mapping may carry, in the order the keys name them', function () {
+    // `KEYS` is what a failure offers as the ones that are, so a style written in another order
+    // is a `theme.yml` that reads back as something else than the one it was written from.
+    $written = StyleMapping::write(StyleMapping::read(['margin' => 64]));
+
+    expect(array_keys($written))->toBe(StyleMapping::KEYS)
+        ->and($written['margin'])->toBe(64);
+});
+
+it('writes back the mapping it read, whatever a file named and whatever it left out', function () {
+    $all = StyleMapping::write(StyleMapping::read([]));
+
+    foreach ([['margin', 64], ['rule', 6], ['leading', 1.4], ['headings', [30, 20, 16]]] as [$key, $value]) {
+        expect(StyleMapping::write(StyleMapping::read([$key => $value])))->toBe(array_merge($all, [$key => $value]), $key);
+    }
+
+    // All four of the heading treatments, because these two are the only keys whose value
+    // changes shape on the way through: a word in the file and two booleans on a style.
+    foreach (StyleMapping::WEIGHTS as $weight) {
+        foreach (StyleMapping::INKS as $ink) {
+            $named = ['heading-weight' => $weight, 'heading-ink' => $ink];
+
+            expect(StyleMapping::write(StyleMapping::read($named)))->toBe(array_merge($all, $named), $weight . '/' . $ink);
+        }
+    }
 });
 
 it('draws a title at the size its theme names', function () {

@@ -155,7 +155,7 @@ final class Theme
             self::readDark($data, $file),
             self::readColours($data['colors'] ?? null, $file) ?? $defaults->colours,
             self::readFonts($data['fonts'] ?? null, $file) ?? $defaults->fonts,
-            Style::fromArray(self::mapping($data, 'style', $file), $file),
+            StyleMapping::read(self::mapping($data, 'style', $file), $file),
         );
     }
 
@@ -304,7 +304,7 @@ final class Theme
             'dark' => $this->dark,
             'colors' => $this->colours,
             'fonts' => $this->fonts,
-            'style' => $this->style->toArray(),
+            'style' => StyleMapping::write($this->style),
         ];
     }
 
