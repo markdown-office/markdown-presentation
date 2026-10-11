@@ -277,6 +277,56 @@ All notable changes to this project are documented here. The format follows
   `NotesColourMapPass` should be deleted once this package takes that release, rather than
   kept as a second implementation of a fix upstream then owns.
 
+### Changed
+
+- **A run of paragraphs and lists is one shape, because editing one box is what a
+  PowerPoint user does.** Every Markdown block used to be written as a shape of its own, so
+  a slide whose body was three paragraphs and a list carried four or five text boxes side by
+  side. Clicking the text selected a box rather than the sentence under the pointer, moving
+  one box left the rest of the column where it was, and each box was placed from its own
+  measured height, so two of them could be drawn over one another. A run of consecutive
+  paragraphs and lists is now one shape holding one `<a:p>` each, with the inline markup of
+  a paragraph still a run inside that paragraph.
+
+  | | Before | After |
+  | --- | --- | --- |
+  | `# T` then three paragraphs | `title`, `paragraph`, `paragraph`, `paragraph` | `title`, `text` — one shape, four `<a:p>` in it |
+  | a paragraph, a list and a paragraph | `paragraph`, `list`, `paragraph` | `text` — the list's items are paragraphs of it |
+  | a paragraph, a table, a paragraph | `paragraph`, `table`, `paragraph` | unchanged: a table is a shape of its own |
+
+  A heading, a quote, a rule, a table, a picture and a code block are still shapes of their
+  own, and any of them ends the run — which is also what keeps a frame from straddling two
+  columns of a two-column role, since the columns divide at a heading. A quote ends it
+  because it is drawn a gutter in from the margin at another size in another colour, which
+  one box's paragraphs cannot each be while sharing one box.
+
+  The gap between two paragraphs is the theme's own `block:` spacing, written as their
+  `a:spcAft` — the same number the layout spends between two shapes of a column, spent in the
+  other of its two places, and counted once rather than twice.
+
+- **A frame is measured the way PowerPoint lays its paragraphs out, which is not where the
+  spacing is written.** PowerPoint puts a paragraph's spacing after every line of the frame
+  rather than after the paragraph it was written on, so a paragraph that wraps to three lines
+  is three lines of leading plus two gaps. Measured rather than assumed, by asking PowerPoint
+  to lay a frame out and report the height it came back with: a frame of three paragraphs of
+  three lines came back 63.6pt taller with 9pt written on two of them, which is seven gaps of
+  9pt and not the two a reader would expect. The same holds for `spcBef`, for spacing
+  inherited from a list style rather than written on the paragraph, and for a line spacing
+  written as a percentage or as a point measure — so it is the spacing, not how it is written.
+  LibreOffice applies the same file per paragraph.
+
+  `ShapeWriter::height()` therefore measures a frame with a gap after every line but the last.
+  Measured per paragraph it was a line short for every line that wrapped in it, and
+  PowerPoint does not shrink the type to fit the box it was given — the `normAutofit` this
+  library writes does not shrink at load — so the text was drawn over whatever the layout put
+  below the frame, which is the one failure this change exists to remove.
+
+  The cost is that body text is looser inside a frame than it was as a shape per paragraph,
+  and a slide that used to fit may not: four of the example decks now clamp where they did
+  not. The renderer says so through the overflow report rather than overlapping. A frame that
+  does not fit is one clamped shape and one entry in that report, where there used to be an
+  entry per block.
+
 ### Notes
 
 - **Exception messages repeat absolute server paths, and that is a choice.** Not a finding
