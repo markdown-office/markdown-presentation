@@ -146,27 +146,28 @@ it('refuses rather than writing back a notes slide it could not read', function 
     $bytes = (string) file_get_contents($path);
     $payload = null;
 
-    // The CRC is the one thing every zip implementation checks, so a wrong one is the only
-    // way to make a part unreadable that does not depend on the build. A flipped byte in
-    // the deflate stream is not: deflate will often decode a corrupted block into
-    // different bytes rather than failing, and whether it complains depends on the zlib
-    // it was compiled against, which is why the original version of this test passed on
-    // a laptop and failed on the runner. A reserved compression method does not work
-    // either: marking the central directory with one stops the archive opening at all,
-    // and marking only the local header is ignored, because a reader takes the method
-    // from the directory.
+    // The part is made unreadable by claiming it is larger than the archive. Two things
+    // about this are deliberate. The original version flipped a byte in the deflate
+    // stream, which deflate will often decode into different bytes rather than fail on,
+    // so the test asserted this library's behaviour against one machine's zlib and
+    // passed locally while failing on the runner. The checksum is also made wrong, on the
+    // theory that an implementation which skips one check keeps the other -- the runner
+    // that failed the last version of this test read a part with a CRC of 0xDEADBEEF
+    // quite happily. A reserved compression method is no use either: it stops the
+    // archive opening rather than the part, and a reader takes the method from the
+    // central directory regardless of what the local header says.
     //
-    // Both headers are marked, since which of the two a reader trusts is its own
-    // business. The archive stays structurally valid, so this is an unreadable *part*
-    // rather than an unreadable *file* -- which is the case worth handling.
+    // The archive stays structurally valid, so this is an unreadable *part* and not an
+    // unreadable *file*, which is the case the pass exists to handle. Both headers are
+    // marked, since which of the two a reader trusts is its own business.
+    $impossible = pack('V', 0x00FFFFFF);
     $wrongCrc = pack('V', 0xDEADBEEF);
-    $offsets = [];
 
     for ($at = 0; ($at = strpos($bytes, 'PK' . chr(1) . chr(2), $at)) !== false; $at++) {
         $name = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
 
         if (str_starts_with(substr($bytes, $at + 46, $name), 'ppt/notesSlides/')) {
-            $offsets[] = $at + 16;
+            $bytes = substr_replace(substr_replace($bytes, $impossible, $at + 20, 4), $wrongCrc, $at + 16, 4);
         }
     }
 
@@ -174,16 +175,10 @@ it('refuses rather than writing back a notes slide it could not read', function 
         $name = (int) unpack('v', substr($bytes, $at + 26, 2))[1];
 
         if (str_starts_with(substr($bytes, $at + 30, $name), 'ppt/notesSlides/')) {
-            $offsets[] = $at + 14;
+            $bytes = substr_replace(substr_replace($bytes, $impossible, $at + 18, 4), $wrongCrc, $at + 14, 4);
 
             break;
         }
-    }
-
-    expect($offsets)->not->toBeEmpty();
-
-    foreach ($offsets as $at) {
-        $bytes = substr_replace($bytes, $wrongCrc, $at, 4);
     }
 
     file_put_contents($path, $bytes);
