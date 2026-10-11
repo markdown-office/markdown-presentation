@@ -31,7 +31,12 @@ function builtDeck(string $name): array
 {
     $root = dirname(__DIR__, 2);
     $source = (string) file_get_contents($root . '/examples/markdown/' . $name);
-    $path = sys_get_temp_dir() . '/mdp-example-' . md5($name) . '.pptx';
+
+    // The hash is a filename, not a digest: it tells one deck's render apart from another's
+    // in the system temporary directory, and nothing reads it back to decide anything. So it
+    // is xxh3 rather than md5, which was here doing the same job while claiming to be
+    // something it was not.
+    $path = sys_get_temp_dir() . '/mdp-example-' . hash('xxh3', $name) . '.pptx';
 
     // The renderer is handed the directory the deck is in, because that is what a relative
     // image path in it resolves against.

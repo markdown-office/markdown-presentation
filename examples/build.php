@@ -315,7 +315,11 @@ function renderDeck(string $soffice, string $python, string $path, string $direc
 
     // The profile is a few hundred files of LibreOffice's own state and belongs in the
     // temporary directory rather than beside the slide images it has nothing to do with.
-    $scratch = sys_get_temp_dir() . '/mdpres-' . getmypid() . '-' . md5($path);
+    //
+    // The hash is there to give each deck its own directory in one run, not to verify
+    // anything — the pid already keeps two runs apart, and nothing reads this back. So it is
+    // xxh3, which is what it does, rather than md5, which said it was a digest.
+    $scratch = sys_get_temp_dir() . '/mdpres-' . getmypid() . '-' . hash('xxh3', $path);
     @mkdir($scratch, 0o700, true);
 
     try {

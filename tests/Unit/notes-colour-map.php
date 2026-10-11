@@ -22,7 +22,10 @@ function notesSlidesOf(string $markdown): array
     // A plain function does not inherit the file scope Pest runs its test bodies in.
     $root = dirname(__DIR__, 2);
 
-    $path = sys_get_temp_dir() . '/mdp-note-' . md5($markdown) . '.pptx';
+    // A filename, not a digest: it tells one deck's render apart from another's in the
+    // system temporary directory and nothing ever reads it back. xxh3 says that; md5, which
+    // was here doing the same work, said something this use of it was not.
+    $path = sys_get_temp_dir() . '/mdp-note-' . hash('xxh3', $markdown) . '.pptx';
 
     (new PresentationRenderer($root . '/examples/markdown'))->render(
         (new DeckParser())->parse($markdown),
@@ -79,7 +82,7 @@ it('writes the colour map once, whatever the deck asks for', function () {
 });
 
 it('leaves a deck with no notes exactly as the writer wrote it', function () use ($root) {
-    $path = sys_get_temp_dir() . '/mdp-none-' . md5('no notes') . '.pptx';
+    $path = sys_get_temp_dir() . '/mdp-none-' . hash('xxh3', 'no notes') . '.pptx';
 
     (new PresentationRenderer($root . '/examples/markdown'))->render(
         (new DeckParser())->parse("# One\n\nNo note on this one.\n"),
@@ -136,7 +139,7 @@ it('writes no part back as zero bytes, whatever the archive could not read', fun
     // the end of the file is refused on all of them. So the reader here is one this test
     // writes — the refusal `tests/Unit/exceptions.php` asserts — and what is asserted is
     // the part of it that holds on every build either way.
-    $path = sys_get_temp_dir() . '/mdp-whole-' . md5('whole') . '.pptx';
+    $path = sys_get_temp_dir() . '/mdp-whole-' . hash('xxh3', 'whole') . '.pptx';
 
     (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
         (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
@@ -184,7 +187,7 @@ it('leaves a part it does not understand alone', function () {
 });
 
 it('runs twice without adding the element a second time', function () {
-    $path = sys_get_temp_dir() . '/mdp-twice-' . md5('twice') . '.pptx';
+    $path = sys_get_temp_dir() . '/mdp-twice-' . hash('xxh3', 'twice') . '.pptx';
 
     (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
         (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
@@ -206,7 +209,7 @@ it('writes each notes slide once, however many slides carry one', function () {
         . "<!-- two -->\n\n---\n\n# Three\n\nThe third.\n\n<!-- three -->\n";
 
     $root = dirname(__DIR__, 2);
-    $path = sys_get_temp_dir() . '/mdp-once-' . md5('once') . '.pptx';
+    $path = sys_get_temp_dir() . '/mdp-once-' . hash('xxh3', 'once') . '.pptx';
 
     (new PresentationRenderer($root . '/examples/markdown'))->render(
         (new DeckParser())->parse($deck),
