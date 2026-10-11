@@ -202,11 +202,20 @@ final class TemplateGeometry
 
             // Both attributes are optional and both have a default: `body` and `0`. Office
             // writes a title with neither, which is why they are read rather than required.
-            $type = $placeholder->getAttribute('type');
+            //
+            // The default is applied before the key as well as before the value, because the
+            // key is what a placeholder is matched to its master's by. PowerPoint writes the
+            // ordinary content placeholder of *Title and Content* — the layout a theme maps
+            // `content` to more often than any other — as a bare `<p:ph idx="1"/>`, and a key
+            // built from the attribute as written is `/1`, which matches nothing in a master
+            // that says `body/1`. The layout then states no position, inherits nothing, and
+            // loses its body box to {@see self::cover()}, which drops every placeholder it
+            // cannot place.
+            $type = $placeholder->getAttribute('type') === '' ? 'body' : $placeholder->getAttribute('type');
             $idx = (int) $placeholder->getAttribute('idx');
 
             $found[$type . '/' . $idx] = [
-                'type' => $type === '' ? 'body' : $type,
+                'type' => $type,
                 'idx' => $idx,
                 'box' => $this->box($shape, $page),
             ];

@@ -28,6 +28,22 @@ it('every file the page shows is the file on disk', function (string $code, stri
     expect($code)->toBe(rtrim((string) file_get_contents($file), "\n"));
 })->with(Doctest::fileClaims($markdown));
 
+it('names no tool on the page that is not in the repository', function () use ($markdown) {
+    // The page has a table of the tools that come with the library, and a tool that has been
+    // renamed or deleted leaves a row pointing at nothing: a reader who follows it gets a 404 and
+    // no reason. Read off the backticked paths rather than from a list, so the table itself is
+    // what is checked.
+    preg_match_all('/`(tools\/[\w.-]+)`/', $markdown, $named);
+
+    expect($named[1])->not->toBe([]);
+
+    foreach (array_unique($named[1]) as $tool) {
+        expect(is_file(Doctest::root() . '/' . $tool))->toBeTrue(
+            sprintf('README.md names %s, which is not in the repository.', $tool),
+        );
+    }
+});
+
 it('has examples on the page for it to run', function () use ($markdown) {
     // A README with no examples passes the two tests above by having nothing to
     // check, and the page is where this library is read.

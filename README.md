@@ -552,6 +552,102 @@ number are placeholders too and are left out rather than laid out as body text.
 A template that cannot be read is a named failure — `Exception\MalformedTemplate` — rather
 than a theme that quietly renders as though it had not said where its geometry comes from.
 
+### Using your own deck as the template
+
+A `template.pptx` does not have to be a `.potx` or come from PowerPoint's gallery. Any deck you
+have will do, as long as you point `layouts.yml` at the layout names *your* deck carries and
+copy it into the theme directory under the name `template.pptx`.
+
+The deck this library was tested against is carried in the repository, authored and saved by
+Microsoft PowerPoint itself, so every step below is shown against a real file rather than a
+description of one. Here is what it says:
+
+```php
+use MarkdownPresentation\Render\TemplateGeometry;
+
+// A real deck: PowerPoint's own Facet design, with the palette and fonts changed.
+$deck = (string) getenv('MARKDOWN_PRESENTATION_ROOT') . '/tests/fixtures/powerpoint/harbour-lights.pptx';
+$boxes = (new TemplateGeometry($deck))->boxes();
+
+foreach (['Title Slide', 'Title and Content', 'Two Content', 'Picture with Caption'] as $name) {
+    $title = $boxes[$name]['title'];
+
+    printf(
+        "%-20s title %3d,%3d %3dx%3d   body %3d,%3d %3dx%3d\n",
+        $name,
+        $title->x, $title->y, $title->width, $title->height,
+        $boxes[$name]['body'][0]->x, $boxes[$name]['body'][0]->y,
+        $boxes[$name]['body'][0]->width, $boxes[$name]['body'][0]->height,
+    );
+}
+```
+
+```text
+Title Slide          title 119,189 612x130   body 119,319 612x 86
+Title and Content    title  53, 48 677x104   body  53,170 677x306
+Two Content          title  53, 48 677x104   body  53,170 329x306
+Picture with Caption title  53,378 677x 45   body  53, 48 677x303
+```
+
+That is the whole mechanism: each layout's placeholders, scaled onto the page this library
+writes. *Two Content* has two columns, so a `two-column` slide gets two; *Picture with Caption*
+numbers its picture placeholder `idx="1"` and its caption `idx="2"`, so the picture goes in the
+first column and the caption under it.
+
+To use it, the theme directory is the template plus the two files that name it:
+
+```
+themes/harbour/
+├── theme.yml          name: Harbour
+├── layouts.yml        which of your deck's layouts each role gets
+└── template.pptx      your deck, copied in
+```
+
+```yaml
+# The layout names are your deck's, verbatim — check them in PowerPoint's slide master view.
+# A role left out keeps this library's own geometry rather than failing.
+layouts:
+  title: Title Slide
+  content: Title and Content
+  two-column: Two Content
+  section: Section Header
+  image-title: Picture with Caption
+```
+
+A deck then names the theme and gets laid out in it, with the layout parts in the written file
+carrying the same names, so *Reset* in PowerPoint restores the geometry rather than moving it:
+
+```markdown
+---
+theme: ../../themes/harbour
+---
+
+# Harbour Lights
+
+Text in the box your deck's *Title and Content* puts it in.
+```
+
+Four things go wrong often enough to be worth saying, and all four were hit while building the
+fixtures above:
+
+- **The name is the interface.** `layouts.yml` matches the `name` a layout part carries in
+  PowerPoint's file, not the label shown in the ribbon. They are usually the same and are not
+  guaranteed to be: Facet's layouts are named `Title and Content`, and a deck saved on a German
+  installation writes `Titel und Inhalt` for the same layout. Open your deck, look at the slide
+  master, and copy what is there.
+- **The page is scaled, not divided.** A template's boxes are a fraction of *its* page, so each
+  axis is scaled by the ratio of that page to the 960 × 540 this library writes. A deck on A4
+  rather than 16:9 works, and its boxes come out at the right proportion — which is what the
+  second fixture in `tests/fixtures/powerpoint/` is for.
+- **A placeholder written `<p:ph idx="1"/>` is a body.** PowerPoint leaves the `type` out where
+  the schema's default applies, and `idx` alone is what identifies it. A template reader has to
+  apply that default before matching a placeholder to the one of the same index on the master,
+  or *Title and Content* silently loses its body box.
+- **A placeholder with no position takes its master's.** PowerPoint writes this for a layout
+  that does not move the placeholder it inherited, and for every footer, date and slide number
+  in every layout. The first is read through; the rest are left out rather than laid out as
+  body text, because a date is a placeholder this library has no feature for.
+
 ### Steps
 
 `<!-- v-click -->` on a line of its own opens a step. PowerPoint has no "press a key to
@@ -871,6 +967,7 @@ The tools that come with the library are in `tools/`:
 | --- | --- |
 | `tools/phpstan.sh` | Fetches the analyser by checksum and runs it at the level `phpstan.neon.dist` configures |
 | `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: nothing in the test suite needs it, because CI has no PowerPoint |
+| `tools/build-powerpoint-fixtures.sh` | Rebuilds the two decks in `tests/fixtures/powerpoint/`, which were authored in PowerPoint rather than written by hand |
 
 Three themes ship with the library, and they are three different decks rather than one deck in
 three swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
@@ -1339,6 +1436,16 @@ The last row is the only one asserted by what is *absent*. `styles.yml` is not r
 a slot that does not exist still fails when the theme is loaded, so a typo in one is never
 rendered as silence — which is a test, but a test of the theme loader rather than of a
 rendered file.
+
+Reading has the opposite problem, and it is where the fixtures earn their place. Everything
+above is checked against files this library wrote, which agree with the reader about every
+convention that matters. `tests/fixtures/powerpoint/` holds two decks that PowerPoint itself
+authored and saved — one designed, one on A4 with a table on a layout that has no table in it —
+and `tests/Unit/powerpoint-fixtures.php` reads those instead. A reader that has only ever seen
+this library's own templates is a reader nobody has shown works on a file a person made, and the
+first of those tests is the bug that proved the point: PowerPoint writes *Title and Content*'s
+content placeholder as a bare `<p:ph idx="1"/>`, so a reader matching the `type` attribute as
+written inherited nothing from the master and left the layout with a title box and no body.
 
 What the renderer refuses is refused loudly, and each refusal names what would have
 worked instead: a directive nobody reads, a theme that does not resolve, a layout role
