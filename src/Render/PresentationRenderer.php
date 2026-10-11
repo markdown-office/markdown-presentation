@@ -685,13 +685,9 @@ final class PresentationRenderer
      * deep to read it: a blank layout draws its title as a heading, so `level:` would
      * otherwise govern nothing at all there.
      *
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks The slide's blocks, in reading order.
      * @param ?int                                                        $depth What `level:` named.
      *
-     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
-    */
-    /**
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks The slide's blocks, in reading order.
      * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
      */
     private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox, ?int $depth): array
@@ -726,20 +722,24 @@ final class PresentationRenderer
             return $hasTitleBox ? $blocks : [$this->titleHeading($title, $depth), ...$blocks];
         }
 
-        if ($hasTitleBox) {
-            return array_merge(array_slice($blocks, 0, $at), array_slice($blocks, $at + 1));
+        $drawn = $heading;
+
+        if (!$hasTitleBox && $depth !== null) {
+            // As a heading rather than as a title box, so the level itself moves: a title of
+            // level `$depth` is drawn at the size a heading one level shallower is drawn at,
+            // and `level: 1` is the top of what a body can draw.
+            $drawn = new Heading($heading->runs, max(1, $depth - 1), $heading->step);
         }
 
-        if ($depth === null) {
-            return $blocks;
-        }
+        // One list, then one question: a title box draws the title, so the heading goes
+        // rather than being drawn a second time; without one the heading *is* the title, so
+        // it stays, at the depth it was written unless `level:` named another.
+        $blocks[$at] = $drawn;
+        $kept = array_values($blocks);
 
-        // As a heading rather than as a title box, so the level itself moves: a title of
-        // level `$depth` is drawn at the size a heading one level shallower is drawn at, and
-        // `level: 1` is the top of what a body can draw.
-        $blocks[$at] = new Heading($heading->runs, max(1, $depth - 1), $heading->step);
-
-        return array_values($blocks);
+        return $hasTitleBox
+            ? array_merge(array_slice($kept, 0, $at), array_slice($kept, $at + 1))
+            : $kept;
     }
 
     private function note(WrittenSlide $slide, string $text): void

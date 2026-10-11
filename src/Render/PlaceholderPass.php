@@ -137,13 +137,13 @@ final class PlaceholderPass
      */
     public static function layoutShapes(string $xml, SlideGeometry $geometry, LayoutRole $role): string
     {
-        if (str_contains($xml, '<p:ph ')) {
-            return $xml;
-        }
-
         $end = strpos($xml, '</p:spTree>');
 
-        if ($end === false) {
+        // One question, asked once: is there somewhere in this part to put a shape? A part
+        // that already carries a placeholder is not one to double, and a part with no shape
+        // tree has nowhere to put one — a layout this cannot find room in is not one this
+        // may repair by guessing.
+        if (str_contains($xml, '<p:ph ') || $end === false) {
             return $xml;
         }
 
