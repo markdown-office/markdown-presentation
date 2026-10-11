@@ -12,7 +12,7 @@ declare(strict_types=1);
  *   php tests/fixtures/themes/templated/build.php
  */
 
-require __DIR__ . '/../../../../vendor/autoload.php';
+require_once __DIR__ . '/../../../../vendor/autoload.php';
 
 use MarkdownPresentation\Tests\Support\Template;
 

@@ -11,7 +11,7 @@ declare(strict_types=1);
  * examples/out, and a PNG of every slide beside them in examples/out/<deck>/.
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Render\PresentationRenderer;

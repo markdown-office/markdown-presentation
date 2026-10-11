@@ -138,7 +138,7 @@ it('imports nothing from the global namespace in a test file', function () {
                 }
 
                 foreach (file($file->getPathname()) as $number => $line) {
-                    if (preg_match('#^use\s+[A-Za-z_][A-Za-z0-9_]*\s*;#', $line) === 1) {
+                    if (preg_match('#^use\s+\w+\s*;#', $line) === 1) {
                         $imports[] = $file->getFilename() . ':' . ($number + 1) . ' ' . trim($line);
                     }
                 }

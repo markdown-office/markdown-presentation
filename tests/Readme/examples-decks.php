@@ -59,7 +59,7 @@ it('lists every deck that is on disk', function () use ($readme, $root) {
     // The table names the sources; the directory holds them. A deck added without a row
     // is a deck nobody is told about, and a row without a deck is a lie.
     $listed = [];
-    preg_match_all('/`([0-9]{2}-[a-z-]+)\.md`/', $readme, $matches);
+    preg_match_all('/`(\d{2}-[a-z-]+)\.md`/', $readme, $matches);
 
     $listed = array_map(
         static fn (string $stem): string => $stem . '.md',
@@ -82,7 +82,7 @@ it('lists every deck that is on disk', function () use ($readme, $root) {
 
 it('builds every deck the page says it builds', function () use ($readme, $root) {
     $build = (string) file_get_contents($root . '/examples/build.php');
-    preg_match_all('/`([0-9]{2}-[a-z-]+)\.md`\s*\|\s*\*\*nothing\*\*/', $readme, $declined);
+    preg_match_all('/`(\d{2}-[a-z-]+)\.md`\s*\|\s*\*\*nothing\*\*/', $readme, $declined);
 
     // A page that says a deck is not built has to be right about it: the reason has to be
     // in `build.php`, keyed by the stem, or the deck stops being built for a reason nobody
