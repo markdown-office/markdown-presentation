@@ -118,8 +118,8 @@ want () {
 want harbour-lights && { author harbour-lights 5 12192000 6858000 harbour-lights.applescript || exit 1; }
 want workshop && { author workshop 6 9906000 6858000 workshop.applescript || exit 1; }
 
-# Two slides rather than the deck either of the others is: this one exists for its `<p:timing>`.
-want entrance-animation && { author entrance-animation 2 12192000 6858000 entrance-animation.applescript || exit 1; }
+# Three slides rather than the deck either of the others is: this one exists for its `<p:timing>`.
+want entrance-animation && { author entrance-animation 3 12192000 6858000 entrance-animation.applescript || exit 1; }
 
 pkill -9 -f "Microsoft PowerPoint" >/dev/null 2>&1
 rm -rf "$CONTAINER"
