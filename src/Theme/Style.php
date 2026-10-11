@@ -42,22 +42,29 @@ final class Style
     /** The two inks a heading can be drawn in, and the one that is the default. */
     public const INKS = ['ink', 'accent'];
 
+    /**
+     * What every failure here appends to the file it came from.
+     *
+     * A `theme.yml` whose `style:` mapping is wrong is fixed in that mapping and not in the rest
+     * of the theme, so the message names the part rather than the file — otherwise all of them
+     * read as though the whole file were at fault.
+     */
+    private const STYLE = ' (style)';
+
     /** A heading of a single weight, or none: the reading weight is a face's own. */
     private const REGULAR = 'regular';
 
-    /** The default type scale, in points, and the default leading as a multiple of a line's own
-     * height. The values {@see \MarkdownPresentation\Render\SlideGeometry} has always used, so
-     * a `theme.yml` that names no `style:` renders exactly what it rendered before this
-     * existed — which is the whole of the reason they are the defaults rather than a choice.
-     */
-
     /**
      * The numbers a theme may set, with the library's own defaults.
- *
+     *
      * Every parameter has a default, so `new Style()` and {@see self::defaults()} are the
      * same thing and a caller that wants the library's own numbers can say so without naming
      * all twelve of them. {@see self::defaults()} exists for the caller that wants the
      * defaults *by name* rather than by remembering them.
+     *
+     * The values are the ones {@see \MarkdownPresentation\Render\SlideGeometry} has always
+     * used, so a `theme.yml` that names no `style:` renders exactly what it rendered before this
+     * existed — which is the whole of the reason they are the defaults rather than a choice.
      *
      * @param non-empty-list<int> $headings Sizes by depth, shallowest first.
      */
@@ -100,7 +107,7 @@ final class Style
     {
         foreach (array_keys($data) as $key) {
             if (!in_array((string) $key, self::KEYS, true)) {
-                throw MalformedTheme::unknownKey($file . ' (style)', (string) $key, self::KEYS);
+                throw MalformedTheme::unknownKey($file . self::STYLE, (string) $key, self::KEYS);
             }
         }
 
@@ -143,11 +150,11 @@ final class Style
         }
 
         if (!is_int($value)) {
-            throw MalformedTheme::wrongType($file . ' (style)', $key, 'a whole number of pixels');
+            throw MalformedTheme::wrongType($file . self::STYLE, $key, 'a whole number of pixels');
         }
 
         if ($value < self::MINIMUM_LENGTH) {
-            throw MalformedTheme::wrongType($file . ' (style)', $key, sprintf('a number of pixels of at least %d', self::MINIMUM_LENGTH));
+            throw MalformedTheme::wrongType($file . self::STYLE, $key, sprintf('a number of pixels of at least %d', self::MINIMUM_LENGTH));
         }
 
         return $value;
@@ -171,7 +178,7 @@ final class Style
         }
 
         if (!is_int($value) || $value < self::MINIMUM_POINTS) {
-            throw MalformedTheme::wrongType($file . ' (style)', $key, sprintf('a whole number of points, at least %d', self::MINIMUM_POINTS));
+            throw MalformedTheme::wrongType($file . self::STYLE, $key, sprintf('a whole number of points, at least %d', self::MINIMUM_POINTS));
         }
 
         return $value;
@@ -200,12 +207,12 @@ final class Style
         }
 
         if (!is_array($value) || !array_is_list($value) || $value === []) {
-            throw MalformedTheme::wrongType($file . ' (style)', $key, 'a list of type sizes in points, shallowest heading first');
+            throw MalformedTheme::wrongType($file . self::STYLE, $key, 'a list of type sizes in points, shallowest heading first');
         }
 
         foreach ($value as $size) {
             if (!is_int($size) || $size < self::MINIMUM_POINTS) {
-                throw MalformedTheme::wrongType($file . ' (style)', $key, sprintf('a list of whole point sizes, each at least %d', self::MINIMUM_POINTS));
+                throw MalformedTheme::wrongType($file . self::STYLE, $key, sprintf('a list of whole point sizes, each at least %d', self::MINIMUM_POINTS));
             }
         }
 
@@ -232,11 +239,11 @@ final class Style
         }
 
         if (!is_int($value) && !is_float($value)) {
-            throw MalformedTheme::wrongType($file . ' (style)', 'leading', 'a number');
+            throw MalformedTheme::wrongType($file . self::STYLE, 'leading', 'a number');
         }
 
         if ($value < self::MINIMUM_LEADING) {
-            throw MalformedTheme::wrongType($file . ' (style)', 'leading', sprintf('a number of at least %s', self::MINIMUM_LEADING));
+            throw MalformedTheme::wrongType($file . self::STYLE, 'leading', sprintf('a number of at least %s', self::MINIMUM_LEADING));
         }
 
         return (float) $value;
@@ -259,7 +266,7 @@ final class Style
         }
 
         if (!is_string($value) || !in_array($value, $choices, true)) {
-            throw MalformedTheme::wrongType($file . ' (style)', $key, sprintf('one of: %s', implode(', ', $choices)));
+            throw MalformedTheme::wrongType($file . self::STYLE, $key, sprintf('one of: %s', implode(', ', $choices)));
         }
 
         return $value;

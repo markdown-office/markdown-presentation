@@ -271,7 +271,7 @@ final class DeckParser
             throw MalformedFrontmatter::notAMapping($index + 1);
         }
 
-    /** @var array<string, mixed> $parsed */
+        /** @var array<string, mixed> $parsed */
         return $parsed;
     }
 

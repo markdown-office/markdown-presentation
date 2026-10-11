@@ -81,10 +81,11 @@ final class ThemeLoader
             throw MalformedTheme::notAMapping($file, $wanted, self::describe($parsed));
         }
 
-    /** @var array<array-key, mixed> $parsed */
+        /** @var array<array-key, mixed> $parsed */
         return $parsed;
     }
-        /** What a YAML document turned out to be, in the words the failure uses. */
+
+    /** What a YAML document turned out to be, in the words the failure uses. */
     private static function describe(mixed $parsed): string
     {
         return is_array($parsed) ? 'a list' : 'a ' . get_debug_type($parsed);

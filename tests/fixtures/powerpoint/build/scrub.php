@@ -26,6 +26,9 @@ declare(strict_types=1);
  * who made the deck, is a fixture that must not be committed.
  */
 
+require dirname(__DIR__, 4) . '/vendor/autoload.php';
+require __DIR__ . '/FixtureFailed.php';
+
 /**
  * The elements that name a person or an organisation, by the part they live in.
  *
@@ -54,14 +57,14 @@ foreach ($paths as $path) {
 echo 'scrubbed ', count($paths), " deck(s)\n";
 
 /**
- * @throws RuntimeException When a deck cannot be read, rewritten, or shown to be clean.
+ * @throws PowerPointFixtureFailed When a deck cannot be read, rewritten, or shown to be clean.
  */
 function scrub(string $path): void
 {
     $source = new ZipArchive();
 
     if ($source->open($path) !== true) {
-        throw new RuntimeException(sprintf('Unable to open "%s".', $path));
+        throw new PowerPointFixtureFailed(sprintf('Unable to open "%s".', $path));
     }
 
     $rewritten = tempnam(sys_get_temp_dir(), 'scrub') . '.pptx';
@@ -70,7 +73,7 @@ function scrub(string $path): void
     if ($target->open($rewritten, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
         $source->close();
 
-        throw new RuntimeException(sprintf('Unable to write "%s".', $rewritten));
+        throw new PowerPointFixtureFailed(sprintf('Unable to write "%s".', $rewritten));
     }
 
     for ($index = 0; $index < $source->numFiles; $index++) {
@@ -91,7 +94,7 @@ function scrub(string $path): void
     $source->close();
 
     if (!rename($rewritten, $path)) {
-        throw new RuntimeException(sprintf('Unable to put the scrubbed deck back at "%s".', $path));
+        throw new PowerPointFixtureFailed(sprintf('Unable to put the scrubbed deck back at "%s".', $path));
     }
 
     assertClean($path);
@@ -102,7 +105,7 @@ function scrub(string $path): void
  *
  * @param list<string> $elements
  *
- * @throws RuntimeException When an element is there and could not be emptied.
+ * @throws PowerPointFixtureFailed When an element is there and could not be emptied.
  */
 function emptyThose(string $xml, array $elements, string $part): string
 {
@@ -116,7 +119,7 @@ function emptyThose(string $xml, array $elements, string $part): string
         $replaced = preg_replace($pattern, '<' . $element . '$1></' . $element . '>', $xml);
 
         if (!is_string($replaced)) {
-            throw new RuntimeException(sprintf('Unable to empty <%s> in %s.', $element, $part));
+            throw new PowerPointFixtureFailed(sprintf('Unable to empty <%s> in %s.', $element, $part));
         }
 
         $xml = $replaced;
@@ -129,14 +132,14 @@ function emptyThose(string $xml, array $elements, string $part): string
  * The check that makes the write above worth doing: read every part back and refuse the file
  * if anything still says who made it or where it was made.
  *
- * @throws RuntimeException
+ * @throws PowerPointFixtureFailed
  */
 function assertClean(string $path): void
 {
     $zip = new ZipArchive();
 
     if ($zip->open($path) !== true) {
-        throw new RuntimeException(sprintf('Unable to reopen "%s".', $path));
+        throw new PowerPointFixtureFailed(sprintf('Unable to reopen "%s".', $path));
     }
 
     $found = [];
@@ -155,7 +158,7 @@ function assertClean(string $path): void
     $zip->close();
 
     if ($found !== []) {
-        throw new RuntimeException(sprintf(
+        throw new PowerPointFixtureFailed(sprintf(
             '"%s" still names who made it: %s.',
             $path,
             implode('; ', $found),

@@ -39,7 +39,8 @@ final class Slide
     {
         return $this->raw;
     }
-        /** The text, with the frontmatter and the speaker note taken off it. */
+
+    /** The text, with the frontmatter and the speaker note taken off it. */
     public function content(): string
     {
         return $this->content;
@@ -67,7 +68,7 @@ final class Slide
         return $this->title;
     }
         /**
- * How deep the title reads: the depth of the heading it became, or the `level:`
+     * How deep the title reads: the depth of the heading it became, or the `level:`
      * the frontmatter named, which is the one that wins where both are there.
      *
      * Not what the renderer sizes a title box from, and deliberately so: this is also
@@ -83,12 +84,14 @@ final class Slide
     {
         return $this->note;
     }
-        /** The zero-based line the slide starts on. */
+
+    /** The zero-based line the slide starts on. */
     public function start(): int
     {
         return $this->start;
     }
-        /** The zero-based line the slide ends on, exclusive. */
+
+    /** The zero-based line the slide ends on, exclusive. */
     public function end(): int
     {
         return $this->end;

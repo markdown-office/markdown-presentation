@@ -6,13 +6,13 @@ use MarkdownPresentation\Tests\Support\Doctest;
 
 /*
  * Claims that were wrong, kept so they cannot come back.
- /**
-  * The comment policy in the sibling package bans dividers, restatement, type-only
-  * docblocks and counts, and this is what makes the first of those a rule rather than
-  * a note. The second half is here for the same reason it is there: a confidently
-  * false docblock passes every other check in the suite, because nothing reads prose.
-  * Each phrase below was a claim this package could not support — add one when the
-  * next is corrected, which is the whole maintenance cost of the list.
+ *
+ * The comment policy in the sibling package bans dividers, restatement, type-only
+ * docblocks and counts, and this is what makes the first of those a rule rather than
+ * a note. The second half is here for the same reason it is there: a confidently
+ * false docblock passes every other check in the suite, because nothing reads prose.
+ * Each phrase below was a claim this package could not support — add one when the
+ * next is corrected, which is the whole maintenance cost of the list.
  */
 
 /**

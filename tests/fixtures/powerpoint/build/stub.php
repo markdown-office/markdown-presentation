@@ -17,11 +17,17 @@ declare(strict_types=1);
  * with — the design, the layouts, the placeholders, the type — is PowerPoint's own.
  */
 
+require dirname(__DIR__, 4) . '/vendor/autoload.php';
+require __DIR__ . '/FixtureFailed.php';
+
 const PRESENTATIONML = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 const DRAWINGML = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const RELATIONSHIPS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const PACKAGE = 'http://schemas.openxmlformats.org/package/2006/relationships';
 const TYPES = 'http://schemas.openxmlformats.org/package/2006/content-types';
+
+/** The line every part here opens with, before its own content. */
+const PROLOGUE = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
 
 $path = $argv[1] ?? null;
 $slides = (int) ($argv[2] ?? 4);
@@ -39,7 +45,7 @@ write($path, $slides, $cx, $cy);
 echo 'wrote ', $path, ' — ', $slides, " empty slides on a {$cx} x {$cy} EMU page\n";
 
 /**
- * @throws RuntimeException When the archive cannot be written.
+ * @throws PowerPointFixtureFailed When the archive cannot be written.
  */
 function write(string $path, int $slides, int $cx, int $cy): void
 {
@@ -47,7 +53,7 @@ function write(string $path, int $slides, int $cx, int $cy): void
     $zip = new ZipArchive();
 
     if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-        throw new RuntimeException(sprintf('Unable to write the stub at "%s".', $path));
+        throw new PowerPointFixtureFailed(sprintf('Unable to write the stub at "%s".', $path));
     }
 
     foreach ($files as $name => $contents) {
@@ -69,6 +75,13 @@ function write(string $path, int $slides, int $cx, int $cy): void
  */
 function parts(int $slides, int $cx, int $cy): array
 {
+    /**
+     * The three namespace declarations every part that draws something carries.
+     *
+     * Written once because getting one of them wrong is the difference between a deck PowerPoint
+     * opens and one it offers to repair, and the three appear on almost every part here.
+     */
+    $namespaces = ' xmlns:a="' . DRAWINGML . '" xmlns:r="' . RELATIONSHIPS . '" xmlns:p="' . PRESENTATIONML . '"';
     $rels = [];
     $link = static function (string $type, string $target) use (&$rels): string {
         $rels[] = [$type, $target];
@@ -102,7 +115,7 @@ function parts(int $slides, int $cx, int $cy): array
     $files = [];
 
     $files['[Content_Types].xml'] = sprintf(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="%s">'
+        PROLOGUE . '<Types xmlns="%s">'
         . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
         . '<Default Extension="xml" ContentType="application/xml"/>%s<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>'
         . '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>'
@@ -121,7 +134,7 @@ function parts(int $slides, int $cx, int $cy): array
     );
 
     $files['_rels/.rels'] = sprintf(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="%s">'
+        PROLOGUE . '<Relationships xmlns="%s">'
         . '<Relationship Id="rId1" Type="%s/officeDocument" Target="ppt/presentation.xml"/>'
         . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
         . '<Relationship Id="rId3" Type="%s/extended-properties" Target="docProps/app.xml"/>'
@@ -131,7 +144,7 @@ function parts(int $slides, int $cx, int $cy): array
         RELATIONSHIPS,
     );
 
-    $files['docProps/core.xml'] = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    $files['docProps/core.xml'] = PROLOGUE
         . '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"'
         . ' xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/"'
         . ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
@@ -143,22 +156,19 @@ function parts(int $slides, int $cx, int $cy): array
 
     // Empty on purpose: PowerPoint fills both of these in from the machine it runs on, and this
     // file is thrown away, so there is nothing to gain by pretending otherwise.
-    $files['docProps/app.xml'] = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    $files['docProps/app.xml'] = PROLOGUE
         . '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">'
         . '<Application>stub</Application><Slides>' . $slides . '</Slides><Company></Company>'
         . '</Properties>';
 
     $files['ppt/presentation.xml'] = sprintf(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        . '<p:presentation xmlns:a="%s" xmlns:r="%s" xmlns:p="%s"><p:sldMasterIdLst>'
+        PROLOGUE
+        . '<p:presentation' . $namespaces . '><p:sldMasterIdLst>'
         . '<p:sldMasterId id="2147483648" r:id="%s"/></p:sldMasterIdLst>'
         . '<p:sldIdLst>%s</p:sldIdLst><p:sldSz cx="%d" cy="%d"/>'
         . '<p:notesSz cx="6858000" cy="9144000"/>'
         . '<p:defaultTextStyle><a:defPPr><a:defRPr lang="en-US"/></a:defPPr></p:defaultTextStyle>'
         . '</p:presentation>',
-        DRAWINGML,
-        RELATIONSHIPS,
-        PRESENTATIONML,
         $master,
         $ids,
         $cx,
@@ -172,16 +182,13 @@ function parts(int $slides, int $cx, int $cy): array
         . '<a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree>';
 
     $files['ppt/slideMasters/slideMaster1.xml'] = sprintf(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster xmlns:a="%s" xmlns:r="%s" xmlns:p="%s">'
+        PROLOGUE . '<p:sldMaster' . $namespaces . '>'
         . '<p:cSld>%s</p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1"'
         . ' accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6"'
         . ' hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/>'
         . '</p:sldLayoutIdLst><p:txStyles><p:titleStyle><a:lvl1pPr><a:defRPr sz="4400"/></a:lvl1pPr></p:titleStyle>'
         . '<p:bodyStyle><a:lvl1pPr><a:defRPr sz="3200"/></a:lvl1pPr></p:bodyStyle>'
         . '<p:otherStyle><a:defPPr/></p:otherStyle></p:txStyles></p:sldMaster>',
-        DRAWINGML,
-        RELATIONSHIPS,
-        PRESENTATIONML,
         $tree,
     );
 
@@ -191,12 +198,9 @@ function parts(int $slides, int $cx, int $cy): array
     );
 
     $files['ppt/slideLayouts/slideLayout1.xml'] = sprintf(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldLayout xmlns:a="%s" xmlns:r="%s"'
-        . ' xmlns:p="%s" type="blank" preserve="1"><p:cSld name="Stub">%s</p:cSld>'
+        PROLOGUE . '<p:sldLayout' . $namespaces . ' type="blank" preserve="1">'
+        . '<p:cSld name="Stub">%s</p:cSld>'
         . '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>',
-        DRAWINGML,
-        RELATIONSHIPS,
-        PRESENTATIONML,
         $tree,
     );
 
@@ -206,11 +210,8 @@ function parts(int $slides, int $cx, int $cy): array
 
     for ($number = 1; $number <= $slides; $number++) {
         $files["ppt/slides/slide{$number}.xml"] = sprintf(
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="%s" xmlns:r="%s"'
-            . ' xmlns:p="%s"><p:cSld>%s</p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>',
-            DRAWINGML,
-            RELATIONSHIPS,
-            PRESENTATIONML,
+            PROLOGUE . '<p:sld' . $namespaces . '>'
+            . '<p:cSld>%s</p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>',
             $tree,
         );
 
@@ -219,11 +220,9 @@ function parts(int $slides, int $cx, int $cy): array
         );
     }
 
-    $files['ppt/presProps.xml'] = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentationPr'
-        . ' xmlns:a="' . DRAWINGML . '" xmlns:r="' . RELATIONSHIPS . '" xmlns:p="' . PRESENTATIONML . '"/>';
-    $files['ppt/viewProps.xml'] = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:viewPr'
-        . ' xmlns:a="' . DRAWINGML . '" xmlns:r="' . RELATIONSHIPS . '" xmlns:p="' . PRESENTATIONML . '"/>';
-    $files['ppt/tableStyles.xml'] = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:tblStyleLst'
+    $files['ppt/presProps.xml'] = PROLOGUE . '<p:presentationPr' . $namespaces . '/>';
+    $files['ppt/viewProps.xml'] = PROLOGUE . '<p:viewPr' . $namespaces . '/>';
+    $files['ppt/tableStyles.xml'] = PROLOGUE . '<a:tblStyleLst'
         . ' xmlns:a="' . DRAWINGML . '" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>';
 
     $files['ppt/theme/theme1.xml'] = theme();
@@ -263,7 +262,7 @@ function theme(): string
         . '<a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst>';
 
     return sprintf(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="%s" name="Stub">'
+        PROLOGUE . '<a:theme xmlns:a="%s" name="Stub">'
         . '<a:themeElements><a:clrScheme name="Stub">%s</a:clrScheme>'
         . '<a:fontScheme name="Stub"><a:majorFont><a:latin typeface="Calibri Light"/><a:ea typeface=""/>'
         . '<a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/>'
@@ -329,7 +328,7 @@ function relationship(int $id, string $type, string $target): string
 function relationships(string $body): string
 {
     return sprintf(
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="%s">%s</Relationships>',
+        PROLOGUE . '<Relationships xmlns="%s">%s</Relationships>',
         PACKAGE,
         $body,
     );

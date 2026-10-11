@@ -33,6 +33,19 @@ function powerpointFixtures(): string
     return dirname(__DIR__) . '/fixtures/powerpoint';
 }
 
+/*
+ * The layout names both decks carry, as PowerPoint spells them.
+ *
+ * A `layouts.yml` matches a template by the name its layout part carries, so these two strings
+ * are the whole interface between the two, and a theme that spells one differently stops matching
+ * with nothing to say so. Spelled once here rather than at every place a test happens to need one.
+ */
+const TITLE_AND_CONTENT = 'Title and Content';
+const PICTURE_WITH_CAPTION = 'Picture with Caption';
+
+/** The manifest of the theme built around the deck PowerPoint designed. */
+const HARBOUR_THEME = "name: Harbour\n";
+
 function harbourLights(): string
 {
     return powerpointFixtures() . '/harbour-lights.pptx';
@@ -47,9 +60,9 @@ it('reads the layouts of a deck PowerPoint designed', function () {
     $boxes = (new TemplateGeometry(harbourLights()))->boxes();
 
     expect($boxes)->toHaveKey('Title Slide')
-        ->and($boxes)->toHaveKey('Title and Content')
+        ->and($boxes)->toHaveKey(TITLE_AND_CONTENT)
         ->and($boxes)->toHaveKey('Two Content')
-        ->and($boxes)->toHaveKey('Picture with Caption')
+        ->and($boxes)->toHaveKey(PICTURE_WITH_CAPTION)
         ->and($boxes['Title Slide']['title']->x)->toBe(119)
         ->and($boxes['Title Slide']['title']->y)->toBe(189);
 });
@@ -59,11 +72,11 @@ it('reads the layouts of a deck that was only worked in', function () {
 
     // The awkward deck is on A4 rather than a slide shape, so every box is scaled by the ratio
     // of its page rather than by a fixed number of EMU per pixel.
-    expect($boxes)->toHaveKey('Title and Content')
+    expect($boxes)->toHaveKey(TITLE_AND_CONTENT)
         ->and($boxes)->toHaveKey('Two Content')
-        ->and($boxes)->toHaveKey('Picture with Caption')
-        ->and($boxes['Title and Content']['title']->x)->toBe(66)
-        ->and($boxes['Title and Content']['title']->width)->toBe(828);
+        ->and($boxes)->toHaveKey(PICTURE_WITH_CAPTION)
+        ->and($boxes[TITLE_AND_CONTENT]['title']->x)->toBe(66)
+        ->and($boxes[TITLE_AND_CONTENT]['title']->width)->toBe(828);
 });
 
 it('takes a bare ph for the body PowerPoint writes without naming it a body', function () {
@@ -77,11 +90,11 @@ it('takes a bare ph for the body PowerPoint writes without naming it a body', fu
     // of 960, and 4351338 EMU down a 6858000 EMU one is 343.
     $boxes = (new TemplateGeometry(workshopNotes()))->boxes();
 
-    expect($boxes['Title and Content'])->toHaveKeys(['title', 'body'])
-        ->and($boxes['Title and Content']['body'][0]->x)->toBe(66)
-        ->and($boxes['Title and Content']['body'][0]->y)->toBe(144)
-        ->and($boxes['Title and Content']['body'][0]->width)->toBe(828)
-        ->and($boxes['Title and Content']['body'][0]->height)->toBe(343);
+    expect($boxes[TITLE_AND_CONTENT])->toHaveKeys(['title', 'body'])
+        ->and($boxes[TITLE_AND_CONTENT]['body'][0]->x)->toBe(66)
+        ->and($boxes[TITLE_AND_CONTENT]['body'][0]->y)->toBe(144)
+        ->and($boxes[TITLE_AND_CONTENT]['body'][0]->width)->toBe(828)
+        ->and($boxes[TITLE_AND_CONTENT]['body'][0]->height)->toBe(343);
 });
 
 it('reads a layout whose placeholders are all left where the master put them', function () {
@@ -89,7 +102,7 @@ it('reads a layout whose placeholders are all left where the master put them', f
     // every one of its layouts with no position of their own, and leaves the title of *Title and
     // Content* unplaced too. A reader that wanted them would inherit three boxes it cannot draw
     // in; a reader that takes them anyway would put a date where nothing asked for one.
-    expect((new TemplateGeometry(harbourLights()))->boxes()['Title and Content']['title'])
+    expect((new TemplateGeometry(harbourLights()))->boxes()[TITLE_AND_CONTENT]['title'])
         ->toEqual(new Box(53, 48, 677, 104));
 });
 
@@ -104,7 +117,7 @@ it('takes the picture column first out of a layout that has one', function () {
     // and it is the caption that is filled first. The library draws the picture into the first
     // column and the text into the second, which is the only order that puts the text under a
     // full-width picture rather than beside it.
-    $boxes = (new TemplateGeometry(harbourLights()))->boxes()['Picture with Caption'];
+    $boxes = (new TemplateGeometry(harbourLights()))->boxes()[PICTURE_WITH_CAPTION];
 
     expect($boxes['body'][0]->y)->toBe(48)
         ->and($boxes['body'][0]->height)->toBe(303)
@@ -142,7 +155,7 @@ it('draws a slide in the geometry a real deck states', function () {
     // not write: the layout part the deck is given and the slide on it agree, so *Reset*
     // restores what the slide already has.
     $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Harbour\n",
+        'theme.yml' => HARBOUR_THEME,
         'layouts.yml' => "layouts:\n  content: Title and Content\n",
         'template.pptx' => file_get_contents(harbourLights()),
     ]);
@@ -186,7 +199,7 @@ it('draws a body in the box the deck states rather than the one the library woul
 
 it('draws both columns of a two-content slide where a real deck puts them', function () {
     $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Harbour\n",
+        'theme.yml' => HARBOUR_THEME,
         'layouts.yml' => "layouts:\n  two-column: Two Content\n",
         'template.pptx' => file_get_contents(harbourLights()),
     ]);
@@ -211,7 +224,7 @@ it('leaves a role whose layout the deck does not have where the library puts it'
     // not have is therefore not an error — it is a role kept where the library puts it, which is
     // the only thing a half-matched theme can mean.
     $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Harbour\n",
+        'theme.yml' => HARBOUR_THEME,
         // A section mapped to a layout neither deck has, which is the ordinary way a theme is
         // written and then used against a deck nobody checked it against.
         'layouts.yml' => "layouts:\n  content: Title and Content\n  section: Section Divider\n",
@@ -238,9 +251,9 @@ it('names nothing in either deck that PowerPoint did not write', function () {
     $harbour = array_keys((new TemplateGeometry(harbourLights()))->boxes());
     $workshop = array_keys((new TemplateGeometry(workshopNotes()))->boxes());
 
-    expect($harbour)->toContain('Title and Content')
-        ->and($harbour)->toContain('Picture with Caption')
-        ->and($workshop)->toContain('Title and Content')
+    expect($harbour)->toContain(TITLE_AND_CONTENT)
+        ->and($harbour)->toContain(PICTURE_WITH_CAPTION)
+        ->and($workshop)->toContain(TITLE_AND_CONTENT)
         ->and($workshop)->toContain('Comparison')
         ->and($harbour)->not->toContain('')
         ->and($workshop)->not->toContain('')

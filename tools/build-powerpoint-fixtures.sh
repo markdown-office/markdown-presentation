@@ -31,7 +31,7 @@ PICTURE="$HERE/examples/markdown/assets/logo.png"
 
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
-if [ ! -d /Applications/Microsoft\ PowerPoint.app ]; then
+if [[ ! -d '/Applications/Microsoft PowerPoint.app' ]]; then
 	echo "Microsoft PowerPoint is not installed; these fixtures are authored in it and cannot" >&2
 	echo "be rebuilt anywhere else." >&2
 	exit 1
@@ -64,7 +64,7 @@ author () {
 	osascript "$BUILDER/$script" "$CONTAINER/$deck.pptx" "$CONTAINER/logo.png" "$log" >>"$log" 2>&1 &
 	local running=$!
 
-	while kill -0 "$running" 2>/dev/null && [ "$waited" -lt 600 ]; do
+	while kill -0 "$running" 2>/dev/null && [[ "$waited" -lt 600 ]]; do
 		sleep 1
 		waited=$((waited + 1))
 	done
@@ -92,7 +92,7 @@ author workshop 6 9906000 6858000 workshop.applescript || exit 1
 pkill -9 -f "Microsoft PowerPoint" >/dev/null 2>&1
 rm -rf "$CONTAINER"
 
-if [ "${1:-}" != "--keep" ]; then
+if [[ "${1:-}" != "--keep" ]]; then
 	rm -rf "$WORK"
 fi
 

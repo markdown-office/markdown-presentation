@@ -23,6 +23,15 @@ use MarkdownPresentation\Tests\Support\Scratch;
  */
 
 /**
+ * The part a one-slide deck's numbers are written into.
+ *
+ * Every test here reads what a theme changed by looking at this part, so it is spelled once: a
+ * deck that failed to build would otherwise leave all of them reading a missing part, and a
+ * missing part and a part with the wrong number in it are not the same failure.
+ */
+const SLIDE_ONE = 'ppt/slides/slide1.xml';
+
+/**
  * A theme with one `style:` key set, and everything else at the library's own numbers.
  *
  * A `colors:` key may be passed alongside, and is passed through to {@see Theme::fromArray}
@@ -47,7 +56,6 @@ function styledTheme(array $style, array $colors = []): Theme
  */
 function themedDeck(Theme $theme, string $markdown = "---\ntheme: %s\n---\n\n# T\n\n## Sub\n\nBody.\n\n***\n"): Pptx
 {
-    $root = dirname(__DIR__, 2);
     $directory = Scratch::directoryPath('theme');
     file_put_contents($directory . '/theme.yml', (string) json_encode($theme->toArray()));
 
@@ -233,7 +241,7 @@ it('leaves the theme\'s own gap between two paragraphs of one frame', function (
     $deck = "---\ntheme: %s\n---\n\n# T\n\nOne.\n\nTwo.\n";
 
     foreach (['tight' => 8, 'loose' => 24] as $name => $block) {
-        $xml = themedDeck(styledTheme(['block' => $block]), $deck)->part('ppt/slides/slide1.xml');
+        $xml = themedDeck(styledTheme(['block' => $block]), $deck)->part(SLIDE_ONE);
         // `a:spcPts` is a measure in hundredths of a point, and a pixel is three quarters of
         // one, so 8px of block gap is 600 there and 24px is 1800.
         preg_match_all('#<a:spcAft>\s*<a:spcPts val="(\d+)"/>#', $xml, $found);
@@ -252,8 +260,8 @@ it('draws a rule at the weight its theme names', function () {
 it('draws a heading in its face\'s own weight when the theme says so', function () {
     // A serif deck with a large title wants the reading weight of the face; a sans deck with
     // a heavy title does not. `b="1"` is the bold the writer emits.
-    $regular = themedDeck(styledTheme(['heading-weight' => 'regular']))->part('ppt/slides/slide1.xml');
-    $bold = themedDeck(styledTheme(['heading-weight' => 'bold']))->part('ppt/slides/slide1.xml');
+    $regular = themedDeck(styledTheme(['heading-weight' => 'regular']))->part(SLIDE_ONE);
+    $bold = themedDeck(styledTheme(['heading-weight' => 'bold']))->part(SLIDE_ONE);
 
     expect(headingIsBold($regular))->toBeFalse()
         ->and(headingIsBold($bold))->toBeTrue();
@@ -263,7 +271,7 @@ it('draws a heading in the accent rather than the body ink when the theme says s
     // An accent a body could never be painted in, so the two are told apart by the colour
     // rather than by which shape it happened to land on.
     $accent = styledTheme(['heading-ink' => 'accent'], ['accent1' => '#C00000']);
-    $ink = headingShape(themedDeck(styledTheme(['heading-ink' => 'ink']))->part('ppt/slides/slide1.xml'));
+    $ink = headingShape(themedDeck(styledTheme(['heading-ink' => 'ink']))->part(SLIDE_ONE));
 
     expect(headingColour(themedDeck($accent)))->toBe('C00000')
         ->and(headingColourIn($ink ?? ''))->not->toBe('C00000');
@@ -275,7 +283,7 @@ it('leaves a title in the body ink whatever a heading says of itself', function 
     // colour from its own text reads as two decks.
     $theme = styledTheme(['heading-ink' => 'accent'], ['accent1' => '#C00000']);
     $pptx = themedDeck($theme);
-    preg_match('#<p:sp>(?:(?!</p:sp>).)*name="title".*?</p:sp>#s', $pptx->part('ppt/slides/slide1.xml'), $shape);
+    preg_match('#<p:sp>(?:(?!</p:sp>).)*name="title".*?</p:sp>#s', $pptx->part(SLIDE_ONE), $shape);
 
     expect(headingColourIn($shape[0] ?? ''))->toBe('000000');
 });
@@ -318,7 +326,7 @@ function headingIsBold(string $slide): bool
 /** The first colour written on the `## Sub` shape on slide one. */
 function headingColour(Pptx $pptx): ?string
 {
-    $shape = headingShape($pptx->part('ppt/slides/slide1.xml'));
+    $shape = headingShape($pptx->part(SLIDE_ONE));
 
     return $shape === null ? null : headingColourIn($shape);
 }

@@ -29,6 +29,11 @@ use MarkdownPresentation\Tests\Support\ThemeDirectory;
  * claim about the `.pptx` and not about the renderer's intentions.
 */
 
+/** The placeholder names a written layout carries, as the layout part spells them. */
+const TITLE_SLOT = 'title';
+const BODY_ONE_SLOT = 'body 1';
+const BODY_TWO_SLOT = 'body 2';
+
 function slideDeck(string $markdown): Pptx
 {
     $deck = (new DeckParser())->parse($markdown);
@@ -352,18 +357,16 @@ it('divides an image-text layout into a picture column and a text column', funct
 });
 
 it('leaves an image-text layout\'s text column wide enough for the estimate to be wrong', function () {
-    // Both of a picture's columns are laid out from an estimate of how many lines its text
-    // wraps to, and the estimate reads a table of Helvetica's widths against a face that is
-    // usually wider. Where the estimate is short the two paragraphs are drawn on top of one
-    // another, and LibreOffice's preview does not show it — PowerPoint's own render does.
-    [$picture, $text] = (new SlideGeometry())->body(LayoutRole::ImageText);
+    // Both of a picture's columns are laid out from an estimate of how many lines its text wraps
+    // to, and the estimate reads a table of Helvetica's widths against a face that is usually
+    // wider. Where the estimate is short the two paragraphs are drawn on top of one another, and
+    // LibreOffice's preview does not show it — PowerPoint's own render does.
+    [, $text] = (new SlideGeometry())->body(LayoutRole::ImageText);
 
     // The ratio is 5:4 rather than the 3:2 a picture would prefer, and this is what holds it
     // there. {@see ShapeWriter} lays a column out from a table of Helvetica's widths and a
     // theme's own face is wider than Helvetica, so the text column has to be wide enough that
-    // being wrong by a word does not put a paragraph on top of the one above it. Where it is
-    // not, two paragraphs are drawn over one another — which LibreOffice's preview does not
-    // show and PowerPoint's own render does.
+    // being wrong by a word does not put a paragraph on top of the one above it.
     //
     // Five ninths of what the two columns share is a shade under half the body, and that is
     // the number: a 3:2 split would leave the text on two fifths, which is where the overlap
@@ -401,7 +404,7 @@ it('gives an image-text layout a title box and a body placeholder for each of it
     $pptx = slideDeck("---\nlayout: image-text\n---\n# One\n\nLeft.\n\n## Right\n\nRight side.\n");
 
     expect($pptx->layoutNames())->toBe([1 => 'Picture Left'])
-        ->and(array_keys($pptx->layoutPlaceholders()))->toBe(['title', 'body 1', 'body 2']);
+        ->and(array_keys($pptx->layoutPlaceholders()))->toBe([TITLE_SLOT, BODY_ONE_SLOT, BODY_TWO_SLOT]);
 });
 
 it('gives an image-title layout a headline and a body tall enough to be worth looking at', function () {
@@ -418,7 +421,7 @@ it('writes an image-title layout named the way the theme names it, with a title 
     $pptx = slideDeck("---\nlayout: image-title\n---\n# One\n\nText.\n");
 
     expect($pptx->layoutNames())->toBe([1 => 'Picture with Caption'])
-        ->and(array_keys($pptx->layoutPlaceholders()))->toBe(['title', 'body 1'])
+        ->and(array_keys($pptx->layoutPlaceholders()))->toBe([TITLE_SLOT, BODY_ONE_SLOT])
         ->and($pptx->placeholderOf('title'))->toBe('type="title"');
 });
 
@@ -443,7 +446,7 @@ it('writes an image slide whose layout carries only a body placeholder', functio
     $pptx = slideDeck("---\nlayout: image-slide\n---\n\nJust a picture.\n");
 
     expect($pptx->layoutNames())->toBe([1 => 'Full Bleed Picture'])
-        ->and(array_keys($pptx->layoutPlaceholders()))->toBe(['body 1']);
+        ->and(array_keys($pptx->layoutPlaceholders()))->toBe([BODY_ONE_SLOT]);
 });
 
 it('draws a title named in the frontmatter as a heading on an image slide', function () {

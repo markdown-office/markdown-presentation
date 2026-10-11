@@ -43,6 +43,10 @@ function builtDeck(string $name): array
     return [Pptx::open($path), $source];
 }
 
+/** The deck that carries the three picture roles, and the layout part its full-bleed one is called. */
+const PICTURE_DECK = '07-images.md';
+const FULL_BLEED_LAYOUT = 'Full Bleed Picture';
+
 $root = dirname(__DIR__, 2);
 $readme = (string) file_get_contents($root . '/examples/README.md');
 
@@ -96,7 +100,7 @@ it('converts each deck that is not the rejected one', function (string $name) {
     '04-frontmatter.md',
     '05-steps.md',
     '06-tables.md',
-    '07-images.md',
+    PICTURE_DECK,
     '08-code.md',
     '09-inline-markup.md',
 ]);
@@ -184,20 +188,20 @@ it('draws a frontmatter title on a blank layout, which has no title box', functi
 });
 
 it('binds each picture layout to the layout part its theme names for it', function () {
-    [$pptx] = builtDeck('07-images.md');
+    [$pptx] = builtDeck(PICTURE_DECK);
 
     // A role is portable and the layout part is not: the deck wrote `image-text` and the
     // file carries a part called `Picture Left`, which is what `layouts.yml` is for.
-    expect($pptx->layoutNames())->toContain('Picture Left', 'Picture with Caption', 'Full Bleed Picture');
+    expect($pptx->layoutNames())->toContain('Picture Left', 'Picture with Caption', FULL_BLEED_LAYOUT);
 });
 
 it('gives the picture layouts placeholders rather than free-floating boxes', function () {
-    [$pptx] = builtDeck('07-images.md');
+    [$pptx] = builtDeck(PICTURE_DECK);
 
     // The claim that makes them roles rather than drawing: each layout part carries the
     // placeholders for the boxes the slides are drawn in, and *Reset* restores them.
     $picture = array_search('Picture Left', $pptx->layoutNames(), true);
-    $full = array_search('Full Bleed Picture', $pptx->layoutNames(), true);
+    $full = array_search(FULL_BLEED_LAYOUT, $pptx->layoutNames(), true);
 
     expect($picture)->not->toBeFalse()
         ->and(array_keys($pptx->layoutPlaceholders((int) $picture)))->toBe(['title', 'body 1', 'body 2'])
@@ -205,11 +209,11 @@ it('gives the picture layouts placeholders rather than free-floating boxes', fun
 });
 
 it('leaves an image slide with no title placeholder to inherit', function () {
-    [$pptx] = builtDeck('07-images.md');
+    [$pptx] = builtDeck(PICTURE_DECK);
 
     // A picture alone, which is what the role is: a template whose own layout carries a
     // title placeholder does not turn it into a role that has one.
-    $full = array_search('Full Bleed Picture', $pptx->layoutNames(), true);
+    $full = array_search(FULL_BLEED_LAYOUT, $pptx->layoutNames(), true);
 
     expect($full)->not->toBeFalse();
 
