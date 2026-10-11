@@ -211,9 +211,7 @@ final class BlockParser
             // than drawn, because three colons on a slide read as a mistake and two do not.
             if (preg_match(self::CLOSES_REGION, $line) === 1) {
                 throw UnknownMarker::strayCloser($slide);
-            }
-
-            if (preg_match(self::REGION, $line, $region) === 1) {
+            } elseif (preg_match(self::REGION, $line, $region) === 1) {
                 // Everything before the opener stays on the step it was written at, and
                 // everything inside is one step of its own, so the opener names that step
                 // through the same jump a bare marker does.
@@ -232,12 +230,11 @@ final class BlockParser
                 $index = $end + 1;
 
                 continue;
-            }
-
-            // Capture 1 is the step and nothing below looks at it: absent is the bare form
-            // and an empty capture is a `::click=` with nothing after the equals, and the two
-            // are not the same marker. `jump()` is what tells them apart.
-            if (preg_match(self::MARKER, $line, $marker) === 1) {
+            } elseif (preg_match(self::MARKER, $line, $marker) === 1) {
+                // Capture 1 is the step and nothing below looks at it: absent is the bare form
+                // and an empty capture is a `::click=` with nothing after the equals, and the
+                // two are not the same marker. `jump()` is what tells them apart.
+                //
                 // The step opens *after* the block the marker closes. Advancing first would
                 // put the block a writer wrote above the marker on the step below it, which
                 // is the reverse of what the author meant.
@@ -249,20 +246,6 @@ final class BlockParser
 
             if (trim($line) === '') {
                 $this->flush($blocks, $quote, $paragraph, $step);
-
-                continue;
-            }
-
-            // A heading, a rule and an image are each one line and nothing more, so the walk
-            // does not have to learn how far any of them reaches. None of the three can match
-            // a line the quote below matches — all three are anchored at the start of the
-            // line, and `>` is not the start of a heading, a rule or an image — so the order
-            // they are asked in is not observable.
-            $single = $this->single($line, $slide, $directory, $files, $step);
-
-            if ($single !== null) {
-                $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = $single;
 
                 continue;
             }
@@ -281,15 +264,14 @@ final class BlockParser
                 continue;
             }
 
-            // A code block, a pipe table and a list each reach past the line that opens them,
-            // so each hands back the line its last line is on and the walk resumes there. The
-            // line was stepped over above, so this is where it ends rather than where it began.
-            [$spanning, $end] = $this->spanning($lines, $index - 1, $step);
+            // The line was stepped over above, so this is where a block ends rather than where
+            // it began, and the walk resumes on the line after that.
+            [$block, $end] = $this->block($lines, $index - 1, $slide, $directory, $files, $step);
             $index = $end + 1;
 
-            if ($spanning !== null) {
+            if ($block !== null) {
                 $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = $spanning;
+                $blocks[] = $block;
 
                 continue;
             }
@@ -303,46 +285,38 @@ final class BlockParser
     }
 
     /**
-     * The block one line is a whole on its own, or null where it is none of those three.
+     * The block the line at `$index` is a whole on its own, and the line that block ends on.
+     *
+     * A heading, a rule and an image are one line and nothing more, so the walk does not have
+     * to learn how far any of them reaches. A code block, a pipe table and a list each reach
+     * past the line that opens them and are handed the lines that follow it: a walk that asked
+     * how far each of them reached would be carrying three notions of "ends here" at once.
+     * A null block and the line it was asked about, where the line opens none of the six.
+     *
+     * {@see self::blocks()} asks this of a line its quote has not taken, which is what keeps a
+     * quoted pipe row a quote: `> a|b` carries a `|` and an alignment row below it would make
+     * it a table, and a table headed `> a` is not one.
      *
      * The union rather than {@see Block} because {@see self::flush()} appends to a list
      * every kind of block may go into, and a wider answer here would need narrowing there.
-     */
-    private function single(string $line, int $slide, string $directory, PathScope $files, int $step): Heading|Rule|Image|null
-    {
-        // One question — "is this line a whole block?" — asked as one expression, so the
-        // answer is the block rather than a place the caller has to go and look.
-        return match (true) {
-            preg_match(self::HEADING, $line, $heading) === 1
-                => new Heading($this->inline->parse($heading[2]), strlen($heading[1]), $step),
-            preg_match(self::RULE, $line) === 1 => new Rule($step),
-            preg_match(self::IMAGE, trim($line), $matches) === 1
-                => $this->image($matches, $slide, $directory, $files, $step),
-            default => null,
-        };
-    }
-
-    /**
-     * The block the line at `$index` opens that runs past itself, and the line it ends on.
-     *
-     * A code block, a pipe table and a list are read here rather than in the walk above
-     * because each has to be handed the lines that follow it: a walk that asked how far each
-     * of them reached would be carrying three different notions of "ends here" at once.
-     *
-     * A null block and the line it was asked about, where the line opens none of the three.
      *
      * @param list<string> $lines
      *
-     * @return array{0: Code|Table|ListBlock|null, 1: int}
+     * @return array{0: Code|Heading|Image|ListBlock|Rule|Table|null, 1: int}
      */
-    private function spanning(array $lines, int $index, int $step): array
+    private function block(array $lines, int $index, int $slide, string $directory, PathScope $files, int $step): array
     {
         $line = $lines[$index];
 
-        // The three are asked in one expression rather than as three guards because they are
-        // one question — "does this line open a block that reaches past itself?" — and each
-        // answer is the block read, which is a different shape from the next one's.
-        $block = match (true) {
+        // One question — "is this line a whole block?" — asked as one expression, so the
+        // answer is the block rather than a place the caller has to go and look. The three
+        // that reach past the line they open already answer with the line they end on.
+        return match (true) {
+            preg_match(self::HEADING, $line, $heading) === 1
+                => [new Heading($this->inline->parse($heading[2]), strlen($heading[1]), $step), $index],
+            preg_match(self::RULE, $line) === 1 => [new Rule($step), $index],
+            preg_match(self::IMAGE, trim($line), $matches) === 1
+                => [$this->image($matches, $slide, $directory, $files, $step), $index],
             preg_match(self::FENCE, $line, $fence) === 1 => self::code($lines, $index, $fence, $step),
             str_contains($line, '|') && preg_match(self::ALIGNMENT_ROW, $lines[$index + 1] ?? '') === 1
                 => $this->table($lines, $index, $step),
@@ -350,10 +324,8 @@ final class BlockParser
             // with `self::list()` reading the indent off whichever pattern matched.
             preg_match(self::BULLET, $line, $item) === 1 || preg_match(self::ORDERED, $line, $item) === 1
                 => self::list($lines, $index, $this->inline, $item, $step),
-            default => null,
+            default => [null, $index],
         };
-
-        return $block ?? [null, $index];
     }
 
     /**

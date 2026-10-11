@@ -140,23 +140,7 @@ final class DeckParser
             }
 
             if (str_starts_with($trimmed, '---')) {
-                // An empty block is not a slide: Slidev's `slice()` returns without
-                // moving the start, and moving it would turn a deck written with a
-                // leading `---` frontmatter block into an empty slide in front of it.
-                if ($start !== $index) {
-                    $slides[] = self::slide($lines, $start, $index, count($slides));
-                    $start = $index + 1;
-                }
-
-                // A run of four dashes or more closes the slide without opening
-                // frontmatter — `$trimmed[3] !== '-'` — and the line after has to
-                // carry something, or there is no block to read. `--- with a
-                // trailing word` does open one, which is why this tests the
-                // character rather than the line.
-                if (($trimmed[3] ?? '') !== '-' && trim($lines[$index + 1] ?? '') !== '') {
-                    $start = $index;
-                    $index = self::closingDelimiter($lines, $index + 1, $last);
-                }
+                $index = self::delimiter($lines, $trimmed, $index, $last, $start, $slides);
             } elseif (preg_match(self::FENCE_OPEN, $trimmed, $fence) === 1) {
                 $index = self::closingFence($lines, $index, $last, $fence[1]);
             } elseif (preg_match(self::OPENS_NOTE, $trimmed) === 1) {
@@ -174,6 +158,44 @@ final class DeckParser
         }
 
         return new Deck($markdown, $slides);
+    }
+
+    /**
+     * A `---` line: the slide being read ends there, and the block after it is the
+     * frontmatter of the next one where a line follows carrying something.
+     *
+     * Both halves in one method, because they are one line's grammar — a delimiter that ends
+     * a slide and a delimiter that opens a frontmatter block are the same line, and
+     * {@see self::parse()} reads line kinds rather than their halves.
+     *
+     * What it returns is the last line the delimiter consumed, which the walk steps past:
+     * a delimiter that opened nothing returns the line it was handed.
+     *
+     * @param list<string> $lines
+     * @param list<Slide>  $slides
+     */
+    private static function delimiter(array $lines, string $trimmed, int $index, int $last, int &$start, array &$slides): int
+    {
+        // An empty block is not a slide: Slidev's `slice()` returns without
+        // moving the start, and moving it would turn a deck written with a
+        // leading `---` frontmatter block into an empty slide in front of it.
+        if ($start !== $index) {
+            $slides[] = self::slide($lines, $start, $index, count($slides));
+            $start = $index + 1;
+        }
+
+        // A run of four dashes or more closes the slide without opening
+        // frontmatter — `$trimmed[3] !== '-'` — and the line after has to
+        // carry something, or there is no block to read. `--- with a
+        // trailing word` does open one, which is why this tests the
+        // character rather than the line.
+        if (($trimmed[3] ?? '') !== '-' && trim($lines[$index + 1] ?? '') !== '') {
+            $start = $index;
+
+            return self::closingDelimiter($lines, $index + 1, $last);
+        }
+
+        return $index;
     }
 
     /**
