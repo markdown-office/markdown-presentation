@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Render\PlaceholderPass;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SlideGeometry;
@@ -170,9 +171,14 @@ it('changes nothing the second time it runs', function () {
 });
 
 it('says so when the presentation cannot be read at all', function () {
+    // `UnreadablePackage` and not `RuntimeException`, and not merely because the type is
+    // more specific: `NotesColourMapPass` refuses the very same file with the very same
+    // check, and it refuses it with this class. A caller catching what the README says
+    // will catch one pass and silently miss the other, on a deck that is one broken path
+    // in either case.
     expect(fn () => PlaceholderPass::applyTo(
         Scratch::file('not-a-deck.pptx', 'not a zip'),
         new SlideGeometry(),
         [LayoutRole::Content],
-    ))->toThrow(RuntimeException::class);
+    ))->toThrow(UnreadablePackage::class);
 });

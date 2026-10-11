@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Tests\Support;
 
-use RuntimeException;
 use ZipArchive;
 
 /**
@@ -31,7 +30,7 @@ final class Pptx
     public static function open(string $path): self
     {
         if (!is_file($path)) {
-            throw new RuntimeException(sprintf('No presentation was written to "%s".', $path));
+            throw FixtureFailed::noPresentationAt($path);
         }
 
         return new self($path);
@@ -57,21 +56,16 @@ final class Pptx
     /**
      * One part's XML, as a string.
      *
-     * @throws RuntimeException When the part is not in the file, with the list of what is —
-     *                          a test that expected a slide and got none should say which
-     *                          slides are there.
-    */
+     * @throws FixtureFailed When the part is not in the file, with the list of what is —
+     *                       a test that expected a slide and got none should say which
+     *                       slides are there.
+     */
     public function part(string $name): string
     {
         $xml = $this->handle()->getFromName($name);
 
         if ($xml === false) {
-            throw new RuntimeException(sprintf(
-                'No part "%s" in "%s". The parts are: %s.',
-                $name,
-                basename($this->path),
-                implode(', ', $this->parts()),
-            ));
+            throw FixtureFailed::noPart($name, $this->path, $this->parts());
         }
 
         return $xml;
@@ -411,7 +405,7 @@ final class Pptx
         // CHECKCONS because a zip that cannot be read is not a `.pptx` in any sense a test
         // should be asserting about; without it a corrupt file reads as an empty one.
         if ($zip->open($this->path, ZipArchive::CHECKCONS) !== true) {
-            throw new RuntimeException(sprintf('"%s" is not a readable zip.', $this->path));
+            throw FixtureFailed::notAZip($this->path);
         }
 
         return $zip;

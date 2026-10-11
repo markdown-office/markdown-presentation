@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Tests\Support;
 
-use RuntimeException;
 use ZipArchive;
 
 /**
@@ -53,7 +52,7 @@ final class Template
         $zip = new ZipArchive();
 
         if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new RuntimeException(sprintf('Unable to write the template at "%s".', $path));
+            throw FixtureFailed::noTemplateAt($path);
         }
 
         $zip->addFromString('ppt/presentation.xml', sprintf(

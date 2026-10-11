@@ -6,7 +6,6 @@ namespace MarkdownPresentation\Tests\Support;
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Theme\Theme;
-use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -106,7 +105,7 @@ final class Doctest
             'markdown' => DeckHtml::render((new DeckParser())->parse($code)),
             'yaml' => self::theme($code),
             'php' => self::script($code),
-            default => throw new RuntimeException(sprintf('No example language "%s".', $language)),
+            default => throw FixtureFailed::noExampleLanguage($language),
         };
 
         return str_replace(self::root(), '<root>', $result);
@@ -148,7 +147,7 @@ final class Doctest
         );
 
         if (!is_resource($process)) {
-            throw new RuntimeException('Unable to run the example.');
+            throw FixtureFailed::noProcess();
         }
 
         $out = (string) stream_get_contents($pipes[1]);
@@ -158,7 +157,7 @@ final class Doctest
         fclose($pipes[2]);
 
         if (proc_close($process) !== 0) {
-            throw new RuntimeException('The example failed: ' . trim($errors));
+            throw FixtureFailed::exampleFailed($errors);
         }
 
         return $out;

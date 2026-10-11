@@ -117,6 +117,33 @@ it('reports a failure under one catch, whatever it is a failure of', function ()
         ->toBeInstanceOf(Exception::class);
 });
 
+it('throws a named type out of the support code too', function () {
+    // `FixtureFailed` is there for the same reason the library's own types are: a caller
+    // that wants to skip a test whose fixture could not be built has to be able to tell
+    // that apart from a render that came out wrong, and `RuntimeException` says neither.
+    //
+    // The half of the promise nobody reads is the half that rots — the directory is only
+    // walked when somebody adds a file to it — so it is walked here rather than trusted.
+    $generic = [];
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(Doctest::root() . '/tests/Support', FilesystemIterator::SKIP_DOTS),
+    );
+
+    foreach ($files as $file) {
+        if ($file->getExtension() !== 'php' || !$file->isFile()) {
+            continue;
+        }
+
+        foreach (file($file->getPathname()) as $number => $line) {
+            if (preg_match('#new\s+\\\\?(?:Runtime|Logic)?Exception\s*\(#', $line) === 1) {
+                $generic[] = $file->getFilename() . ':' . ($number + 1) . ' ' . trim($line);
+            }
+        }
+    }
+
+    expect($generic)->toBe([]);
+});
+
 it('refuses a package with a part it cannot read', function () {
     // The half of the promise above nobody reaches by describing it: a package that opens,
     // with one part in it this process cannot decompress. What used to happen instead is
