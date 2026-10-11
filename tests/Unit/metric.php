@@ -120,8 +120,10 @@ it('measures an empty string as one line', function () {
 
 it('measures a paragraph by the lines it wraps to', function () {
     // `x` is 500 units, so 500 of them at 16pt is 4000px of type in the 860px the body
-    // box leaves: five lines, and five times the 26px a line of body text is.
-    expect(measured(str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(130.0);
+    // box leaves: five lines. Each is the 26px a line of body text is, and each but the last
+    // carries the 12px the theme writes after a paragraph — which PowerPoint puts after every
+    // line, so five lines cost 5 × 26 + 4 × 12 rather than 5 × 26.
+    expect(measured(str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(178.0);
 });
 
 it('measures a run boundary as a change of face rather than as a line', function () {
@@ -174,7 +176,9 @@ it('measures a quote by the lines it wraps to', function () {
 });
 
 it('measures a list by the lines its items wrap to', function () {
-    expect(measured('- ' . str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(130.0);
+    // One item of five lines, so the same five lines and the four gaps between them as the
+    // paragraph above.
+    expect(measured('- ' . str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(178.0);
 });
 
 it('measures a code line by its characters, so a long one wraps', function () {

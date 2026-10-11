@@ -183,19 +183,14 @@ final class ShapeWriter
      */
     private function textHeight(TextFrame $frame, int $width): int
     {
-        $paragraphs = $frame->paragraphs();
-        $last = count($paragraphs) - 1;
-        $height = 0;
+        $lines = 0;
 
-        foreach ($paragraphs as $at => $entry) {
-            $height += $this->entryLines($entry, $width) * $this->geometry->lineHeight($this->bodySize());
-
-            if ($at < $last) {
-                $height += $this->geometry->style()->blockGap();
-            }
+        foreach ($frame->paragraphs() as $entry) {
+            $lines += $this->entryLines($entry, $width);
         }
 
-        return $height;
+        return $lines * $this->geometry->lineHeight($this->bodySize())
+            + ($lines - 1) * $this->geometry->style()->blockGap();
     }
 
     /**
@@ -367,9 +362,8 @@ final class ShapeWriter
 
             // `runs()` zeroes the spacing on every paragraph it fills, which is right for a
             // shape of one paragraph and wrong for a frame of several. The gap between two of
-            // them is written here instead, and only where there is a paragraph under this
-            // one to be separated from — a trailing one would be space the frame was never
-            // measured for.
+            // them is written here instead, on every paragraph that has another one under
+            // it; a trailing one would be space the frame was never measured for.
             if ($at < $last) {
                 $paragraph->setSpacingAfter($this->geometry->paragraphSpace());
             }

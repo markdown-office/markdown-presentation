@@ -708,6 +708,21 @@ it('leaves the theme\'s own gap between two paragraphs of one frame', function (
         ->and(preg_match_all('#<a:spcAft>#', $xml))->toBe(2);
 });
 
+it('measures a frame the way PowerPoint lays it out, which is a gap after every line', function () {
+    // PowerPoint puts a paragraph's spacing after every line of the frame rather than after
+    // the paragraph it was written on, so three paragraphs of two lines each are six lines
+    // and five gaps. Measured per paragraph — the natural reading, and the wrong one — the
+    // frame would be two gaps short, and PowerPoint does not shrink the type to fit the box
+    // it was given, so the text would be drawn over whatever the layout put below it.
+    $pptx = renderDeck(str_repeat(
+        "A paragraph of ordinary prose that has to wrap because it is long enough to fill the width of a body box more than twice over, and then some.\n\n",
+        3,
+    ));
+
+    expect($pptx->positionOf('text')['height'])->toBe(216.0)
+        ->and(substr_count($pptx->part('ppt/slides/slide1.xml'), '<a:p>'))->toBe(3);
+});
+
 it('leaves the gap between two paragraphs out of the frame\'s height twice', function () {
     // A gap measured into the frame *and* written into it is a frame a gap taller than the
     // text in it, and every shape below it that much further down the slide.

@@ -301,8 +301,19 @@ another colour, which one box's paragraphs cannot each be.
 
 The gap between two paragraphs is the theme's own `block:` spacing, written into the shape as
 `a:spcAft` — the same number the layout spends between two shapes of a column, spent in the
-other of its two places. A frame of text that does not fit its slide is clamped to the room
-left and reported as one shape, because one is what it is.
+other of its two places, and counted once rather than twice.
+
+One thing about that gap is worth knowing, because it is measured rather than assumed:
+**PowerPoint puts a paragraph's spacing after every line of the frame, not only after the
+paragraph it was written on.** A paragraph that wraps to three lines is therefore three lines
+of leading plus two gaps. The frame is measured the way PowerPoint lays it out — a gap after
+every line but the last — so what it holds is exactly what it was given room for and nothing
+can be drawn over it. The cost is that body text is looser inside a frame than it was as a
+shape per paragraph, and a slide that used to fit may not; the renderer says so rather than
+overlapping (see [When a slide is too full](#when-a-slide-is-too-full)).
+
+A frame of text that does not fit its slide is clamped to the room left and reported as one
+shape, because one is what it is.
 
 Shapes stack down the body box, each one starting where the one above it ended with a gap
 between them.
@@ -401,8 +412,9 @@ foreach ($renderer->overflows() as $overflow) {
 slide 1 step 1 column 1: code wants 1150px, 396px left
 ```
 
-One entry per block that had to be clamped, so a slide whose contents are taller than its
-box reports every block below the point it ran out. The list is emptied by each
+One entry per shape that had to be clamped, so a slide whose contents are taller than its
+box reports every shape below the point it ran out. A run of paragraphs and lists is one
+shape, so it is one entry where there used to be one per block. The list is emptied by each
 `render()`: a layout belongs to one deck, so a caller converting several in a loop reads the
 last one's.
 
