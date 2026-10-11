@@ -239,19 +239,16 @@ final class BlockParser
      */
     private function single(string $line, int $slide, string $directory, PathScope $files, int $step): Heading|Rule|Image|null
     {
-        if (preg_match(self::HEADING, $line, $heading) === 1) {
-            return new Heading($this->inline->parse($heading[2]), strlen($heading[1]), $step);
-        }
-
-        if (preg_match(self::RULE, $line) === 1) {
-            return new Rule($step);
-        }
-
-        if (preg_match(self::IMAGE, trim($line), $matches) === 1) {
-            return $this->image($matches, $slide, $directory, $files, $step);
-        }
-
-        return null;
+        // One question — "is this line a whole block?" — asked as one expression, so the
+        // answer is the block rather than a place the caller has to go and look.
+        return match (true) {
+            preg_match(self::HEADING, $line, $heading) === 1
+                => new Heading($this->inline->parse($heading[2]), strlen($heading[1]), $step),
+            preg_match(self::RULE, $line) === 1 => new Rule($step),
+            preg_match(self::IMAGE, trim($line), $matches) === 1
+                => $this->image($matches, $slide, $directory, $files, $step),
+            default => null,
+        };
     }
 
     /**
