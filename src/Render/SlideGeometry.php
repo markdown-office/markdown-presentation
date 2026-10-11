@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Theme\LayoutRole;
+use MarkdownPresentation\Theme\Style;
 
 /**
  * Where each role puts its title and its body, and how big the type in each is.
@@ -21,21 +22,32 @@ use MarkdownPresentation\Theme\LayoutRole;
  * than in a layout and adopting a whole typographic system would resize the type of every
  * deck that used one.
  *
- * The numbers are fractions of a 960 × 540 slide, which is the unit {@see Box} holds. They
- * are deliberately plain — a 40 pixel margin all the way round and everything left over for
- * content — because a layout that needs more than that is what `template.pptx` is for.
+ * The numbers are fractions of a 960 × 540 slide, which is the unit {@see Box} holds. The
+ * margins, the gutters and the type sizes are the theme's own ({@see Style}); everything
+ * else is plain, because a layout that needs more than that is what `template.pptx` is for.
  *
  * The heights here are *budgets*: {@see ShapeWriter} asks {@see TextMetric} how many lines
  * a block actually takes and multiplies by {@see self::lineHeight()}, so what is left here
  * is only what does not depend on the text at all.
-*/
+ */
 final class SlideGeometry
 {
     public const WIDTH = 960;
     public const HEIGHT = 540;
+
+    /**
+     * The margin left all the way round, in pixels, for a theme that names none.
+     *
+     * {@see Style::defaults()} is the authority — this is the same number, stated here as
+     * well because the box arithmetic below is written against it and a reader should not
+     * have to open another class to find out what a deck without a theme looks like.
+     */
     public const MARGIN = 40;
+
+    /** The gap that separates two things rather than enclosing them, by default. */
     public const GUTTER = 20;
 
+    /** The size body text is drawn at, by default. */
     public const BODY_SIZE = 16;
     public const CODE_SIZE = 12;
     public const TABLE_SIZE = 12;
@@ -74,6 +86,15 @@ final class SlideGeometry
     public const TABLE_COLUMN = 80;
 
     /**
+     * The height of the headline band of an `image-title` layout, in pixels.
+     *
+     * One line of type rather than the two a content slide's title box is given room for.
+     * The headline here introduces a picture rather than sitting above a paragraph, and every
+     * pixel of the band is a pixel of picture.
+     */
+    public const HEADLINE = 45;
+
+    /**
      * The air inside a table cell, on the left and on the right.
      *
      * PHPPresentation writes a cell's `a:bodyPr` with no `lIns`/`rIns` at all, and
@@ -89,30 +110,32 @@ final class SlideGeometry
      */
     public const TABLE_PADDING = 6;
 
-    /** The vertical room a rule occupies, the two-pixel bar centred in it. */
+    /**
+     * The vertical room a rule occupies, the bar centred in it.
+     *
+     * The room rather than the bar: how much of a column a thematic break takes is a layout
+     * decision, and how thick the bar drawn inside it is the theme's
+     * ({@see Style::ruleWeight()}).
+     */
     public const RULE_HEIGHT = 16;
 
     /**
-     * The gap left between two blocks in a column.
+     * The gap left between two blocks in a column, by default.
      *
-     * In the layout rather than in the shapes: every paragraph is written with
-     * `setSpacingBefore(0)` and `setSpacingAfter(0)`, because {@see ShapeWriter::height()}
-     * decides where the next block starts and a leading gap it does not know about is what
-     * puts one shape on top of the one before it. A gap the heights do know about is the
-     * only kind that survives.
+     * In the layout rather than in the shapes: a paragraph is written with
+     * `setSpacingBefore(0)` and the last paragraph of a frame with `setSpacingAfter(0)`,
+     * because {@see ShapeWriter::height()} decides where the next shape starts and a leading
+     * gap it does not know about is what puts one shape on top of the one before it.
+     *
+     * One gap spent once: between two shapes of a column it is added to the cursor as they
+     * are laid out, and between two paragraphs of one frame it is written as the paragraph's
+     * own spacing after — {@see self::paragraphSpace()}. A frame measured with the gap *and*
+     * written with it is a gap taller than the text it separates.
      */
     public const BLOCK_GAP = 12;
 
-    private const BODY_WIDTH = self::WIDTH - 2 * self::MARGIN;
-
     /** A point is 4/3 of a pixel at the 96 dpi {@see Box} counts in. */
     private const PIXELS_PER_POINT = 4 / 3;
-
-    /** The multiple of a line's own height that one line of text is drawn at. */
-    private const LINE_SPACING = 1.2;
-
-    /** A heading one level deeper than a content slide's title, down to the sixth. */
-    private const HEADING_SIZES = [22, 20, 18, 16, 14];
 
     /**
      * The boxes a template's own layouts gave the roles, on top of the ones below.
@@ -124,43 +147,113 @@ final class SlideGeometry
     /**
      * @param array<string, array{title?: Box, body?: non-empty-list<Box>}> $boxes Role to the
      *        boxes a template's layout gave it. A role left out keeps the numbers below.
+     * @param Style                                                       $style  The numbers
+     *        the theme sets: how much of the page the margins take, and how big the type in
+     *        what is left is.
      */
-    public function __construct(array $boxes = [])
-    {
+    public function __construct(
+        array $boxes = [],
+        private readonly Style $style = new Style(),
+    ) {
         $this->boxes = $boxes;
     }
 
     /**
      * A copy whose named roles take their boxes from a template.
      *
-     * Merged rather than replacing what this already knows, so a template that covers two of
-     * the five roles leaves the other three where this class puts them — the same rule
-     * `layouts.yml` follows, where a theme mapping two of the five is a theme that works.
+     * Merged rather than replacing what this already knows, so a template that covers only some
+     * of the roles leaves the rest where this class puts them — the same rule
+     * `layouts.yml` follows, where a theme that maps two of them is a theme that works.
      *
      * @param array<string, array{title?: Box, body?: non-empty-list<Box>}> $boxes
      */
     public function with(array $boxes): self
     {
-        return new self(array_replace($this->boxes, $boxes));
+        return new self(array_replace($this->boxes, $boxes), $this->style);
+    }
+
+    /** The numbers the theme sets: margins, gutters, gaps and the type scale. */
+    public function style(): Style
+    {
+        return $this->style;
+    }
+
+    /** The width a title or a body box spans, in pixels: the page less a margin either side. */
+    private function bodyWidth(): int
+    {
+        return self::WIDTH - 2 * $this->style->margin();
+    }
+
+    /**
+     * A vertical measurement in the theme's own terms.
+     *
+     * Every band on the page is a multiple of the margin rather than a number of pixels, so
+     * widening the margin moves the title, the body and the rule together instead of leaving
+     * one of them where it was. The ratios are the ones the layout has always used at a
+     * 40-pixel margin.
+     */
+    private function band(float $margins): int
+    {
+        return (int) round($this->style->margin() * $margins);
+    }
+
+    /**
+     * A band as tall as `$lines` lines of type this size takes, and never shorter than the
+     * margin-derived band it stands in for.
+     *
+     * A title box of a fixed number of pixels holds the library's own title size and nothing
+     * else: a theme asking for a forty-point title gets a box sized for a twenty-eight-point
+     * one, and `a:normAutofit` shrinks the type back down to what fits. Scaling the band with
+     * the type is what makes a theme's type scale mean anything on a title rather than only
+     * in a body.
+     */
+    private function headingBand(int $size, int $lines): int
+    {
+        return max($this->band(1.8), $lines * $this->lineHeight($size));
     }
 
     /**
      * The title box of a role, the size of its type in points, and the alignment it uses.
      *
-     * Null for `blank`, which has no title: a blank layout that drew one would not be blank,
-     * and the way to put a title on such a slide is to write a heading in its body. That
-     * answer is this class's rather than a template's — a template whose `blank` layout
-     * happens to carry a title placeholder does not turn the role into one that has a title.
+     * Null for a role with no title box — `blank` and `image-slide` — which is
+     * {@see LayoutRole::hasTitleBox()} asked from here. A layout that drew a title anyway
+     * would not be the layout it is, and the way to put a title on such a slide is to write
+     * a heading in its body. That answer is this class's rather than a template's: a
+     * template whose `blank` layout happens to carry a title placeholder does not turn the
+     * role into one that has a title.
      *
      * @return ?array{box: Box, size: int, alignment: string}
-    */
+     */
     public function title(LayoutRole $role): ?array
     {
+        $margin = $this->style->margin();
+        $width = $this->bodyWidth();
+
         $title = match ($role) {
-            LayoutRole::Title => ['box' => new Box(self::MARGIN, 180, self::BODY_WIDTH, 120), 'size' => 40, 'alignment' => 'l'],
-            LayoutRole::Content, LayoutRole::TwoColumn => ['box' => new Box(self::MARGIN, 24, self::BODY_WIDTH, 72), 'size' => 28, 'alignment' => 'l'],
-            LayoutRole::Section => ['box' => new Box(self::MARGIN, 200, self::BODY_WIDTH, 140), 'size' => 44, 'alignment' => 'ctr'],
-            LayoutRole::Blank => null,
+            LayoutRole::Title => [
+                'box' => new Box($margin, $this->band(4.5), $width, $this->band(3)),
+                'size' => $this->style->cover(),
+                'alignment' => 'l',
+            ],
+            LayoutRole::Content, LayoutRole::TwoColumn, LayoutRole::ImageText => [
+                'box' => new Box($margin, $this->band(0.6), $width, $this->headingBand($this->style->title(), 2)),
+                'size' => $this->style->title(),
+                'alignment' => 'l',
+            ],
+            // One line, not a wrapping block: the headline here introduces a picture rather
+            // than sitting above a paragraph, and the height it takes is the height of a line
+            // of it. {@see self::HEADLINE} is what the body is measured from.
+            LayoutRole::ImageTitle => [
+                'box' => new Box($margin, $this->band(0.6), $width, self::HEADLINE),
+                'size' => $this->style->title(),
+                'alignment' => 'l',
+            ],
+            LayoutRole::Section => [
+                'box' => new Box($margin, $this->band(5), $width, $this->band(3.5)),
+                'size' => $this->style->section(),
+                'alignment' => 'ctr',
+            ],
+            LayoutRole::Blank, LayoutRole::ImageSlide => null,
         };
 
         if ($title === null) {
@@ -173,36 +266,114 @@ final class SlideGeometry
     }
 
     /**
-     * The body boxes of a role, in reading order. `two-column` gives two because that is what
-     * it is for; every other role gives one.
+     * Where the body of every role that draws a title above it starts, in pixels.
+     *
+     * A band of its own rather than the title's bottom, because the gap under a title is air
+     * and air is a rhythm rather than a measurement of the type above it. Stating it as a
+     * multiple of the margin is what makes a theme that widens its margin widen the space
+     * under the title too, rather than leaving the body where it was and pushing the type
+     * into it.
+     */
+    private function bodyTop(): int
+    {
+        return $this->band(2.6);
+    }
+
+    /**
+     * The body boxes of a role, in reading order. `two-column` and `image-text` give two
+     * because that is what they are for; every other role gives one.
      *
      * @return non-empty-list<Box>
-    */
+     */
     public function body(LayoutRole $role): array
     {
+        $margin = $this->style->margin();
+        $width = $this->bodyWidth();
+        $top = $this->bodyTop();
+
         return $this->boxes[$role->value]['body'] ?? match ($role) {
-            LayoutRole::TwoColumn => [
-                new Box(self::MARGIN, 104, intdiv(self::BODY_WIDTH - self::GUTTER, 2), 396),
-                new Box(self::MARGIN + intdiv(self::BODY_WIDTH + self::GUTTER, 2), 104, intdiv(self::BODY_WIDTH - self::GUTTER, 2), 396),
-            ],
-            LayoutRole::Title => [new Box(self::MARGIN, 320, self::BODY_WIDTH, 180)],
-            LayoutRole::Section => [new Box(self::MARGIN, 360, self::BODY_WIDTH, 140)],
+            LayoutRole::TwoColumn => $this->columns($top, 1, 1),
+            // The picture leads and the text follows it, so the wider column goes to the
+            // picture: a reader looks at the image first, and text set into the narrower one
+            // beside it is text beside a picture rather than a picture beside text.
+            //
+            // Even rather than the 3:2 a picture would like, though: {@see ShapeWriter} estimates
+            // wrapping from a table of Helvetica's widths and a theme's own face is wider, so a
+            // column narrow enough to need the estimate to be exactly right is a column where
+            // two paragraphs are drawn on top of each other. 5:4 leaves the estimate slack.
+            LayoutRole::ImageText => $this->columns($top, 5, 4),
+            LayoutRole::Title => [new Box($margin, $this->band(8), $width, $this->band(4.5))],
+            LayoutRole::Section => [new Box($margin, $this->band(9), $width, $this->band(3.5))],
             // A blank layout has no title, so its body starts at the margin and gets the whole
             // height — which is the only thing that distinguishes it from a content slide.
-            LayoutRole::Blank => [new Box(self::MARGIN, self::MARGIN, self::BODY_WIDTH, self::HEIGHT - 2 * self::MARGIN)],
-            LayoutRole::Content => [new Box(self::MARGIN, 104, self::BODY_WIDTH, 396)],
+            LayoutRole::Blank => [new Box($margin, $margin, $width, self::HEIGHT - 2 * $margin)],
+            LayoutRole::Content => [new Box($margin, $top, $width, self::HEIGHT - $margin - $top)],
+            // A headline sits in a band of its own, and the picture takes what is left of the
+            // page under it — which is the whole of what separates this from a content slide:
+            // a shorter headline, and everything below it belongs to the picture.
+            LayoutRole::ImageTitle => [$this->below(new Box(
+                $margin,
+                $this->band(0.6),
+                $width,
+                self::HEADLINE,
+            ))],
+            // Full bleed: a slide whose whole content is one picture has no margin to keep, and
+            // the gutter that separates two columns has nothing left to separate.
+            LayoutRole::ImageSlide => [new Box(0, 0, self::WIDTH, self::HEIGHT)],
         };
+    }
+
+    /**
+     * The box below a headline: the rest of the page, less the margins either side of it.
+     *
+     * A second method rather than the arithmetic inline because `image-title` is the only
+     * role whose body starts somewhere other than the top of the content body, and the
+     * arithmetic is the kind that is worth being able to read in one place.
+     */
+    private function below(Box $headline): Box
+    {
+        $top = $headline->y + $headline->height + $this->style->blockGap();
+
+        return new Box($headline->x, $top, $headline->width, self::HEIGHT - $this->style->margin() - $top);
+    }
+
+    /**
+     * Two columns across the body width, in the ratio `$left`:`$right`, separated by the
+     * theme's gutter and both running from under a content slide's title to the bottom margin.
+     *
+     * The same gutter every other indentation uses, so two columns are as far apart as a
+     * bullet is from its text rather than a gap of their own. The right column takes the
+     * remainder rather than its own share of the total, because a column ending a pixel short
+     * of the margin is a ragged edge nothing on the page explains.
+     *
+     * @return non-empty-list<Box>
+     */
+    private function columns(int $top, int $left, int $right): array
+    {
+        $margin = $this->style->margin();
+        $gutter = $this->style->gutter();
+        $available = $this->bodyWidth() - $gutter;
+        $left = intdiv($available * $left, $left + $right);
+        $height = self::HEIGHT - $margin - $top;
+
+        return [
+            new Box($margin, $top, $left, $height),
+            new Box($margin + $left + $gutter, $top, $available - $left, $height),
+        ];
     }
 
     /**
      * The size of a heading in a slide's body, by its depth.
      *
-     * The sixth is the last entry, so a heading deeper than the Markdown has levels for
-     * would take the smallest size there is rather than fail.
-    */
+     * The theme's own scale, whose last entry is the smallest of it: a heading deeper than the
+     * scale runs takes that size rather than failing, which is what keeps a document CommonMark
+     * accepts from being refused over the depth of one heading in it.
+     */
     public function headingSize(int $level): int
     {
-        return self::HEADING_SIZES[$level - 1] ?? self::HEADING_SIZES[count(self::HEADING_SIZES) - 1];
+        $headings = $this->style->headings();
+
+        return $headings[$level - 1] ?? $headings[count($headings) - 1];
     }
 
     /**
@@ -222,11 +393,31 @@ final class SlideGeometry
      *
      * One method rather than a constant per block: a paragraph, a heading, a quote and a
      * table cell are each one line of type, and the four constants this replaced were four
-     * places for the same number to be wrong in.
+     * places for the same number to be wrong in. The theme's leading is the multiple, because
+     * the space between two lines is as much a theme's decision as the size of them.
      */
     public function lineHeight(int $size): int
     {
-        return (int) round($size * self::PIXELS_PER_POINT * self::LINE_SPACING);
+        return (int) round($size * self::PIXELS_PER_POINT * $this->style->leading());
+    }
+
+    /**
+     * The gap written between two paragraphs of one text frame, in points.
+     *
+     * The theme's own block gap, because the air between two paragraphs is the same air as
+     * between two shapes of a column and `block:` should decide both — a theme that widens one
+     * widens the other. In points rather than pixels because `a:spcPts` is a point measure the
+     * writer stores in hundredths, where {@see Box} is the 96 dpi pixel
+     * {@see self::PIXELS_PER_POINT} converts.
+     *
+     * Rounded to a hundredth of a point, which is all {@see Box} can be half of anyway and is
+     * what the writer's hundredths need: `12 / (4 / 3)` is `9.000000000000002` in binary
+     * floating point, and that is written into an attribute the format defines as a whole
+     * number.
+     */
+    public function paragraphSpace(): float
+    {
+        return round($this->style->blockGap() / self::PIXELS_PER_POINT, 2);
     }
 
     /**

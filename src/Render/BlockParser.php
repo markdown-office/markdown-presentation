@@ -155,17 +155,16 @@ final class BlockParser
         $paragraph = [];
         $step = 1;
 
-        for ($index = 0; $index < count($lines); $index++) {
-            if (preg_match(self::FENCE, $lines[$index], $fence) === 1) {
-                [$code, $index] = self::code($lines, $index, $fence, $step);
+        $index = 0;
 
-                $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = $code;
+        // A `while` rather than a `for` because a code block, a table and a list each move
+        // the walk themselves, and a `for` whose counter the body writes to is a loop whose
+        // step depends on what it is stepping over.
+        while ($index < count($lines)) {
+            $line = $lines[$index];
+            $index++;
 
-                continue;
-            }
-
-            [$isMarker, $argument] = self::marker($lines[$index]);
+            [$isMarker, $argument] = self::marker($line);
 
             if ($isMarker) {
                 // The step opens *after* the block the marker closes. Advancing first would
@@ -177,24 +176,22 @@ final class BlockParser
                 continue;
             }
 
-            $line = $lines[$index];
-
             if (trim($line) === '') {
                 $this->flush($blocks, $quote, $paragraph, $step);
 
                 continue;
             }
 
-            if (preg_match(self::HEADING, $line, $heading) === 1) {
-                $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = new Heading($this->inline->parse($heading[2]), strlen($heading[1]), $step);
+            // A heading, a rule and an image are each one line and nothing more, so the walk
+            // does not have to learn how far any of them reaches. None of the three can match
+            // a line the quote below matches — all three are anchored at the start of the
+            // line, and `>` is not the start of a heading, a rule or an image — so the order
+            // they are asked in is not observable.
+            $single = $this->single($line, $slide, $directory, $files, $step);
 
-                continue;
-            }
-
-            if (preg_match(self::RULE, $line) === 1) {
+            if ($single !== null) {
                 $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = new Rule($step);
+                $blocks[] = $single;
 
                 continue;
             }
@@ -213,36 +210,15 @@ final class BlockParser
                 continue;
             }
 
-            if (preg_match(self::IMAGE, trim($line), $image) === 1) {
+            // A code block, a pipe table and a list each reach past the line that opens them,
+            // so each hands back the line its last line is on and the walk resumes there. The
+            // line was stepped over above, so this is where it ends rather than where it began.
+            [$spanning, $end] = $this->spanning($lines, $index - 1, $step);
+            $index = $end + 1;
+
+            if ($spanning !== null) {
                 $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = $this->image($image, $slide, $directory, $files, $step);
-
-                continue;
-            }
-
-            if (str_contains($line, '|') && preg_match(self::ALIGNMENT_ROW, $lines[$index + 1] ?? '') === 1) {
-                [$table, $index] = $this->table($lines, $index, $step);
-
-                $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = $table;
-
-                continue;
-            }
-
-            if (preg_match(self::BULLET, $line, $item) === 1) {
-                [$list, $index] = self::list($lines, $index, $this->inline, $item, $step);
-
-                $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = $list;
-
-                continue;
-            }
-
-            if (preg_match(self::ORDERED, $line, $item) === 1) {
-                [$list, $index] = self::list($lines, $index, $this->inline, $item, $step);
-
-                $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = $list;
+                $blocks[] = $spanning;
 
                 continue;
             }
@@ -253,6 +229,60 @@ final class BlockParser
         $this->flush($blocks, $quote, $paragraph, $step);
 
         return $blocks;
+    }
+
+    /**
+     * The block one line is a whole on its own, or null where it is none of those three.
+     *
+     * The union rather than {@see Block} because {@see self::flush()} appends to a list
+     * every kind of block may go into, and a wider answer here would need narrowing there.
+     */
+    private function single(string $line, int $slide, string $directory, PathScope $files, int $step): Heading|Rule|Image|null
+    {
+        // One question — "is this line a whole block?" — asked as one expression, so the
+        // answer is the block rather than a place the caller has to go and look.
+        return match (true) {
+            preg_match(self::HEADING, $line, $heading) === 1
+                => new Heading($this->inline->parse($heading[2]), strlen($heading[1]), $step),
+            preg_match(self::RULE, $line) === 1 => new Rule($step),
+            preg_match(self::IMAGE, trim($line), $matches) === 1
+                => $this->image($matches, $slide, $directory, $files, $step),
+            default => null,
+        };
+    }
+
+    /**
+     * The block the line at `$index` opens that runs past itself, and the line it ends on.
+     *
+     * A code block, a pipe table and a list are read here rather than in the walk above
+     * because each has to be handed the lines that follow it: a walk that asked how far each
+     * of them reached would be carrying three different notions of "ends here" at once.
+     *
+     * A null block and the line it was asked about, where the line opens none of the three.
+     *
+     * @param list<string> $lines
+     *
+     * @return array{0: Code|Table|ListBlock|null, 1: int}
+     */
+    private function spanning(array $lines, int $index, int $step): array
+    {
+        $line = $lines[$index];
+
+        // The three are asked in one expression rather than as three guards because they are
+        // one question — "does this line open a block that reaches past itself?" — and each
+        // answer is the block read, which is a different shape from the next one's.
+        $block = match (true) {
+            preg_match(self::FENCE, $line, $fence) === 1 => self::code($lines, $index, $fence, $step),
+            str_contains($line, '|') && preg_match(self::ALIGNMENT_ROW, $lines[$index + 1] ?? '') === 1
+                => $this->table($lines, $index, $step),
+            // A bullet and an ordered item are one block kind: paragraphs of the same frame,
+            // with `self::list()` reading the indent off whichever pattern matched.
+            preg_match(self::BULLET, $line, $item) === 1 || preg_match(self::ORDERED, $line, $item) === 1
+                => self::list($lines, $index, $this->inline, $item, $step),
+            default => null,
+        };
+
+        return $block ?? [null, $index];
     }
 
     /**
@@ -288,27 +318,46 @@ final class BlockParser
     {
         $prose = [];
 
-        for ($index = 0; $index < count($lines); $index++) {
+        $index = 0;
+
+        while ($index < count($lines)) {
             if (preg_match(self::FENCE, $lines[$index], $fence) === 1) {
-                // To the closing fence, or to the end of the slide: an unclosed fence is code
-                // to the end of the slide, as {@see self::code()} reads it.
-                for ($index++; $index < count($lines); $index++) {
-                    if (preg_match(self::closes($fence), rtrim($lines[$index])) === 1) {
-                        break;
-                    }
-                }
+                $index = self::closingFence($lines, $index, $fence) + 1;
 
                 continue;
             }
 
-            if (preg_match(self::MARKER, $lines[$index]) === 1) {
-                continue;
+            if (preg_match(self::MARKER, $lines[$index]) !== 1) {
+                $prose[] = $lines[$index];
             }
 
-            $prose[] = $lines[$index];
+            $index++;
         }
 
         return implode("\n", $prose);
+    }
+
+    /**
+     * The line a fence opened at `$open` closes on, or one past the end of the slide when it
+     * is never closed.
+     *
+     * The walk resumes after this line, which is what makes the difference between a fence
+     * that closes and one that does not: a `---` inside an unclosed fence must be read as
+     * code, and returning one past the end rather than the last line is what keeps the walk
+     * from asking about it.
+     *
+     * @param list<string>               $lines
+     * @param array{0: string, 1: string, 2: string} $fence
+     */
+    private static function closingFence(array $lines, int $open, array $fence): int
+    {
+        for ($index = $open + 1; $index < count($lines); $index++) {
+            if (preg_match(self::closes($fence), rtrim($lines[$index])) === 1) {
+                return $index;
+            }
+        }
+
+        return count($lines);
     }
 
     /**
@@ -321,8 +370,12 @@ final class BlockParser
      */
     private static function refuse(int $slide, string $content): void
     {
+        // A finding as one line, so a comment written across four of them can still be
+        // quoted. A local rather than a method of its own: `refuse()` is its only caller.
+        $oneLine = static fn (string $text): string => trim((string) preg_replace('/\s+/', ' ', $text));
+
         if (preg_match(self::COMMENT, $content, $comment) === 1) {
-            throw UnknownDirective::comment($slide, self::oneLine($comment[0]));
+            throw UnknownDirective::comment($slide, $oneLine($comment[0]));
         }
 
         preg_match_all(self::TAG, $content, $tags, PREG_SET_ORDER);
@@ -336,14 +389,8 @@ final class BlockParser
         }
 
         if (preg_match(self::CONTAINER, $content, $fence) === 1) {
-            throw UnknownDirective::container($slide, self::oneLine($fence[0]));
+            throw UnknownDirective::container($slide, $oneLine($fence[0]));
         }
-    }
-
-    /** A finding as one line, so a comment written across four of them can still be quoted. */
-    private static function oneLine(string $text): string
-    {
-        return trim((string) preg_replace('/\s+/', ' ', $text));
     }
 
     private static function jump(int $slide, ?string $argument, int $step): int
@@ -432,7 +479,19 @@ final class BlockParser
     private function table(array $lines, int $index, int $step): array
     {
         $rows = [self::runs(self::cells($lines[$index]), $this->inline)];
-        $align = array_map(self::alignment(...), self::cells($lines[$index + 1]));
+
+        // Inline rather than a method of its own: the alignment row is read once, here, and a
+        // private method reached only through `array_map(self::alignment(...))` is a reader
+        // having to leave this one to find out what a `:` in the second row does.
+        $align = array_map(
+            static fn (string $cell): string => match (true) {
+                str_starts_with($cell, ':') && str_ends_with($cell, ':') => 'center',
+                str_ends_with($cell, ':') => 'right',
+                default => 'left',
+            },
+            self::cells($lines[$index + 1]),
+        );
+
         $end = $index + 1;
 
         while (
@@ -445,15 +504,6 @@ final class BlockParser
         }
 
         return [new Table($rows, $align, $step), $end];
-    }
-
-    private static function alignment(string $cell): string
-    {
-        return match (true) {
-            str_starts_with($cell, ':') && str_ends_with($cell, ':') => 'center',
-            str_ends_with($cell, ':') => 'right',
-            default => 'left',
-        };
     }
 
     /**

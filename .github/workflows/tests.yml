@@ -220,12 +220,12 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      # A library commits no lock file, so there is nothing for `composer audit` to
-      # read and it is a no-op without one. Resolving first — without installing, so
-      # the job stays quick — gives it the set of packages a consumer would actually
-      # be given.
+      # A library commits no lock file, so there is nothing for `composer audit` to read and
+      # it is a no-op without one. Installing first gives it the set a consumer would actually
+      # be given — the same command, and the same resolution, as every other job above; there
+      # is no lock to install *from*, so what it writes is what the audit reads.
       - name: Resolve what a consumer would be given
-        run: composer update --no-install --prefer-dist --no-interaction --no-progress
+        run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Audit it
         run: composer audit --locked --no-interaction

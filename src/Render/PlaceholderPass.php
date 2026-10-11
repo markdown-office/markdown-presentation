@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Render;
 
+use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Theme\LayoutRole;
 use PhpOffice\Common\Drawing as CommonDrawing;
-use RuntimeException;
 use ZipArchive;
 
 /**
@@ -63,16 +63,17 @@ final class PlaceholderPass
      *
      * @param list<LayoutRole> $roles The roles the deck used, in the order their layouts were built.
      *
-     * @throws RuntimeException When the presentation cannot be opened for writing, which is
-     *         the one failure this can meet: a path that is not a package, or one the
-     *         process cannot write.
+     * @throws UnreadablePackage When the presentation cannot be opened for writing, which is the
+     *         one failure this can meet: a path that is not a package, or one the process cannot
+     *         write. The same refusal {@see NotesColourMapPass} makes on the same file, so a
+     *         caller catches one type for the two passes rather than one for each.
      */
     public static function applyTo(string $path, SlideGeometry $geometry, array $roles): int
     {
         $zip = new ZipArchive();
 
         if ($zip->open($path) !== true) {
-            throw new RuntimeException(sprintf('Unable to open the presentation at "%s".', $path));
+            throw UnreadablePackage::cannotOpen($path);
         }
 
         $changed = 0;
@@ -136,13 +137,13 @@ final class PlaceholderPass
      */
     public static function layoutShapes(string $xml, SlideGeometry $geometry, LayoutRole $role): string
     {
-        if (str_contains($xml, '<p:ph ')) {
-            return $xml;
-        }
-
         $end = strpos($xml, '</p:spTree>');
 
-        if ($end === false) {
+        // One question, asked once: is there somewhere in this part to put a shape? A part
+        // that already carries a placeholder is not one to double, and a part with no shape
+        // tree has nowhere to put one — a layout this cannot find room in is not one this
+        // may repair by guessing.
+        if (str_contains($xml, '<p:ph ') || $end === false) {
             return $xml;
         }
 

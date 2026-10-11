@@ -54,10 +54,13 @@ final class TemplateGeometry
 
     /**
      * `subTitle` is a column because that is what it is on the layout a `title` role maps
-     * to, and `obj` because a template's content placeholder is as often one of those as a
-     * `body`.
+     * to, `obj` because a template's content placeholder is as often one of those as a
+     * `body`, and `pic` because the layouts this library gives a picture to carry the
+     * picture in one of their body columns — a template's *Picture Left* is two `body`
+     * placeholders under another name, and reading only the ones called `body` would take
+     * its text column and leave its picture column behind.
      */
-    private const BODY_TYPES = ['body', 'subTitle', 'obj'];
+    private const BODY_TYPES = ['body', 'subTitle', 'obj', 'pic'];
 
     /**
      * @param string $path The theme's `template.pptx`.
@@ -73,7 +76,7 @@ final class TemplateGeometry
      * *Blank* has no placeholders at all, and a role that maps to one keeps the geometry
      * {@see SlideGeometry} puts it at. That is the precedence — a template fills in the roles
      * it covers and says nothing about the rest — and it is the rule `layouts.yml` already
-     * follows, where a theme that maps two of the five roles is a theme that works rather
+     * follows, where a theme that maps two roles is a theme that works rather
      * than one that fails on the three.
      *
      * Two layouts with the same name would collide; the last one in the archive wins, which
@@ -199,11 +202,20 @@ final class TemplateGeometry
 
             // Both attributes are optional and both have a default: `body` and `0`. Office
             // writes a title with neither, which is why they are read rather than required.
-            $type = $placeholder->getAttribute('type');
+            //
+            // The default is applied before the key as well as before the value, because the
+            // key is what a placeholder is matched to its master's by. PowerPoint writes the
+            // ordinary content placeholder of *Title and Content* — the layout a theme maps
+            // `content` to more often than any other — as a bare `<p:ph idx="1"/>`, and a key
+            // built from the attribute as written is `/1`, which matches nothing in a master
+            // that says `body/1`. The layout then states no position, inherits nothing, and
+            // loses its body box to {@see self::cover()}, which drops every placeholder it
+            // cannot place.
+            $type = $placeholder->getAttribute('type') === '' ? 'body' : $placeholder->getAttribute('type');
             $idx = (int) $placeholder->getAttribute('idx');
 
             $found[$type . '/' . $idx] = [
-                'type' => $type === '' ? 'body' : $type,
+                'type' => $type,
                 'idx' => $idx,
                 'box' => $this->box($shape, $page),
             ];

@@ -1,5 +1,7 @@
-# Office's own palette. The neutral one: a deck that names no theme gets this, and
-# so does every theme that leaves an accent alone.
+# Office's own palette, with the type scale and the rhythm a screen in a lit room wants:
+# roomy margins, an open leading and a rule heavy enough to divide a slide you read from the
+# back of a room. A deck that names no theme gets this, and so does every theme that leaves an
+# accent alone.
 name: Default
 description: Office's colours and type, for a deck that says nothing about its look.
 author: markdown-office
@@ -20,3 +22,16 @@ fonts:
   heading: Calibri
   body: Calibri
   mono: Consolas
+style:
+  margin: 40
+  gutter: 20
+  block: 12
+  rule: 2
+  body: 16
+  title: 28
+  cover: 40
+  section: 44
+  headings: [22, 20, 18, 16, 14]
+  leading: 1.2
+  heading-weight: bold
+  heading-ink: ink

@@ -12,7 +12,7 @@ declare(strict_types=1);
  *   php tests/fixtures/themes/templated/build.php
  */
 
-require __DIR__ . '/../../../../vendor/autoload.php';
+require_once __DIR__ . '/../../../../vendor/autoload.php';
 
 use MarkdownPresentation\Tests\Support\Template;
 
@@ -46,6 +46,34 @@ Template::write(__DIR__ . '/template.pptx', [
             // No box of its own: this is what PowerPoint writes for a layout that does not
             // move the title it inherited, and the reader has to fall back to the master.
             ['type' => 'title'],
+        ],
+    ],
+    [
+        'name' => 'Picture Left',
+        'shapes' => [
+            // A title where a content slide's is, a picture in the column further left, and the
+            // text in the width that is left. `pic` before `body` on purpose: `idx` is what
+            // says which column is which, and a reader that took them in the order the file
+            // lists them would put the text where the picture goes.
+            ['type' => 'title', 'x' => 838200, 'y' => 685800, 'cx' => 10515600, 'cy' => 1000125],
+            ['type' => 'body', 'idx' => 2, 'x' => 6096000, 'y' => 1828800, 'cx' => 5029200, 'cy' => 4114800],
+            ['type' => 'pic', 'idx' => 1, 'x' => 838200, 'y' => 1828800, 'cx' => 4785360, 'cy' => 4114800],
+        ],
+    ],
+    [
+        'name' => 'Picture with Caption',
+        'shapes' => [
+            ['type' => 'title', 'x' => 838200, 'y' => 685800, 'cx' => 10515600, 'cy' => 1000125],
+            ['type' => 'pic', 'idx' => 1, 'x' => 838200, 'y' => 1828800, 'cx' => 10515600, 'cy' => 4114800],
+        ],
+    ],
+    [
+        'name' => 'Full Bleed Picture',
+        'shapes' => [
+            // No title: a role with no title box stays without one whatever the template's own
+            // layout carries, so a headline here would be the library inventing a title the
+            // role does not have.
+            ['type' => 'pic', 'idx' => 1, 'x' => 0, 'y' => 0, 'cx' => 12192000, 'cy' => 6858000],
         ],
     ],
     // Office's own *Blank*: nothing this library can draw in it, so a role mapped here keeps

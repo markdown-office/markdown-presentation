@@ -20,6 +20,21 @@ use MarkdownPresentation\Tests\Support\Scratch;
  * not notice it happening.
  */
 
+/** The paragraph these decks are made too long out of, repeated by `str_repeat()`. */
+const FILLER = "Text.\n\n";
+
+/**
+ * Sixty lines of code in a fenced block, which is the block these decks overflow on.
+ *
+ * A function rather than a constant because the same sixty lines are wanted four times and
+ * the number that makes it overflow is the claim: 60 × 19px plus the insets does not fit a
+ * 396-pixel body box, and a shorter block would stop being the thing under test.
+ */
+function tallCodeBlock(): string
+{
+    return "```\n" . str_repeat("line;\n", 60) . "```\n";
+}
+
 /** Render a deck, returning the renderer, because the report is on the renderer. */
 function overflowing(string $markdown, bool $strict = false): PresentationRenderer
 {
@@ -36,7 +51,7 @@ it('reports nothing for a deck that fits its slides', function () {
 it('reports a block it had to make smaller, and how much smaller', function () {
     // Sixty lines of code at 12pt is 60 × 19px plus the insets, in a body box 396px tall.
     // It is drawn as small as the room allows, and this is where that is said out loud.
-    expect(overflowing("```\n" . str_repeat("line;\n", 60) . "```\n")->overflows())->toBe([[
+    expect(overflowing(tallCodeBlock())->overflows())->toBe([[
         'slide' => 1,
         'step' => 1,
         'column' => 0,
@@ -46,13 +61,25 @@ it('reports a block it had to make smaller, and how much smaller', function () {
     ]]);
 });
 
-it('reports every block a full column left no room for, not only the first', function () {
-    // A column that has run out stays out, so every block below the point it ran out is
+it('reports every shape a full column left no room for, not only the first', function () {
+    // A column that has run out stays out, so every shape below the point it ran out is
     // clamped too. One entry for the first would say the column recovered.
-    $overflows = overflowing(str_repeat("Text.\n\n", 40))->overflows();
+    //
+    // A code block between two runs of text is what makes this a test of several entries: a
+    // run of paragraphs is one shape now, so forty of them are one entry and forty paragraphs
+    // on their own would prove nothing about the ones below the point the column ran out.
+    $overflows = overflowing(
+        str_repeat(FILLER, 30) . "```\nline;\n```\n\n" . str_repeat("More.\n\n", 30),
+    )->overflows();
 
     expect(count($overflows))->toBeGreaterThan(1)
-        ->and(array_column($overflows, 'block'))->toBe(array_fill(0, count($overflows), 'paragraph'));
+        ->and(array_column($overflows, 'block'))->toBe(['text', 'code', 'text']);
+});
+
+it('reports one entry for a run of paragraphs, because it is one shape', function () {
+    // The other half: forty paragraphs that do not fit are one shape that did not fit, and an
+    // entry for each of them would say forty things were missing where one is.
+    expect(overflowing(str_repeat(FILLER, 40))->overflows())->toHaveCount(1);
 });
 
 it('names the slide and the step a block overflowed on', function () {
@@ -60,7 +87,7 @@ it('names the slide and the step a block overflowed on', function () {
     // second block arrives — so "slide 1" on its own does not say which drawing of that
     // slide ran out of room.
     $overflows = overflowing(
-        "# One\n\n" . str_repeat("Text.\n\n", 20) . "<!-- v-click -->\n\n" . str_repeat("More.\n\n", 20),
+        "# One\n\n" . str_repeat(FILLER, 20) . "<!-- v-click -->\n\n" . str_repeat("More.\n\n", 20),
     )->overflows();
 
     expect(array_column($overflows, 'slide'))->toBe(array_fill(0, count($overflows), 1))
@@ -80,7 +107,7 @@ it('reports the column a block overflowed in', function () {
 it('empties the report on each render rather than accumulating it', function () {
     // A layout belongs to one deck: a caller converting several in a loop wants the last
     // one's overflows, not all of them.
-    $renderer = overflowing(str_repeat("Text.\n\n", 40));
+    $renderer = overflowing(str_repeat(FILLER, 40));
     $renderer->render((new DeckParser())->parse("Fits.\n"), Scratch::file('deck.pptx', ''));
 
     expect($renderer->overflows())->toBe([]);
@@ -89,7 +116,7 @@ it('empties the report on each render rather than accumulating it', function () 
 it('refuses a deck that overflows when the renderer is strict', function () {
     // Strict is for a caller that would rather have no file than a file with a slide on it
     // that is missing something, and the message has to say which slide and what.
-    expect(fn () => overflowing("```\n" . str_repeat("line;\n", 60) . "```\n", strict: true))
+    expect(fn () => overflowing(tallCodeBlock(), strict: true))
         ->toThrow(
             ContentOverflow::class,
             'Slide 1, step 1, column 1: its code needs 1150px of height and 396px are left.',
@@ -102,7 +129,7 @@ it('writes no file when a strict render refuses the deck', function () {
     $path = Scratch::file('deck.pptx', '');
 
     expect(fn () => (new PresentationRenderer(strict: true))->render(
-        (new DeckParser())->parse("```\n" . str_repeat("line;\n", 60) . "```\n"),
+        (new DeckParser())->parse(tallCodeBlock()),
         $path,
     ))->toThrow(ContentOverflow::class);
 
@@ -112,5 +139,5 @@ it('writes no file when a strict render refuses the deck', function () {
 it('writes a file for a deck that overflows when the renderer is not strict', function () {
     // The pair with the one above: the file is the point of the non-strict renderer, and a
     // clamp that refused to write anything would be strict with extra steps.
-    expect(overflowing("```\n" . str_repeat("line;\n", 60) . "```\n")->overflows())->not->toBe([]);
+    expect(overflowing(tallCodeBlock())->overflows())->not->toBe([]);
 });

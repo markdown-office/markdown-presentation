@@ -181,8 +181,13 @@ final class TextMetric
     private function advance(string $text, int $size, bool $mono, bool $bold): int
     {
         $units = 0;
+        $offset = 0;
+        $length = strlen($text);
 
-        for ($offset = 0, $length = strlen($text); $offset < $length;) {
+        // A `while` rather than a `for` because how far the cursor moves is the answer
+        // rather than a step: a character outside ASCII is more than one byte, and the
+        // header of a `for` has nowhere to say so without reading as an afterthought.
+        while ($offset < $length) {
             $character = self::character($text, $offset);
             $offset += strlen($character);
             $units += self::units($character, $mono);

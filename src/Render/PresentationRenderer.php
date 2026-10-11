@@ -189,7 +189,13 @@ final class PresentationRenderer
         $presentation->getLayout()->setDocumentLayout(DocumentLayout::LAYOUT_SCREEN_16X9);
 
         $used = $this->usedRoles($roles);
-        $geometry = $this->geometry->with($this->template($theme, $used));
+        // The theme's type scale and spacing first, then the boxes a template gives for the
+        // roles it covers: a template places, and placing is the later of the two answers.
+        // The parentheses are load-bearing, not decoration: `new X()->y()` on one expression
+        // is PHP 8.4 syntax, and `composer.json` promises 8.2, where it does not parse. Written
+        // without them this file cannot be loaded at all, so every test that renders a deck
+        // fails on the 8.2 job and nothing local says why.
+        $geometry = (new SlideGeometry(style: $theme->theme()->style()))->with($this->template($theme, $used));
         $layouts = $this->layouts($this->slideMaster($presentation), $theme, $used);
         $this->properties($presentation, $deck, $theme);
 
@@ -396,9 +402,9 @@ final class PresentationRenderer
     /**
      * The roles the deck's slides use, in first-seen order and each of them once.
      *
-     * Only the roles that are used are built. A theme that maps two of the five would
-     * otherwise fail on the three its deck never asked for, which is not the same failure as
-     * a deck that asks for one it did not map.
+     * Only the roles that are used are built. A theme that maps some of them would
+     * otherwise fail on the ones its deck never asked for, which is not the same failure as a
+     * deck that asks for one it did not map.
      *
      * Compared on the role's value rather than with `array_unique`, which casts each element
      * to a string and an enum cannot be cast to one.
@@ -679,13 +685,9 @@ final class PresentationRenderer
      * deep to read it: a blank layout draws its title as a heading, so `level:` would
      * otherwise govern nothing at all there.
      *
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks The slide's blocks, in reading order.
      * @param ?int                                                        $depth What `level:` named.
      *
-     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
-    */
-    /**
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks The slide's blocks, in reading order.
      * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
      */
     private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox, ?int $depth): array
@@ -720,20 +722,24 @@ final class PresentationRenderer
             return $hasTitleBox ? $blocks : [$this->titleHeading($title, $depth), ...$blocks];
         }
 
-        if ($hasTitleBox) {
-            return array_merge(array_slice($blocks, 0, $at), array_slice($blocks, $at + 1));
+        $drawn = $heading;
+
+        if (!$hasTitleBox && $depth !== null) {
+            // As a heading rather than as a title box, so the level itself moves: a title of
+            // level `$depth` is drawn at the size a heading one level shallower is drawn at,
+            // and `level: 1` is the top of what a body can draw.
+            $drawn = new Heading($heading->runs, max(1, $depth - 1), $heading->step);
         }
 
-        if ($depth === null) {
-            return $blocks;
-        }
+        // One list, then one question: a title box draws the title, so the heading goes
+        // rather than being drawn a second time; without one the heading *is* the title, so
+        // it stays, at the depth it was written unless `level:` named another.
+        $blocks[$at] = $drawn;
+        $kept = array_values($blocks);
 
-        // As a heading rather than as a title box, so the level itself moves: a title of
-        // level `$depth` is drawn at the size a heading one level shallower is drawn at, and
-        // `level: 1` is the top of what a body can draw.
-        $blocks[$at] = new Heading($heading->runs, max(1, $depth - 1), $heading->step);
-
-        return array_values($blocks);
+        return $hasTitleBox
+            ? array_merge(array_slice($kept, 0, $at), array_slice($kept, $at + 1))
+            : $kept;
     }
 
     private function note(WrittenSlide $slide, string $text): void
@@ -746,8 +752,13 @@ final class PresentationRenderer
     /**
      * A step's blocks, stacked into the role's body boxes.
      *
+     * Stacked as shapes rather than as blocks: {@see TextFrame::group()} decides which blocks
+     * share one text frame first, because the air between two of them is then the frame's own
+     * paragraph spacing rather than room taken out of the column between two boxes. What
+     * follows is the arithmetic it has always been, one drawable at a time.
+     *
      * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
-    */
+     */
     private function stack(
         WrittenSlide $slide,
         array $blocks,
@@ -762,24 +773,25 @@ final class PresentationRenderer
         foreach ($geometry->body($role) as $column => $box) {
             $y = $box->y;
             $bottom = $box->y + $box->height;
+            $visible = $this->visible($blocks, $columns, $step, $column);
 
-            foreach ($this->visible($blocks, $columns, $step, $column) as $block) {
+            foreach (TextFrame::group($visible) as $drawable) {
                 // A column whose contents are taller than its box runs off the bottom of it,
                 // and an image spends the whole of the room left — so both the cursor and
-                // the height are held inside the box. A block that does not fit is drawn as
+                // the height are held inside the box. A shape that does not fit is drawn as
                 // small as the room allows rather than over whatever is under it, and
                 // {@see self::overflow()} is what says that it had to be.
                 $y = min($y, $bottom - SlideGeometry::MIN_SIZE);
                 $room = max(0, $bottom - $y);
-                $wanted = $writer->height($block, $box, $room);
+                $wanted = $writer->height($drawable, $box, $room);
                 $height = max(min($wanted, $room), SlideGeometry::MIN_SIZE);
 
                 if ($height < $wanted) {
-                    $this->overflow($number, $step, $column, $block->name(), $wanted, $room);
+                    $this->overflow($number, $step, $column, $drawable->name(), $wanted, $room);
                 }
 
-                $writer->write($slide, $block, new Box($box->x, $y, $box->width, $height), $height);
-                $y += $height + SlideGeometry::BLOCK_GAP;
+                $writer->write($slide, $drawable, new Box($box->x, $y, $box->width, $height), $height);
+                $y += $height + $geometry->style()->blockGap();
             }
         }
     }
@@ -818,6 +830,10 @@ final class PresentationRenderer
      * that never writes one fills the left column and leaves the right empty, which is
      * honest: it asked for two columns and wrote one.
      *
+     * Both two-column roles divide the same way, so `image-text` reads as the layout it is
+     * named after: the picture and the text before the `##` on the left, everything after it
+     * on the right.
+     *
      * Decided once for the whole slide rather than per column, because a block that opens the
      * second column belongs to the second column, and a per-column walk that decided
      * otherwise after collecting it drew it in both.
@@ -832,7 +848,7 @@ final class PresentationRenderer
         $current = 0;
 
         foreach ($blocks as $block) {
-            if ($role === LayoutRole::TwoColumn && $current === 0 && $this->opensSecondColumn($block)) {
+            if ($this->splits($role) && $current === 0 && $this->opensSecondColumn($block)) {
                 $current = 1;
             }
 
@@ -866,6 +882,18 @@ final class PresentationRenderer
     private function opensSecondColumn(Block $block): bool
     {
         return $block instanceof Heading && $block->level === 2;
+    }
+
+    /**
+     * Whether a role's blocks are divided between two columns at all.
+     *
+     * Asked of the geometry rather than read off a list of roles, because the boxes are the
+     * fact: a template that gives a role two body boxes has made it two columns whatever the
+     * role is called, and one that gives it one has not.
+     */
+    private function splits(LayoutRole $role): bool
+    {
+        return count($this->geometry->body($role)) > 1;
     }
 
     /**

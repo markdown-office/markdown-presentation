@@ -10,17 +10,15 @@ namespace MarkdownPresentation\Render\Block;
  * A slide is a list of these and nothing else: the renderer walks it twice — once to
  * measure, once to draw — and both passes read the same list, so what is measured and
  * what is written cannot drift apart.
+ *
+ * A block is not necessarily a shape. A paragraph and a list are drawn as paragraphs of one
+ * {@see \MarkdownPresentation\Render\TextFrame} whatever else the column holds, which is
+ * what a reader would build by clicking into a box and typing; a heading, a quote, a rule, a
+ * table, a picture and a code block are shapes of their own, and those are the classes that
+ * carry a `name()` for the shape the file holds.
 */
 interface Block
 {
-    /**
-     * The name this block's shape carries in the file.
-     *
-     * Read off `ppt/slides/slideN.xml`, this is what turns a deck back into the list of
-     * blocks it was written from.
-     */
-    public function name(): string;
-
     /**
      * The step this block appears on, counting from one.
      *

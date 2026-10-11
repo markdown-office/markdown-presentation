@@ -1,6 +1,6 @@
 ---
 title: Images
-description: Fitted, centred, embedded, and converted on the way in.
+description: Fitted, centred, embedded, converted, and the three layouts built around a picture.
 ---
 
 # A picture takes the room left in its column
@@ -45,3 +45,39 @@ $renderer->render($deck, 'deck.pptx');
 
 Columns divide at the first `##` in the body, so everything above this one —
 the picture included — is the left column.
+
+---
+layout: image-text
+---
+
+## image-text
+
+![The office logo, beside the text rather than above it](assets/logo.png)
+
+## The text beside the picture
+
+The picture takes the **wider** column, because a reader looks at it first.
+The two are separated by the same gutter a bullet is from its text.
+
+`image-text` divides at the first `##` exactly as `two-column` does, so the
+picture above is the left column.
+
+---
+layout: image-title
+---
+
+## image-title
+
+![A wide diagram under a headline](assets/landscape.webp)
+
+---
+layout: image-slide
+---
+
+![The office logo, filling the page](assets/logo.png)
+
+<!--
+No heading and no `title:` on this slide, which is the point of the layout: the picture is
+the slide. A title named here would be drawn as a heading above it, which is what `blank`
+does with a title for the same reason — and would stop the slide being the picture alone.
+-->

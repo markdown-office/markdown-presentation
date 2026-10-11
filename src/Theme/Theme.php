@@ -7,7 +7,7 @@ namespace MarkdownPresentation\Theme;
 use MarkdownPresentation\Exception\MalformedTheme;
 
 /**
- * A theme's colours, fonts and metadata.
+ * A theme's colours, fonts, type scale and metadata.
  *
  * The colours are DrawingML's twelve: `dk1`, `lt1`, `dk2`, `lt2`, `accent1`…`accent6`,
  * `hlink` and `folHlink`. The spellings an earlier draft of the concept used —
@@ -18,6 +18,11 @@ use MarkdownPresentation\Exception\MalformedTheme;
  *
  * Colours and fonts a file does not mention keep Office's defaults, so a theme that
  * names two accents still produces a colour scheme that is complete.
+ *
+ * `style:` is the third of the three, and the one that decides what a slide looks like
+ * rather than what colour it is — see {@see Style}. A theme that names none of it is drawn
+ * in the library's own type scale and spacing, which is what every deck was drawn in before
+ * a theme could say otherwise.
  *
  * `dark: true` says the page is dark. It renames no colour — `dk1` is still the dark
  * one and `lt1` the light one — it says which of them plays which part, which is what
@@ -50,7 +55,7 @@ final class Theme
         /** The font slots, in the order a `theme.yml` should list them. */
     public const FONTS = ['heading', 'body', 'mono'];
         /** The keys a `theme.yml` may have. */
-    public const KEYS = ['name', 'description', 'author', 'dark', 'colors', 'fonts'];
+    public const KEYS = ['name', 'description', 'author', 'dark', 'colors', 'fonts', 'style'];
     /**
      * The spellings the concept draft used, mapped onto DrawingML's own. {@see
      * self::colourNames()} lists them wherever a colour name is offered to the
@@ -78,6 +83,7 @@ final class Theme
         private readonly bool $dark,
         private readonly array $colours,
         private readonly array $fonts,
+        private readonly Style $style,
     ) {
     }
 
@@ -111,6 +117,7 @@ final class Theme
                 'body' => 'Calibri',
                 'mono' => 'Consolas',
             ],
+            Style::defaults(),
         );
     }
 
@@ -148,7 +155,30 @@ final class Theme
             self::readDark($data, $file),
             self::readColours($data['colors'] ?? null, $file) ?? $defaults->colours,
             self::readFonts($data['fonts'] ?? null, $file) ?? $defaults->fonts,
+            StyleMapping::read(self::mapping($data, 'style', $file), $file),
         );
+    }
+
+    /**
+     * @param array<array-key, mixed> $data
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws MalformedTheme
+     */
+    private static function mapping(array $data, string $key, string $file): array
+    {
+        $value = $data[$key] ?? null;
+
+        if ($value === null) {
+            return [];
+        }
+
+        if (!is_array($value) || ($value !== [] && array_is_list($value))) {
+            throw MalformedTheme::wrongType($file, $key, 'a mapping of style names to values');
+        }
+
+        return $value;
     }
 
     public function name(): string
@@ -248,9 +278,22 @@ final class Theme
     }
 
     /**
+     * The numbers this theme sets: its type scale, its spacing rhythm and how it treats a
+     * heading.
+     *
+     * Never null — a theme that names no `style:` gets {@see Style::defaults()}, which is
+     * what {@see \MarkdownPresentation\Render\SlideGeometry} has always used. A renderer
+     * therefore never has to ask whether a theme had an opinion before it can draw with it.
+     */
+    public function style(): Style
+    {
+        return $this->style;
+    }
+
+    /**
      * The theme as the array it was read from, in DrawingML's spellings.
      *
-     * @return array{name: string, description: ?string, author: ?string, dark: bool, colors: array<string, string>, fonts: array<string, string>}
+     * @return array{name: string, description: ?string, author: ?string, dark: bool, colors: array<string, string>, fonts: array<string, string>, style: array<string, mixed>}
     */
     public function toArray(): array
     {
@@ -261,6 +304,7 @@ final class Theme
             'dark' => $this->dark,
             'colors' => $this->colours,
             'fonts' => $this->fonts,
+            'style' => StyleMapping::write($this->style),
         ];
     }
 

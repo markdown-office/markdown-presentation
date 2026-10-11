@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Tests\Support;
 
-use RuntimeException;
-
 /**
  * A place for the files a test creates, and their removal.
  *
@@ -22,7 +20,7 @@ final class Scratch
         $directory = dirname(__DIR__, 2) . '/tmp/' . self::SUBDIRECTORY;
 
         if (!is_dir($directory) && !mkdir($directory, 0o777, true) && !is_dir($directory)) {
-            throw new RuntimeException(sprintf('Unable to create the scratch directory "%s".', $directory));
+            throw FixtureFailed::noDirectory($directory);
         }
 
         return $directory;

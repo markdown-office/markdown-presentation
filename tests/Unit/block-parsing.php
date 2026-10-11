@@ -13,6 +13,16 @@ use MarkdownPresentation\Render\Block\Heading;
 use MarkdownPresentation\Render\Block\Image;
 use MarkdownPresentation\Render\Block\ListBlock;
 use MarkdownPresentation\Render\Block\Paragraph;
+
+/**
+ * The target of the links the tests below parse, and the scheme {@see UnsupportedLink}
+ * accepts.
+ *
+ * A constant rather than four spellings because the point of those assertions is that the
+ * *same* target becomes a run's `link`: a reader comparing two literals has to check the
+ * strings really are equal, which is the comparison the test was supposed to be making.
+ */
+const EXAMPLE_LINK = 'https://example.com';
 use MarkdownPresentation\Render\Block\Quote;
 use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
@@ -263,7 +273,7 @@ it('reads a cell as the runs it is drawn from, markup and all', function () {
 
     expect($block->cells[1])->toEqual([
         [new Run('Name', bold: true)],
-        [new Run('lk', link: 'https://example.com')],
+        [new Run('lk', link: EXAMPLE_LINK)],
     ]);
 });
 
@@ -447,7 +457,7 @@ it('leaves an unclosed tilde pair as the characters they are', function () {
 
 it('reads a link as its text with a target', function () {
     expect((new InlineParser())->parse('[text](https://example.com)'))->toEqual([
-        new Run('text', link: 'https://example.com'),
+        new Run('text', link: EXAMPLE_LINK),
     ]);
 });
 
@@ -532,7 +542,7 @@ it('reads a link with no text as a run with nothing in it', function () {
     // A writer who did that wrote nothing to show; the target is still kept so the link is
     // not silently discarded.
     expect((new InlineParser())->parse('[](https://example.com)'))->toEqual([
-        new Run('', link: 'https://example.com'),
+        new Run('', link: EXAMPLE_LINK),
     ]);
 });
 
@@ -540,7 +550,7 @@ it('reads a link with a title and keeps only its target', function () {
     // The title is for a reader hovering the link; PowerPoint has a tooltip for it and a
     // `.pptx` hyperlink does not carry one, so the target is what the run gets.
     expect((new InlineParser())->parse('[text](https://example.com "A title")'))->toEqual([
-        new Run('text', link: 'https://example.com'),
+        new Run('text', link: EXAMPLE_LINK),
     ]);
 });
 

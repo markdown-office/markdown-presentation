@@ -6,7 +6,6 @@ namespace MarkdownPresentation\Tests\Support;
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Theme\Theme;
-use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -106,7 +105,7 @@ final class Doctest
             'markdown' => DeckHtml::render((new DeckParser())->parse($code)),
             'yaml' => self::theme($code),
             'php' => self::script($code),
-            default => throw new RuntimeException(sprintf('No example language "%s".', $language)),
+            default => throw FixtureFailed::noExampleLanguage($language),
         };
 
         return str_replace(self::root(), '<root>', $result);
@@ -148,7 +147,7 @@ final class Doctest
         );
 
         if (!is_resource($process)) {
-            throw new RuntimeException('Unable to run the example.');
+            throw FixtureFailed::noProcess();
         }
 
         $out = (string) stream_get_contents($pipes[1]);
@@ -158,7 +157,7 @@ final class Doctest
         fclose($pipes[2]);
 
         if (proc_close($process) !== 0) {
-            throw new RuntimeException('The example failed: ' . trim($errors));
+            throw FixtureFailed::exampleFailed($errors);
         }
 
         return $out;
@@ -190,12 +189,16 @@ final class Doctest
                 continue;
             }
 
-            $fence = $open[1];
+            $closes = '/\A {0,3}`{' . strlen($open[1]) . ',}\z/';
             $info = trim($open[2]);
             $code = [];
+            $first = $index + 1;
 
-            while (++$index < count($lines)) {
-                if (preg_match('/\A {0,3}`{' . strlen($fence) . ',}\z/', rtrim($lines[$index])) === 1) {
+            // From the line after the opening fence, and left on the closer. The line the
+            // block starts at is worked out from where that ended and how much was read, so
+            // a fence that is never closed still names where it opened.
+            for ($index = $first; $index < count($lines); $index++) {
+                if (preg_match($closes, rtrim($lines[$index])) === 1) {
                     break;
                 }
 

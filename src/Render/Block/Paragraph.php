@@ -17,11 +17,6 @@ final class Paragraph implements Block
     ) {
     }
 
-    public function name(): string
-    {
-        return 'paragraph';
-    }
-
     public function step(): int
     {
         return $this->step;

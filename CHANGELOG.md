@@ -8,6 +8,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A template's *Title and Content* lost its body.** `TemplateGeometry` keyed a placeholder by
+  the `type` attribute as written, so PowerPoint's ordinary content placeholder — written
+  `<p:ph idx="1"/>`, with no `type`, because `body` is the default the schema gives it — was
+  keyed `/1` and asked the master for `/1`. The master says `body/1`, so it inherited nothing,
+  stated no position of its own, and was dropped by `cover()`. A theme mapped to that layout
+  got the title box the template states and the library's own body box instead, silently and
+  with no error anywhere.
+
+  | | Before | After |
+  | --- | --- | --- |
+  | a template whose *Title and Content* inherits its body from its master | a title box and no body | both, the body the master's |
+  | `workshop.pptx`, `Title and Content` | `title(66,29 828×104)` | plus `body0(66,144 828×343)` |
+
+  The default is now applied before the key as well as before the value. Every `.pptx` this
+  library writes spells out `type="body"`, so no test written against one could have shown it;
+  the two decks in `tests/fixtures/powerpoint/`, which PowerPoint authored and saved, both
+  fail without it.
+
 - **32 bytes of deck asked for half a billion slides.** `<!-- v-click=500 -->` rendered 500
   slides in 0.1s and 0.6MB, and the relationship is linear, so
   `<!-- v-click=2147483647 -->` asked for 2.1 billion. On 64-bit,
@@ -277,6 +295,56 @@ All notable changes to this project are documented here. The format follows
   `NotesColourMapPass` should be deleted once this package takes that release, rather than
   kept as a second implementation of a fix upstream then owns.
 
+### Changed
+
+- **A run of paragraphs and lists is one shape, because editing one box is what a
+  PowerPoint user does.** Every Markdown block used to be written as a shape of its own, so
+  a slide whose body was three paragraphs and a list carried four or five text boxes side by
+  side. Clicking the text selected a box rather than the sentence under the pointer, moving
+  one box left the rest of the column where it was, and each box was placed from its own
+  measured height, so two of them could be drawn over one another. A run of consecutive
+  paragraphs and lists is now one shape holding one `<a:p>` each, with the inline markup of
+  a paragraph still a run inside that paragraph.
+
+  | | Before | After |
+  | --- | --- | --- |
+  | `# T` then three paragraphs | `title`, `paragraph`, `paragraph`, `paragraph` | `title`, `text` — one shape, four `<a:p>` in it |
+  | a paragraph, a list and a paragraph | `paragraph`, `list`, `paragraph` | `text` — the list's items are paragraphs of it |
+  | a paragraph, a table, a paragraph | `paragraph`, `table`, `paragraph` | unchanged: a table is a shape of its own |
+
+  A heading, a quote, a rule, a table, a picture and a code block are still shapes of their
+  own, and any of them ends the run — which is also what keeps a frame from straddling two
+  columns of a two-column role, since the columns divide at a heading. A quote ends it
+  because it is drawn a gutter in from the margin at another size in another colour, which
+  one box's paragraphs cannot each be while sharing one box.
+
+  The gap between two paragraphs is the theme's own `block:` spacing, written as their
+  `a:spcAft` — the same number the layout spends between two shapes of a column, spent in the
+  other of its two places, and counted once rather than twice.
+
+- **A frame is measured the way PowerPoint lays its paragraphs out, which is not where the
+  spacing is written.** PowerPoint puts a paragraph's spacing after every line of the frame
+  rather than after the paragraph it was written on, so a paragraph that wraps to three lines
+  is three lines of leading plus two gaps. Measured rather than assumed, by asking PowerPoint
+  to lay a frame out and report the height it came back with: a frame of three paragraphs of
+  three lines came back 63.6pt taller with 9pt written on two of them, which is seven gaps of
+  9pt and not the two a reader would expect. The same holds for `spcBef`, for spacing
+  inherited from a list style rather than written on the paragraph, and for a line spacing
+  written as a percentage or as a point measure — so it is the spacing, not how it is written.
+  LibreOffice applies the same file per paragraph.
+
+  `ShapeWriter::height()` therefore measures a frame with a gap after every line but the last.
+  Measured per paragraph it was a line short for every line that wrapped in it, and
+  PowerPoint does not shrink the type to fit the box it was given — the `normAutofit` this
+  library writes does not shrink at load — so the text was drawn over whatever the layout put
+  below the frame, which is the one failure this change exists to remove.
+
+  The cost is that body text is looser inside a frame than it was as a shape per paragraph,
+  and a slide that used to fit may not: four of the example decks now clamp where they did
+  not. The renderer says so through the overflow report rather than overlapping. A frame that
+  does not fit is one clamped shape and one entry in that report, where there used to be an
+  entry per block.
+
 - **The refusal for an unreadable notes slide could only be tested on some machines.** The
   test that proves the pass refuses rather than writing a part back as zero bytes corrupted
   a real `.pptx` and relied on the build's inflater giving up on it. It does not, everywhere:
@@ -306,6 +374,21 @@ All notable changes to this project are documented here. The format follows
   in the README under *What a failure repeats*, along with what bounds it: a deck cannot
   choose the paths in a message, because the two things a deck writes paths for (an image and
   a theme) are contained to directories the calling program allowed.
+
+- **Two decks Microsoft PowerPoint authored are carried as fixtures.** Every template test was
+  checked against `tests/fixtures/themes/templated/template.pptx`, which this repository writes
+  from a description — a good template, and a poor PowerPoint file: one master, layouts written
+  by the same hand as the reader, and placeholders that spell out every attribute the format
+  lets them spell out. `tests/fixtures/powerpoint/` holds two decks saved by PowerPoint 16.113.4
+  instead: one designed (Facet, a changed palette, two changed theme fonts, eighteen named
+  layouts) and one merely used (A4 rather than 16:9, a table on a layout with no table in it, a
+  slide that has drifted away from the layout it is on). That is what found the bug above. They
+  are validation and documentation, not themes — the three built-in themes stay library-owned.
+
+  `tools/build-powerpoint-fixtures.sh` rebuilds both. PowerPoint is required rather than
+  optional: `make new slide` answers "class slide cannot be created", so the slides have to
+  exist before it opens the file and everything after that is its own work. The authorship
+  metadata PowerPoint writes is stripped afterwards, and a test checks that it was.
 
 The first slice of the PowerPoint half of `markdown-office`. It decides where a
 slide begins and which theme a deck means, and renders the deck to a `.pptx`.

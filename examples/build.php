@@ -11,7 +11,7 @@ declare(strict_types=1);
  * examples/out, and a PNG of every slide beside them in examples/out/<deck>/.
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Render\PresentationRenderer;
@@ -30,6 +30,9 @@ const NOT_BUILT = [
 
 /** Where the decks, their PDFs and their previews are written. */
 const OUT = __DIR__ . '/out';
+
+/** The extension every deck is written under, and stripped from again for its PDF. */
+const DECK = '.pptx';
 
 /** The directory a relative image path in a deck resolves against. */
 const SOURCES = __DIR__ . '/markdown';
@@ -131,7 +134,7 @@ renderPreviews($built);
  */
 function build(DeckParser $parser, string $name, string $source, string $stem): array
 {
-    $path = OUT . '/' . $stem . '.pptx';
+    $path = OUT . '/' . $stem . DECK;
 
     // The renderer is handed the directory the deck is in, because that is what a relative
     // image path in it resolves against — and an example whose pictures are missing would
@@ -143,7 +146,7 @@ function build(DeckParser $parser, string $name, string $source, string $stem): 
     foreach ($renderer->overflows() as $overflow) {
         printf(
             "  %-24s clamped: slide %d step %d column %d: %s wanted %dpx, %dpx left\n",
-            $stem . '.pptx',
+            $stem . DECK,
             $overflow['slide'],
             $overflow['step'],
             $overflow['column'] + 1,
@@ -315,7 +318,11 @@ function renderDeck(string $soffice, string $python, string $path, string $direc
 
     // The profile is a few hundred files of LibreOffice's own state and belongs in the
     // temporary directory rather than beside the slide images it has nothing to do with.
-    $scratch = sys_get_temp_dir() . '/mdpres-' . getmypid() . '-' . md5($path);
+    //
+    // The hash is there to give each deck its own directory in one run, not to verify
+    // anything — the pid already keeps two runs apart, and nothing reads this back. So it is
+    // xxh3, which is what it does, rather than md5, which said it was a digest.
+    $scratch = sys_get_temp_dir() . '/mdpres-' . getmypid() . '-' . hash('xxh3', $path);
     @mkdir($scratch, 0o700, true);
 
     try {
@@ -327,7 +334,7 @@ function renderDeck(string $soffice, string $python, string $path, string $direc
             escapeshellarg($path),
         ), $output, $status);
 
-        $pdf = $directory . '/' . basename($path, '.pptx') . '.pdf';
+        $pdf = $directory . '/' . basename($path, DECK) . '.pdf';
 
         if ($status !== 0 || !is_file($pdf)) {
             printf("  %-30s no PDF: %s\n", basename($path), trim(implode(' ', $output)));

@@ -1,3 +1,8 @@
+# A text-first deck: a serif face set at the size of a book, wide margins so the measure is a
+# line long enough to read, and a hairline rule rather than a bar. The two things that make it
+# minimal are that it is *quiet* — a heading in its own face's reading weight, not a
+# synthesised bold — and that its heading scale is nearly flat, so a `##` and a `###` differ
+# by a point and a half rather than by four.
 name: Minimal
 description: Dense text-first decks, with as little on a slide as the text needs.
 author: markdown-office
@@ -18,3 +23,16 @@ fonts:
   heading: Georgia
   body: Georgia
   mono: Menlo
+style:
+  margin: 64
+  gutter: 18
+  block: 14
+  rule: 1
+  body: 17
+  title: 26
+  cover: 38
+  section: 38
+  headings: [23, 22, 21, 20, 19]
+  leading: 1.12
+  heading-weight: regular
+  heading-ink: ink

@@ -18,31 +18,39 @@ cd "$(dirname "$0")/.."
 file="$1"
 line="$2"
 
-if [ ! -f "$file" ]; then
+if [[ ! -f $file ]]; then
   echo "No such file: $file"
   exit 2
 fi
 
 total="$(wc -l < "$file" | tr -d ' ')"
 
-if [ "$line" -gt "$total" ]; then
+if [[ $line -gt $total ]]; then
   echo "Line $line is past the end of $file, which has $total lines"
   exit 2
 fi
 
 removed="$(sed -n "${line}p" "$file")"
 
-if [ -z "$removed" ]; then
+if [[ -z $removed ]]; then
   echo "Line $line of $file is empty, so there is no change to revert"
   exit 2
 fi
 
 cp "$file" "$file.orig"
 
-restore() { mv "$file.orig" "$file"; }
+restore() {
+  mv "$file.orig" "$file"
+  rm -f "$file.reverted"
+  return 0
+}
 trap restore EXIT
 
-sed -i '' "${line}d" "$file"
+# Not `sed -i`: BSD sed takes the backup suffix as a separate empty argument and
+# GNU sed takes none, so `-i ''` fails on the Linux runner and `-i` alone fails
+# on the machine this was written on. A same-directory temporary is the one form
+# both accept, and `mv` within a directory is the rename rather than a copy.
+sed "${line}d" "$file" > "$file.reverted" && mv "$file.reverted" "$file"
 
 echo "Reverted line $line: ${removed}"
 

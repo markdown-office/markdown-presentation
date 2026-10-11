@@ -243,14 +243,14 @@ and it names the themes that do.
 
 ### What a slide becomes
 
-Every block of a slide becomes a shape, named after the kind of block it came from, so the
-mapping can be read off `ppt/slides/slideN.xml` without the library:
+Every shape of a slide is named after the kind of thing it was drawn from, so the mapping can
+be read off `ppt/slides/slideN.xml` without the library:
 
 | Markdown | Shape | Notes |
 | --- | --- | --- |
 | `# Heading` | `title`, then `heading` | The first heading becomes the title and is not drawn twice, whatever markup it carries |
-| A paragraph | `paragraph` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters. A link target is checked — see [Links](#links) |
-| `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted, from the number the deck writes; nesting is the indent |
+| A paragraph | `text` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters. A link target is checked — see [Links](#links) |
+| `- a` / `1. a` | `text` | Ordered lists are numbered, not bulleted, from the number the deck writes; nesting is the indent |
 | ```` ```lang ```` | `code` | Mono font, filled with `bg2`, the language in the shape's description. No colouring |
 | `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has; a cell carries the same inline markup a paragraph does. The header row is bold, filled with `bg2`, and the columns are as wide as what they hold |
 | `> a` | `quote` | Italic, in `tx2`, indented. Written over several lines it is one shape |
@@ -261,7 +261,61 @@ A title is text like any other: a frontmatter `title: Ops **runbook**` is drawn 
 word in bold rather than as asterisks, and the deck's own `dc:title` carries the same title as
 plain text, because nothing on the other end of a metadata field reads a pair of asterisks.
 
-Blocks stack down the body box, each one starting where the one above it ended with a gap
+### One box for a run of text
+
+A run of paragraphs and lists is drawn as **one** shape holding one paragraph each — the way a
+person builds a slide, by clicking into a placeholder and typing. Three paragraphs with a
+list between them are one box, so clicking any of them selects all of them, moving one moves
+the lot, and PowerPoint lays them out inside the one box they were measured for rather than
+six boxes that might not agree about where they are.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+$deck = (new DeckParser())->parse("# One\n\nFirst.\n\nSecond **bold** one.\n\n- An item.\n\nLast.\n");
+$path = sys_get_temp_dir() . '/deck.pptx';
+(new PresentationRenderer())->render($deck, $path);
+
+$zip = new ZipArchive();
+$zip->open($path);
+
+foreach (preg_split('#(?=<p:sp>)#', $zip->getFromName('ppt/slides/slide1.xml')) as $shape) {
+    if (preg_match('#<p:cNvPr id="\d+" name="([^"]+)"#', $shape, $name) !== 1) {
+        continue;
+    }
+
+    printf("%s: %d paragraphs\n", $name[1], substr_count($shape, '<a:p>'));
+}
+```
+
+```text
+title: 1 paragraphs
+text: 4 paragraphs
+```
+
+A heading, a quote, a rule, a table, a picture and a code block are shapes of their own, and
+any of them ends the run: a heading is a different size and colour, and the others are not
+text. A quote ends it because it is drawn a gutter in from the margin at another size in
+another colour, which one box's paragraphs cannot each be.
+
+The gap between two paragraphs is the theme's own `block:` spacing, written into the shape as
+`a:spcAft` — the same number the layout spends between two shapes of a column, spent in the
+other of its two places, and counted once rather than twice.
+
+One thing about that gap is worth knowing, because it is measured rather than assumed:
+**PowerPoint puts a paragraph's spacing after every line of the frame, not only after the
+paragraph it was written on.** A paragraph that wraps to three lines is therefore three lines
+of leading plus two gaps. The frame is measured the way PowerPoint lays it out — a gap after
+every line but the last — so what it holds is exactly what it was given room for and nothing
+can be drawn over it. The cost is that body text is looser inside a frame than it was as a
+shape per paragraph, and a slide that used to fit may not; the renderer says so rather than
+overlapping (see [When a slide is too full](#when-a-slide-is-too-full)).
+
+A frame of text that does not fit its slide is clamped to the room left and reported as one
+shape, because one is what it is.
+
+Shapes stack down the body box, each one starting where the one above it ended with a gap
 between them.
 
 Every block is measured before it is drawn: `Render\TextMetric` counts the lines it will
@@ -358,8 +412,9 @@ foreach ($renderer->overflows() as $overflow) {
 slide 1 step 1 column 1: code wants 1150px, 396px left
 ```
 
-One entry per block that had to be clamped, so a slide whose contents are taller than its
-box reports every block below the point it ran out. The list is emptied by each
+One entry per shape that had to be clamped, so a slide whose contents are taller than its
+box reports every shape below the point it ran out. A run of paragraphs and lists is one
+shape, so it is one entry where there used to be one per block. The list is emptied by each
 `render()`: a layout belongs to one deck, so a caller converting several in a loop reads the
 last one's.
 
@@ -412,7 +467,7 @@ echo implode(' ', array_slice($names[1], 1)), "\n";
 
 ```text
 Two Content
-paragraph heading paragraph
+text heading text
 ```
 
 Two columns divide at the first `##` in the body, because that is the heading a writer puts
@@ -420,15 +475,60 @@ on a column of a slide and there is nothing else to go on. A deck that never wri
 the left column and leaves the right empty, which is honest: it asked for two columns and
 wrote one.
 
-The five roles are `title`, `content`, `two-column`, `section` and `blank`. Only the ones a
-deck uses are built, so a theme that maps two of the five does not fail on the three nobody
-asked for.
+The two `text` shapes are the paragraphs either side of the `##`, one shape each — see
+[What a slide becomes](#what-a-slide-becomes).
+
+The eight roles are `title`, `content`, `two-column`, `section`, `blank`, `image-text`,
+`image-title` and `image-slide`. Only the ones a deck uses are built, so a theme that maps two
+of them does not fail on the six nobody asked for.
 
 `blank` has no title box — that is what makes it blank — so a slide using it carries its title
 as a heading: the one in its body if it wrote one, and the one its frontmatter named if it did
 not. `level:` governs whichever of the two it is, at the same depth it would govern a body
 heading. The alternative, refusing a `title:` on a blank slide, would refuse a perfectly good
 deck over the one thing the library does draw perfectly well there.
+
+The three picture layouts are roles in exactly that sense — a theme maps each to a layout name,
+a template can supply the boxes for each, and *Reset* restores them:
+
+| Role | What it is for | Columns | Title box |
+| --- | --- | --- | --- |
+| `image-text` | A picture beside a block of text | Two, the picture in the wider one | Yes |
+| `image-title` | A large picture under a headline | One | Yes |
+| `image-slide` | The picture alone, full bleed | One, the whole page | No |
+
+`image-text` divides at the first `##` exactly as `two-column` does, so the picture — everything
+above the heading — is the left column. Its two columns are separated by the same gutter a
+bullet is from its text, not by a gap of its own, and the text column is wider than a picture's
+share of the page would suggest: `ShapeWriter` estimates wrapping from a table of Helvetica's
+widths and a theme's own face is wider than that, so a column narrow enough to need the
+estimate to be exactly right is a column where two paragraphs are drawn on top of one another.
+
+`image-title` gives its headline a band one line tall rather than the two a content slide's
+title box is given room for, because every pixel of that band is a pixel of picture.
+
+`image-slide` has no title box and no margin either: its body box is the whole page, so the
+picture is fitted to the page rather than to a box inside it. A title named on one is drawn as
+a heading in the body, which is `blank`'s answer for the same reason.
+
+```php
+use MarkdownPresentation\Render\SlideGeometry;
+use MarkdownPresentation\Theme\LayoutRole;
+
+$geometry = new SlideGeometry();
+[$picture, $text] = $geometry->body(LayoutRole::ImageText);
+
+printf(
+    "%dpx picture, %dpx text, %dpx apart\n",
+    $picture->width,
+    $text->width,
+    $text->x - $picture->x - $picture->width,
+);
+```
+
+```text
+477px picture, 383px text, 20px apart
+```
 
 ### Placeholders
 
@@ -448,13 +548,16 @@ view, and what makes a layout other than a blank rectangle in the layout picker.
 layout's placeholders are written at are the boxes the slides are drawn in, so *Reset*
 restores the geometry the slide already had and moves nothing.
 
-`two-column` gets two body placeholders, `idx="1"` and `idx="2"`; every other role gets one.
-`blank` gets no title placeholder, because it has no title box — that is what makes it blank.
+`two-column` and `image-text` get two body placeholders, `idx="1"` and `idx="2"`; every other
+role gets one. `blank` and `image-slide` get no title placeholder, because neither has a title
+box — that is what makes `blank` blank and what makes `image-slide` the picture alone.
 
-A slide's body is a stack of differently shaped blocks — a table, a picture, a code block —
-and none of them is a placeholder: promoting one would make *Reset* move that block and leave
-the rest of the column floating. The outline view shows a deck's titles and still shows no
-bullets.
+A slide's body is a stack of differently shaped blocks — a table, a picture, a code block, and
+the frames of text among them — and none of them is a placeholder: promoting one would make
+*Reset* move that shape and leave the rest of the column floating. A frame of text is the one
+that would be expected to be a placeholder, holding the whole of a slide's body, and it is the
+one that must not be: a slide *Reset* tidies is a slide whose body has moved. The outline view
+shows a deck's titles and still shows no bullets.
 
 ### Templates
 
@@ -494,7 +597,7 @@ Three rules decide what a template is allowed to change:
 - **A template fills in the roles it covers and says nothing about the rest.** A layout it
   does not have, and a layout it has with no placeholders in it — Office's own *Blank* — leave
   that role where `SlideGeometry` puts it. This is the same rule `layouts.yml` follows, where a
-  theme mapping three of the five roles is a theme that works.
+  theme mapping some of the roles is a theme that works.
 - **A template places; it does not typeset.** Sizes and alignments stay with `SlideGeometry`,
   because a template states them in a *master*'s `p:txStyles` — a whole typographic system,
   not a layout — and adopting one would resize the type of every deck that shipped a template.
@@ -508,6 +611,102 @@ number are placeholders too and are left out rather than laid out as body text.
 
 A template that cannot be read is a named failure — `Exception\MalformedTemplate` — rather
 than a theme that quietly renders as though it had not said where its geometry comes from.
+
+### Using your own deck as the template
+
+A `template.pptx` does not have to be a `.potx` or come from PowerPoint's gallery. Any deck you
+have will do, as long as you point `layouts.yml` at the layout names *your* deck carries and
+copy it into the theme directory under the name `template.pptx`.
+
+The deck this library was tested against is carried in the repository, authored and saved by
+Microsoft PowerPoint itself, so every step below is shown against a real file rather than a
+description of one. Here is what it says:
+
+```php
+use MarkdownPresentation\Render\TemplateGeometry;
+
+// A real deck: PowerPoint's own Facet design, with the palette and fonts changed.
+$deck = (string) getenv('MARKDOWN_PRESENTATION_ROOT') . '/tests/fixtures/powerpoint/harbour-lights.pptx';
+$boxes = (new TemplateGeometry($deck))->boxes();
+
+foreach (['Title Slide', 'Title and Content', 'Two Content', 'Picture with Caption'] as $name) {
+    $title = $boxes[$name]['title'];
+
+    printf(
+        "%-20s title %3d,%3d %3dx%3d   body %3d,%3d %3dx%3d\n",
+        $name,
+        $title->x, $title->y, $title->width, $title->height,
+        $boxes[$name]['body'][0]->x, $boxes[$name]['body'][0]->y,
+        $boxes[$name]['body'][0]->width, $boxes[$name]['body'][0]->height,
+    );
+}
+```
+
+```text
+Title Slide          title 119,189 612x130   body 119,319 612x 86
+Title and Content    title  53, 48 677x104   body  53,170 677x306
+Two Content          title  53, 48 677x104   body  53,170 329x306
+Picture with Caption title  53,378 677x 45   body  53, 48 677x303
+```
+
+That is the whole mechanism: each layout's placeholders, scaled onto the page this library
+writes. *Two Content* has two columns, so a `two-column` slide gets two; *Picture with Caption*
+numbers its picture placeholder `idx="1"` and its caption `idx="2"`, so the picture goes in the
+first column and the caption under it.
+
+To use it, the theme directory is the template plus the two files that name it:
+
+```
+themes/harbour/
+├── theme.yml          name: Harbour
+├── layouts.yml        which of your deck's layouts each role gets
+└── template.pptx      your deck, copied in
+```
+
+```yaml
+# The layout names are your deck's, verbatim — check them in PowerPoint's slide master view.
+# A role left out keeps this library's own geometry rather than failing.
+layouts:
+  title: Title Slide
+  content: Title and Content
+  two-column: Two Content
+  section: Section Header
+  image-title: Picture with Caption
+```
+
+A deck then names the theme and gets laid out in it, with the layout parts in the written file
+carrying the same names, so *Reset* in PowerPoint restores the geometry rather than moving it:
+
+```markdown
+---
+theme: ../../themes/harbour
+---
+
+# Harbour Lights
+
+Text in the box your deck's *Title and Content* puts it in.
+```
+
+Four things go wrong often enough to be worth saying, and all four were hit while building the
+fixtures above:
+
+- **The name is the interface.** `layouts.yml` matches the `name` a layout part carries in
+  PowerPoint's file, not the label shown in the ribbon. They are usually the same and are not
+  guaranteed to be: Facet's layouts are named `Title and Content`, and a deck saved on a German
+  installation writes `Titel und Inhalt` for the same layout. Open your deck, look at the slide
+  master, and copy what is there.
+- **The page is scaled, not divided.** A template's boxes are a fraction of *its* page, so each
+  axis is scaled by the ratio of that page to the 960 × 540 this library writes. A deck on A4
+  rather than 16:9 works, and its boxes come out at the right proportion — which is what the
+  second fixture in `tests/fixtures/powerpoint/` is for.
+- **A placeholder written `<p:ph idx="1"/>` is a body.** PowerPoint leaves the `type` out where
+  the schema's default applies, and `idx` alone is what identifies it. A template reader has to
+  apply that default before matching a placeholder to the one of the same index on the master,
+  or *Title and Content* silently loses its body box.
+- **A placeholder with no position takes its master's.** PowerPoint writes this for a layout
+  that does not move the placeholder it inherited, and for every footer, date and slide number
+  in every layout. The first is read through; the rest are left out rather than laid out as
+  body text, because a date is a placeholder this library has no feature for.
 
 ### Steps
 
@@ -814,7 +1013,7 @@ and nothing is a PHP class:
 
 ```
 themes/corporate-dark/
-├── theme.yml        required   colours, fonts, metadata
+├── theme.yml        required   colours, fonts, type scale, metadata
 ├── styles.yml       optional   Word style-slot overrides
 ├── layouts.yml      optional   semantic role → template layout name
 ├── template.pptx    optional   PowerPoint template: where the layouts put their boxes
@@ -822,10 +1021,23 @@ themes/corporate-dark/
 └── LICENSE          optional
 ```
 
-Three themes ship with the library — `default`, `corporate-dark` and `minimal`. Here
-is one of them, which is the file on disk:
+The tools that come with the library are in `tools/`:
+
+| Tool | What it is |
+| --- | --- |
+| `tools/phpstan.sh` | Fetches the analyser by checksum and runs it at the level `phpstan.neon.dist` configures |
+| `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: nothing in the test suite needs it, because CI has no PowerPoint |
+| `tools/build-powerpoint-fixtures.sh` | Rebuilds the two decks in `tests/fixtures/powerpoint/`, which were authored in PowerPoint rather than written by hand |
+
+Three themes ship with the library, and they are three different decks rather than one deck in
+three swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
+which is the file on disk:
 
 ```yaml path=themes/corporate-dark/theme.yml
+# A dark briefing deck read on a projector in a room with the lights down. Everything about it
+# is bigger than the default and nothing about it is lighter: wide margins, a heavy rule, the
+# largest body type of the three, and a heading in the accent rather than in the ink the body
+# text is — which is the one treatment that reads at the back of a room.
 name: Corporate Dark
 description: Dark corporate deck for technical briefings.
 author: markdown-office
@@ -847,6 +1059,19 @@ fonts:
   heading: Inter
   body: Roboto
   mono: JetBrains Mono
+style:
+  margin: 48
+  gutter: 24
+  block: 16
+  rule: 4
+  body: 18
+  title: 32
+  cover: 46
+  section: 50
+  headings: [26, 23, 21, 19, 17]
+  leading: 1.32
+  heading-weight: bold
+  heading-ink: accent
 ```
 
 The colours are DrawingML's twelve. The longer spellings an earlier draft of the
@@ -1006,13 +1231,13 @@ echo implode(', ', $theme->roles()), "\n";
 
 ```text
 Two Content
-title, content, two-column, section, blank
+title, content, two-column, section, blank, image-text, image-title, image-slide
 ```
 
 The roles are `title`, `content`, `two-column`, `section` and `blank`. A name that is
 not one of them, and a role the theme does not map, are both failures that name the
 alternatives — because the author of the deck can act on that and nobody else can.
-Here a theme whose template has only two of the five:
+Here a theme whose template maps only two roles:
 
 ```php
 use MarkdownPresentation\Exception\UnknownLayoutRole;
@@ -1030,9 +1255,63 @@ foreach (['three-column', 'section'] as $role) {
 ```
 
 ```text
-"three-column" is not a layout role. The roles are: title, content, two-column, section, blank.
+"three-column" is not a layout role. The roles are: title, content, two-column, section, blank, image-text, image-title, image-slide.
 The theme "Sparse" maps no "section" layout. It maps: title, content.
 ```
+
+### Type scale and rhythm
+
+`style:` is the part of a theme that decides what a slide looks like rather than what colour
+it is. Without it three themes are the same deck in three swatches: the same type at the same
+sizes, the same margins, the same gaps, and a reader who saw all three would remember the
+palette and nothing else.
+
+| Key | What it decides | Unit |
+| --- | --- | --- |
+| `margin` | The space left all the way round the page. Every band on the slide is a multiple of it, so widening the margin moves the title, the body and the gap between them together | px |
+| `gutter` | The gap that separates rather than encloses: two columns, a bullet from its text, one level of a list from the one above | px |
+| `block` | The gap left between two blocks in a column | px |
+| `rule` | How thick a thematic break's bar is drawn. The room it occupies is the layout's, not the theme's | px |
+| `body` | The size body text and list items are drawn at | pt |
+| `title` | The size a content slide's title is drawn at | pt |
+| `cover` | The size the title layout's title is drawn at | pt |
+| `section` | The size a section layout's title is drawn at | pt |
+| `headings` | The size a heading in a body is drawn at, by depth, shallowest first. A scale that runs out keeps its last size rather than failing | pt, a list |
+| `leading` | The multiple of a line's own height one line is drawn at | a number |
+| `heading-weight` | `bold`, or `regular` for the heading face's own reading weight | a word |
+| `heading-ink` | `ink` for the colour the body text is in, or `accent` for the theme's accent | a word |
+
+Every key is optional and takes the library's own value where a file does not mention it, so
+a theme that names one thing — a wider margin, a heavier rule — and leaves the rest alone is a
+theme that works:
+
+```php
+use Symfony\Component\Yaml\Yaml;
+use MarkdownPresentation\Theme\Theme;
+
+$theme = Theme::fromArray(Yaml::parse("name: Wide\nstyle:\n  margin: 64\n  heading-ink: accent\n"));
+$style = $theme->style();
+
+printf("%dpx margin, %dpt body, %dpx rule\n", $style->margin(), $style->body(), $style->ruleWeight());
+printf("body: %dpt  title: %dpt  headings: %s\n", $style->body(), $style->title(), implode('/', $style->headings()));
+```
+
+```text
+64px margin, 16pt body, 2px rule
+body: 16pt  title: 28pt  headings: 22/20/18/16/14
+```
+
+Two things are deliberately *not* in it. The code and table sizes stay with the library, because
+a table is legible at twelve points whatever the body text is set at and tying the two together
+would make a deck with a large body unreadable in its own tables. And a **title's** ink is the
+body ink whatever `heading-ink` says, because `heading-ink` is about a heading *in a body*; a
+slide whose title were a different colour from its own text would read as two decks.
+
+The three shipped themes are deliberately far apart on every one of these axes, which is what
+makes the three files in `examples/out/03-themes-*.pptx` comparable: `default` is Office's
+palette at the library's own scale, `corporate-dark` is larger and heavier throughout with its
+headings in the accent, and `minimal` is a serif deck with the widest margins, a hairline rule
+and headings in their own face's reading weight rather than a synthesised bold.
 
 ### Style slots
 
@@ -1207,7 +1486,7 @@ renders of one deck differ; the parts are what a test reads.
 | One slide part per slide of the deck, and every one declared | `[Content_Types].xml`, `ppt/slides/` |
 | One slide per step, each revealing the steps before it | `ppt/slides/slideN.xml` |
 | A `layout:` role becomes a slide layout part named by the theme | `ppt/slideLayouts/`, `ppt/slides/_rels/` |
-| One shape per block, named after the kind of block it was | `<p:cNvPr name="…">` |
+| One shape per run of text and per block of every other kind, named after it | `<p:cNvPr name="…">` |
 | The theme's twelve colours become the colour scheme | `ppt/theme/theme1.xml` |
 | A dark theme swaps the colour map, and its shapes follow it | `ppt/slideMasters/slideMaster1.xml`, `ppt/slides/slideN.xml` |
 | The theme's `heading`, `body` and `mono` reach the runs that use them | `<a:latin typeface="…">` |
@@ -1218,12 +1497,66 @@ a slot that does not exist still fails when the theme is loaded, so a typo in on
 rendered as silence — which is a test, but a test of the theme loader rather than of a
 rendered file.
 
+Reading has the opposite problem, and it is where the fixtures earn their place. Everything
+above is checked against files this library wrote, which agree with the reader about every
+convention that matters. `tests/fixtures/powerpoint/` holds two decks that PowerPoint itself
+authored and saved — one designed, one on A4 with a table on a layout that has no table in it —
+and `tests/Unit/powerpoint-fixtures.php` reads those instead. A reader that has only ever seen
+this library's own templates is a reader nobody has shown works on a file a person made, and the
+first of those tests is the bug that proved the point: PowerPoint writes *Title and Content*'s
+content placeholder as a bare `<p:ph idx="1"/>`, so a reader matching the `type` attribute as
+written inherited nothing from the master and left the layout with a title box and no body.
+
 What the renderer refuses is refused loudly, and each refusal names what would have
 worked instead: a directive nobody reads, a theme that does not resolve, a layout role
 that is not one, a `v-click` step that does not go forwards, an image that is not a file,
 and an image no `.pptx` can carry. Those messages are listed one by one in
 `tests/Unit/exceptions.php`, which finds the exception classes by reading the directory
 rather than by a list that would quietly stop being true.
+
+### Rendering in the real PowerPoint
+
+Everything above is checked against the parts of the file this library wrote. There is no
+other implementation to check a render against, and LibreOffice — which `examples/build.php`
+uses for its previews — is a *different* implementation of the same format, so it renders what
+it believes the format means rather than what PowerPoint means.
+
+For the one question that asks for PowerPoint itself, `tools/render-with-powerpoint.applescript`
+opens each deck in Microsoft PowerPoint and exports it to PDF:
+
+```
+osascript tools/render-with-powerpoint.applescript examples/out/*.pptx --out build/powerpoint
+```
+
+It is a developer tool and nothing in the test suite requires it: continuous integration has no
+PowerPoint, and a test that needed one would be a test that could only be run on one person's
+machine. Every step either produces the file it promised or exits non-zero with the reason —
+a deck that opened and exported nothing is a failure, and so is a directory that cannot be
+written, a deck that is not there and a `--out` that is missing.
+
+Three things about it are worth knowing before running it:
+
+- **It stages each deck inside PowerPoint's own sandbox container.** Office applications are
+  sandboxed and refuse to read a path the user has not granted them with error `-9074`, so the
+  deck is copied in, exported there and copied back out. The scratch directory is removed on
+  every path through the script, including every failure.
+- **It closes only the decks it opened.** A deck somebody had open before the script ran is
+  still open afterwards.
+- **It can fail because PowerPoint is in a bad state.** `-9074` from a deck already staged
+  inside the container means PowerPoint could not open *any* document — most often a window it
+  had not finished starting. Quitting PowerPoint and running it again is the fix, and the
+  script says so rather than reporting a permission problem.
+
+`build/` is the output directory in the command above, and it is git-ignored. Nothing this
+writes lands in a deck.
+
+### Word is not an alternative
+
+`/Applications/Microsoft Word.app` is Microsoft 365 Word, and Word cannot open a
+presentation. A `.pptx` is OOXML from Office 2007 and Word was never a PowerPoint product, so
+it would import the file through a lossy converter and report nothing about whether the deck
+is valid. PowerPoint is the only application on this machine that will tell the truth about
+whether these decks open.
 
 ## How this page is checked
 
