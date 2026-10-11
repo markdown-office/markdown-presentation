@@ -234,14 +234,15 @@ final class BlockParser
                 continue;
             }
 
-            [$isMarker, $argument] = self::marker($line);
-
-            if ($isMarker) {
+            // Capture 1 is the step and nothing below looks at it: absent is the bare form
+            // and an empty capture is a `::click=` with nothing after the equals, and the two
+            // are not the same marker. `jump()` is what tells them apart.
+            if (preg_match(self::MARKER, $line, $marker) === 1) {
                 // The step opens *after* the block the marker closes. Advancing first would
                 // put the block a writer wrote above the marker on the step below it, which
                 // is the reverse of what the author meant.
                 $this->flush($blocks, $quote, $paragraph, $step);
-                $step = self::jump($slide, $argument, $step);
+                $step = self::jump($slide, $marker[1] ?? null, $step);
 
                 continue;
             }
@@ -353,24 +354,6 @@ final class BlockParser
         };
 
         return $block ?? [null, $index];
-    }
-
-    /**
-     * Whether a line is a `::click` marker, and the step it names.
-     *
-     * Null means the bare form and `''` means `::click=` with nothing after the equals. The
-     * two are told apart because they are not the same marker: the bare form is the next
-     * step, and an equals with nothing after it is a writer who meant to number a step and
-     * did not.
-     *
-     * @return array{0: bool, 1: string|null} True and the step number, false when the line
-     *                                    is not a marker at all.
-    */
-    private static function marker(string $line): array
-    {
-        return preg_match(self::MARKER, $line, $marker) === 1
-            ? [true, $marker[1] ?? null]
-            : [false, null];
     }
 
     /**
@@ -584,7 +567,9 @@ final class BlockParser
     */
     private function table(array $lines, int $index, int $step): array
     {
-        $rows = [self::runs(self::cells($lines[$index]), $this->inline)];
+        // A cell is a paragraph's worth of text and takes the same inline markup one does,
+        // so a row is read as the runs each of its cells is drawn from.
+        $rows = [array_map($this->inline->parse(...), self::cells($lines[$index]))];
 
         // Inline rather than a method of its own: the alignment row is read once, here, and a
         // private method reached only through `array_map(self::alignment(...))` is a reader
@@ -605,7 +590,7 @@ final class BlockParser
             && trim($lines[$end + 1]) !== ''
             && str_contains($lines[$end + 1], '|')
         ) {
-            $rows[] = self::runs(self::cells($lines[$end + 1]), $this->inline);
+            $rows[] = array_map($this->inline->parse(...), self::cells($lines[$end + 1]));
             $end++;
         }
 
@@ -630,19 +615,6 @@ final class BlockParser
         }
 
         return array_map(static fn (string $cell): string => trim($cell), $cells);
-    }
-
-    /**
-     * One row's cells as the runs each of them is drawn from, because a cell is a
-     * paragraph's worth of text and takes the same inline markup one does.
-     *
-     * @param list<string> $cells
-     *
-     * @return list<list<Run>>
-    */
-    private static function runs(array $cells, InlineParser $inline): array
-    {
-        return array_map($inline->parse(...), $cells);
     }
 
     /**
