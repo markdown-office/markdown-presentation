@@ -146,22 +146,46 @@ it('refuses rather than writing back a notes slide it could not read', function 
     $bytes = (string) file_get_contents($path);
     $payload = null;
 
-    // Every local file header carries the name and the size of what follows it, which is
-    // what makes a byte inside one payload findable without unzipping the archive.
+    // The CRC is the one thing every zip implementation checks, so a wrong one is the only
+    // way to make a part unreadable that does not depend on the build. A flipped byte in
+    // the deflate stream is not: deflate will often decode a corrupted block into
+    // different bytes rather than failing, and whether it complains depends on the zlib
+    // it was compiled against, which is why the original version of this test passed on
+    // a laptop and failed on the runner. A reserved compression method does not work
+    // either: marking the central directory with one stops the archive opening at all,
+    // and marking only the local header is ignored, because a reader takes the method
+    // from the directory.
+    //
+    // Both headers are marked, since which of the two a reader trusts is its own
+    // business. The archive stays structurally valid, so this is an unreadable *part*
+    // rather than an unreadable *file* -- which is the case worth handling.
+    $wrongCrc = pack('V', 0xDEADBEEF);
+    $offsets = [];
+
+    for ($at = 0; ($at = strpos($bytes, 'PK' . chr(1) . chr(2), $at)) !== false; $at++) {
+        $name = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
+
+        if (str_starts_with(substr($bytes, $at + 46, $name), 'ppt/notesSlides/')) {
+            $offsets[] = $at + 16;
+        }
+    }
+
     for ($at = 0; ($at = strpos($bytes, 'PK' . chr(3) . chr(4), $at)) !== false; $at++) {
         $name = (int) unpack('v', substr($bytes, $at + 26, 2))[1];
-        $extra = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
 
         if (str_starts_with(substr($bytes, $at + 30, $name), 'ppt/notesSlides/')) {
-            $payload = $at + 30 + $name + $extra;
+            $offsets[] = $at + 14;
 
             break;
         }
     }
 
-    expect($payload)->not->toBeNull();
+    expect($offsets)->not->toBeEmpty();
 
-    $bytes[$payload + 5] = chr(ord($bytes[$payload + 5]) ^ 0xFF);
+    foreach ($offsets as $at) {
+        $bytes = substr_replace($bytes, $wrongCrc, $at, 4);
+    }
+
     file_put_contents($path, $bytes);
 
     expect(fn () => NotesColourMapPass::applyTo($path))
