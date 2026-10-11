@@ -8,6 +8,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A template's *Title and Content* lost its body.** `TemplateGeometry` keyed a placeholder by
+  the `type` attribute as written, so PowerPoint's ordinary content placeholder — written
+  `<p:ph idx="1"/>`, with no `type`, because `body` is the default the schema gives it — was
+  keyed `/1` and asked the master for `/1`. The master says `body/1`, so it inherited nothing,
+  stated no position of its own, and was dropped by `cover()`. A theme mapped to that layout
+  got the title box the template states and the library's own body box instead, silently and
+  with no error anywhere.
+
+  | | Before | After |
+  | --- | --- | --- |
+  | a template whose *Title and Content* inherits its body from its master | a title box and no body | both, the body the master's |
+  | `workshop.pptx`, `Title and Content` | `title(66,29 828×104)` | plus `body0(66,144 828×343)` |
+
+  The default is now applied before the key as well as before the value. Every `.pptx` this
+  library writes spells out `type="body"`, so no test written against one could have shown it;
+  the two decks in `tests/fixtures/powerpoint/`, which PowerPoint authored and saved, both
+  fail without it.
+
 - **32 bytes of deck asked for half a billion slides.** `<!-- v-click=500 -->` rendered 500
   slides in 0.1s and 0.6MB, and the relationship is linear, so
   `<!-- v-click=2147483647 -->` asked for 2.1 billion. On 64-bit,
@@ -356,6 +374,21 @@ All notable changes to this project are documented here. The format follows
   in the README under *What a failure repeats*, along with what bounds it: a deck cannot
   choose the paths in a message, because the two things a deck writes paths for (an image and
   a theme) are contained to directories the calling program allowed.
+
+- **Two decks Microsoft PowerPoint authored are carried as fixtures.** Every template test was
+  checked against `tests/fixtures/themes/templated/template.pptx`, which this repository writes
+  from a description — a good template, and a poor PowerPoint file: one master, layouts written
+  by the same hand as the reader, and placeholders that spell out every attribute the format
+  lets them spell out. `tests/fixtures/powerpoint/` holds two decks saved by PowerPoint 16.113.4
+  instead: one designed (Facet, a changed palette, two changed theme fonts, eighteen named
+  layouts) and one merely used (A4 rather than 16:9, a table on a layout with no table in it, a
+  slide that has drifted away from the layout it is on). That is what found the bug above. They
+  are validation and documentation, not themes — the three built-in themes stay library-owned.
+
+  `tools/build-powerpoint-fixtures.sh` rebuilds both. PowerPoint is required rather than
+  optional: `make new slide` answers "class slide cannot be created", so the slides have to
+  exist before it opens the file and everything after that is its own work. The authorship
+  metadata PowerPoint writes is stripped afterwards, and a test checks that it was.
 
 The first slice of the PowerPoint half of `markdown-office`. It decides where a
 slide begins and which theme a deck means, and renders the deck to a `.pptx`.
