@@ -18,9 +18,13 @@ SLIDEV_COMMIT="${SLIDEV_COMMIT:-11fe3f79e45c26e22658e67f52e5cd4222aa41bf}"
 SOURCE="https://raw.githubusercontent.com/slidevjs/slidev/${SLIDEV_COMMIT}/packages/parser/src/core.ts"
 FIXTURE="$(cd ../.. && pwd)/tests/fixtures/slidev/expected.json"
 
-[ -d node_modules/yaml ] || npm install --silent --no-save yaml
+[[ -d node_modules/yaml ]] || npm install --silent --ignore-scripts --no-save yaml
 
-curl --fail --silent --show-error --location "$SOURCE" --output core.ts
+# `--proto-redir '=https'` rather than `--location`: the fixture is read from a
+# pinned commit of a repository this project does not control, and following a
+# redirect off HTTPS without saying so is the difference between downloading
+# the parser and downloading whatever the redirect names.
+curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' "$SOURCE" --output core.ts
 
 # `core.ts` imports two things that do not resolve outside the monorepo: a type-only
 # import, and `ensurePrefix` for `stringify`, which no part of the splitting touches.
