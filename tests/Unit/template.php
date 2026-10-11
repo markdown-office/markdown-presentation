@@ -130,6 +130,19 @@ it('draws both columns of a two-column slide where the template puts them', func
         ->and($shapes[3]['x'])->toBe(500.0);
 });
 
+it('draws a run of paragraphs in the box the template gives the body', function () {
+    // The frame is the shape a column's text is drawn in, so a template that moves the column
+    // moves the frame with it — the geometry is the template's, whatever is drawn in it.
+    $pptx = templatedDeck("---\ntheme: " . templatedTheme() . "\n---\n# One\n\nFirst.\n\nSecond.\n\nThird.\n");
+    $body = $pptx->layoutPlaceholders()['body 1'];
+    $frame = $pptx->positionOf('text');
+
+    expect($frame['x'])->toBe($body['x'])
+        ->and($frame['y'])->toBe($body['y'])
+        ->and($frame['width'])->toBe($body['width'])
+        ->and($frame['height'])->toBeLessThanOrEqual($body['height']);
+});
+
 it('leaves a role whose layout the template does not have where the library puts it', function () {
     // The precedence: a template fills in the roles it covers and says nothing about the rest.
     // *Section Header* is mapped and absent, which is the same as not mapping it at all.
