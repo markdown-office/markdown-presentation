@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\FencedFrontmatter;
@@ -19,7 +20,11 @@ use MarkdownPresentation\Exception\UnknownStyleSlot;
 use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Exception\UnsupportedLink;
+use MarkdownPresentation\Render\NotesColourMapPass;
+use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Doctest;
+use MarkdownPresentation\Tests\Support\Scratch;
+use MarkdownPresentation\Tests\Support\UnreadableArchive;
 
 /**
  * Every failure this library reports, found by reading the directory rather than by
@@ -107,7 +112,41 @@ it('reports what a deck author can fix under the class that says so', function (
 it('reports a failure under one catch, whatever it is a failure of', function () {
     // The promise the README makes, asserted rather than described: one `catch` on the base
     // covers everything this library throws, including the failures that are not the deck's.
-    expect(UnreadablePackage::cannotOpen('/tmp/deck.pptx'))->toBeInstanceOf(Exception::class);
+    expect(UnreadablePackage::cannotOpen('/tmp/deck.pptx'))->toBeInstanceOf(Exception::class)
+        ->and(UnreadablePackage::cannotRead('/tmp/deck.pptx', 'ppt/notesSlides/notesSlide1.xml'))
+        ->toBeInstanceOf(Exception::class);
+});
+
+it('refuses a package with a part it cannot read', function () {
+    // The half of the promise above nobody reaches by describing it: a package that opens,
+    // with one part in it this process cannot decompress. What used to happen instead is
+    // that `false` became `''` under a cast and `'' === false` was not true, so the entry
+    // was deleted and added back as zero bytes — a deck that opens, with a corrupt speaker
+    // note and nothing anywhere saying so. What that does to the file on disk is asserted
+    // beside the pass that causes it, in `tests/Unit/notes-colour-map.php`.
+    //
+    // The reader is one this test writes rather than a corrupted file. Whether a damaged
+    // payload refuses to inflate is the build's own business: one zlib rejects a reserved
+    // deflate block type and another decodes it into different bytes, and neither a wrong
+    // CRC nor a compressed size past the end of the file is refused on all of them.
+    $path = Scratch::file('unreadable.pptx', '');
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
+        $path,
+    );
+
+    // Each run gets its own archive: the pass closes the one it is given, and a second
+    // `applyTo()` over a closed handle is not the same refusal.
+    $refuses = function () use ($path): void {
+        $archive = new UnreadableArchive('ppt/notesSlides/notesSlide1.xml');
+        $archive->open($path);
+
+        NotesColourMapPass::applyTo($path, $archive);
+    };
+
+    expect($refuses)
+        ->toThrow(UnreadablePackage::class, 'so the package was left as it was found rather than rewritten with the part lost')
+        ->and($refuses)->toThrow(Exception::class);
 });
 
 it('names a slide and a file in every failure, because the fix is in the message', function () {

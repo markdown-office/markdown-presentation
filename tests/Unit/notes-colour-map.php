@@ -8,6 +8,7 @@ use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Render\NotesColourMapPass;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
+use MarkdownPresentation\Tests\Support\UnreadableArchive;
 
 $root = dirname(__DIR__, 2);
 
@@ -127,110 +128,44 @@ it('says so when the presentation cannot be read at all', function () {
     @unlink($path);
 });
 
-it('refuses rather than writing back a notes slide it could not read', function () {
-    // The failure this fixes: the part was read twice -- once to patch, once to compare --
-    // and the comparison was against `false`, which is not `''`, so the entry was deleted and
-    // written back as zero bytes. A deck that opened and showed a corrupt speaker note is a
-    // worse outcome than one that was refused, and the file on disk is now the one to check.
-    //
-    // The payload is corrupted rather than written broken: a local file header carries the
-    // name and the compressed size, so flipping a byte in the deflate stream leaves the
-    // archive readable and every other part intact.
-    $path = sys_get_temp_dir() . '/mdp-corrupt-' . md5('corrupt') . '.pptx';
+it('writes no part back as zero bytes, whatever the archive could not read', function () {
+    // The harm the guard prevents, checked on the file rather than on the failure. Making a
+    // part unreadable needs an archive the build's inflater will give up on, and that is the
+    // build's own business: a reserved deflate block type is refused by one zlib and decoded
+    // into different bytes by another, and neither a wrong CRC nor a compressed size past
+    // the end of the file is refused on all of them. So the reader here is one this test
+    // writes — the refusal `tests/Unit/exceptions.php` asserts — and what is asserted is
+    // the part of it that holds on every build either way.
+    $path = sys_get_temp_dir() . '/mdp-whole-' . md5('whole') . '.pptx';
 
     (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
         (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
         $path,
     );
 
-    $bytes = (string) file_get_contents($path);
-    $payload = null;
+    // The renderer runs this pass over the package it has just written, so this is a second
+    // run over one that already patched a notes slide rather than one that found nothing.
+    expect(NotesColourMapPass::applyTo($path))->toBe(0);
 
-    // The part is made unreadable by claiming it is larger than the archive. Two things
-    // about this are deliberate. The original version flipped a byte in the deflate
-    // stream, which deflate will often decode into different bytes rather than fail on,
-    // so the test asserted this library's behaviour against one machine's zlib and
-    // passed locally while failing on the runner. The checksum is also made wrong, on the
-    // theory that an implementation which skips one check keeps the other -- the runner
-    // that failed the last version of this test read a part with a CRC of 0xDEADBEEF
-    // quite happily. A reserved compression method is no use either: it stops the
-    // archive opening rather than the part, and a reader takes the method from the
-    // central directory regardless of what the local header says.
-    //
-    // The archive stays structurally valid, so this is an unreadable *part* and not an
-    // unreadable *file*, which is the case the pass exists to handle. Both headers are
-    // marked, since which of the two a reader trusts is its own business.
-    // `str_starts_with($name, 'ppt/notesSlides/')` is not enough to find the part. That
-    // prefix also matches `ppt/notesSlides/_rels/notesSlide1.xml.rels`, which every notes
-    // slide has, and it is written first. Four separate corruptions were applied to that
-    // rels file while the notes slide this test is about stayed perfectly readable, which
-    // is why none of them changed the outcome. The pattern is the one the pass itself
-    // matches on.
-    $payload = null;
-    $method = null;
+    $archive = new UnreadableArchive('ppt/notesSlides/notesSlide1.xml');
+    $archive->open($path);
 
-    for ($at = 0; ($at = strpos($bytes, 'PK' . chr(3) . chr(4), $at)) !== false; $at++) {
-        $name = (int) unpack('v', substr($bytes, $at + 26, 2))[1];
-        $extra = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
+    expect(fn () => NotesColourMapPass::applyTo($path, $archive))->toThrow(UnreadablePackage::class);
 
-        if (preg_match('~^ppt/notesSlides/notesSlide\d+\.xml$~', substr($bytes, $at + 30, $name)) === 1) {
-            $payload = $at + 30 + $name + $extra;
-            $method = (int) unpack('v', substr($bytes, $at + 8, 2))[1];
-
-            break;
-        }
-    }
-
-    expect($payload)->not->toBeNull();
-
-    fwrite(STDERR, "\n===DIAG===\n" . describeLayout($bytes) . "===ENDDIAG===\n");
-
-    // A part that is stored rather than deflated has no zlib header to break, and every
-    // way of breaking its metadata was tolerated by the build this failed on: a wrong
-    // CRC in both headers, and a compressed size larger than the file. Nothing about such
-    // a part is unreadable, so there is no archive to hand this pass that makes it refuse,
-    // and the assertion would be testing the build rather than the pass.
-    //
-    // Skipped rather than passed. A skipped test that says why is worth more than a green
-    // one that proved nothing, and it runs for real wherever the part is deflated.
-    if ($method !== 8) {
-        markTestSkipped(
-            'the notes slide is stored rather than deflated on this build (method ' . $method
-            . '), so no corruption makes it unreadable here',
-        );
-    }
-
-    // libzip writes raw deflate, with no zlib wrapper, so there is no compression method in
-    // this byte to invalidate -- the low three bits are BFINAL and BTYPE, and BTYPE of 3 is
-    // reserved. That is the first corruption tried here that is a format check rather than
-    // a decoder's discretion: every inflate rejects a reserved block type, wherever it is.
-    //
-    // Setting all three is not the same as flipping the byte. A flipped byte is one wrong
-    // value the decoder may absorb -- deflate will often decode a damaged block into
-    // different bytes rather than fail, which is why the first version of this test passed
-    // on a laptop and failed on the runner, and why a wrong CRC and an impossible
-    // compressed size were not enough either: the runner read both of those happily.
-    $bytes[$payload] = chr(ord($bytes[$payload]) | 0x07);
-
-    file_put_contents($path, $bytes);
-
-    expect(fn () => NotesColourMapPass::applyTo($path))
-        ->toThrow(UnreadablePackage::class, 'so the package was left as it was found rather than rewritten with the part lost');
-
-    // And the part is still there rather than being zero bytes, which is the whole of what
-    // the comparison against `false` was getting wrong.
     $after = new ZipArchive();
     $after->open($path);
+    $sizes = [];
 
     for ($index = 0; $index < $after->numFiles; $index++) {
-        if (str_starts_with((string) $after->getNameIndex($index), 'ppt/notesSlides/')) {
-            expect($after->statIndex($index)['size'])->toBeGreaterThan(0);
-        }
+        $sizes[(string) $after->getNameIndex($index)] = (int) $after->statIndex($index)['size'];
     }
 
+    $notes = $after->getFromName('ppt/notesSlides/notesSlide1.xml');
     $after->close();
-
     @unlink($path);
+
+    expect(array_keys(array_filter($sizes, static fn (int $size): bool => $size === 0)))->toBe([])
+        ->and($notes)->toBeString()->toContain('<p:clrMapOvr>');
 });
 
 it('carries a note onto the right slide', function () {
@@ -297,47 +232,3 @@ it('writes each notes slide once, however many slides carry one', function () {
 
     expect($twice)->toBe([])->and($notes)->toHaveCount(3);
 });
-
-/**
- * Every local file header in the archive, so a failing run says what the bytes are
- * rather than what this file assumed they were. Temporary diagnostic.
- */
-function describeLayout(string $bytes): string
-{
-    $out = '';
-
-    for ($at = 0; ($at = strpos($bytes, 'PK' . chr(3) . chr(4), $at)) !== false; $at++) {
-        $flags = (int) unpack('v', substr($bytes, $at + 6, 2))[1];
-        $method = (int) unpack('v', substr($bytes, $at + 8, 2))[1];
-        $name = (int) unpack('v', substr($bytes, $at + 26, 2))[1];
-        $extra = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
-        $part = substr($bytes, $at + 30, $name);
-        $payload = $at + 30 + $name + $extra;
-
-        if (!str_starts_with($part, 'ppt/notesSlides/')) {
-            continue;
-        }
-
-        $out .= sprintf(
-            "  local@%-7d %-42s method=%-2d flags=0x%04x payload=%-7d first8=%s\n",
-            $at,
-            $part,
-            $method,
-            $flags,
-            $payload,
-            bin2hex(substr($bytes, $payload, 8)),
-        );
-    }
-
-    for ($at = 0; ($at = strpos($bytes, 'PK' . chr(1) . chr(2), $at)) !== false; $at++) {
-        $method = (int) unpack('v', substr($bytes, $at + 10, 2))[1];
-        $name = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
-        $part = substr($bytes, $at + 46, $name);
-
-        if (str_starts_with($part, 'ppt/notesSlides/')) {
-            $out .= sprintf("  centr@%-7d %-42s method=%d\n", $at, $part, $method);
-        }
-    }
-
-    return $out . '  file size = ' . strlen($bytes) . "\n";
-}
