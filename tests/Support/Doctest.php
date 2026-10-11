@@ -189,12 +189,16 @@ final class Doctest
                 continue;
             }
 
-            $fence = $open[1];
+            $closes = '/\A {0,3}`{' . strlen($open[1]) . ',}\z/';
             $info = trim($open[2]);
             $code = [];
+            $first = $index + 1;
 
-            while (++$index < count($lines)) {
-                if (preg_match('/\A {0,3}`{' . strlen($fence) . ',}\z/', rtrim($lines[$index])) === 1) {
+            // From the line after the opening fence, and left on the closer. The line the
+            // block starts at is worked out from where that ended and how much was read, so
+            // a fence that is never closed still names where it opened.
+            for ($index = $first; $index < count($lines); $index++) {
+                if (preg_match($closes, rtrim($lines[$index])) === 1) {
                     break;
                 }
 

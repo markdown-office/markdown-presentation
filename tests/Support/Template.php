@@ -165,17 +165,21 @@ final class Template
         $written = '';
 
         foreach ($shapes as $number => $shape) {
+            $placeholder = '';
+
+            if (isset($shape['type'])) {
+                // The index is what says which column a placeholder is, so it is written only
+                // where the shape has one — a title states none, and `idx="0"` would be a
+                // different placeholder to the reader that opens this file.
+                $index = isset($shape['idx']) ? sprintf(' idx="%d"', $shape['idx']) : '';
+                $placeholder = sprintf('<p:nvPr><p:ph type="%s"%s/></p:nvPr>', $shape['type'], $index);
+            }
+
             $written .= sprintf(
                 '<p:sp><p:nvSpPr><p:cNvPr id="%d" name="Shape %d"/>%s</p:nvSpPr><p:spPr>%s</p:spPr></p:sp>',
                 $number + 2,
                 $number + 2,
-                isset($shape['type'])
-                    ? sprintf(
-                        '<p:nvPr><p:ph type="%s"%s/></p:nvPr>',
-                        $shape['type'],
-                        isset($shape['idx']) ? sprintf(' idx="%d"', $shape['idx']) : '',
-                    )
-                    : '',
+                $placeholder,
                 self::transform($shape),
             );
         }

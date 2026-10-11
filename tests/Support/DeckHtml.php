@@ -51,10 +51,12 @@ final class DeckHtml
         $rows = '';
 
         foreach ($frontmatter as $key => $value) {
+            $text = is_string($value) ? $value : (json_encode($value) ?: '');
+
             $rows .= sprintf(
                 "<dt>%s</dt><dd>%s</dd>\n",
                 self::escape((string) $key),
-                self::escape(is_string($value) ? $value : (json_encode($value) ?: '')),
+                self::escape($text),
             );
         }
 
