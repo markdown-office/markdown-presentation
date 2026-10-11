@@ -32,11 +32,6 @@ final class ListBlock implements Block
     ) {
     }
 
-    public function name(): string
-    {
-        return 'list';
-    }
-
     public function step(): int
     {
         return $this->step;

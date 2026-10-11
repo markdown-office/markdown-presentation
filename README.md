@@ -243,14 +243,14 @@ and it names the themes that do.
 
 ### What a slide becomes
 
-Every block of a slide becomes a shape, named after the kind of block it came from, so the
-mapping can be read off `ppt/slides/slideN.xml` without the library:
+Every shape of a slide is named after the kind of thing it was drawn from, so the mapping can
+be read off `ppt/slides/slideN.xml` without the library:
 
 | Markdown | Shape | Notes |
 | --- | --- | --- |
 | `# Heading` | `title`, then `heading` | The first heading becomes the title and is not drawn twice, whatever markup it carries |
-| A paragraph | `paragraph` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters. A link target is checked — see [Links](#links) |
-| `- a` / `1. a` | `list` | Ordered lists are numbered, not bulleted, from the number the deck writes; nesting is the indent |
+| A paragraph | `text` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters. A link target is checked — see [Links](#links) |
+| `- a` / `1. a` | `text` | Ordered lists are numbered, not bulleted, from the number the deck writes; nesting is the indent |
 | ```` ```lang ```` | `code` | Mono font, filled with `bg2`, the language in the shape's description. No colouring |
 | `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has; a cell carries the same inline markup a paragraph does. The header row is bold, filled with `bg2`, and the columns are as wide as what they hold |
 | `> a` | `quote` | Italic, in `tx2`, indented. Written over several lines it is one shape |
@@ -261,7 +261,50 @@ A title is text like any other: a frontmatter `title: Ops **runbook**` is drawn 
 word in bold rather than as asterisks, and the deck's own `dc:title` carries the same title as
 plain text, because nothing on the other end of a metadata field reads a pair of asterisks.
 
-Blocks stack down the body box, each one starting where the one above it ended with a gap
+### One box for a run of text
+
+A run of paragraphs and lists is drawn as **one** shape holding one paragraph each — the way a
+person builds a slide, by clicking into a placeholder and typing. Three paragraphs with a
+list between them are one box, so clicking any of them selects all of them, moving one moves
+the lot, and PowerPoint lays them out inside the one box they were measured for rather than
+six boxes that might not agree about where they are.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+$deck = (new DeckParser())->parse("# One\n\nFirst.\n\nSecond **bold** one.\n\n- An item.\n\nLast.\n");
+$path = sys_get_temp_dir() . '/deck.pptx';
+(new PresentationRenderer())->render($deck, $path);
+
+$zip = new ZipArchive();
+$zip->open($path);
+
+foreach (preg_split('#(?=<p:sp>)#', $zip->getFromName('ppt/slides/slide1.xml')) as $shape) {
+    if (preg_match('#<p:cNvPr id="\d+" name="([^"]+)"#', $shape, $name) !== 1) {
+        continue;
+    }
+
+    printf("%s: %d paragraphs\n", $name[1], substr_count($shape, '<a:p>'));
+}
+```
+
+```text
+title: 1 paragraphs
+text: 4 paragraphs
+```
+
+A heading, a quote, a rule, a table, a picture and a code block are shapes of their own, and
+any of them ends the run: a heading is a different size and colour, and the others are not
+text. A quote ends it because it is drawn a gutter in from the margin at another size in
+another colour, which one box's paragraphs cannot each be.
+
+The gap between two paragraphs is the theme's own `block:` spacing, written into the shape as
+`a:spcAft` — the same number the layout spends between two shapes of a column, spent in the
+other of its two places. A frame of text that does not fit its slide is clamped to the room
+left and reported as one shape, because one is what it is.
+
+Shapes stack down the body box, each one starting where the one above it ended with a gap
 between them.
 
 Every block is measured before it is drawn: `Render\TextMetric` counts the lines it will
@@ -412,13 +455,16 @@ echo implode(' ', array_slice($names[1], 1)), "\n";
 
 ```text
 Two Content
-paragraph heading paragraph
+text heading text
 ```
 
 Two columns divide at the first `##` in the body, because that is the heading a writer puts
 on a column of a slide and there is nothing else to go on. A deck that never writes one fills
 the left column and leaves the right empty, which is honest: it asked for two columns and
 wrote one.
+
+The two `text` shapes are the paragraphs either side of the `##`, one shape each — see
+[What a slide becomes](#what-a-slide-becomes).
 
 The eight roles are `title`, `content`, `two-column`, `section`, `blank`, `image-text`,
 `image-title` and `image-slide`. Only the ones a deck uses are built, so a theme that maps two
@@ -494,10 +540,12 @@ restores the geometry the slide already had and moves nothing.
 role gets one. `blank` and `image-slide` get no title placeholder, because neither has a title
 box — that is what makes `blank` blank and what makes `image-slide` the picture alone.
 
-A slide's body is a stack of differently shaped blocks — a table, a picture, a code block —
-and none of them is a placeholder: promoting one would make *Reset* move that block and leave
-the rest of the column floating. The outline view shows a deck's titles and still shows no
-bullets.
+A slide's body is a stack of differently shaped blocks — a table, a picture, a code block, and
+the frames of text among them — and none of them is a placeholder: promoting one would make
+*Reset* move that shape and leave the rest of the column floating. A frame of text is the one
+that would be expected to be a placeholder, holding the whole of a slide's body, and it is the
+one that must not be: a slide *Reset* tidies is a slide whose body has moved. The outline view
+shows a deck's titles and still shows no bullets.
 
 ### Templates
 
@@ -1329,7 +1377,7 @@ renders of one deck differ; the parts are what a test reads.
 | One slide part per slide of the deck, and every one declared | `[Content_Types].xml`, `ppt/slides/` |
 | One slide per step, each revealing the steps before it | `ppt/slides/slideN.xml` |
 | A `layout:` role becomes a slide layout part named by the theme | `ppt/slideLayouts/`, `ppt/slides/_rels/` |
-| One shape per block, named after the kind of block it was | `<p:cNvPr name="…">` |
+| One shape per run of text and per block of every other kind, named after it | `<p:cNvPr name="…">` |
 | The theme's twelve colours become the colour scheme | `ppt/theme/theme1.xml` |
 | A dark theme swaps the colour map, and its shapes follow it | `ppt/slideMasters/slideMaster1.xml`, `ppt/slides/slideN.xml` |
 | The theme's `heading`, `body` and `mono` reach the runs that use them | `<a:latin typeface="…">` |

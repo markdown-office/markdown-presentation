@@ -92,11 +92,15 @@ it('leaves the body blocks of a slide out of it', function () {
     // blocks — a table, a picture, a code block — and promoting one of them to a placeholder
     // would make Reset move that block and leave the rest of the column floating. The layout
     // has the placeholder; nothing on the slide refers to it.
+    //
+    // The frame of text is in here for the same reason as the table would be. It is the one
+    // shape a reader might expect to be a placeholder — it holds every paragraph of the
+    // slide, so *Reset* moving it would move the slide's whole body — and it is the one that
+    // must not be: a slide that Reset tidies is a slide whose body has jumped.
     $pptx = placeholderDeck("# One\n\nText.\n\n- An item.\n\n```php\n\$line = 1;\n```\n");
 
     expect($pptx->layoutPlaceholders())->toHaveKey('body 1')
-        ->and($pptx->placeholderOf('paragraph'))->toBeNull()
-        ->and($pptx->placeholderOf('list'))->toBeNull()
+        ->and($pptx->placeholderOf('text'))->toBeNull()
         ->and($pptx->placeholderOf('code'))->toBeNull();
 });
 

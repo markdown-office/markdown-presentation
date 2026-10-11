@@ -748,8 +748,13 @@ final class PresentationRenderer
     /**
      * A step's blocks, stacked into the role's body boxes.
      *
+     * Stacked as shapes rather than as blocks: {@see TextFrame::group()} decides which blocks
+     * share one text frame first, because the air between two of them is then the frame's own
+     * paragraph spacing rather than room taken out of the column between two boxes. What
+     * follows is the arithmetic it has always been, one drawable at a time.
+     *
      * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
-    */
+     */
     private function stack(
         WrittenSlide $slide,
         array $blocks,
@@ -764,23 +769,24 @@ final class PresentationRenderer
         foreach ($geometry->body($role) as $column => $box) {
             $y = $box->y;
             $bottom = $box->y + $box->height;
+            $visible = $this->visible($blocks, $columns, $step, $column);
 
-            foreach ($this->visible($blocks, $columns, $step, $column) as $block) {
+            foreach (TextFrame::group($visible) as $drawable) {
                 // A column whose contents are taller than its box runs off the bottom of it,
                 // and an image spends the whole of the room left — so both the cursor and
-                // the height are held inside the box. A block that does not fit is drawn as
+                // the height are held inside the box. A shape that does not fit is drawn as
                 // small as the room allows rather than over whatever is under it, and
                 // {@see self::overflow()} is what says that it had to be.
                 $y = min($y, $bottom - SlideGeometry::MIN_SIZE);
                 $room = max(0, $bottom - $y);
-                $wanted = $writer->height($block, $box, $room);
+                $wanted = $writer->height($drawable, $box, $room);
                 $height = max(min($wanted, $room), SlideGeometry::MIN_SIZE);
 
                 if ($height < $wanted) {
-                    $this->overflow($number, $step, $column, $block->name(), $wanted, $room);
+                    $this->overflow($number, $step, $column, $drawable->name(), $wanted, $room);
                 }
 
-                $writer->write($slide, $block, new Box($box->x, $y, $box->width, $height), $height);
+                $writer->write($slide, $drawable, new Box($box->x, $y, $box->width, $height), $height);
                 $y += $height + $geometry->style()->blockGap();
             }
         }

@@ -46,13 +46,25 @@ it('reports a block it had to make smaller, and how much smaller', function () {
     ]]);
 });
 
-it('reports every block a full column left no room for, not only the first', function () {
-    // A column that has run out stays out, so every block below the point it ran out is
+it('reports every shape a full column left no room for, not only the first', function () {
+    // A column that has run out stays out, so every shape below the point it ran out is
     // clamped too. One entry for the first would say the column recovered.
-    $overflows = overflowing(str_repeat("Text.\n\n", 40))->overflows();
+    //
+    // A code block between two runs of text is what makes this a test of several entries: a
+    // run of paragraphs is one shape now, so forty of them are one entry and forty paragraphs
+    // on their own would prove nothing about the ones below the point the column ran out.
+    $overflows = overflowing(
+        str_repeat("Text.\n\n", 30) . "```\nline;\n```\n\n" . str_repeat("More.\n\n", 30),
+    )->overflows();
 
     expect(count($overflows))->toBeGreaterThan(1)
-        ->and(array_column($overflows, 'block'))->toBe(array_fill(0, count($overflows), 'paragraph'));
+        ->and(array_column($overflows, 'block'))->toBe(['text', 'code', 'text']);
+});
+
+it('reports one entry for a run of paragraphs, because it is one shape', function () {
+    // The other half: forty paragraphs that do not fit are one shape that did not fit, and an
+    // entry for each of them would say forty things were missing where one is.
+    expect(overflowing(str_repeat("Text.\n\n", 40))->overflows())->toHaveCount(1);
 });
 
 it('names the slide and the step a block overflowed on', function () {

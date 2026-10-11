@@ -287,7 +287,7 @@ it('writes a heading carrying inline markup once, and as markup rather than as c
     // the same line was drawn again underneath it as three runs.
     $pptx = renderDeck("# Release **v2** notes\n\nBody.\n");
 
-    expect($pptx->shapeNames())->toBe(['title', 'paragraph'])
+    expect($pptx->shapeNames())->toBe(['title', 'text'])
         ->and($pptx->texts(1))->toBe(['Release ', 'v2', ' notes', 'Body.'])
         ->and($pptx->part('ppt/slides/slide1.xml'))->toContain('b="1"');
 });
@@ -298,7 +298,7 @@ it('writes the title heading once even where a paragraph comes before it', funct
     // same line on the slide twice.
     $pptx = renderDeck("Lead.\n\n# The title\n");
 
-    expect($pptx->shapeNames())->toBe(['title', 'paragraph'])
+    expect($pptx->shapeNames())->toBe(['title', 'text'])
         ->and($pptx->texts(1))->toBe(['The title', 'Lead.']);
 });
 
@@ -337,7 +337,7 @@ it('draws a heading that is not the title in the body', function () {
 });
 
 it('leaves a heading that became the title out of the body', function () {
-    expect(renderDeck("# One\n\nSome text.\n")->shapeNames())->toBe(['title', 'paragraph']);
+    expect(renderDeck("# One\n\nSome text.\n")->shapeNames())->toBe(['title', 'text']);
 });
 
 it('draws a heading that is not the first heading of the slide', function () {
@@ -349,12 +349,12 @@ it('draws a heading that is not the first heading of the slide', function () {
 it('keeps a title written in the frontmatter even when the content has no heading', function () {
     $pptx = renderDeck("---\ntitle: Named\n---\n\nSome text.\n");
 
-    expect($pptx->shapeNames())->toBe(['title', 'paragraph'])
+    expect($pptx->shapeNames())->toBe(['title', 'text'])
         ->and($pptx->texts(1)[0])->toBe('Named');
 });
 
-it('renders a paragraph as a paragraph', function () {
-    expect(renderDeck("Just words.\n")->shapeNames())->toBe(['paragraph']);
+it('renders a paragraph as one shape of text', function () {
+    expect(renderDeck("Just words.\n")->shapeNames())->toBe(['text']);
 });
 
 it('keeps the line breaks of a paragraph the writer wrote', function () {
@@ -365,12 +365,15 @@ it('keeps the line breaks of a paragraph the writer wrote', function () {
     expect($pptx->texts(1))->toBe(["One\nTwo\nThree"]);
 });
 
-it('renders a bullet list as one list shape', function () {
-    expect(renderDeck("- one\n- two\n")->shapeNames())->toBe(['list']);
+it('renders a bullet list as paragraphs of the same frame', function () {
+    // A list is one frame, which it was before the frame existed too; what it holds is now
+    // paragraphs rather than a shape of its own kind, and it goes in with the paragraphs
+    // around it.
+    expect(renderDeck("- one\n- two\n")->shapeNames())->toBe(['text']);
 });
 
-it('renders an ordered list as one list shape', function () {
-    expect(renderDeck("1. one\n2. two\n")->shapeNames())->toBe(['list']);
+it('renders an ordered list as paragraphs of the same frame', function () {
+    expect(renderDeck("1. one\n2. two\n")->shapeNames())->toBe(['text']);
 });
 
 it('numbers an ordered list rather than bulleting it', function () {
@@ -445,7 +448,7 @@ it('keeps a paragraph under a list item with it', function () {
     // reason a wrapped list item does not become two items.
     $pptx = renderDeck("- one\n  still one\n- two\n");
 
-    expect($pptx->shapeNames())->toBe(['list'])
+    expect($pptx->shapeNames())->toBe(['text'])
         ->and($pptx->texts(1))->toBe(['one still one', 'two']);
 });
 
@@ -590,7 +593,7 @@ it('starts the block after a table below the rows the table writes', function ()
     $pptx = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |\n| 7 | 8 |\n\nAfter.\n");
 
     expect($pptx->positionOf('table')['height'])->toBe(5.0 * 38.0)
-        ->and($pptx->positionOf('paragraph')['y'])->toBe(104.0 + 5 * 38.0 + 12.0);
+        ->and($pptx->positionOf('text')['y'])->toBe(104.0 + 5 * 38.0 + 12.0);
 });
 
 it('renders a block quote as a quote shape', function () {
@@ -654,42 +657,64 @@ it('fills a rule with the theme accent colour', function () {
     expect($pptx->fillOf('rule'))->toBe('#89b4fa');
 });
 
-it('stacks the blocks of a slide down the body box', function () {
-    // Heights decide where each block starts, so a block drawn on top of the one before it
-    // is the failure that shows the two have drifted apart.
+it('draws a run of paragraphs as one shape of text', function () {
+    // The claim the grouping is for: three paragraphs a reader would type into one box are
+    // one box, so clicking any of them selects all three and moving one moves the lot.
+    expect(renderDeck("First.\n\nSecond.\n\nThird.\n")->shapeNames())->toBe(['text']);
+});
+
+it('writes each paragraph of a frame as its own paragraph in the file', function () {
+    // Three `<a:p>` in one `<p:sp>`, which is what makes it one shape rather than three
+    // boxes that happen to be the same size: a paragraph is a line break in a text body and
+    // a shape boundary is not.
     $pptx = renderDeck("First.\n\nSecond.\n\nThird.\n");
 
-    $paragraphs = array_values(array_filter(
-        $pptx->shapeNames(),
-        static fn (string $name): bool => $name === 'paragraph',
-    ));
-
-    expect($paragraphs)->toBe(['paragraph', 'paragraph', 'paragraph'])
-        ->and($pptx->positionOf('paragraph', 1)['y'])->toBe(104.0);
+    expect(substr_count($pptx->part('ppt/slides/slide1.xml'), '<a:p>'))->toBe(3)
+        ->and($pptx->texts(1))->toBe(['First.', 'Second.', 'Third.']);
 });
 
 it('starts a body block below the title box', function () {
     $pptx = renderDeck("# Title\n\nSome text.\n");
 
-    expect($pptx->positionOf('paragraph')['y'])->toBeGreaterThan($pptx->positionOf('title')['y']);
+    expect($pptx->positionOf('text')['y'])->toBeGreaterThan($pptx->positionOf('title')['y']);
 });
 
-it('leaves a gap between two blocks of a column', function () {
-    // Every paragraph is written with `setSpacingBefore(0)` and `setSpacingAfter(0)`, so
-    // without a gap in the layout two consecutive paragraphs abut with nothing between
-    // them: one line of text against the next.
-    $tops = array_column(renderDeck("First.\n\nSecond.\n")->positions(), 'y');
-
-    expect($tops[1] - $tops[0])->toBe(38.0);
-});
-
-it('keeps two blocks from being written at the same height', function () {
-    // Each block's top is the one above it plus that block's height and the gap, so two
-    // blocks sharing a top is the arithmetic drifting — which shows up as one drawn over
-    // the other rather than as a failure.
-    $tops = array_column(renderDeck("# T\n\nA.\n\n```\nx\n```\n\nB.\n")->positions(), 'y');
+it('stacks the shapes of a column down the body box', function () {
+    // Heights decide where each shape starts, so one drawn on top of the one before it is
+    // the failure that shows the two have drifted apart.
+    $tops = array_column(renderDeck("First.\n\n```\nx\n```\n\nSecond.\n")->positions(), 'y');
 
     expect(array_values(array_unique($tops)))->toHaveCount(count($tops));
+});
+
+it('leaves a gap between two shapes of a column', function () {
+    // Every shape is written with `setSpacingBefore(0)`, so without a gap in the layout two
+    // shapes drawn one after the other abut with nothing between them: the last line of one
+    // against the first line of the next.
+    $shapes = renderDeck("First.\n\n```\nx\n```\n")->positions();
+
+    expect($shapes[1]['y'] - ($shapes[0]['y'] + $shapes[0]['height']))->toBe(12.0);
+});
+
+it('leaves the theme\'s own gap between two paragraphs of one frame', function () {
+    // The gap a reader sees between two paragraphs is now written into the frame rather than
+    // taken out of the column between two boxes, and it is the same number either way:
+    // `a:spcAft` in hundredths of a point, on every paragraph that has another under it.
+    $xml = renderDeck("First.\n\nSecond.\n")->part('ppt/slides/slide1.xml');
+
+    // 12px of block gap is 9pt at 96 dpi, and the two paragraphs of the frame carry one gap
+    // between them: the first, and not the second.
+    expect(preg_match_all('#<a:spcAft>\s*<a:spcPts val="900"/>#', $xml))->toBe(1)
+        ->and(preg_match_all('#<a:spcAft>#', $xml))->toBe(2);
+});
+
+it('leaves the gap between two paragraphs out of the frame\'s height twice', function () {
+    // A gap measured into the frame *and* written into it is a frame a gap taller than the
+    // text in it, and every shape below it that much further down the slide.
+    $frame = renderDeck("First.\n\nSecond.\n")->positionOf('text');
+
+    // Two lines of 26px at the theme's leading, and one 12px gap between them.
+    expect($frame['height'])->toBe(64.0);
 });
 
 it('renders inline emphasis as a run rather than as the characters', function () {
@@ -705,12 +730,12 @@ it('bolds the run a deck bolds', function () {
 
 it('shrinks a text box that overflows rather than growing it over the block below', function () {
     // PHPPresentation defaults to `spAutoFit`, which hands the box's height to the reader:
-    // a paragraph measured one line short then grows onto whatever is under it. The
-    // measurement is an estimate, so a mis-estimate has to be recoverable, and shrinking the
-    // type is the direction that does not draw over another shape.
+    // a frame measured one line short then grows onto whatever is under it. The measurement
+    // is an estimate, so a mis-estimate has to be recoverable, and shrinking the type is the
+    // direction that does not draw over another shape.
     $xml = renderDeck("Text.\n\nMore text.\n")->part('ppt/slides/slide1.xml');
 
-    expect(substr_count($xml, '<a:normAutofit/>'))->toBe(2)
+    expect(substr_count($xml, '<a:normAutofit/>'))->toBe(1)
         ->and($xml)->not->toContain('<a:spAutoFit/>');
 });
 

@@ -121,7 +121,7 @@ it('measures an empty string as one line', function () {
 it('measures a paragraph by the lines it wraps to', function () {
     // `x` is 500 units, so 500 of them at 16pt is 4000px of type in the 860px the body
     // box leaves: five lines, and five times the 26px a line of body text is.
-    expect(measured(str_repeat('x', 500) . "\n")->positionOf('paragraph')['height'])->toBe(130.0);
+    expect(measured(str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(130.0);
 });
 
 it('measures a run boundary as a change of face rather than as a line', function () {
@@ -154,8 +154,8 @@ it('measures a paragraph carrying markup as the paragraph it reads as', function
         $sentence,
     );
 
-    expect(measured("# Lead\n\n$marked\n")->positionOf('paragraph')['height'])
-        ->toBe(measured("# Lead\n\n$sentence\n")->positionOf('paragraph')['height']);
+    expect(measured("# Lead\n\n$marked\n")->positionOf('text')['height'])
+        ->toBe(measured("# Lead\n\n$sentence\n")->positionOf('text')['height']);
 });
 
 it('measures a heading by the lines it wraps to', function () {
@@ -174,7 +174,7 @@ it('measures a quote by the lines it wraps to', function () {
 });
 
 it('measures a list by the lines its items wrap to', function () {
-    expect(measured('- ' . str_repeat('x', 500) . "\n")->positionOf('list')['height'])->toBe(130.0);
+    expect(measured('- ' . str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(130.0);
 });
 
 it('measures a code line by its characters, so a long one wraps', function () {

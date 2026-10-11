@@ -7,6 +7,7 @@ use MarkdownPresentation\Render\Block\Paragraph;
 use MarkdownPresentation\Render\Box;
 use MarkdownPresentation\Render\Run;
 use MarkdownPresentation\Render\ShapeWriter;
+use MarkdownPresentation\Render\TextFrame;
 use MarkdownPresentation\Theme\Theme;
 use PhpOffice\PhpPresentation\Slide;
 
@@ -32,7 +33,7 @@ it('writes a shape at no less than one pixel in either direction', function (cal
 })->with([
     // Built lazily: a dataset value is made when the file is loaded, and the image fixture
     // belongs to a scratch directory a file earlier in the alphabet owns.
-    'a paragraph' => fn (): Paragraph => new Paragraph([new Run('Text.')], 1),
+    'a run of text' => fn (): TextFrame => new TextFrame([new Paragraph([new Run('Text.')], 1)]),
     'an image' => fn (): Image => new Image('dot.png', png(40, 10), null, '', 1),
 ]);
 

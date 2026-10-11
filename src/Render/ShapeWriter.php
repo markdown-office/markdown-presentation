@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Render;
 
-use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
 use MarkdownPresentation\Render\Block\Image;
-use MarkdownPresentation\Render\Block\ListBlock;
 use MarkdownPresentation\Render\Block\Paragraph;
 use MarkdownPresentation\Render\Block\Quote;
 use MarkdownPresentation\Render\Block\Rule;
@@ -37,10 +35,13 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
  * pass and a shape drawn by another drift apart the first time somebody edits one of them,
  * and the drift shows up as a gap rather than as a failure.
  *
- * Every shape is named after the kind of block it came from, so the whole mapping can be
- * read off `ppt/slides/slideN.xml` without opening the library.
+ * Every shape is named after the kind of thing it was drawn from, so the whole mapping can be
+ * read off `ppt/slides/slideN.xml` without opening the library. A {@see TextFrame} is the one
+ * shape drawn from several blocks at once, and it is named for what it holds rather than for
+ * the first of them.
  *
  * @phpstan-import-type Piece from TextMetric
+ * @phpstan-import-type FrameParagraph from TextFrame
 */
 final class ShapeWriter
 {
@@ -56,39 +57,38 @@ final class ShapeWriter
 
     /**
      *
-     * How tall a block is, in pixels. `$room` is how much of its box is left, which only an
+     * How tall a shape is, in pixels. `$room` is how much of its box is left, which only an
      * image consults: an image takes what a paragraph and a table would not.
      *
-     * `$box` is the column the block is laid out in rather than the block's own box: the
-     * width text wraps in is the column's, and a block is measured before it has a box.
+     * `$box` is the column the shape is laid out in rather than the shape's own box: the
+     * width text wraps in is the column's, and a shape is measured before it has a box.
      *
-     * The union rather than `Block`, because it is exhaustive: a ninth kind of block is not
-     * something this method can guess a height for, and naming the eight is what says so at
-     * the type rather than at run time.
-     *
-     * @param Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table $block
+     * The union rather than `Block`, because it is exhaustive: a tenth kind of shape is not
+     * something this method can guess a height for, and naming the nine is what says so at
+     * the type rather than at run time. A paragraph and a list are in it as a
+     * {@see TextFrame} rather than as themselves: they only ever reach a slide inside one, and
+     * a frame measured apart from its paragraphs is a frame whose height says nothing about
+     * the type in it.
      */
-    public function height(Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table $block, Box $box, int $room): int
+    public function height(Code|TextFrame|Heading|Image|Quote|Rule|Table $drawable, Box $box, int $room): int
     {
         $width = $this->textWidth($box);
 
         return match (true) {
-            $block instanceof Heading => $this->geometry->headingHeight(
-                $block->level,
-                $this->runLines($block->runs, $width, $this->geometry->headingSize($block->level), bold: true),
+            $drawable instanceof TextFrame => $this->textHeight($drawable, $width),
+            $drawable instanceof Heading => $this->geometry->headingHeight(
+                $drawable->level,
+                $this->runLines($drawable->runs, $width, $this->geometry->headingSize($drawable->level), bold: true),
             ),
-            $block instanceof Code => $this->codeHeight($block, $width),
-            $block instanceof ListBlock => $this->listHeight($block, $box),
-            $block instanceof Table => $this->tableHeight($block, $box),
-            $block instanceof Rule => SlideGeometry::RULE_HEIGHT,
-            $block instanceof Image => $room,
-            $block instanceof Quote => $this->runLines(
-                $block->runs,
+            $drawable instanceof Code => $this->codeHeight($drawable, $width),
+            $drawable instanceof Table => $this->tableHeight($drawable, $box),
+            $drawable instanceof Rule => SlideGeometry::RULE_HEIGHT,
+            $drawable instanceof Image => $room,
+            $drawable instanceof Quote => $this->runLines(
+                $drawable->runs,
                 $width - $this->geometry->style()->gutter(),
                 SlideGeometry::QUOTE_SIZE,
             ) * $this->geometry->lineHeight(SlideGeometry::QUOTE_SIZE),
-            $block instanceof Paragraph => $this->runLines($block->runs, $width, $this->bodySize())
-                * $this->geometry->lineHeight($this->bodySize()),
         };
     }
 
@@ -172,19 +172,50 @@ final class ShapeWriter
         return $lines * $this->geometry->lineHeight(SlideGeometry::CODE_SIZE) + 2 * SlideGeometry::INSET_Y;
     }
 
-    private function listHeight(ListBlock $block, Box $box): int
+    /**
+     * The height of a frame: its paragraphs one after another, with the theme's own gap
+     * between them.
+     *
+     * The gap is the one the layout spends between two shapes of a column, moved into the one
+     * shape the paragraphs now share — counted once here and written there as
+     * {@see SlideGeometry::paragraphSpace()}, which is what stops the two from being spent
+     * twice over a frame that is a gap taller than the text in it.
+     */
+    private function textHeight(TextFrame $frame, int $width): int
     {
-        $lines = 0;
+        $paragraphs = $frame->paragraphs();
+        $last = count($paragraphs) - 1;
+        $height = 0;
 
-        foreach ($block->items as $item) {
-            $lines += $this->runLines(
-                $item['runs'],
-                $this->textWidth($box) - $item['level'] * $this->geometry->style()->gutter(),
-                $this->bodySize(),
-            );
+        foreach ($paragraphs as $at => $entry) {
+            $height += $this->entryLines($entry, $width) * $this->geometry->lineHeight($this->bodySize());
+
+            if ($at < $last) {
+                $height += $this->geometry->style()->blockGap();
+            }
         }
 
-        return $lines * $this->geometry->lineHeight($this->bodySize());
+        return $height;
+    }
+
+    /**
+     * How many lines one paragraph of a frame takes.
+     *
+     * @param FrameParagraph $entry A paragraph, or one item of a list.
+     */
+    private function entryLines(Paragraph|array $entry, int $width): int
+    {
+        if ($entry instanceof Paragraph) {
+            return $this->runLines($entry->runs, $width, $this->bodySize());
+        }
+
+        // A list item's text starts a gutter in for its marker, and one gutter more for each
+        // level, which is the width the text above it was measured in too.
+        return $this->runLines(
+            $entry['runs'],
+            $width - $entry['level'] * $this->geometry->style()->gutter(),
+            $this->bodySize(),
+        );
     }
 
     private function tableHeight(Table $block, Box $box): int
@@ -285,36 +316,64 @@ final class ShapeWriter
 
     /**
      *
-     * The shape a block becomes, added to the slide.
+     * The shape a drawable becomes, added to the slide.
      *
-     * @param Box $box    Where the block starts and how much of its box it has left.
+     * @param Box $box    Where it starts and how much of its box it has left.
      * @param int $height The height {@see self::height()} gave it.
-     *
-     * @param Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table $block
-    */
-    public function write(Slide $slide, Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table $block, Box $box, int $height): AbstractShape
+     */
+    public function write(Slide $slide, Code|TextFrame|Heading|Image|Quote|Rule|Table $drawable, Box $box, int $height): AbstractShape
     {
         $shape = match (true) {
-            $block instanceof Code => $this->code($slide, $block, $box, $height),
-            $block instanceof Table => $this->table($slide, $block, $box, $height),
-            $block instanceof Image => $this->image($slide, $block, $box, $height),
-            $block instanceof Rule => $this->rule($slide, $box),
-            $block instanceof Heading => $this->heading($slide, $block, $box, $height),
-            $block instanceof ListBlock => $this->list($slide, $block, $box, $height),
-            $block instanceof Quote => $this->quote($slide, $block, $box, $height),
-            $block instanceof Paragraph => $this->paragraph($slide, $block, $box, $height),
+            $drawable instanceof Code => $this->code($slide, $drawable, $box, $height),
+            $drawable instanceof Table => $this->table($slide, $drawable, $box, $height),
+            $drawable instanceof Image => $this->image($slide, $drawable, $box, $height),
+            $drawable instanceof Rule => $this->rule($slide, $box),
+            $drawable instanceof Heading => $this->heading($slide, $drawable, $box, $height),
+            $drawable instanceof TextFrame => $this->textFrame($slide, $drawable, $box, $height),
+            $drawable instanceof Quote => $this->quote($slide, $drawable, $box, $height),
         };
 
-        $shape->setName($block->name());
+        $shape->setName($drawable->name());
 
         return $shape;
     }
 
-    private function paragraph(Slide $slide, Paragraph $block, Box $box, int $height): RichText
+    /**
+     * A run of paragraphs and lists, as one shape holding one paragraph each.
+     *
+     * The frame is the unit a reader edits: it is drawn once, placed once, and PowerPoint
+     * flows its paragraphs inside it.
+     */
+    private function textFrame(Slide $slide, TextFrame $frame, Box $box, int $height): RichText
     {
         $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
-        $this->runs($shape->getActiveParagraph(), $block->runs, $this->bodySize());
+
+        $paragraphs = $frame->paragraphs();
+        $last = count($paragraphs) - 1;
+        $first = true;
+
+        foreach ($paragraphs as $at => $entry) {
+            // A fresh shape already carries one paragraph, and creating another for the first
+            // would leave that empty one in the file as a blank line.
+            $paragraph = $first ? $shape->getActiveParagraph() : $shape->createParagraph();
+            $first = false;
+
+            if ($entry instanceof Paragraph) {
+                $this->runs($paragraph, $entry->runs, $this->bodySize());
+            } else {
+                $this->item($paragraph, $entry);
+            }
+
+            // `runs()` zeroes the spacing on every paragraph it fills, which is right for a
+            // shape of one paragraph and wrong for a frame of several. The gap between two of
+            // them is written here instead, and only where there is a paragraph under this
+            // one to be separated from — a trailing one would be space the frame was never
+            // measured for.
+            if ($at < $last) {
+                $paragraph->setSpacingAfter($this->geometry->paragraphSpace());
+            }
+        }
 
         return $shape;
     }
@@ -355,37 +414,28 @@ final class ShapeWriter
         return $shape;
     }
 
-    private function list(Slide $slide, ListBlock $block, Box $box, int $height): RichText
+    /**
+     * One item of a list, which in the file is a paragraph with a marker on it.
+     *
+     * @param array{level: int, runs: list<Run>, ordered: bool, start: ?int} $item
+     */
+    private function item(TextParagraph $paragraph, array $item): void
     {
-        $shape = $this->textBox($slide);
-        $this->place($shape, $box, $height);
+        $paragraph->setBulletStyle($this->bullet(
+            $item['ordered'] ? Bullet::TYPE_NUMERIC : Bullet::TYPE_BULLET,
+            $item['start'],
+        ));
 
-        $first = true;
+        // The level the writer numbers at, which is what makes a numbered sub-list
+        // number itself instead of carrying on from the list above it. The margin and
+        // the indent below are stated outright, so this moves the numbering and not the
+        // position.
+        $paragraph->getAlignment()->setLevel($item['level'] - 1);
+        $paragraph->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+        $paragraph->getAlignment()->setMarginLeft($item['level'] * $this->geometry->style()->gutter());
+        $paragraph->getAlignment()->setIndent(-$this->geometry->style()->gutter());
 
-        foreach ($block->items as $item) {
-            // A fresh shape already carries one paragraph, and creating another for the
-            // first item would leave that empty one in the file as a blank line.
-            $paragraph = $first ? $shape->getActiveParagraph() : $shape->createParagraph();
-            $first = false;
-
-            $paragraph->setBulletStyle($this->bullet(
-                $item['ordered'] ? Bullet::TYPE_NUMERIC : Bullet::TYPE_BULLET,
-                $item['start'],
-            ));
-
-            // The level the writer numbers at, which is what makes a numbered sub-list
-            // number itself instead of carrying on from the list above it. The margin and
-            // the indent below are stated outright, so this moves the numbering and not the
-            // position.
-            $paragraph->getAlignment()->setLevel($item['level'] - 1);
-            $paragraph->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $paragraph->getAlignment()->setMarginLeft($item['level'] * $this->geometry->style()->gutter());
-            $paragraph->getAlignment()->setIndent(-$this->geometry->style()->gutter());
-
-            $this->runs($paragraph, $item['runs'], $this->bodySize());
-        }
-
-        return $shape;
+        $this->runs($paragraph, $item['runs'], $this->bodySize());
     }
 
     private function code(Slide $slide, Code $block, Box $box, int $height): RichText
@@ -629,8 +679,10 @@ final class ShapeWriter
      * and a shape asked for its active paragraph cannot name a cell's.
      *
      * Spacing is zeroed here rather than left at PowerPoint's default because
-     * {@see self::height()} decides where the next block starts, and a leading gap the
-     * heights do not know about is what puts one shape on top of the one before it.
+     * {@see self::height()} decides where the next shape starts, and a leading gap the
+     * heights do not know about is what puts one shape on top of the one before it. A
+     * {@see TextFrame} puts the gap between its own paragraphs back on top of it, on every
+     * paragraph that has another one under it.
      *
      * @param list<Run> $runs
     */

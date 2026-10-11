@@ -197,14 +197,14 @@ it('draws a heading at the depth its theme\'s scale names', function () {
 });
 
 it('draws a body paragraph at the size its theme names', function () {
-    expect(themedDeck(styledTheme(['body' => 19]))->fontSize('paragraph'))->toBe(19.0);
+    expect(themedDeck(styledTheme(['body' => 19]))->fontSize('text'))->toBe(19.0);
 });
 
 it('moves the body of a slide when the theme widens its margin', function () {
     // The spacing rhythm: a wider margin is more air on every side, and the body follows the
     // margin rather than staying where it was.
-    $narrow = themedDeck(styledTheme(['margin' => 30]))->positionOf('paragraph');
-    $wide = themedDeck(styledTheme(['margin' => 70]))->positionOf('paragraph');
+    $narrow = themedDeck(styledTheme(['margin' => 30]))->positionOf('text');
+    $wide = themedDeck(styledTheme(['margin' => 70]))->positionOf('text');
 
     expect($narrow['x'])->toBeLessThan($wide['x'])
         ->and($wide['y'])->toBeGreaterThan($narrow['y'])
@@ -212,17 +212,33 @@ it('moves the body of a slide when the theme widens its margin', function () {
         ->and($wide['width'])->toBeLessThan($narrow['width']);
 });
 
-it('leaves the theme\'s own gap between two blocks of a column', function () {
+it('leaves the theme\'s own gap between two shapes of a column', function () {
     // The gap is between the shapes rather than in the box they are laid out in, so this is
-    // read off two shapes on one slide: a paragraph, then a paragraph, with the theme's
+    // read off two shapes on one slide: a frame of text, then a code block, with the theme's
     // spacing between the end of the first and the top of the second.
-    $deck = "---\ntheme: %s\n---\n\n# T\n\nOne.\n\nTwo.\n";
+    $deck = "---\ntheme: %s\n---\n\n# T\n\nOne.\n\nTwo.\n\n```\nx\n```\n";
 
     foreach (['tight' => 8, 'loose' => 24] as $name => $block) {
         $shapes = themedDeck(styledTheme(['block' => $block]), $deck)->positions();
         $between = $shapes[2]['y'] - ($shapes[1]['y'] + $shapes[1]['height']);
 
         expect(round($between))->toBe((float) $block, $name);
+    }
+});
+
+it('leaves the theme\'s own gap between two paragraphs of one frame', function () {
+    // The same number, spent in the other of its two places: `block:` is the air between two
+    // paragraphs as well as the air between two shapes, and a theme that sets it is setting
+    // both.
+    $deck = "---\ntheme: %s\n---\n\n# T\n\nOne.\n\nTwo.\n";
+
+    foreach (['tight' => 8, 'loose' => 24] as $name => $block) {
+        $xml = themedDeck(styledTheme(['block' => $block]), $deck)->part('ppt/slides/slide1.xml');
+        // `a:spcPts` is a measure in hundredths of a point, and a pixel is three quarters of
+        // one, so 8px of block gap is 600 there and 24px is 1800.
+        preg_match_all('#<a:spcAft>\s*<a:spcPts val="(\d+)"/>#', $xml, $found);
+
+        expect(in_array((string) (int) round($block * 75), $found[1], true))->toBeTrue($name);
     }
 });
 

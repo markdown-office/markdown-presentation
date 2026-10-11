@@ -122,11 +122,15 @@ final class SlideGeometry
     /**
      * The gap left between two blocks in a column, by default.
      *
-     * In the layout rather than in the shapes: every paragraph is written with
-     * `setSpacingBefore(0)` and `setSpacingAfter(0)`, because {@see ShapeWriter::height()}
-     * decides where the next block starts and a leading gap it does not know about is what
-     * puts one shape on top of the one before it. A gap the heights do know about is the
-     * only kind that survives.
+     * In the layout rather than in the shapes: a paragraph is written with
+     * `setSpacingBefore(0)` and the last paragraph of a frame with `setSpacingAfter(0)`,
+     * because {@see ShapeWriter::height()} decides where the next shape starts and a leading
+     * gap it does not know about is what puts one shape on top of the one before it.
+     *
+     * One gap spent once: between two shapes of a column it is added to the cursor as they
+     * are laid out, and between two paragraphs of one frame it is written as the paragraph's
+     * own spacing after — {@see self::paragraphSpace()}. A frame measured with the gap *and*
+     * written with it is a gap taller than the text it separates.
      */
     public const BLOCK_GAP = 12;
 
@@ -395,6 +399,25 @@ final class SlideGeometry
     public function lineHeight(int $size): int
     {
         return (int) round($size * self::PIXELS_PER_POINT * $this->style->leading());
+    }
+
+    /**
+     * The gap written between two paragraphs of one text frame, in points.
+     *
+     * The theme's own block gap, because the air between two paragraphs is the same air as
+     * between two shapes of a column and `block:` should decide both — a theme that widens one
+     * widens the other. In points rather than pixels because `a:spcPts` is a point measure the
+     * writer stores in hundredths, where {@see Box} is the 96 dpi pixel
+     * {@see self::PIXELS_PER_POINT} converts.
+     *
+     * Rounded to a hundredth of a point, which is all {@see Box} can be half of anyway and is
+     * what the writer's hundredths need: `12 / (4 / 3)` is `9.000000000000002` in binary
+     * floating point, and that is written into an attribute the format defines as a whole
+     * number.
+     */
+    public function paragraphSpace(): float
+    {
+        return round($this->style->blockGap() / self::PIXELS_PER_POINT, 2);
     }
 
     /**

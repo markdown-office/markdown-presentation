@@ -274,7 +274,7 @@ it('draws a title named in the frontmatter on a blank layout, which has no title
     // it to say. It is drawn as the heading a blank slide's title already is.
     $pptx = slideDeck("---\nlayout: blank\ntitle: Named\n---\n\nBody.\n");
 
-    expect($pptx->shapeNames())->toBe(['heading', 'paragraph'])
+    expect($pptx->shapeNames())->toBe(['heading', 'text'])
         ->and($pptx->texts(1))->toBe(['Named', 'Body.']);
 });
 
@@ -292,7 +292,7 @@ it('draws a blank layout\'s title once, whether it came from the frontmatter or 
     // every other role.
     $pptx = slideDeck("---\nlayout: blank\ntitle: Named\n---\n\n# Named\n\nBody.\n");
 
-    expect($pptx->shapeNames())->toBe(['heading', 'paragraph'])
+    expect($pptx->shapeNames())->toBe(['heading', 'text'])
         ->and($pptx->texts(1))->toBe(['Named', 'Body.']);
 });
 
@@ -312,7 +312,7 @@ it('puts everything before the second heading in the left column and everything 
     $shapes = slideDeck("---\nlayout: two-column\n---\n# Both\n\nLeft.\n\n## Right\n\nRight side.\n")->positions();
 
     expect(array_map(static fn (array $shape): string => $shape['name'], $shapes))
-        ->toBe(['title', 'paragraph', 'heading', 'paragraph'])
+        ->toBe(['title', 'text', 'heading', 'text'])
         ->and($shapes[1]['x'])->toBeLessThan($shapes[2]['x'])
         ->and($shapes[2]['x'])->toBe($shapes[3]['x']);
 });
@@ -323,7 +323,7 @@ it('leaves the right column empty for a two-column slide that writes no second h
     $shapes = slideDeck("---\nlayout: two-column\n---\n# Both\n\nOnly left.\n")->positions();
 
     expect(array_map(static fn (array $shape): string => $shape['name'], $shapes))
-        ->toBe(['title', 'paragraph']);
+        ->toBe(['title', 'text']);
 });
 
 it('keeps both columns of a two-column layout the same height', function () {
@@ -450,7 +450,7 @@ it('draws a title named in the frontmatter as a heading on an image slide', func
     // The same answer `blank` gives, because there is no box to draw it in either way.
     $pptx = slideDeck("---\nlayout: image-slide\ntitle: Named\n---\n\nBody.\n");
 
-    expect($pptx->shapeNames())->toBe(['heading', 'paragraph'])
+    expect($pptx->shapeNames())->toBe(['heading', 'text'])
         ->and($pptx->texts(1))->toBe(['Named', 'Body.']);
 });
 

@@ -127,9 +127,9 @@ it('leaves emphasis that does not close exactly as it was written', function () 
 it('nests four spaces of indent one level and not two', function () {
     [$pptx] = builtDeck('01-kitchen-sink.md');
 
-    // A list is one shape and its indentation lives on the paragraphs inside it, so the
-    // left edges of the shapes say nothing. What matters is how many indent steps the
-    // bulleted list has: reading four spaces as two levels would add a step.
+    // A list is paragraphs of a text frame and its indentation lives on those paragraphs, so
+    // the left edges of the shapes say nothing. What matters is how many indent steps the
+    // bulleted paragraphs have: reading four spaces as two levels would add a step.
     $levels = [];
     $shape = '';
 
@@ -138,7 +138,7 @@ it('nests four spaces of indent one level and not two', function () {
             $shape = $name[1];
         }
 
-        if ($shape !== 'list') {
+        if ($shape !== 'text') {
             continue;
         }
 
