@@ -160,6 +160,12 @@ it('refuses rather than writing back a notes slide it could not read', function 
     // The archive stays structurally valid, so this is an unreadable *part* and not an
     // unreadable *file*, which is the case the pass exists to handle. Both headers are
     // marked, since which of the two a reader trusts is its own business.
+    // `str_starts_with($name, 'ppt/notesSlides/')` is not enough to find the part. That
+    // prefix also matches `ppt/notesSlides/_rels/notesSlide1.xml.rels`, which every notes
+    // slide has, and it is written first. Four separate corruptions were applied to that
+    // rels file while the notes slide this test is about stayed perfectly readable, which
+    // is why none of them changed the outcome. The pattern is the one the pass itself
+    // matches on.
     $payload = null;
     $method = null;
 
@@ -167,7 +173,7 @@ it('refuses rather than writing back a notes slide it could not read', function 
         $name = (int) unpack('v', substr($bytes, $at + 26, 2))[1];
         $extra = (int) unpack('v', substr($bytes, $at + 28, 2))[1];
 
-        if (str_starts_with(substr($bytes, $at + 30, $name), 'ppt/notesSlides/')) {
+        if (preg_match('~^ppt/notesSlides/notesSlide\d+\.xml$~', substr($bytes, $at + 30, $name)) === 1) {
             $payload = $at + 30 + $name + $extra;
             $method = (int) unpack('v', substr($bytes, $at + 8, 2))[1];
 
