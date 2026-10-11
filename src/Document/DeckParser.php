@@ -127,14 +127,18 @@ final class DeckParser
             // a delimiter.
             if ($inNote) {
                 $inNote = preg_match(self::CLOSES_NOTE, $trimmed) !== 1;
-                $index++;
+                if ($index < $last + 1) {
+                    $index++;
+                }
 
                 continue;
             }
 
             if ($inHtmlComment) {
                 $inHtmlComment = self::commentContinues($line, true);
-                $index++;
+                if ($index < $last + 1) {
+                    $index++;
+                }
 
                 continue;
             }

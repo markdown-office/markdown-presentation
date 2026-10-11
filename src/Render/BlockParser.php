@@ -205,6 +205,10 @@ final class BlockParser
             $line = $lines[$index];
             $index++;
 
+            if ($line !== '') {
+                $end = $index;
+            }
+
             // A `:::` the walk reaches has not closed anything: the one that closes a region
             // is skipped when the region is read, and the one that opens a region is matched
             // below. Reaching one is a closer with nothing to close, and it is refused rather
