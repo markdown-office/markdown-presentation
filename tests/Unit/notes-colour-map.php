@@ -210,3 +210,40 @@ it('runs twice without adding the element a second time', function () {
 
     @unlink($path);
 });
+
+it('writes each notes slide once, however many slides carry one', function () {
+    // A pass that deletes and re-adds as it walks the archive duplicates what it
+    // rewrites: the entry is marked for deletion rather than removed, the replacement
+    // is appended, and the walk visits the original again. Three notes are enough to
+    // show it; a deck with none passes whether the walk is sound or not, which is why
+    // this is a shape assertion rather than a check that the element is present.
+    $deck = "# One\n\nThe first.\n\n<!-- one -->\n\n---\n\n# Two\n\nThe second.\n\n"
+        . "<!-- two -->\n\n---\n\n# Three\n\nThe third.\n\n<!-- three -->\n";
+
+    $root = dirname(__DIR__, 2);
+    $path = sys_get_temp_dir() . '/mdp-once-' . md5('once') . '.pptx';
+
+    (new PresentationRenderer($root . '/examples/markdown'))->render(
+        new DeckParser()->parse($deck),
+        $path,
+    );
+
+    $zip = new ZipArchive();
+    $zip->open($path);
+    $seen = [];
+
+    for ($index = 0; $index < $zip->numFiles; $index++) {
+        $seen[(string) $zip->getNameIndex($index)] = ($seen[(string) $zip->getNameIndex($index)] ?? 0) + 1;
+    }
+
+    $zip->close();
+    @unlink($path);
+
+    $twice = array_filter($seen, static fn (int $count): bool => $count > 1);
+    $notes = array_filter(
+        array_keys($seen),
+        static fn (string $name): bool => str_starts_with($name, 'ppt/notesSlides/'),
+    );
+
+    expect($twice)->toBe([])->and($notes)->toHaveCount(3);
+});

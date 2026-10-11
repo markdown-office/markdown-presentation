@@ -53,9 +53,27 @@ final class NotesColourMapPass
             throw UnreadablePackage::cannotOpen($path);
         }
 
-        $changed = 0;
+        // Read every part this pass rewrites before rewriting any of them.
+        //
+        // Rewriting inside the walk looks harmless and is not. `deleteName()` is
+        // deferred: libzip marks the entry and does not drop it from `numFiles` until
+        // the archive closes, so the `addFromString()` that follows grows `numFiles` by
+        // one while `$index` grows by one, and the walk cannot end. It appears to end,
+        // because a part already carrying the element is left alone — so a deck whose
+        // slides all need rewriting runs forever, and one that does not grows the
+        // package for as long as memory lasts.
+        //
+        // The rewritten entry also lands at the end of the archive, which moves every
+        // index after it. What `$index` points at one turn is therefore not what it
+        // pointed at the last. Where the build tolerates reading an entry marked for
+        // deletion the result is a slide patched under the wrong index; where it does
+        // not, `getFromIndex()` answers false and the pass reports the part unreadable
+        // although it is in the package and perfectly decompressable.
+        //
+        // Collecting the names first costs a handful of strings and removes both.
+        $pending = [];
 
-        for ($index = 0; $index < $zip->numFiles; $index++) {
+        for ($index = 0, $count = $zip->numFiles; $index < $count; $index++) {
             $name = (string) $zip->getNameIndex($index);
 
             if (preg_match('~^ppt/notesSlides/notesSlide\d+\.xml$~', $name) !== 1) {
@@ -70,28 +88,26 @@ final class NotesColourMapPass
             $xml = self::contents($zip, $index);
 
             if ($xml === false) {
+                $zip->close();
+
                 throw UnreadablePackage::cannotRead($path, $name);
             }
 
             $patched = self::addColourMap($xml);
 
-            if ($patched === $xml) {
-                continue;
+            if ($patched !== $xml) {
+                $pending[$name] = $patched;
             }
+        }
 
-            // This loop terminates because these two keep `numFiles` where it is: the part
-            // goes and one of the same name comes back, and `addFromString()` appends
-            // rather than replaces. Deleting without adding would take the archive apart,
-            // and adding without deleting would grow it by one entry per patched slide for
-            // this loop to walk over again.
-            $zip->deleteName($name);
-            $zip->addFromString($name, $patched);
-            $changed++;
+        foreach ($pending as $name => $patched) {
+            $zip->deleteName((string) $name);
+            $zip->addFromString((string) $name, $patched);
         }
 
         $zip->close();
 
-        return $changed;
+        return count($pending);
     }
 
     /**
