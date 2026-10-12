@@ -115,11 +115,13 @@ final class BlockParser
      * still a step and a column switch is still a column switch, which is checked in the suite
      * rather than reasoned about, because the pair is the whole two-colon grammar.
      *
-     * No capture and no argument, because the marker means one thing: the next column. A
-     * column named as a number would be a way to move backwards, and a block cannot go back to
-     * a column it has already been read out of.
+     * Capture 1 is what a writer put after an equals, and it is refused wherever it stands: the
+     * marker means one thing, the next column, and a column named as a number would be a way to
+     * move backwards, which a block cannot do because it has already been read out of the
+     * column it was in. {@see \MarkdownPresentation\Exception\UnknownMarker} names what would
+     * have worked, where drawing it as a paragraph would put `::column=2` on the slide.
      */
-    private const COLUMN = '/\A[ \t]*::column[ \t]*\z/';
+    private const COLUMN = '/\A[ \t]*::column[ \t]*(?:=[ \t]*(.*?)[ \t]*)?[ \t]*\z/';
 
     /** A note opener {@see \MarkdownPresentation\Document\DeckParser} did not take off the slide. */
     private const NOTE = '~^[ \t]*::note[ \t]*$~m';
@@ -199,18 +201,20 @@ final class BlockParser
         // less literally than one standing on a line of its own.
         self::refuse($slide, self::prose($lines));
 
-        return $this->blocks($lines, $slide, $directory, $files, self::FIRST_STEP, self::FIRST_COLUMN);
+        return $this->blocks($lines, $slide, $directory, $files, self::FIRST_STEP, self::FIRST_COLUMN, 0);
     }
 
     /**
-     * The walk itself, at a step and a column the caller has already reached.
+     * The walk itself, at a step, a column and a count of markers the caller has reached.
      *
      * A method of its own rather than the body of {@see self::parse()} because a region is
      * read by calling this again with the lines between its fences and the step its opener
      * named, and a slide has one walk and not one per region — a `::click` written inside a
      * region moves the same counter from the step the region opened at. A region is a step
      * boundary and not a column boundary, so what it holds stays in the column it was written
-     * in.
+     * in, which is why the markers counted so far are handed in rather than counted again: a
+     * walk that started its own count at nothing would return fewer markers than the column a
+     * block in it is in.
      *
      * @param list<string> $lines
      */
@@ -221,6 +225,7 @@ final class BlockParser
         PathScope $files,
         int $step,
         int $column,
+        int $columnMarkers,
     ): SlideBlocks {
         $blocks = [];
         $columns = [];
@@ -257,10 +262,12 @@ final class BlockParser
                     $files,
                     $step,
                     $column,
+                    $columnMarkers,
                 );
 
                 array_push($blocks, ...$inside->blocks());
                 array_push($columns, ...$inside->columns());
+                $columnMarkers = $inside->columnMarkers();
 
                 $index = $end + 1;
 
@@ -277,7 +284,7 @@ final class BlockParser
                 $step = self::jump($slide, $marker[1] ?? null, $step);
 
                 continue;
-            } elseif (preg_match(self::COLUMN, $line) === 1) {
+            } elseif (preg_match(self::COLUMN, $line, $argument) === 1) {
                 // Whatever is open above the marker belongs to the column it was written in,
                 // so it is closed before the column moves — a paragraph with `::column` in the
                 // middle of it would be one shape drawn in the column it was started in.
@@ -285,8 +292,17 @@ final class BlockParser
                 // No step moves with it. `jump()` is the only thing in this class that may move
                 // one, and a marker that also opened a step would put a build-up written
                 // across two columns on step two onwards.
+                //
+                // The count rather than the column itself, because a marker with nothing after
+                // it moves nothing and the renderer still has to know it was written. Refused
+                // first so that `::column=2` never reaches the count: it is not a marker.
+                if (isset($argument[1])) {
+                    throw UnknownMarker::argument($slide, $argument[1]);
+                }
+
                 $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
                 $column++;
+                $columnMarkers++;
 
                 continue;
             }
@@ -329,7 +345,7 @@ final class BlockParser
 
         $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
 
-        return new SlideBlocks($blocks, $columns);
+        return new SlideBlocks($blocks, $columns, $columnMarkers);
     }
 
     /**

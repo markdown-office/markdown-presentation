@@ -254,6 +254,12 @@ it('does not claim again what the code does not do', function (string $claim) {
     // rather than the spelling — the entry says the slide divided at its first `##` without
     // claiming that a heading divides anything.
     'a heading is what puts a block in the next column' => 'a writer puts on a column of a slide',
+    // Whether a trailing `::column` was refused used to depend on whether a block followed
+    // it: the marker at the end of a slide was drawn where the same marker with text after
+    // it was a failure, and the test above it said that was deliberate. The renderer measures
+    // the layout against the count of markers now, so nothing a deck writes after its last
+    // marker changes what happens to it, and no page may argue the other way.
+    'whether a trailing ::column is refused depends on what follows it' => 'Refusing here would make the spelling of a column depend on what happens to follow it',
 ]);
 
 it('has no decorative dividers in it', function () {

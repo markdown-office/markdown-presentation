@@ -481,7 +481,8 @@ the only way there is: a `##` is an ordinary heading and stays in whichever colu
 written, so the heading in the example above is drawn in the right one because the marker is
 above it and not because of anything about the heading. There is no argument and no way
 backwards — the marker means "the next column", which is the one direction a block can move
-in.
+in. `::column=2` is a failure under `UnknownMarker` naming the marker that would have
+worked, rather than a paragraph reading `::column=2` drawn on the slide.
 
 A deck that never writes one fills the first column and leaves the rest empty, which is
 honest: it asked for a layout with columns and wrote one of them.
@@ -489,9 +490,11 @@ honest: it asked for a layout with columns and wrote one of them.
 The two `text` shapes are the paragraphs either side of the marker, one shape each — see
 [What a slide becomes](#what-a-slide-becomes).
 
-A marker the layout cannot offer — one on a `content` slide, or a third on a two-column one —
-is a failure naming the role and how many columns it has, because the slide is what is
-missing them rather than the marker:
+A marker the layout cannot offer — one on a `content` slide, a third on a two-column one, or
+either of those at the end of a slide with nothing written after it — is a failure naming the
+role and how many columns it has, because the slide is what is missing them rather than the
+marker. It is the markers that are counted rather than the blocks they left behind, so what a
+deck's last line happens to be does not decide whether it renders:
 
 ```php
 use MarkdownPresentation\Document\DeckParser;
@@ -832,9 +835,10 @@ parts it is made of. A `:::` with nothing to close, and a `::note` with nothing 
 failures naming the spelling that would have worked.
 
 A step number that does not go forwards, a `::click=` with nothing after the equals, and a step
-that is not a number are all failures. So is a marker at the end of a list item: honouring one
-would mean splitting a single list block into several, which is a different feature from the one
-claimed here, so the refusal names the mistake instead of drawing the marker on the slide.
+that is not a number are all failures, and so is a `::column` carrying an argument: the marker
+takes none. So is a marker at the end of a list item: honouring one would mean splitting a
+single list block into several, which is a different feature from the one claimed here, so the
+refusal names the mistake instead of drawing the marker on the slide.
 
 ### How many steps a deck may have
 

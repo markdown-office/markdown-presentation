@@ -23,23 +23,29 @@ All notable changes to this project are documented here. The format follows
   block can move in, and it moves no step: a build-up written across two columns spends the
   same clicks it would on one column. `::click` and `::column` share two colons and neither
   is a prefix of the other, so the pair is checked in the suite in both directions rather
-  than reasoned about.
+  than reasoned about. `::column=2` is a failure under `UnknownMarker` naming the marker that
+  would have worked, rather than a paragraph reading `::column=2` drawn on the slide.
 
   A column nothing was written in is still not an error. The alternative is guessing which
   block was meant to be in it, which is the guess this library refuses everywhere else; a
   deck that asked for a layout with columns and wrote one of them has said what it wants.
+  Whether there was a block after the marker does not enter into it: the marker is measured
+  by what the deck wrote and by the role it was written for, so a deck's spelling cannot
+  depend on its last line.
 
   **A `::column` on a role with fewer columns than the deck asks for is a new failure**,
   `Exception\UnsupportedColumn`, and it extends `InvalidInput`: the marker is well formed and
   the slide is what cannot offer the column, which is the same shape as `UnsupportedLink` and
   `UnsupportedImageFormat` rather than `UnknownMarker`. The message names the slide, the role
-  and how many columns it has. One refusal covers both ways of hitting it — a marker on a
-  one-column role, and a third marker on a two-column slide.
+  and how many columns it has. One refusal covers every way of hitting it — a marker on a
+  one-column role, a third marker on a two-column slide, and either of those written at the
+  end of a slide where nothing follows.
 
   The column travels out of the parser as `Render\SlideBlocks`, the blocks and the column
-  each was written for in two lists of one length rather than a property on every block
-  class. `Render\PresentationRenderer::columns()` now reads what the parser recorded, and
-  `Render\BlockParser::parse()` returns that object.
+  each was written for in two lists of one length, with the count of markers beside them,
+  rather than a property on every block class. `Render\PresentationRenderer::columns()`
+  measures the layout against that count rather than against the column a block landed in,
+  and `Render\BlockParser::parse()` returns that object.
 
 - **A step is an animation on one slide, not a slide of its own.** **Breaking.** A deck using
   `::click` now contains fewer slides: the markdown is unchanged and the file is a build-up
@@ -145,8 +151,10 @@ All notable changes to this project are documented here. The format follows
 
   `splits()` is gone with it — there is no longer a rule to ask whether it divides — and so is
   the constructor's `SlideGeometry` argument, which nothing read but that one method. A caller
-  passing it positionally gets an `ArgumentCountError` rather than a geometry that was
-  promised and never used.
+  passing it positionally gets a `TypeError`, because argument four is `$strict` now and a
+  `SlideGeometry` is not a `bool`; a caller naming it gets `Error: Unknown named parameter
+  $geometry`. Both are loud, which is the point: a geometry that was promised and never used
+  is not something to accept quietly either.
 
 - **Six claims in the README were false.** Each was checked by running the thing rather than by
   reading the page, and each is now held in `tests/Unit/dead-code.php` so it cannot come back.

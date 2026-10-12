@@ -6,6 +6,7 @@ use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownDirective;
+use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedLink;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Block;
@@ -370,12 +371,55 @@ it('keeps a region in the column it was written in', function () {
         ->and(writtenColumnsOf("Left.\n\n::column\n\n:::click\n\nRight.\n:::\n"))->toBe([0, 1]);
 });
 
+it('counts the column markers a slide was written with', function () {
+    // What the renderer measures a layout against. A marker with nothing after it leaves no
+    // block to count, and it is still the only thing on the slide that says the deck asked
+    // for a second column.
+    expect(slideContentOf("Left.\n\n::column\n\nRight.\n")->columnMarkers())->toBe(1)
+        ->and(slideContentOf("Left.\n\n::column\n")->columnMarkers())->toBe(1)
+        ->and(slideContentOf("Left.\n\nRight.\n")->columnMarkers())->toBe(0)
+        ->and(slideContentOf("::column\n")->columnMarkers())->toBe(1);
+});
+
+it('counts a column marker before a region into the region as well', function () {
+    // A region is read by its own walk, at the column and the count the one around it had
+    // reached. A walk that began its own count at nothing would report fewer markers than
+    // the column a block in it is written for — which is the invariant below, and the
+    // reason the count is handed in rather than added up on the way out.
+    $content = slideContentOf("Left.\n\n::column\n\n:::click\n\nRight.\n:::\n\nThird.\n");
+
+    expect($content->columns())->toBe([0, 1, 1])
+        ->and($content->columnMarkers())->toBe(1);
+});
+
+it('refuses a column marker with an argument, naming what would have worked', function () {
+    // The marker means the next column and cannot be named as one, so there is no argument
+    // for it to take. Drawn as a paragraph it put `::column=2` on the slide, which is the
+    // marker read back to the author as text.
+    expect(fn () => slideContentOf("Left.\n\n::column=2\n\nRight.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::column=2", which is not a column marker: the marker '
+            . 'takes no argument. Write "::column" on a line of its own to move the blocks after it into the '
+            . 'next column.')
+        ->and(fn () => slideContentOf("Left.\n\n::column=\n\nRight.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::column=", which is not a column marker');
+});
+
 it('refuses a slide whose blocks and columns are not the same length', function () {
     // The invariant the object exists to hold. It is a caller that built the pair wrongly
     // rather than a deck that cannot be drawn, so it is not under `InvalidInput`: a deck
     // author told to go and rename something would go and rename something.
-    expect(fn () => new SlideBlocks([new Paragraph([], 1)], []))
+    expect(fn () => new SlideBlocks([new Paragraph([], 1)], [], 0))
         ->toThrow(Exception::class, 'A slide carries 1 blocks and 0 columns');
+});
+
+it('refuses a marker count below the column a block was written for', function () {
+    // The other half of the same invariant, and the one the recursion can break: a walk that
+    // reads a region returns a count of its own, and a count of nothing beside a block in
+    // column one is a caller that built the value wrongly rather than a deck.
+    expect(fn () => new SlideBlocks([new Paragraph([], 1)], [1], 0))
+        ->toThrow(Exception::class, 'A slide carries 0 "::column" markers and a block written in column 1; '
+            . 'a marker moves what follows it into the next column, so there cannot be fewer markers than '
+            . 'the column a block is in.');
 });
 
 it('refuses an HTML comment that is neither a step nor a note', function () {

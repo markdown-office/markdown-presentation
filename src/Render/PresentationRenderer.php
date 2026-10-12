@@ -597,7 +597,8 @@ final class PresentationRenderer
      * wherever the deck wrote it, a `::column` above the slide's only block means column zero
      * is empty and moving the block into it would be moving it backwards, and a title this
      * method draws itself is a heading in front of everything the deck wrote, so it takes the
-     * first column.
+     * first column. The marker count goes with both: a marker nobody wrote here is a marker
+     * {@see self::columns()} still has to measure the layout against.
      *
      * @param ?int $depth What `level:` named.
      */
@@ -611,6 +612,7 @@ final class PresentationRenderer
 
         $blocks = $content->blocks();
         $columns = $content->columns();
+        $markers = $content->columnMarkers();
         $heading = null;
         $at = 0;
 
@@ -634,7 +636,7 @@ final class PresentationRenderer
             // blank slide's title already is.
             return $hasTitleBox
                 ? $content
-                : new SlideBlocks([$this->titleHeading($title, $depth), ...$blocks], [0, ...$columns]);
+                : new SlideBlocks([$this->titleHeading($title, $depth), ...$blocks], [0, ...$columns], $markers);
         }
 
         $drawn = $heading;
@@ -656,8 +658,9 @@ final class PresentationRenderer
             ? new SlideBlocks(
                 array_merge(array_slice($kept, 0, $at), array_slice($kept, $at + 1)),
                 array_merge(array_slice($columns, 0, $at), array_slice($columns, $at + 1)),
+                $markers,
             )
-            : new SlideBlocks($kept, $columns);
+            : new SlideBlocks($kept, $columns, $markers);
     }
 
     private function note(WrittenSlide $slide, string $text): void
@@ -781,9 +784,12 @@ final class PresentationRenderer
      * built rather than a fresh {@see SlideGeometry} — the two disagreeing is what laid a
      * template-backed column out and left it empty.
      *
-     * One refusal for both ways of asking for a column that is not there: a `::column` on a
-     * role with one, and a third `::column` on a slide with two. Both are the same deck
-     * wanting a layout this one cannot be.
+     * Measured on the markers rather than on the column a block landed in, because a marker
+     * with nothing after it leaves no block behind, and a rule that turns on what follows the
+     * last marker of a slide is a rule a deck cannot see. N markers ask for the columns zero
+     * through N, so a role has to have more than N of them — which covers the one marker on a
+     * role with one column, the third on a slide with two, and either of them written at the
+     * end of a slide where nothing follows.
      *
      * @return list<int>
      *
@@ -791,16 +797,13 @@ final class PresentationRenderer
      */
     private function columns(SlideBlocks $content, LayoutRole $role, SlideGeometry $geometry, int $slide): array
     {
-        $columns = $content->columns();
         $available = count($geometry->body($role));
 
-        foreach ($columns as $column) {
-            if ($column >= $available) {
-                throw UnsupportedColumn::beyond($slide, $role->value, $available);
-            }
+        if ($content->columnMarkers() >= $available) {
+            throw UnsupportedColumn::beyond($slide, $role->value, $available);
         }
 
-        return $columns;
+        return $content->columns();
     }
 
     /**

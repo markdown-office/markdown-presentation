@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Exception;
 
 /**
- * A `::click` marker this library cannot act on.
+ * A marker this library cannot act on.
  *
  * A step this renderer drops would leave a deck whose slides do not say what the author
  * wrote, so every way of getting it wrong — a number that goes backwards, a marker whose
  * argument is not a number, a region nothing closes — are refused with the form that would
  * have worked. So is a number past the ceiling on one slide's click chain, because a step is
  * a position in a build-up and a position in the billions is not one anybody can mean.
+ *
+ * A `::column` is here rather than under {@see UnsupportedColumn} because an argument is a
+ * marker that is not one: the marker itself is refused, on the grounds that a column cannot be
+ * named, where a well-formed marker the slide's layout cannot offer is the layout's failure.
  */
 final class UnknownMarker extends InvalidInput
 {
@@ -57,6 +61,24 @@ final class UnknownMarker extends InvalidInput
         return new self(sprintf(
             'Slide %d has a "::click=" step marker with no number. Write "::click" for the next step.',
             $slide,
+        ));
+    }
+
+    /**
+     * A `::column` carrying an argument.
+     *
+     * Refused rather than drawn as the text of a paragraph: `::column=2` on a slide is a
+     * marker somebody thought they had read, and two colons on their own put the mistake on
+     * the slide rather than in front of the author who wrote it.
+     */
+    public static function argument(int $slide, string $argument): self
+    {
+        return new self(sprintf(
+            'Slide %d has a "::column=%s", which is not a column marker: the marker takes no '
+            . 'argument. Write "::column" on a line of its own to move the blocks after it into '
+            . 'the next column.',
+            $slide,
+            $argument,
         ));
     }
 

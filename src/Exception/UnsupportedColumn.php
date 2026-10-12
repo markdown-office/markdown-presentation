@@ -10,7 +10,9 @@ namespace MarkdownPresentation\Exception;
  * The marker is well formed and the slide is what cannot offer: `::column` is how a block is
  * moved into the next column, and a role with one column has no next one. A third `::column`
  * on a two-column slide is the same failure and gets the same message, because a layout with
- * three columns is the thing both of them are asking for and neither of them has.
+ * three columns is the thing both of them are asking for and neither of them has. So is a
+ * marker with nothing written after it on a role with one column, which is measured by what
+ * the deck wrote rather than by the block it left behind.
  *
  * Not {@see UnknownMarker}: that family is a marker that is not one, and `::column` is one.
  * {@see UnsupportedLink} and {@see UnsupportedImageFormat} are the same shape as this — the
