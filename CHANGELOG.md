@@ -8,6 +8,52 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A step is an animation on one slide, not a slide of its own.** **Breaking.** A deck using
+  `::click` now contains fewer slides: the markdown is unchanged and the file is a build-up
+  rather than a run of copies of the same slide.
+
+  | Was | Now |
+  | --- | --- |
+  | one `.pptx` part per step, each showing every step before it | one part holding every block, with a `<p:timing>` click chain |
+  | `slide 2` is step 2 of source slide 1 | `slide 1` is source slide 1 |
+  | `::click=3` with nothing on step 2 wrote three slides, two of them identical | one slide, one click |
+  | `overflows()` reported every step a build-up was drawn at | the step of the block that did not fit |
+
+  The entry effect is `appear` — a `<p:set>` of `style.visibility` and nothing else — so what
+  a reader sees is a shape that was not there and then is, with nothing moving and nothing
+  fading. The markup was written from what PowerPoint writes rather than from a description of
+  the format: `tests/fixtures/powerpoint/entrance-animation.pptx` is a deck PowerPoint itself
+  authored, and `Render\TimingPass` reproduces its `<p:timing>` byte for byte.
+
+  **The layout is the finished slide**, which is what the last step of a build-up used to look
+  like — the strictest of the drawings the library made of it. Overflow is therefore unchanged
+  in strictness and halved in count, and a block that fitted any step still fits.
+
+  A run of text either side of a marker is now **two text frames** rather than one. A frame is
+  one shape and a shape is revealed whole, so a frame holding two steps' paragraphs would put
+  the second click's text on the slide at the first. Nothing moves: the gap between two frames
+  is the gap between two paragraphs of a frame, which is the same number either way, and the
+  suite asserts that the second paragraph starts at the same height in both.
+
+  The title is written once, is not animated, and is in no step of the chain: it is on the
+  slide before the reader clicks anything and never changes. Speaker notes lose nothing — a
+  note was written to every step's slide, and there is one slide now.
+
+  The first step names no branch, and a step nothing was written on names none either, so
+  `::click=3` with content only on step three costs one click rather than three. That was a
+  behaviour change in its own right: a step nothing was written on used to be written as a
+  slide drawn exactly like the one before it, which is a click the reader spends to see no
+  change.
+
+  Both ceilings keep their numbers and stop bounding what they were written to bound.
+  `BlockParser::MAX_STEP` is now what a deck is allowed to *say* — a step number is a position
+  in a chain somebody clicks through, and a position in the billions is a deck written by
+  something that did not mean it — and costs the renderer nothing to be generous with, where it
+  used to bound two billion `.pptx` parts asked for by sixteen bytes of Markdown.
+  `PresentationRenderer::MAX_SLIDES` is now the deck's own slide count, refused before the
+  first slide is built; the deck of forty slides with twenty steps each that used to ask for
+  800 written slides asks for 40.
+
 - **Steps are `::click`, regions are `:::click`, and notes are `::note`.** **Breaking.** A deck
   written with `<!-- v-click -->` no longer builds: an HTML comment is now refused with a
   message naming the two spellings this format does have. Nothing else about a deck changes.
@@ -496,7 +542,8 @@ All notable changes to this project are documented here. The format follows
   choose the paths in a message, because the two things a deck writes paths for (an image and
   a theme) are contained to directories the calling program allowed.
 
-- **Two decks Microsoft PowerPoint authored are carried as fixtures.** Every template test was
+- **Two decks Microsoft PowerPoint authored are carried as fixtures for the template reader.**
+  Every template test was
   checked against `tests/fixtures/themes/templated/template.pptx`, which this repository writes
   from a description — a good template, and a poor PowerPoint file: one master, layouts written
   by the same hand as the reader, and placeholders that spell out every attribute the format
@@ -506,7 +553,9 @@ All notable changes to this project are documented here. The format follows
   slide that has drifted away from the layout it is on). That is what found the bug above. They
   are validation and documentation, not themes — the three built-in themes stay library-owned.
 
-  `tools/build-powerpoint-fixtures.sh` rebuilds both. PowerPoint is required rather than
+  `tools/build-powerpoint-fixtures.sh` rebuilds them, and any deck named on the command line
+  rebuilds only that one — a deck PowerPoint writes is not byte-identical to the one it wrote
+  last time. PowerPoint is required rather than
   optional: `make new slide` answers "class slide cannot be created", so the slides have to
   exist before it opens the file and everything after that is its own work. The authorship
   metadata PowerPoint writes is stripped afterwards, and a test checks that it was.
@@ -515,6 +564,31 @@ The first slice of the PowerPoint half of `markdown-office`. It decides where a
 slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 
 ### Added
+
+- **`TimingPass`, which writes a click-triggered build onto a slide. Nothing calls it yet.**
+  No deck a person writes changes, and a `v-click` step is still a slide of its own. It is here
+  because the markup is intricate enough not to be written twice, and because the renderer
+  change that uses it rewrites a loop another branch is already restructuring.
+
+  A step used to be a slide, so a build of twenty steps was twenty copies of one slide in the
+  package. PowerPoint builds a slide up without that, naming the shapes that appear at each
+  click in a `<p:timing>` element on the one slide. The pass writes that, and reproduces
+  PowerPoint's own bytes for a step of one shape and for a step of several.
+
+  Its facts were read off `tests/fixtures/powerpoint/entrance-animation.pptx`, a deck
+  PowerPoint 16.113.4 authored and saved, because markup written from a description of the
+  format is not evidence that PowerPoint reads it back:
+
+  | | What PowerPoint writes |
+  | --- | --- |
+  | a step | one `<p:par>` whose `<p:cond delay="indefinite"/>` waits for a click |
+  | a shape in that step | one `<p:par>` inside it — `nodeType="clickEffect"` opens the click, `nodeType="withEffect"` joins the one already open |
+  | a shape | its own id, in `<p:spTgt spid>` and in `<p:bldLst>` |
+  | the effect | `presetID="1" presetClass="entr"`: `style.visibility` set to `visible`, nothing moving |
+
+  The second row is the one the markup cannot show: `clickEffect` and `withEffect` are
+  otherwise identical, so a build whose second bullet waits for a second click reads correctly
+  and behaves wrongly.
 
 - **`ThemeLoader` had been storing a theme's `template.pptx` path and nothing ever opened
   it.** Before: a theme directory's `template.pptx` was read as a path, kept, and never read,

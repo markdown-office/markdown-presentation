@@ -246,8 +246,40 @@ it('leaves an image slide with no title placeholder to inherit', function () {
     $this->fail(sprintf('No slide is bound to the "Full Bleed Picture" layout in %s.', '07-images.md'));
 });
 
-it('reveals each step cumulatively', function () {
+it('reveals each step on a click of its own', function () {
     [$pptx] = builtDeck('05-steps.md');
 
-    expect($pptx->slideCount())->toBeGreaterThan(2);
+    // The first slide builds up in three steps, so it carries two clicks after the first
+    // step: a deck that wrote one slide per step would carry three slides here instead.
+    expect($pptx->reveals(1))->toHaveCount(2)
+        ->and($pptx->reveals(1)[0])->not->toBeEmpty();
+});
+
+it('clicks a two-column build in the order the steps were written', function () {
+    [$pptx] = builtDeck('05-steps.md');
+
+    // The left column names step three, and the heading that opens the right column is at that
+    // step too, so the first click carries a shape from both columns at once. The step written
+    // after it comes second, so the chain runs in the order the deck was read rather than the
+    // order the two columns are laid out in.
+    expect($pptx->reveals(4))->toBe([['text', 'heading'], ['text']]);
+});
+
+it('holds a picture back until its own click', function () {
+    [$pptx] = builtDeck('05-steps.md');
+
+    // A picture is measured into the room it will occupy whether or not it has appeared, so it
+    // is the only thing the click that shows it carries. A renderer that wrote a slide per step
+    // would put the picture on a slide of its own instead.
+    expect($pptx->reveals(5))->toBe([['image']]);
+});
+
+it('lays a two-column build out for a picture the first click has not shown', function () {
+    [$pptx] = builtDeck('05-steps.md');
+
+    // The last click is the picture, and it is in the right-hand column. The left column's own
+    // steps come before it because the columns are laid out in order, so the picture is measured
+    // into a column that has already been filled — which is the case a build-up has to get right
+    // and the one a single-column example cannot show.
+    expect($pptx->reveals(6))->toBe([['text', 'heading'], ['image']]);
 });

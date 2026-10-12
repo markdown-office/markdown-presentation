@@ -22,9 +22,10 @@ interface Block
     /**
      * The step this block appears on, counting from one.
      *
-     * A slide is written once per step up to the highest one it has, each showing every
-     * block whose step has arrived. PowerPoint has no "press a key to reveal this", so
-     * the build-up becomes the slides a presenter would click through anyway.
+     * A slide is written once, holding every block, and a build-up is what the reader clicks
+     * through: {@see \MarkdownPresentation\Render\TimingPass} names the shapes each click
+     * reveals, so a block's step says which of them it belongs to rather than which slide it
+     * was drawn on.
      */
     public function step(): int;
 }

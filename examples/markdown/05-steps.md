@@ -1,13 +1,13 @@
 ---
 title: Steps
-description: What a ::click marker becomes when PowerPoint has no "press a key".
+description: What a ::click marker becomes when a step is a click on one slide.
 ---
 
 # A build-up, in three steps
 
-PowerPoint has no "press a key to reveal this", so a step marker on a line of its
-own becomes the slides a presenter would click through. This slide is written
-three times: once with the first step on it, once with two, and once with three.
+A step marker on a line of its own opens a click, so a build-up is one slide
+holding every step: run the slideshow and click. The first step is on the slide
+before you click anything, and each click after it reveals the next.
 
 - First step.
 
@@ -24,7 +24,8 @@ three times: once with the first step on it, once with two, and once with three.
 # Naming a step outright
 
 A marker can name the step it opens, which is how a build-up skips the ones before
-it. The two steps in between carry whatever was written above the marker.
+it. A step nothing was written on costs no click rather than a click that reveals
+nothing.
 
 ::click=3
 
@@ -39,14 +40,78 @@ parts it is made of rather than as a marker between each of them.
 
 :::click
 
-- The second part, on its own slide.
+- The second part, on its own click.
 
 - And the line under it, on the same one.
 
 :::
 
-The two lists above are one step and one shape each; open the second slide of this
-deck to see the difference.
+Both of the lists above arrive together: one click opens the step and the second
+shape joins it, rather than each costing a click of its own.
+
+---
+layout: two-column
+---
+
+# A build-up across two columns
+
+A two-column slide is written left column first, so the steps it asks for arrive
+in an order that need not be the order they were read in. The clicks still run
+in the order they were written.
+
+Left, on the first step.
+
+::click=3
+
+Left, on the third step.
+
+## The right column
+
+::click
+
+Right, on the second step — written after the third, and clicked before it.
+
+---
+
+# A picture arriving on its own click
+
+A picture is a shape like any other, so it waits for its step the way everything
+else does. It is measured into the room it will occupy on every step, whether or
+not it has appeared yet — a build-up is laid out once, as its last click will
+look, not redrawn click by click.
+
+A picture takes the rest of the column it is in, so it ends one. A slide that
+wants text beside a picture names an image role instead — see `image-text` in
+Layouts.
+
+The text beside it, on the first step.
+
+::click
+
+![The office logo](assets/logo.png)
+
+---
+layout: two-column
+---
+
+# A picture that finishes a two-column build
+
+The two cases a build-up runs into on its own, together. A two-column slide is
+measured column by column, and a picture takes the whole of the room it is given
+whether or not it has appeared — so the column it lands in is laid out for it
+before the click that shows it.
+
+Left, on the first step.
+
+::click
+
+Left, on the second.
+
+## The right column
+
+::click
+
+![A wide diagram under a headline](assets/landscape.webp)
 
 ---
 

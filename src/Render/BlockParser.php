@@ -34,16 +34,20 @@ final class BlockParser
     /**
      * The furthest step a `::click` on one slide may name.
      *
-     * A step is a slide: every step of a build-up is written as a `.pptx` part of its own,
-     * with its shapes, its rels and its entry in `[Content_Types].xml`. The Markdown that
-     * asks for them is kilobytes, so nothing else bounds `::click=2147483647` — measured on
-     * this package, 16 bytes of deck render 500 slides in a tenth of a second, and
-     * `::click=99999999999999999999` saturates the cast to `PHP_INT_MAX` and asks for two
-     * billion, which is why {@see self::jump()} refuses the argument rather than casting it.
+     * A step is a click in one slide's build, not a slide of its own: `::click=2147483647`
+     * used to ask for two billion `.pptx` parts, each with its shapes, its rels and its
+     * entry in `[Content_Types].xml`, out of sixteen bytes of Markdown. It no longer costs
+     * anything — {@see \MarkdownPresentation\Render\PresentationRenderer} writes one slide
+     * whatever the step number is, and a step nothing was written on costs no click at all —
+     * so what this bounds is what a deck is allowed to *say*. A step number is a position in
+     * a chain somebody clicks through, and a position in the billions is a deck written by
+     * something that did not mean it. `::click=99999999999999999999` saturates the cast to
+     * `PHP_INT_MAX` on the way, which is the other half of why {@see self::jump()} refuses
+     * the argument rather than casting it.
      *
      * 500 is two orders of magnitude above any build-up a person writes — a slide with five
-     * hundred clicks on it is not a slide — and the whole ceiling renders in about a tenth
-     * of a second, so a deck that reaches it was not written to.
+     * hundred clicks on it is not a slide — and unlike the ceiling it replaces it costs the
+     * renderer nothing to be generous with.
      */
     public const MAX_STEP = 500;
 

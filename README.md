@@ -701,8 +701,9 @@ Two colons for a boundary, three for a region:
 | `:::click` … `:::` | everything between them is one step of its own |
 | `::note` … `::` | a speaker note, taken off the slide |
 
-PowerPoint has no "press a key to reveal this", so a build-up becomes the slides a presenter
-would click through, each revealing everything the one before it had:
+A step is a click in a build-up on **one** slide. Every block of the slide is written onto it
+at once, and the steps a reader clicks through are written as a PowerPoint animation that
+reveals the shapes belonging to each one:
 
 ```markdown
 Always visible from the first step.
@@ -737,21 +738,39 @@ for ($i = 0; $i < $zip->numFiles; $i++) {
 
 echo count(preg_grep('#^ppt/slides/slide\d+\.xml$#', $parts)), " slides\n";
 
-foreach ([1, 2, 3] as $slide) {
-    echo 'slide ', $slide, ': ', implode(', ', array_filter([
-        str_contains($zip->getFromName("ppt/slides/slide{$slide}.xml"), 'First.') ? 'First.' : null,
-        str_contains($zip->getFromName("ppt/slides/slide{$slide}.xml"), 'Second.') ? 'Second.' : null,
-        str_contains($zip->getFromName("ppt/slides/slide{$slide}.xml"), 'Third.') ? 'Third.' : null,
-    ])), "\n";
+$slide = $zip->getFromName('ppt/slides/slide1.xml');
+
+preg_match_all('#name="([a-z]+)"#', $slide, $names);
+echo 'shapes: ', implode(' ', $names[1]), "\n";
+
+// Every effect written with `nodeType="clickEffect"` opens a click; the `withEffect`s after it
+// join that one. Both name the shape they reveal in `<p:spTgt spid="…">`.
+preg_match_all(
+    '#nodeType="(clickEffect|withEffect)">(?:(?!nodeType=).)*?spid="(\d+)"#s',
+    $slide,
+    $effects,
+    PREG_SET_ORDER,
+);
+
+foreach ($effects as $effect) {
+    echo $effect[1] === 'clickEffect' ? "click reveals {$effect[2]}\n" : "  and {$effect[2]}\n";
 }
 ```
 
 ```text
-3 slides
-slide 1: First.
-slide 2: First., Second.
-slide 3: First., Second., Third.
+1 slides
+shapes: title text text text
+click reveals 4
+click reveals 5
 ```
+
+The first step is not a click: it is on the slide before the reader clicks anything, and so is
+the title, which is written once and never changes. A `::click=3` with nothing written on step
+two costs no click either, because a click that reveals nothing is a click the reader spends
+to see no change.
+
+A step with more than one shape opens one click and joins the rest to it with `withEffect`,
+which is the whole of the difference between a step and one click per shape:
 
 `::click=3` names step three outright, and a region opener takes the same argument:
 
@@ -781,27 +800,26 @@ claimed here, so the refusal names the mistake instead of drawing the marker on 
 
 ### How many steps a deck may have
 
-Two ceilings, because they bound two different things and a deck gets past the first with
-the second:
+Two ceilings, and they no longer bound one thing between them:
 
 | Ceiling | Value | Bounds |
 | --- | --- | --- |
-| `Render\BlockParser::MAX_STEP` | 500 | the steps one slide may name |
+| `Render\BlockParser::MAX_STEP` | 500 | the steps one slide may build up in |
 | `Render\PresentationRenderer::MAX_SLIDES` | 1000 | the slides one deck may write |
 
-Both exist because a step *is* a slide: every step of a build-up is written as a `.pptx`
-part with its shapes, its rels and its entry in `[Content_Types].xml`, and the Markdown
-asking for them is kilobytes. `::click=2147483647` is 16 bytes and asks for two
-billion of them, and a twenty-digit number saturates the cast to `PHP_INT_MAX` — which is why
-the cast is refused rather than trusted. Both are refused by name, with the number that would
-have worked in the message.
+Both are refused by name, with the number that would have worked in the message. `MAX_STEP` is
+what a deck is allowed to *say*: a step number is a position in a chain somebody clicks through,
+and a position in the billions is a deck written by something that did not mean it — which is
+also why a twenty-digit number, which saturates the cast to `PHP_INT_MAX` on the way, is refused
+rather than trusted. `MAX_SLIDES` is the deck's own slide count, refused before the first slide
+is built.
 
-The second is not the first restated. A deck of forty slides with twenty steps each is
-inside every per-slide check and still asks for 800 written slides, so the total is counted
-from the parsed blocks before the first slide is built rather than while they are being.
-
-The numbers are generous on purpose: a build-up of 500 clicks is not a slide anyone gives,
-and a talk of 1000 slides does not exist. A deck that reaches either was not written to.
+Neither costs what it used to. A step is no longer a `.pptx` part of its own with its shapes,
+its rels and its entry in `[Content_Types].xml`, so a deck of forty slides with twenty steps
+each writes forty slides rather than eight hundred, and the 500 steps that one slide may name
+cost the renderer nothing at all. The numbers are the same because they were chosen for how long
+a build-up a person writes, not for how long one takes — a build-up of 500 clicks is not a slide
+anybody gives, and a talk of 1000 slides does not exist.
 
 ### Images
 

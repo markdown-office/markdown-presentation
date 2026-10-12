@@ -83,15 +83,30 @@ it('reports one entry for a run of paragraphs, because it is one shape', functio
 });
 
 it('names the slide and the step a block overflowed on', function () {
-    // A `::click` build-up puts the same blocks on several slides, and step 2 is where the
-    // second block arrives — so "slide 1" on its own does not say which drawing of that
-    // slide ran out of room.
+    // A slide is written once now, so what is measured is the finished slide — and the step
+    // an entry names is the block's own, which is the click a reader would have reached it on.
+    // The blocks above the marker are on step 1 and the ones below it on step 2, and a build
+    // that runs out of room says which of them it was rather than repeating a step it was
+    // drawn at.
     $overflows = overflowing(
         "# One\n\n" . str_repeat(FILLER, 20) . "::click\n\n" . str_repeat("More.\n\n", 20),
     )->overflows();
 
     expect(array_column($overflows, 'slide'))->toBe(array_fill(0, count($overflows), 1))
         ->and(array_values(array_unique(array_column($overflows, 'step'))))->toBe([1, 2]);
+});
+
+it('reports a block that fitted its own step but not the slide it is on', function () {
+    // The half that used to be unreportable: a build-up used to be measured step by step, so a
+    // block with room to itself overflowed nothing until the later steps pushed it off the
+    // bottom — and the entry, when it came, was filed against whichever step was being drawn.
+    // One slide means one measurement, and an entry names the block's step: the first is the
+    // step-1 frame, which fitted on its own and does not fit here.
+    $overflows = overflowing(str_repeat(FILLER, 20) . "::click\n\nShort.\n")->overflows();
+
+    expect($overflows)->not->toBeEmpty()
+        ->and($overflows[0]['step'])->toBe(1)
+        ->and($overflows[0]['wanted'])->toBeGreaterThan($overflows[0]['available']);
 });
 
 it('reports the column a block overflowed in', function () {

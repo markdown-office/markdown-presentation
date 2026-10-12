@@ -60,7 +60,7 @@ renders of one deck differ; the parts are what a test reads.
 | Claim | Read off |
 | --- | --- |
 | One slide part per slide of the deck, and every one declared | `[Content_Types].xml`, `ppt/slides/` |
-| One slide per step, each revealing the steps before it | `ppt/slides/slideN.xml` |
+| One slide holds every step, and each click reveals the shapes of one | `<p:timing>` |
 | A `layout:` role becomes a slide layout part named by the theme | `ppt/slideLayouts/`, `ppt/slides/_rels/` |
 | One shape per run of text and per block of every other kind, named after it | `<p:cNvPr name="…">` |
 | The theme's twelve colours become the colour scheme | `ppt/theme/theme1.xml` |

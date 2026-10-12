@@ -18,7 +18,6 @@ use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
-use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
 use MarkdownPresentation\Render\Block\Image;
@@ -65,8 +64,8 @@ use PhpOffice\PhpPresentation\Slide\SlideLayout;
  * Two things it does not do are somebody else's job, and both classes that do them sit in
  * this directory rather than being reached through a caller: {@see MasterLayouts} writes the
  * master, the layouts and the document's metadata, and {@see DeckWriter} writes the file and
- * runs the two passes over it. What is left here is the walk: a deck's blocks, and the shape
- * of what a build-up draws on each of its steps.
+ * runs the passes over it. What is left here is the walk: a deck's blocks, and the shapes
+ * they are drawn as.
 */
 final class PresentationRenderer
 {
@@ -89,16 +88,28 @@ final class PresentationRenderer
     private const FIRST_STEP = 1;
 
     /**
+     * The id the first shape written on a slide takes.
+     *
+     * Not 1: the shape tree the format requires every slide to carry is what takes that, and
+     * PHPPresentation's `writeShapeCollection()` counts it in with the shapes — it starts at
+     * 1 and increments before it uses the number, so the first shape of the deck is 2.
+     * {@see PlaceholderPass::FIRST_ID} is the same number for the same reason.
+     */
+    private const FIRST_SHAPE_ID = 2;
+
+    /**
      * The most slides one deck may write.
      *
-     * {@see BlockParser::MAX_STEP} bounds a single slide, which is the attack a marker is;
-     * this bounds the deck, which is the attack a deck of markers is. Forty slides of
-     * twenty steps each passes every per-slide check and asks for 800 written slides, and
-     * there is nothing about the *total* that the first ceiling can see.
+     * One slide out per slide in, so this bounds what the deck itself asks for rather than
+     * anything a marker multiplies it by — the reason it was a second ceiling, a deck of
+     * markers asking for hundreds of written slides out of a few lines, is gone with a step
+     * being an animation rather than a slide. What is left is the plain fact that a
+     * presentation that long is not one, and it is still worth refusing before the work
+     * rather than after it.
      *
-     * 1000 is five times the longest talk anybody gives and renders in about a fifth of a
-     * second, which is the point of a ceiling that is generous: it bounds the damage
-     * without being something a real deck can reach by accident.
+     * 1000 is five times the longest talk anybody gives, which is the point of a ceiling that
+     * is generous: it bounds the damage without being something a real deck can reach by
+     * accident.
      */
     public const MAX_SLIDES = 1000;
 
@@ -150,6 +161,10 @@ final class PresentationRenderer
      * contents are taller than its box yields an entry for every block below the point
      * where it ran out, which is the truth about a column that is simply full.
      *
+     * The step is the block's own, which is what makes the entry worth reading now that a
+     * slide is written once: it names the click the reader would have reached the block on,
+     * rather than repeating every step of a build-up that was measured once.
+     *
      * Emptied by {@see self::render()} rather than accumulated, because a layout belongs to
      * one deck: a caller converting several in a loop wants the last one's overflows, not
      * all of them.
@@ -175,6 +190,14 @@ final class PresentationRenderer
     {
         $this->overflows = [];
 
+        // Before anything is read rather than while the slides are being built, so a deck
+        // over the ceiling is refused with no work done rather than after every one of them.
+        // It is the deck's own slide count now: one source slide is one written slide, and
+        // {@see self::blocks()} has nothing left to add up.
+        if ($deck->count() > self::MAX_SLIDES) {
+            throw TooManySlides::in($deck->count(), self::MAX_SLIDES);
+        }
+
         foreach ($deck->slides() as $slide) {
             $this->check($slide);
         }
@@ -196,9 +219,13 @@ final class PresentationRenderer
 
         $writer = new ShapeWriter($theme->theme(), $geometry);
         $blocks = $this->blocks($deck);
+        $builds = [];
 
         foreach ($deck->slides() as $slide) {
-            $this->write(
+            // Keyed by the slide's own number, which is the number of the part it is written
+            // to: one slide out per source slide in, in order, with the constructor's empty
+            // one removed below.
+            $builds[$slide->index() + 1] = $this->write(
                 $presentation,
                 $slide,
                 $roles[$slide->index()],
@@ -217,26 +244,56 @@ final class PresentationRenderer
             $presentation->removeSlideByIndex(0);
         }
 
-        return DeckWriter::save($presentation, $path, $geometry, $used);
+        return DeckWriter::save($presentation, $path, $geometry, $used, $this->chain($builds));
+    }
+
+    /**
+     * The shape→step maps {@see self::write()} returns as the steps each slide's click chain
+     * is written from.
+     *
+     * Turned inside out here rather than in `write()`, which knows which step each of its
+     * shapes is on and not which click it belongs to: a step is revealed by the click that
+     * *precedes* it, and the first step is on the slide before any click at all, so it names
+     * no branch and is dropped. Steps nothing was written on are dropped for the same reason
+     * {@see TimingPass::addTiming()} drops them — a click that reveals nothing is a click the
+     * reader spends to see no change, which is also why a marker naming a step nothing was
+     * written on costs no click rather than an empty one.
+     *
+     * @param array<int, array<int, int>> $builds Slide number to the shapes it wrote.
+     *
+     * @return array<int, list<list<int>>> Slide number to its steps, each to the ids it shows.
+     */
+    private function chain(array $builds): array
+    {
+        $chain = [];
+
+        foreach ($builds as $number => $steps) {
+            $clicks = [];
+
+            foreach ($steps as $id => $step) {
+                if ($step > self::FIRST_STEP) {
+                    $clicks[$step] ??= [];
+                    $clicks[$step][] = $id;
+                }
+            }
+
+            ksort($clicks);
+            $chain[$number] = array_values($clicks);
+        }
+
+        return $chain;
     }
 
     /**
      * Every source slide's blocks, read once, keyed by the slide's index.
      *
-     * Read here rather than in {@see self::write()} because the deck's slide count is the
-     * sum of what each of them has steps, and the loop that writes the slides is not the
-     * place to discover that five hundred slides were asked for and then refuse it: by then
-     * four hundred and ninety-nine of them are built.
-     *
-     * {@see BlockParser::MAX_STEP} bounds one slide, which a deck gets around by having
-     * several: forty slides of twenty steps each is 800 written slides from 40 lines of
-     * Markdown. So this is a second ceiling on a second shape of the same attack, and it is
-     * applied to the whole deck before the first slide exists.
+     * Read here rather than in {@see self::write()} so that a slide which cannot be read at
+     * all — an image that does not resolve, a marker that goes backwards — is a failure with
+     * no file written behind it, rather than one found after the first few slides are built.
      *
      * @return array<int, list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>>
      *
      * @throws ImageNotFound
-     * @throws TooManySlides
      * @throws UnknownDirective
      * @throws UnknownMarker
      * @throws UnsupportedImageFormat
@@ -244,29 +301,14 @@ final class PresentationRenderer
     private function blocks(Deck $deck): array
     {
         $blocks = [];
-        $slides = 0;
 
         foreach ($deck->slides() as $source) {
-            $read = $this->blocks->parse(
+            $blocks[$source->index()] = $this->blocks->parse(
                 $source->content(),
                 $source->index() + 1,
                 $this->directory,
                 $this->files,
             );
-
-            $blocks[$source->index()] = $read;
-
-            // A step nothing was written on is not a slide, which is the same rule
-            // {@see self::write()} applies to each slide on its own.
-            $slides += array_reduce(
-                $read,
-                static fn (int $most, Block $block): int => max($most, $block->step()),
-                self::FIRST_STEP,
-            );
-        }
-
-        if ($slides > self::MAX_SLIDES) {
-            throw TooManySlides::in($slides, self::MAX_SLIDES);
         }
 
         return $blocks;
@@ -416,10 +458,25 @@ final class PresentationRenderer
     }
 
     /**
-     * One source slide, and as many written slides as it has steps.
+     * One source slide as the one written slide it is, and the shapes each of its steps
+     * shows.
+     *
+     * A step used to be a slide of its own, which made a build of twenty steps twenty copies
+     * of one slide in the package. It is an animation on one slide instead — every block is
+     * written at once and {@see TimingPass} names the shapes each click reveals — so what is
+     * measured here is the finished slide, which is the strictest of the drawings it used to
+     * make: a block that did not fit any step still does not fit, and one that fitted the last
+     * step fits exactly.
+     *
+     * The returned map is what makes a step an animation rather than a slide: shape id to
+     * step. {@see self::stack()} counts the shapes as it writes them, because the id is a
+     * position in the slide's shape collection and the collection is the only place the
+     * number is actually kept.
      *
      * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
      * @param array<string, SlideLayout>                                     $layouts
+     *
+     * @return array<int, int> Shape id to the step it appears on, in write order.
      */
     private function write(
         PhpPresentation $presentation,
@@ -429,7 +486,7 @@ final class PresentationRenderer
         ShapeWriter $writer,
         SlideGeometry $geometry,
         array $blocks,
-    ): void {
+    ): array {
         $title = $geometry->title($role);
         $level = $source->frontmatterValue('level');
         $blocks = $this->underTitle(
@@ -439,38 +496,33 @@ final class PresentationRenderer
             $this->depth($level, $source->index() + 1),
         );
 
-        // A step nothing was written on is not a slide. A marker on the last line of a
-        // slide asks for a click that would reveal nothing, and the file would carry two
-        // slides drawn the same way — which is not what the deck said, it is a copy of it.
-        $steps = array_reduce(
-            $blocks,
-            static fn (int $most, Block $block): int => max($most, $block->step()),
-            self::FIRST_STEP,
-        );
+        $slide = $presentation->createSlide();
+        $slide->setSlideLayout($layouts[$role->value]);
+        $slide->setName($source->title() === null ? null : sprintf('slide %d', $source->index() + 1));
 
-        for ($step = self::FIRST_STEP; $step <= $steps; $step++) {
-            $slide = $presentation->createSlide();
-            $slide->setSlideLayout($layouts[$role->value]);
-            $slide->setName($source->title() === null ? null : sprintf('slide %d', $source->index() + 1));
-
-            if ($source->note() !== null) {
-                $this->note($slide, $source->note());
-            }
-
-            if ($title !== null && $source->title() !== null) {
-                $size = $this->depth($level, $source->index() + 1);
-
-                $writer->title(
-                    $slide,
-                    $this->blocks->inline->parse($source->title()),
-                    $title['box'],
-                    $size === null ? $title['size'] : $geometry->titleSize($title['size'], $size),
-                    $title['alignment'],
-                );
-            }
-
-            $this->stack($slide, $blocks, $step, $role, $writer, $source->index() + 1, $geometry);
+        if ($source->note() !== null) {
+            $this->note($slide, $source->note());
         }
+
+        // The title is written before the body and is never animated: it is on the slide from
+        // the first click and never changes, so it is counted here and named in no step.
+        $next = self::FIRST_SHAPE_ID;
+
+        if ($title !== null && $source->title() !== null) {
+            $size = $this->depth($level, $source->index() + 1);
+
+            $writer->title(
+                $slide,
+                $this->blocks->inline->parse($source->title()),
+                $title['box'],
+                $size === null ? $title['size'] : $geometry->titleSize($title['size'], $size),
+                $title['alignment'],
+            );
+
+            $next++;
+        }
+
+        return $this->stack($slide, $blocks, $role, $writer, $source->index() + 1, $geometry, $next);
     }
 
     /**
@@ -604,32 +656,49 @@ final class PresentationRenderer
     }
 
     /**
-     * A step's blocks, stacked into the role's body boxes.
+     * Every block of a slide, stacked into the role's body boxes, and the step each written
+     * shape belongs to.
      *
      * Stacked as shapes rather than as blocks: {@see TextFrame::group()} decides which blocks
      * share one text frame first, because the air between two of them is then the frame's own
      * paragraph spacing rather than room taken out of the column between two boxes. What
      * follows is the arithmetic it has always been, one drawable at a time.
      *
+     * `$first` is the id the first shape written here will take, which is one past the title
+     * where there is one. The ids are counted rather than looked up because a shape's id is
+     * its position in the slide's shape collection — the tree's own group is 1, and
+     * PHPPresentation's `writeShapeCollection()` increments before it uses the number — and
+     * {@see ShapeWriter::write()} adds exactly one shape per call, which is what makes the
+     * count and the file agree.
+     *
      * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     *
+     * @return array<int, int> Shape id to the step it appears on, in write order.
      */
     private function stack(
         WrittenSlide $slide,
         array $blocks,
-        int $step,
         LayoutRole $role,
         ShapeWriter $writer,
         int $number,
         SlideGeometry $geometry,
-    ): void {
+        int $first,
+    ): array {
         $columns = $this->columns($blocks, $role);
+        $steps = [];
 
         foreach ($geometry->body($role) as $column => $box) {
             $y = $box->y;
             $bottom = $box->y + $box->height;
-            $visible = $this->visible($blocks, $columns, $step, $column);
+            $visible = $this->visible($blocks, $columns, $column);
 
             foreach (TextFrame::group($visible) as $drawable) {
+                // A drawable that is a block is its own step; a {@see TextFrame} is several
+                // blocks drawn as one shape, and every block in a frame is on the same step —
+                // {@see TextFrame::group()} ends a run at a step boundary for exactly that
+                // reason — so the frame's step is its first block's.
+                $step = $drawable instanceof TextFrame ? $drawable->firstStep() : $drawable->step();
+
                 // A column whose contents are taller than its box runs off the bottom of it,
                 // and an image spends the whole of the room left — so both the cursor and
                 // the height are held inside the box. A shape that does not fit is drawn as
@@ -645,9 +714,12 @@ final class PresentationRenderer
                 }
 
                 $writer->write($slide, $drawable, new Box($box->x, $y, $box->width, $height), $height);
+                $steps[$first++] = $step;
                 $y += $height + $geometry->style()->blockGap();
             }
         }
+
+        return $steps;
     }
 
     /**
@@ -657,6 +729,9 @@ final class PresentationRenderer
      * block quietly squeezed into the last pixel renders as a deck, and nobody looking at it
      * can tell what is missing. Strict mode raises instead, for a caller that would rather
      * have no file.
+     *
+     * @param int $step The step of the block that did not fit, which is the click the reader
+     *                  would have reached it on.
      *
      * @throws ContentOverflow
      */
@@ -713,19 +788,23 @@ final class PresentationRenderer
     }
 
     /**
-     * The blocks of one column at one step, in order.
+     * The blocks of one column, in order.
+     *
+     * Every one of them, whatever step it is on: a build-up is one slide holding every
+     * block, and which of them a reader can see is what the click chain says rather than
+     * which of them were written.
      *
      * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
      * @param list<int>                                                       $columns Which column each block belongs to.
      *
      * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
     */
-    private function visible(array $blocks, array $columns, int $step, int $column): array
+    private function visible(array $blocks, array $columns, int $column): array
     {
         $visible = [];
 
         foreach ($blocks as $offset => $block) {
-            if ($columns[$offset] === $column && $block->step() <= $step) {
+            if ($columns[$offset] === $column) {
                 $visible[] = $block;
             }
         }
