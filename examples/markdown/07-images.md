@@ -76,8 +76,9 @@ layout: image-slide
 
 ![The office logo, filling the page](assets/logo.png)
 
-<!--
+::note
 No heading and no `title:` on this slide, which is the point of the layout: the picture is
 the slide. A title named here would be drawn as a heading above it, which is what `blank`
 does with a title for the same reason — and would stop the slide being the picture alone.
--->
+::
+

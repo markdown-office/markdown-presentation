@@ -49,7 +49,7 @@
     {
      "index": 0,
      "raw": "# One\n<!-- -->",
-     "content": "# One",
+     "content": "# One\n<!-- -->",
      "frontmatter": [],
      "title": "One",
      "level": 1,
@@ -75,7 +75,7 @@
     {
      "index": 0,
      "raw": "# One\n\n<!--  -->\n",
-     "content": "# One",
+     "content": "# One\n\n<!--  -->",
      "frontmatter": [],
      "title": "One",
      "level": 1,
@@ -249,6 +249,83 @@
      "frontmatter": [],
      "title": null,
      "level": null,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "html comment on one line",
+  "why": "A speaker note is `::note` on a line of its own, its text, and a closing `::`. An HTML comment after a slide's last line is the note Slidev reads it as; here it is a deck written for another tool, left on the slide and refused by the renderer rather than taken.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!-- note -->\n",
+     "content": "# One\n\n<!-- note -->",
+     "frontmatter": [],
+     "title": "One",
+     "level": 1,
+     "note": null
+    },
+    {
+     "index": 1,
+     "raw": "\n# Two\n",
+     "content": "# Two",
+     "frontmatter": [],
+     "title": "Two",
+     "level": 1,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "comment ending the slide",
+  "why": "A speaker note is `::note` on a line of its own, its text, and a closing `::`. An HTML comment after a slide's last line is the note Slidev reads it as; here it is a deck written for another tool, left on the slide and refused by the renderer rather than taken.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!--\nthe note\n-->\n",
+     "content": "# One\n\n<!--\nthe note\n-->",
+     "frontmatter": [],
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "two trailing comments",
+  "why": "A speaker note is `::note` on a line of its own, its text, and a closing `::`. An HTML comment after a slide's last line is the note Slidev reads it as; here it is a deck written for another tool, left on the slide and refused by the renderer rather than taken.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!-- one -->\n<!-- two -->\n",
+     "content": "# One\n\n<!-- one -->\n<!-- two -->",
+     "frontmatter": [],
+     "title": "One",
+     "level": 1,
+     "note": null
+    }
+   ]
+  }
+ },
+ {
+  "name": "comment with a delimiter inside the note",
+  "why": "A speaker note is `::note` on a line of its own, its text, and a closing `::`. An HTML comment after a slide's last line is the note Slidev reads it as; here it is a deck written for another tool, left on the slide and refused by the renderer rather than taken.",
+  "port": {
+   "slides": [
+    {
+     "index": 0,
+     "raw": "# One\n\n<!--\n---\nnote\n-->\n",
+     "content": "# One\n\n<!--\n---\nnote\n-->",
+     "frontmatter": [],
+     "title": "One",
+     "level": 1,
      "note": null
     }
    ]

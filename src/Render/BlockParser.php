@@ -32,20 +32,23 @@ use MarkdownPresentation\Render\Block\Table;
 final class BlockParser
 {
     /**
-     * The furthest step a `v-click` on one slide may name.
+     * The furthest step a `::click` on one slide may name.
      *
      * A step is a slide: every step of a build-up is written as a `.pptx` part of its own,
      * with its shapes, its rels and its entry in `[Content_Types].xml`. The Markdown that
-     * asks for them is kilobytes, so nothing else bounds `<!-- v-click=2147483647 -->` —
-     * measured on this package, 32 bytes of deck render 500 slides in a tenth of a second,
-     * and `v-click=99999999999999999999` saturates the cast to `PHP_INT_MAX` and asks for
-     * two billion, which hangs the process rather than failing it.
+     * asks for them is kilobytes, so nothing else bounds `::click=2147483647` — measured on
+     * this package, 16 bytes of deck render 500 slides in a tenth of a second, and
+     * `::click=99999999999999999999` saturates the cast to `PHP_INT_MAX` and asks for two
+     * billion, which is why {@see self::jump()} refuses the argument rather than casting it.
      *
      * 500 is two orders of magnitude above any build-up a person writes — a slide with five
      * hundred clicks on it is not a slide — and the whole ceiling renders in about a tenth
      * of a second, so a deck that reaches it was not written to.
      */
     public const MAX_STEP = 500;
+
+    /** The step a slide with no marker in it is drawn at, which is every step's starting point. */
+    private const FIRST_STEP = 1;
 
     /** The opening fence of a code block. Capture 1 is the character and run. */
     private const FENCE = '/\A {0,3}(`{3,}|~{3,})(.*)\z/';
@@ -67,22 +70,35 @@ final class BlockParser
     private const IMAGE = '/\A!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)\z/';
 
     /**
-     * A `v-click` marker standing alone on a line, carrying the step it names.
+     * A step boundary: `::click` alone on a line, carrying the step it names.
      *
-     * A marker is only honoured on a line of its own. Slidev also accepts one closing an
-     * element — `<!-- v-click -->` at the end of a list item — and honouring that here
-     * would mean splitting one list block into several, which is a different feature from
-     * the one this renderer claims.
+     * Two colons, and the line has to be nothing but the marker. Anchored at the start of
+     * the line and closed at its end, so `::click` inside a sentence is the text of that
+     * sentence rather than a step a reader cannot predict.
      *
-     * Capture 1 is the step, absent for the bare form and empty for `v-click=` with
-     * nothing after the equals, which is a mistake.
+     * Capture 1 is the step, absent for the bare form and empty for `::click=` with nothing
+     * after the equals, which is a mistake {@see self::jump()} refuses by name.
      *
-     * The body between the markers is {@see DeckParser::MARKER_BODY} rather than a second
-     * copy of it. {@see DeckParser} decides what a trailing comment is before a slide ever
-     * reaches here, so the shape it calls a note and the shape this calls a step have to be
-     * the same one — and a deck ending on a marker is what notices when they are not.
+     * The three-colon {@see self::REGION} cannot match here and cannot be matched by this:
+     * after two colons this pattern wants `click` and the region has a third colon, and
+     * after three the region wants `click` and this has none. Both are checked rather than
+     * assumed, because the pair is the whole grammar.
     */
-    private const MARKER = '/\A[ \t]*<!--[ \t]*' . DeckParser::MARKER_BODY . '-->[ \t]*\z/';
+    private const MARKER = '/\A[ \t]*::click[ \t]*(?:=[ \t]*(.*?)[ \t]*)?[ \t]*\z/';
+
+    /**
+     * The same boundary, opened three times: what follows until `:::` is one step of its own.
+     *
+     * Capture 1 is named by {@see self::MARKER} and means the same thing, because both go
+     * through {@see self::jump()} against the one step counter.
+    */
+    private const REGION = '/\A[ \t]*:::click[ \t]*(?:=[ \t]*(.*?)[ \t]*)?[ \t]*\z/';
+
+    /** The line a region closes on. Three colons and nothing else. */
+    private const CLOSES_REGION = '/\A[ \t]*:::[ \t]*\z/';
+
+    /** A note opener {@see \MarkdownPresentation\Document\DeckParser} did not take off the slide. */
+    private const NOTE = '~^[ \t]*::note[ \t]*$~m';
 
     /** The info string of a fence, whose first word is the language. */
     private const LANGUAGE = '/\A(\S*)/';
@@ -91,9 +107,10 @@ final class BlockParser
      * An HTML comment: the whole of it where it is closed, and the rest of the line where
      * it is not.
      *
-     * A comment is refused wherever it stands rather than read as text, because the only two
-     * a slide carries are a step and the note after its last line, and both have been taken
-     * by the time the content reaches here.
+     * A comment is refused wherever it stands rather than read as text, because this format
+     * has no HTML in it. A step is `::click` and a note is `::note`, and
+     * {@see \MarkdownPresentation\Document\DeckParser} has taken the second off the slide by
+     * the time the content reaches here; a comment left is a deck written for another tool.
      */
     private const COMMENT = '/<!--.*?-->|<!--.*?(?:\n|\z)/s';
 
@@ -108,8 +125,16 @@ final class BlockParser
     /** A `v-*` directive in a tag's attributes, which is what `v-if` is. */
     private const ATTRIBUTE = '/\sv-[A-Za-z]/';
 
-    /** The line a container fence is opened on, which Slidev nests content in. */
-    private const CONTAINER = '/^[ \t]*:::[^\n]*/m';
+    /**
+     * A `:::` line that is neither a region nor its closer, which is what Slidev nests
+     * content in.
+     *
+     * The two negative lookaheads are what leave the three-colon grammar alone: a line with
+     * nothing after its colons is a region closing, and `click` after them is a region
+     * opening, so neither is a container and neither is refused. Anything else under three
+     * colons is.
+     */
+    private const CONTAINER = '/^[ \t]*:::(?![ \t]*$)(?!click\b)[^\n]*/m';
 
     /**
      * `$inline` is public because a slide's title is normalised with the same parser its
@@ -150,10 +175,26 @@ final class BlockParser
         // less literally than one standing on a line of its own.
         self::refuse($slide, self::prose($lines));
 
+        return $this->blocks($lines, $slide, $directory, $files, self::FIRST_STEP);
+    }
+
+    /**
+     * The walk itself, at a step the caller has already reached.
+     *
+     * A method of its own rather than the body of {@see self::parse()} because a region is
+     * read by calling this again with the lines between its fences and the step its opener
+     * named, and a slide has one walk and not one per region — a `::click` written inside a
+     * region moves the same counter from the step the region opened at.
+     *
+     * @param list<string> $lines
+     *
+     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
+     */
+    private function blocks(array $lines, int $slide, string $directory, PathScope $files, int $step): array
+    {
         $blocks = [];
         $quote = [];
         $paragraph = [];
-        $step = 1;
 
         $index = 0;
 
@@ -164,34 +205,47 @@ final class BlockParser
             $line = $lines[$index];
             $index++;
 
-            [$isMarker, $argument] = self::marker($line);
+            // A `:::` the walk reaches has not closed anything: the one that closes a region
+            // is skipped when the region is read, and the one that opens a region is matched
+            // below. Reaching one is a closer with nothing to close, and it is refused rather
+            // than drawn, because three colons on a slide read as a mistake and two do not.
+            if (preg_match(self::CLOSES_REGION, $line) === 1) {
+                throw UnknownMarker::strayCloser($slide);
+            } elseif (preg_match(self::REGION, $line, $region) === 1) {
+                // Everything before the opener stays on the step it was written at, and
+                // everything inside is one step of its own, so the opener names that step
+                // through the same jump a bare marker does.
+                $end = self::closingRegion($lines, $index, $slide);
+                $this->flush($blocks, $quote, $paragraph, $step);
+                $step = self::jump($slide, $region[1] ?? null, $step);
 
-            if ($isMarker) {
+                array_push($blocks, ...$this->blocks(
+                    array_slice($lines, $index, $end - $index),
+                    $slide,
+                    $directory,
+                    $files,
+                    $step,
+                ));
+
+                $index = $end + 1;
+
+                continue;
+            } elseif (preg_match(self::MARKER, $line, $marker) === 1) {
+                // Capture 1 is the step and nothing below looks at it: absent is the bare form
+                // and an empty capture is a `::click=` with nothing after the equals, and the
+                // two are not the same marker. `jump()` is what tells them apart.
+                //
                 // The step opens *after* the block the marker closes. Advancing first would
                 // put the block a writer wrote above the marker on the step below it, which
                 // is the reverse of what the author meant.
                 $this->flush($blocks, $quote, $paragraph, $step);
-                $step = self::jump($slide, $argument, $step);
+                $step = self::jump($slide, $marker[1] ?? null, $step);
 
                 continue;
             }
 
             if (trim($line) === '') {
                 $this->flush($blocks, $quote, $paragraph, $step);
-
-                continue;
-            }
-
-            // A heading, a rule and an image are each one line and nothing more, so the walk
-            // does not have to learn how far any of them reaches. None of the three can match
-            // a line the quote below matches — all three are anchored at the start of the
-            // line, and `>` is not the start of a heading, a rule or an image — so the order
-            // they are asked in is not observable.
-            $single = $this->single($line, $slide, $directory, $files, $step);
-
-            if ($single !== null) {
-                $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = $single;
 
                 continue;
             }
@@ -210,15 +264,14 @@ final class BlockParser
                 continue;
             }
 
-            // A code block, a pipe table and a list each reach past the line that opens them,
-            // so each hands back the line its last line is on and the walk resumes there. The
-            // line was stepped over above, so this is where it ends rather than where it began.
-            [$spanning, $end] = $this->spanning($lines, $index - 1, $step);
+            // The line was stepped over above, so this is where a block ends rather than where
+            // it began, and the walk resumes on the line after that.
+            [$block, $end] = $this->block($lines, $index - 1, $slide, $directory, $files, $step);
             $index = $end + 1;
 
-            if ($spanning !== null) {
+            if ($block !== null) {
                 $this->flush($blocks, $quote, $paragraph, $step);
-                $blocks[] = $spanning;
+                $blocks[] = $block;
 
                 continue;
             }
@@ -232,46 +285,38 @@ final class BlockParser
     }
 
     /**
-     * The block one line is a whole on its own, or null where it is none of those three.
+     * The block the line at `$index` is a whole on its own, and the line that block ends on.
+     *
+     * A heading, a rule and an image are one line and nothing more, so the walk does not have
+     * to learn how far any of them reaches. A code block, a pipe table and a list each reach
+     * past the line that opens them and are handed the lines that follow it: a walk that asked
+     * how far each of them reached would be carrying three notions of "ends here" at once.
+     * A null block and the line it was asked about, where the line opens none of the six.
+     *
+     * {@see self::blocks()} asks this of a line its quote has not taken, which is what keeps a
+     * quoted pipe row a quote: `> a|b` carries a `|` and an alignment row below it would make
+     * it a table, and a table headed `> a` is not one.
      *
      * The union rather than {@see Block} because {@see self::flush()} appends to a list
      * every kind of block may go into, and a wider answer here would need narrowing there.
-     */
-    private function single(string $line, int $slide, string $directory, PathScope $files, int $step): Heading|Rule|Image|null
-    {
-        // One question — "is this line a whole block?" — asked as one expression, so the
-        // answer is the block rather than a place the caller has to go and look.
-        return match (true) {
-            preg_match(self::HEADING, $line, $heading) === 1
-                => new Heading($this->inline->parse($heading[2]), strlen($heading[1]), $step),
-            preg_match(self::RULE, $line) === 1 => new Rule($step),
-            preg_match(self::IMAGE, trim($line), $matches) === 1
-                => $this->image($matches, $slide, $directory, $files, $step),
-            default => null,
-        };
-    }
-
-    /**
-     * The block the line at `$index` opens that runs past itself, and the line it ends on.
-     *
-     * A code block, a pipe table and a list are read here rather than in the walk above
-     * because each has to be handed the lines that follow it: a walk that asked how far each
-     * of them reached would be carrying three different notions of "ends here" at once.
-     *
-     * A null block and the line it was asked about, where the line opens none of the three.
      *
      * @param list<string> $lines
      *
-     * @return array{0: Code|Table|ListBlock|null, 1: int}
+     * @return array{0: Code|Heading|Image|ListBlock|Rule|Table|null, 1: int}
      */
-    private function spanning(array $lines, int $index, int $step): array
+    private function block(array $lines, int $index, int $slide, string $directory, PathScope $files, int $step): array
     {
         $line = $lines[$index];
 
-        // The three are asked in one expression rather than as three guards because they are
-        // one question — "does this line open a block that reaches past itself?" — and each
-        // answer is the block read, which is a different shape from the next one's.
-        $block = match (true) {
+        // One question — "is this line a whole block?" — asked as one expression, so the
+        // answer is the block rather than a place the caller has to go and look. The three
+        // that reach past the line they open already answer with the line they end on.
+        return match (true) {
+            preg_match(self::HEADING, $line, $heading) === 1
+                => [new Heading($this->inline->parse($heading[2]), strlen($heading[1]), $step), $index],
+            preg_match(self::RULE, $line) === 1 => [new Rule($step), $index],
+            preg_match(self::IMAGE, trim($line), $matches) === 1
+                => [$this->image($matches, $slide, $directory, $files, $step), $index],
             preg_match(self::FENCE, $line, $fence) === 1 => self::code($lines, $index, $fence, $step),
             str_contains($line, '|') && preg_match(self::ALIGNMENT_ROW, $lines[$index + 1] ?? '') === 1
                 => $this->table($lines, $index, $step),
@@ -279,28 +324,8 @@ final class BlockParser
             // with `self::list()` reading the indent off whichever pattern matched.
             preg_match(self::BULLET, $line, $item) === 1 || preg_match(self::ORDERED, $line, $item) === 1
                 => self::list($lines, $index, $this->inline, $item, $step),
-            default => null,
+            default => [null, $index],
         };
-
-        return $block ?? [null, $index];
-    }
-
-    /**
-     * Whether a line is a `v-click` marker, and the step it names.
-     *
-     * Null means the bare form and `''` means `v-click=` with nothing after the equals. The
-     * two are told apart because they are not the same marker: the bare form is the next
-     * step, and an equals with nothing after it is a writer who meant to number a step and
-     * did not.
-     *
-     * @return array{0: bool, 1: string|null} True and the step number, false when the line
-     *                                    is not a marker at all.
-    */
-    private static function marker(string $line): array
-    {
-        return preg_match(self::MARKER, $line, $marker) === 1
-            ? [true, $marker[1] ?? null]
-            : [false, null];
     }
 
     /**
@@ -361,10 +386,33 @@ final class BlockParser
     }
 
     /**
-     * The three spellings a slide can be written in that this library cannot draw.
+     * The line the region opened before `$from` closes on, or a refusal where it never does.
      *
-     * Comments first, then the elements, then the containers, and each message names the
-     * spelling that would have worked — which is the whole of what a refusal is for.
+     * An unclosed region is refused rather than read to the end of the slide, because
+     * everything after it would then be one step: a deck that meant three and wrote one is
+     * a deck whose slides do not say what its author wrote.
+     *
+     * @param list<string> $lines
+     *
+     * @throws UnknownMarker
+     */
+    private static function closingRegion(array $lines, int $from, int $slide): int
+    {
+        for ($index = $from; $index < count($lines); $index++) {
+            if (preg_match(self::CLOSES_REGION, $lines[$index]) === 1) {
+                return $index;
+            }
+        }
+
+        throw UnknownMarker::unclosed($slide);
+    }
+
+    /**
+     * The spellings a slide can be written in that this library cannot draw.
+     *
+     * Comments, then the elements, then the containers, then a note nobody closed — and each
+     * message names the spelling that would have worked, which is the whole of what a
+     * refusal is for.
      *
      * @throws UnknownDirective
      */
@@ -391,8 +439,21 @@ final class BlockParser
         if (preg_match(self::CONTAINER, $content, $fence) === 1) {
             throw UnknownDirective::container($slide, $oneLine($fence[0]));
         }
+
+        if (preg_match(self::NOTE, $content, $note) === 1) {
+            throw UnknownDirective::unclosedNote($slide);
+        }
     }
 
+    /**
+     * The step a marker names, refusing every way of getting that wrong.
+     *
+     * One function for the bare marker and for a region opener, because both answer the same
+     * question against the same counter: there is no second numbering path for the
+     * three-colon form to drift away from.
+     *
+     * @throws UnknownMarker
+     */
     private static function jump(int $slide, ?string $argument, int $step): int
     {
         if ($argument === null) {
@@ -478,7 +539,9 @@ final class BlockParser
     */
     private function table(array $lines, int $index, int $step): array
     {
-        $rows = [self::runs(self::cells($lines[$index]), $this->inline)];
+        // A cell is a paragraph's worth of text and takes the same inline markup one does,
+        // so a row is read as the runs each of its cells is drawn from.
+        $rows = [array_map($this->inline->parse(...), self::cells($lines[$index]))];
 
         // Inline rather than a method of its own: the alignment row is read once, here, and a
         // private method reached only through `array_map(self::alignment(...))` is a reader
@@ -499,7 +562,7 @@ final class BlockParser
             && trim($lines[$end + 1]) !== ''
             && str_contains($lines[$end + 1], '|')
         ) {
-            $rows[] = self::runs(self::cells($lines[$end + 1]), $this->inline);
+            $rows[] = array_map($this->inline->parse(...), self::cells($lines[$end + 1]));
             $end++;
         }
 
@@ -524,19 +587,6 @@ final class BlockParser
         }
 
         return array_map(static fn (string $cell): string => trim($cell), $cells);
-    }
-
-    /**
-     * One row's cells as the runs each of them is drawn from, because a cell is a
-     * paragraph's worth of text and takes the same inline markup one does.
-     *
-     * @param list<string> $cells
-     *
-     * @return list<list<Run>>
-    */
-    private static function runs(array $cells, InlineParser $inline): array
-    {
-        return array_map($inline->parse(...), $cells);
     }
 
     /**

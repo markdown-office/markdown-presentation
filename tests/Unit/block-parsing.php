@@ -315,9 +315,9 @@ it('refuses an HTML comment that is neither a step nor a note', function () {
     expect(fn () => blocksOf("# One\n\n<!-- v-if false -->\n\nSecond.\n"))
         ->toThrow(
             UnknownDirective::class,
-            'Slide 1 has the HTML comment <!-- v-if false -->, which is neither a step nor a note. '
-            . 'A step is "<!-- v-click -->" on a line of its own, and a note is a comment after '
-            . 'the last line of a slide.',
+            'Slide 1 has the HTML comment <!-- v-if false -->, which is not something a slide carries. '
+            . 'A step is "::click" on a line of its own and a note is "::note", its text, and a '
+            . 'closing "::".',
         );
 });
 
@@ -348,7 +348,7 @@ it('refuses a Vue element, closing one included', function () {
         ->toThrow(
             UnknownDirective::class,
             'Slide 1 has the element "<v-click>", which is not something a slide draws. A step is '
-            . 'the comment "<!-- v-click -->" on a line of its own, and there is no other element.',
+            . '"::click" on a line of its own, and there is no other element.',
         );
 });
 
@@ -361,8 +361,9 @@ it('refuses a ::: container, naming the alternatives', function () {
     expect(fn () => blocksOf("# One\n\n::: note\nSomething.\n:::\n"))
         ->toThrow(
             UnknownDirective::class,
-            'Slide 1 opens the container "::: note", which is not something a slide draws. Divide a '
-            . 'deck with a "---" line, write a section as a heading, and write a note as a quote: "> ".',
+            'Slide 1 opens the container "::: note", which is not something a slide draws. Three colons '
+            . 'open a step region as ":::click" and close it as ":::"; divide a deck with a "---" line, '
+            . 'write a section as a heading, and write a note as a quote: "> ".',
         );
 });
 

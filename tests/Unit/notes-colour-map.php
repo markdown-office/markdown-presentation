@@ -68,7 +68,7 @@ function notesSlidesOf(string $markdown): array
 it('gives every notes slide the colour map Keynote refuses to open a file without', function () {
     // PowerPoint and LibreOffice do not notice the omission, so nothing else in this suite
     // would ever catch it. Upstream fix: PHPOffice/PHPPresentation#1034.
-    $notes = notesSlidesOf("# One\n\nThe slide.\n\n<!-- a speaker note -->\n");
+    $notes = notesSlidesOf("# One\n\nThe slide.\n\n::note\na speaker note\n\n::\n");
 
     expect($notes)->not->toBe([]);
 
@@ -81,7 +81,7 @@ it('puts the colour map where the schema says it goes', function () {
     // `CT_NotesSlide` orders `cSld`, `clrMapOvr`, `transition`, `timing`, `extLst`. Placing
     // it elsewhere produces a file that is invalid for a stricter reason than the one being
     // fixed, so the position is asserted rather than assumed.
-    $notes = notesSlidesOf("# One\n\nThe slide.\n\n<!-- a speaker note -->\n");
+    $notes = notesSlidesOf("# One\n\nThe slide.\n\n::note\na speaker note\n\n::\n");
 
     foreach ($notes as $xml) {
         expect(strpos($xml, '<p:clrMapOvr>'))->toBeGreaterThan(strpos($xml, '</p:cSld>'));
@@ -157,7 +157,7 @@ it('writes no part back as zero bytes, whatever the archive could not read', fun
     $path = sys_get_temp_dir() . '/mdp-whole-' . hash('xxh3', 'whole') . DECK;
 
     (new PresentationRenderer(dirname(__DIR__, 2) . EXAMPLES))->render(
-        (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
+        (new DeckParser())->parse("# One\n\nThe slide.\n\n::note\na note\n::\n"),
         $path,
     );
 
@@ -191,7 +191,7 @@ it('carries a note onto the right slide', function () {
     // the notes appear, which is why this deck has one note and one notes slide — a sparse
     // numbering that is legal and reads oddly in a zip listing. Asserted so the pass moving
     // a part cannot go unnoticed.
-    $notes = notesSlidesOf("# One\n\nThe first.\n\n<!-- first note -->\n\n---\n\n# Two\n\nThe second.\n");
+    $notes = notesSlidesOf("# One\n\nThe first.\n\n::note\nfirst note\n::\n\n---\n\n# Two\n\nThe second.\n");
 
     expect($notes)->toHaveCount(1);
 });
@@ -205,7 +205,7 @@ it('runs twice without adding the element a second time', function () {
     $path = sys_get_temp_dir() . '/mdp-twice-' . hash('xxh3', 'twice') . DECK;
 
     (new PresentationRenderer(dirname(__DIR__, 2) . EXAMPLES))->render(
-        (new DeckParser())->parse("# One\n\nThe slide.\n\n<!-- a note -->\n"),
+        (new DeckParser())->parse("# One\n\nThe slide.\n\n::note\na note\n::\n"),
         $path,
     );
 
@@ -220,8 +220,8 @@ it('writes each notes slide once, however many slides carry one', function () {
     // is appended, and the walk visits the original again. Three notes are enough to
     // show it; a deck with none passes whether the walk is sound or not, which is why
     // this is a shape assertion rather than a check that the element is present.
-    $deck = "# One\n\nThe first.\n\n<!-- one -->\n\n---\n\n# Two\n\nThe second.\n\n"
-        . "<!-- two -->\n\n---\n\n# Three\n\nThe third.\n\n<!-- three -->\n";
+    $deck = "# One\n\nThe first.\n\n::note\none\n::\n\n---\n\n# Two\n\nThe second.\n\n::note\ntwo\n::\n"
+        . "\n---\n\n# Three\n\nThe third.\n\n::note\nthree\n::\n";
 
     $root = dirname(__DIR__, 2);
     $path = sys_get_temp_dir() . '/mdp-once-' . hash('xxh3', 'once') . DECK;

@@ -6,7 +6,6 @@ namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\Slide as SourceSlide;
-use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
@@ -30,19 +29,11 @@ use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
-use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeResolver;
-use PhpOffice\PhpPresentation\DocumentLayout;
-use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
 use PhpOffice\PhpPresentation\Slide as WrittenSlide;
-use PhpOffice\PhpPresentation\Slide\Background\Color as BackgroundColor;
 use PhpOffice\PhpPresentation\Slide\Note;
 use PhpOffice\PhpPresentation\Slide\SlideLayout;
-use PhpOffice\PhpPresentation\Slide\SlideMaster;
-use PhpOffice\PhpPresentation\Style\Color;
-use PhpOffice\PhpPresentation\Style\ColorMap;
-use PhpOffice\PhpPresentation\Style\SchemeColor;
 
 /**
  * A deck and the theme it names, written out as a `.pptx`.
@@ -65,11 +56,17 @@ use PhpOffice\PhpPresentation\Style\SchemeColor;
  *   time, so a typo in a `styles.yml` is never rendered as silence.
  *
  * And one it does: a directive in the body of a slide it cannot draw — a `v-*` element, a
- * `:::` fence, a comment that is neither a step nor the note after the last line — is a
+ * `:::` fence, an HTML comment, an unclosed `::note` — is a
  * failure from {@see \MarkdownPresentation\Render\BlockParser} rather than a shape carrying
  * the directive's own text. That last one is the case this library exists for: a deck
  * written by a model, a directive it does not know, and a slide with the directive printed
  * on it reads as a rendered deck.
+ *
+ * Two things it does not do are somebody else's job, and both classes that do them sit in
+ * this directory rather than being reached through a caller: {@see MasterLayouts} writes the
+ * master, the layouts and the document's metadata, and {@see DeckWriter} writes the file and
+ * runs the two passes over it. What is left here is the walk: a deck's blocks, and the shape
+ * of what a build-up draws on each of its steps.
 */
 final class PresentationRenderer
 {
@@ -88,7 +85,7 @@ final class PresentationRenderer
     /** The theme a deck that names none gets. */
     public const DEFAULT_THEME = 'default';
 
-    /** The step a slide with no `v-click` in it is drawn at. */
+    /** The step a slide with no marker in it is drawn at. */
     private const FIRST_STEP = 1;
 
     /**
@@ -170,7 +167,7 @@ final class PresentationRenderer
      * @throws ContentOverflow  When a block does not fit and the renderer is strict.
      * @throws MalformedTemplate When the theme's `template.pptx` cannot be read.
      * @throws TooManySlides    When the deck asks for more slides than {@see self::MAX_SLIDES}.
-     * @throws Exception         When the file cannot be written.
+     * @throws \MarkdownPresentation\Exception\Exception When the file cannot be written.
      *
      * @return string The path written.
      */
@@ -186,7 +183,6 @@ final class PresentationRenderer
         $roles = $this->roles($deck, $theme);
 
         $presentation = new PhpPresentation();
-        $presentation->getLayout()->setDocumentLayout(DocumentLayout::LAYOUT_SCREEN_16X9);
 
         $used = $this->usedRoles($roles);
         // The theme's type scale and spacing first, then the boxes a template gives for the
@@ -196,8 +192,7 @@ final class PresentationRenderer
         // without them this file cannot be loaded at all, so every test that renders a deck
         // fails on the 8.2 job and nothing local says why.
         $geometry = (new SlideGeometry(style: $theme->theme()->style()))->with($this->template($theme, $used));
-        $layouts = $this->layouts($this->slideMaster($presentation), $theme, $used);
-        $this->properties($presentation, $deck, $theme);
+        $layouts = MasterLayouts::build($presentation, $deck, $theme, $used, $this->blocks->inline);
 
         $writer = new ShapeWriter($theme->theme(), $geometry);
         $blocks = $this->blocks($deck);
@@ -222,7 +217,7 @@ final class PresentationRenderer
             $presentation->removeSlideByIndex(0);
         }
 
-        return $this->save($presentation, $path, $geometry, $used);
+        return DeckWriter::save($presentation, $path, $geometry, $used);
     }
 
     /**
@@ -377,26 +372,20 @@ final class PresentationRenderer
                 );
             }
 
-            $roles[$slide->index()] = LayoutRole::from($this->checkRole(trim($named), $theme, $slide->index() + 1));
+            $role = trim($named);
+
+            if (LayoutRole::tryFrom($role) === null) {
+                throw UnknownLayoutRole::notARoleOn($slide->index() + 1, $role, LayoutRole::names());
+            }
+
+            // Asked of the theme rather than checked here, because a role the theme does not
+            // map is the theme's to fix and its message already says so.
+            $theme->layout($role);
+
+            $roles[$slide->index()] = LayoutRole::from($role);
         }
 
         return $roles;
-    }
-
-    /**
-     * @throws UnknownLayoutRole
-    */
-    private function checkRole(string $role, LoadedTheme $theme, int $slide): string
-    {
-        if (LayoutRole::tryFrom($role) === null) {
-            throw UnknownLayoutRole::notARoleOn($slide, $role, LayoutRole::names());
-        }
-
-        // Asked of the theme rather than checked here, because a role the theme does not map
-        // is the theme's to fix and its message already says so.
-        $theme->layout($role);
-
-        return $role;
     }
 
     /**
@@ -424,141 +413,6 @@ final class PresentationRenderer
         }
 
         return $used;
-    }
-
-    /**
-     * The master the slides hang off.
-     *
-     * PHPPresentation's constructor always makes one; the `??` is what happens if it ever
-     * stops, and making a master is cheaper than refusing to draw a deck over it.
-    */
-    private function slideMaster(PhpPresentation $presentation): SlideMaster
-    {
-        return $presentation->getAllMasterSlides()[0] ?? $presentation->createMasterSlide();
-    }
-
-    /**
-     * The master: its colour scheme, and the page behind every slide.
-     *
-     * All twelve slots go in whatever the theme named, and the ones no shape uses go in
-     * anyway: DrawingML's `CT_ColorScheme` is a sequence of exactly twelve required
-     * elements, so a scheme with five of them is not a scheme with five colours, it is an
-     * invalid theme part. `accent2`–`accent6` and `folHlink` are written because the format
-     * has no way to leave them out, and because they are what PowerPoint's own colour picker
-     * offers for a theme someone edits in the application.
-     *
-     * What that does *not* do is make a shape refer to a slot by name.
-     * {@see \PhpOffice\PhpPresentation\Writer\PowerPoint2007\AbstractDecoratorWriter::writeColor()}
-     * writes `a:srgbClr` for every `Color` it is given, `SchemeColor` included, so the accent
-     * a bullet or a rule is painted with reaches the file as a literal value. Re-theming the
-     * deck in PowerPoint restyles the picker's swatches; it does not restyle the shapes
-     * already on the slides.
-     *
-     * The colour map is written from the theme's own four roles, so a dark theme's map and
-     * its shapes cannot disagree about which slot paints what — {@see \MarkdownPresentation\Theme\Theme::page()}
-     * and its three neighbours are where the swap lives.
-     */
-    private function master(SlideMaster $master, Theme $theme): void
-    {
-        foreach (Theme::COLOURS as $slot) {
-            $colour = new SchemeColor();
-            $colour->setValue($slot);
-            $colour->setRGB(ltrim($theme->colour($slot) ?? '#000000', '#'));
-            $master->addSchemeColor($colour);
-        }
-
-        $master->colorMap
-            ->changeColor(ColorMap::COLOR_BG1, $theme->page())
-            ->changeColor(ColorMap::COLOR_TX1, $theme->ink())
-            ->changeColor(ColorMap::COLOR_BG2, $theme->panel())
-            ->changeColor(ColorMap::COLOR_TX2, $theme->subtleInk());
-
-        $background = new BackgroundColor();
-        $background->setColor(new Color(ltrim($theme->colour($theme->page()) ?? '#FFFFFF', '#')));
-        $master->setBackground($background);
-    }
-
-    /**
-     * One slide layout per role the deck used, each named the way the theme names it.
-     *
-     * This is where a {@see LayoutRole} becomes a layout in the file. A deck that writes
-     * `layout: two-column` against a theme that maps it to `Two Content` gets slides whose
-     * layout part is called `Two Content`, and the deck's portable vocabulary and the
-     * template's private one stay apart — which is the whole point of the role.
-     *
-     * The placeholders that make the part mean something are written afterwards by
-     * {@see PlaceholderPass} — PHPPresentation's own placeholder support would take a
-     * slide's title shape out of the shape collection's contract, which is why that is a
-     * pass over the written package rather than shapes added here.
-     *
-     * @param list<LayoutRole> $roles
-     *
-     * @return array<string, SlideLayout>
-    */
-    private function layouts(SlideMaster $master, LoadedTheme $theme, array $roles): array
-    {
-        $this->master($master, $theme->theme());
-
-        $layouts = [];
-        $existing = $master->getAllSlideLayouts();
-
-        foreach ($roles as $position => $role) {
-            // PHPPresentation's constructor leaves the master holding one empty layout.
-            // Reusing it for the first role is what stops a deck with a single role from
-            // carrying a second, nameless layout part in its file.
-            $layout = $position === 0 && isset($existing[0]) ? $existing[0] : $master->createSlideLayout();
-            $layout->setLayoutName($theme->layout($role->value));
-            $layouts[$role->value] = $layout;
-        }
-
-        return $layouts;
-    }
-
-    /**
-     * The deck's own metadata, on the properties part every `.docx` and `.pptx` has.
-     *
-     * @throws MalformedFrontmatter
-    */
-    private function properties(PhpPresentation $presentation, Deck $deck, LoadedTheme $theme): void
-    {
-        $properties = $presentation->getDocumentProperties();
-
-        // The deck's author where it names one, the theme's otherwise. The deck is the more
-        // specific of the two — it is the document, and the theme is the template it was
-        // written in. A theme that names no author leaves the library's own name there, which
-        // is a statement about the file rather than about who made it.
-        $author = $deck->frontmatterValue('author');
-
-        $properties->setCreator($author === null
-            ? $theme->theme()->author() ?? 'markdown-presentation'
-            : self::text($author, 'author'));
-
-        $title = $deck->frontmatterValue('title');
-
-        if ($title !== null) {
-            // Stripped, because this part is a string in a metadata field: there is nothing
-            // on the other end to interpret `**`, and a title of `Ops **runbook**` is a
-            // title of "Ops runbook" to every reader of the file.
-            $properties->setTitle($this->blocks->inline->plain(self::text($title, 'title')));
-        }
-
-        $description = $deck->frontmatterValue('description');
-
-        if ($description !== null) {
-            $properties->setDescription(self::text($description, 'description'));
-        }
-    }
-
-    /**
-     * @throws MalformedFrontmatter
-    */
-    private static function text(mixed $value, string $key): string
-    {
-        if (!is_string($value)) {
-            throw MalformedFrontmatter::wrongType(1, $key, 'a string');
-        }
-
-        return $value;
     }
 
     /**
@@ -848,7 +702,7 @@ final class PresentationRenderer
         $current = 0;
 
         foreach ($blocks as $block) {
-            if ($this->splits($role) && $current === 0 && $this->opensSecondColumn($block)) {
+            if ($this->splits($role) && $current === 0 && $block instanceof Heading && $block->level === 2) {
                 $current = 1;
             }
 
@@ -879,11 +733,6 @@ final class PresentationRenderer
         return $visible;
     }
 
-    private function opensSecondColumn(Block $block): bool
-    {
-        return $block instanceof Heading && $block->level === 2;
-    }
-
     /**
      * Whether a role's blocks are divided between two columns at all.
      *
@@ -896,28 +745,4 @@ final class PresentationRenderer
         return count($this->geometry->body($role)) > 1;
     }
 
-    /**
-     * PHPPresentation answers a path whose directory is not there by emitting a warning and a
-     * low-level "could not close zip file", after a broken archive has been left behind.
-     * Saying so here is what makes the failure one a caller can act on.
-     *
-     * @param list<LayoutRole> $roles The roles the deck used, in the order their layouts were built.
-     *
-     * @throws Exception
-    */
-    private function save(PhpPresentation $presentation, string $path, SlideGeometry $geometry, array $roles): string
-    {
-        $directory = dirname($path);
-
-        if (!is_dir($directory)) {
-            throw new Exception(sprintf('There is no directory at "%s" to write "%s" into.', $directory, basename($path)));
-        }
-
-        IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
-
-        NotesColourMapPass::applyTo($path);
-        PlaceholderPass::applyTo($path, $geometry, $roles);
-
-        return $path;
-    }
 }

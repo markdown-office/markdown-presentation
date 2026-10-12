@@ -149,7 +149,7 @@ function sourcesWithClaim(string $claim): array
                 continue;
             }
 
-            if (str_contains((string) file_get_contents($file->getPathname()), $claim)) {
+            if (holdsClaim((string) file_get_contents($file->getPathname()), $claim)) {
                 $found[] = $area . '/' . $file->getFilename();
             }
         }
@@ -160,6 +160,20 @@ function sourcesWithClaim(string $claim): array
     sort($pages);
 
     return array_merge($found, $pages);
+}
+
+/**
+ * Whether a text holds a phrase, whatever case it is written in.
+ *
+ * Folding the case is what makes this a guard rather than a lookup: the sentence a claim
+ * lives in begins with a capital often enough that a case-sensitive `str_contains()` misses
+ * it, and a guard that can be walked past by starting a sentence is not a guard. The
+ * README's "A marker closing a list item is not honoured" sat under a ban on "a marker
+ * closing a list item" for exactly this reason, through a release of a suite that passed.
+ */
+function holdsClaim(string $text, string $claim): bool
+{
+    return str_contains(mb_strtolower($text), mb_strtolower($claim));
 }
 
 /**
@@ -176,8 +190,8 @@ function pagesWithClaim(string $claim): array
     $root = Doctest::root();
     $found = [];
 
-    foreach ([$root . '/README.md', $root . '/CHANGELOG.md'] as $page) {
-        if (str_contains((string) file_get_contents($page), $claim)) {
+    foreach ([$root . '/README.md', $root . '/CHANGELOG.md', $root . '/CONTRIBUTING.md'] as $page) {
+        if (is_file($page) && holdsClaim((string) file_get_contents($page), $claim)) {
             $found[] = basename($page);
         }
     }
@@ -187,7 +201,7 @@ function pagesWithClaim(string $claim): array
         'examples/markdown/' => glob($root . '/examples/markdown/*.md') ?: [],
     ] as $prefix => $pages) {
         foreach ($pages as $page) {
-            if (str_contains((string) file_get_contents($page), $claim)) {
+            if (holdsClaim((string) file_get_contents($page), $claim)) {
                 $found[] = $prefix . basename($page);
             }
         }
@@ -205,6 +219,11 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a styles.yml value reaches the shapes' => 'styles.yml value is applied',
     'a directive nobody acts on is passed over' => 'an unknown directive is ignored',
     'a v-click marker closing a list item is honoured' => 'a marker closing a list item',
+    // The old spellings, as claims rather than as syntax: `CHANGELOG.md` has to be able to
+    // name what a deck used to be written in, so a phrase that only says "<!-- v-click"
+    // would fire on the history that documents the change rather than on a wrong page.
+    'this format still takes an html comment as a step' => 'A step is the comment',
+    'a trailing html comment is still the note' => 'an HTML comment that runs to the end of a slide',
     'an image is embedded whatever format it is in' => 'embedded unchanged, whatever format the deck named it in',
     'the package cannot write a pptx' => 'it renders nothing',
     'a deck has no other way to name who made it' => 'the deck has no other way to say who made it',
@@ -213,6 +232,10 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a theme that ships a template has its layouts ignored' => 'A theme\'s `template.pptx` is not opened',
     'a theme differs from another only in its colours' => 'Nothing else about it differs',
     'the heading scale runs down to the sixth level' => 'stops shrinking a heading at the sixth level',
+    'the roles are the five a deck needs most' => 'The roles are `title`, `content`, `two-column`, `section` and `blank`',
+    'a frame carries a gap after every line it wrapped onto' => 'after every line of the frame',
+    'a heading is painted in the theme accent and reaches the shape as a literal hex' => 'Everything that reaches a shape reaches',
+    'the ceiling story reads as still hanging' => 'hangs the process rather than failing it',
 ]);
 
 it('has no decorative dividers in it', function () {
@@ -241,4 +264,21 @@ it('declares a constant in one test file at most', function () {
     // by the coverage job rather than by the suite — 757 tests passing and the run exiting
     // 1 — which is the worst way to find out.
     expect(constantDeclarations())->toBe([]);
+});
+
+it('says in the code why ShapeWriter is not split', function () {
+    // The one class where `php:S1448` is open on purpose, so the reason has to be somewhere
+    // a person deciding whether to split it will actually read — which is the class itself,
+    // and not this file. A finding that stays red with no argument next to it reads as an
+    // oversight, and the next person to see it will either fix it or silence it.
+    $doc = (string) file_get_contents(Doctest::root() . '/src/Render/ShapeWriter.php');
+
+    expect($doc)->toContain('php:S1448');
+
+    // And the argument has to be the crossings rather than a count, because a count is wrong
+    // the moment one method moves and a name is not. Each of these is read by the measure
+    // half of the class and by the draw half.
+    foreach (['columns()', 'rowHeights()', 'HEADER_ROW', 'bodySize()'] as $crossing) {
+        expect($doc)->toContain($crossing);
+    }
 });

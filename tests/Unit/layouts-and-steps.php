@@ -7,6 +7,7 @@ use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Document\Slide;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\TooManySlides;
+use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Render\BlockParser;
@@ -22,7 +23,7 @@ use MarkdownPresentation\Tests\Support\ThemeDirectory;
 
 /**
  * The three mapping decisions a deck author can argue with: which layout a slide gets, how
- * `v-click` builds a slide up, and where a role's geometry comes from.
+ * `::click` builds a slide up, and where a role's geometry comes from.
  *
  * Every assertion reads the written file. "The deck said `layout: two-column`" is only
  * checkable through the layout part the slide is bound to, which is what makes the mapping a
@@ -515,17 +516,17 @@ function steppedDeck(int $slides, int $steps): string
  */
 function steppedSlide(int $steps): string
 {
-    return sprintf("# One\n\n<!-- v-click=%d -->\n\nText.\n", $steps);
+    return sprintf("# One\n\n::click=%d\n\nText.\n", $steps);
 }
 
-/** A slide whose one `<!-- v-click -->` splits it in two, which is the smallest build-up. */
-const ONE_STEP = "# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n";
+/** A slide whose one `::click` splits it in two, which is the smallest build-up. */
+const ONE_STEP = "# One\n\nFirst.\n\n::click\n\nSecond.\n";
 
 it('writes one slide for a slide with no steps', function () {
     expect(slideDeck("# One\n\nText.\n")->slideCount())->toBe(1);
 });
 
-it('writes a slide per step a v-click names', function () {
+it('writes a slide per step a ::click names', function () {
     // PowerPoint has no "press a key to reveal this", so the build-up becomes the slides a
     // presenter would click through anyway.
     expect(slideDeck(ONE_STEP)->slideCount())->toBe(2);
@@ -539,43 +540,43 @@ it('reveals each step on its own slide and keeps the earlier ones', function () 
 });
 
 it('writes a numbered step as the step it names', function () {
-    $pptx = slideDeck("# One\n\nFirst.\n\n<!-- v-click=3 -->\n\nThird.\n");
+    $pptx = slideDeck("# One\n\nFirst.\n\n::click=3\n\nThird.\n");
 
     expect($pptx->slideCount())->toBe(3)
         ->and($pptx->texts(3))->toBe(['One', 'First.', 'Third.']);
 });
 
-it('names the slide a v-click step is on', function () {
-    expect(fn () => slideDeck("# One\n\n<!-- v-click=two -->\n\nText.\n"))
-        ->toThrow(UnknownMarker::class, 'Slide 1 has a v-click step "two"');
+it('names the slide a ::click step is on', function () {
+    expect(fn () => slideDeck("# One\n\n::click=two\n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a step "two"');
 });
 
-it('refuses a v-click step that does not go forwards', function () {
-    expect(fn () => slideDeck("# One\n\n<!-- v-click=3 -->\n\nText.\n\n<!-- v-click=2 -->\n\nMore.\n"))
-        ->toThrow(UnknownMarker::class, 'Slide 1 has a v-click step 2 after step 3');
+it('refuses a ::click step that does not go forwards', function () {
+    expect(fn () => slideDeck("# One\n\n::click=3\n\nText.\n\n::click=2\n\nMore.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a step 2 after step 3');
 });
 
-it('refuses a v-click equals with no number', function () {
-    expect(fn () => slideDeck("# One\n\n<!-- v-click= -->\n\nText.\n"))
-        ->toThrow(UnknownMarker::class, 'Slide 1 has a "<!-- v-click= -->" step marker with no number');
+it('refuses a ::click equals with no number', function () {
+    expect(fn () => slideDeck("# One\n\n::click=\n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::click=" step marker with no number');
 });
 
-it('refuses a v-click step larger than one slide could carry', function () {
-    // The measured attack: 32 bytes of deck naming `v-click=2147483647` asked for two
-    // billion slides, and `v-click=99999999999999999999` saturates the cast to
-    // `PHP_INT_MAX` and hangs the process rather than failing it. The step number written is
-    // the ceiling plus one, not the twenty-digit one, so the suite cannot be the thing that
-    // hangs -- and the message quotes the number back rather than the `PHP_INT_MAX` it
-    // saturated to.
+it('refuses a ::click step larger than one slide could carry', function () {
+    // The measured attack: 16 bytes of deck naming `::click=2147483647` asked for two
+    // billion slides, and `::click=99999999999999999999` saturated the cast to
+    // `PHP_INT_MAX`, which is the value this refuses rather than trusts. The step number
+    // written is the ceiling plus one, not the twenty-digit one, so the suite cannot be the
+    // thing that asks for two billion -- and the message quotes the number back rather than
+    // the `PHP_INT_MAX` it saturated to.
     expect(fn () => slideDeck(steppedSlide(BlockParser::MAX_STEP + 1)))
-        ->toThrow(UnknownMarker::class, sprintf('Slide 1 has a v-click step "%d"', BlockParser::MAX_STEP + 1));
+        ->toThrow(UnknownMarker::class, sprintf('Slide 1 has a step "%d"', BlockParser::MAX_STEP + 1));
 });
 
 it('refuses a step too large to be held in an integer at all', function () {
     // A twenty-digit number is a different input that reaches the same line, and the same
     // refusal answers both: whatever the cast saturates it to, the deck wrote twenty digits.
-    expect(fn () => slideDeck("# One\n\n<!-- v-click=99999999999999999999 -->\n\nText.\n"))
-        ->toThrow(UnknownMarker::class, 'Slide 1 has a v-click step "99999999999999999999"');
+    expect(fn () => slideDeck("# One\n\n::click=99999999999999999999\n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a step "99999999999999999999"');
 });
 
 it('renders a slide whose build-up is as long as one slide may carry', function () {
@@ -601,10 +602,79 @@ it('leaves a deck on the far side of the deck ceiling alone', function () {
     expect(slideDeck(steppedDeck(2, 500))->slideCount())->toBe(PresentationRenderer::MAX_SLIDES);
 });
 
+it('reads a :::click region as one step of its own', function () {
+    // The boundary and its fences are one thing: what is between them is read at the step the
+    // opener names, through the same counter a bare marker moves, so there is no second
+    // numbering path for the three-colon form to drift away from.
+    $pptx = slideDeck("# One\n\nFirst.\n\n:::click\n\nSecond.\n\n:::\n\nThird.\n");
+
+    expect($pptx->slideCount())->toBe(2)
+        ->and($pptx->texts(1))->toBe(['One', 'First.'])
+        ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.', 'Third.']);
+});
+
+it('names the step a region opener names, the way a bare marker does', function () {
+    $pptx = slideDeck("# One\n\nFirst.\n\n:::click=3\n\nThird.\n\n:::\n");
+
+    expect($pptx->slideCount())->toBe(3)
+        ->and($pptx->texts(1))->toBe(['One', 'First.'])
+        ->and($pptx->texts(3))->toBe(['One', 'First.', 'Third.']);
+});
+
+it('reads two regions as two steps rather than as one', function () {
+    $pptx = slideDeck("# One\n\n:::click\n\nSecond.\n\n:::\n\n:::click\n\nThird.\n\n:::\n");
+
+    expect($pptx->slideCount())->toBe(3)
+        ->and($pptx->texts(2))->toBe(['One', 'Second.'])
+        ->and($pptx->texts(3))->toBe(['One', 'Second.', 'Third.']);
+});
+
+it('moves the step on for a ::click written inside a region', function () {
+    // One counter, read once: the region's contents are at the step its opener named, and a
+    // marker inside them moves that same counter rather than starting a walk of its own.
+    $pptx = slideDeck("# One\n\n:::click\n\nSecond.\n\n::click\n\nThird.\n\n:::\n");
+
+    expect($pptx->slideCount())->toBe(3)
+        ->and($pptx->texts(2))->toBe(['One', 'Second.'])
+        ->and($pptx->texts(3))->toBe(['One', 'Second.', 'Third.']);
+});
+
+it('never matches a bare ::click as a region, or a :::click as a bare marker', function () {
+    // The whole grammar rests on the pair not colliding, so both directions are asked rather
+    // than reasoned about: the four lines below differ only in their colon count.
+    expect(slideDeck("# One\n\nFirst.\n\n::click\n\nSecond.\n")->slideCount())->toBe(2)
+        ->and(slideDeck("# One\n\nFirst.\n\n:::click\n\nSecond.\n\n:::\n")->slideCount())->toBe(2)
+        ->and(slideDeck("# One\n\nFirst.\n\n::click\n\nSecond.\n\n:::click\n\nThird.\n\n:::\n")->slideCount())->toBe(3);
+});
+
+it('refuses a region nothing closes, rather than reading the rest of the slide as it', function () {
+    // Everything after the opener would otherwise be one step, which is a deck that meant
+    // three written as one and a file that says so with no complaint anywhere.
+    expect(fn () => slideDeck("# One\n\nFirst.\n\n:::click\n\nSecond.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 opens a ":::click" region that nothing closes');
+});
+
+it('refuses a ::: that closes nothing, rather than drawing three colons on a slide', function () {
+    expect(fn () => slideDeck("# One\n\nFirst.\n\n:::\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a ":::" that closes nothing');
+});
+
+it('refuses a ::note nothing closes, rather than taking the rest of the slide as the note', function () {
+    // Read as a note it swallows every line after the opener into the notes pane, and a deck
+    // whose slides are empty is not one anybody can act on.
+    expect(fn () => slideDeck("# One\n\nFirst.\n\n::note\nNever closed.\n"))
+        ->toThrow(UnknownDirective::class, 'Slide 1 opens a "::note" that nothing closes');
+});
+
+it('refuses an HTML comment, which this format has no use for', function () {
+    expect(fn () => slideDeck("# One\n\n<!-- v-click -->\n"))
+        ->toThrow(UnknownDirective::class, 'which is not something a slide carries');
+});
+
 it('opens a step after the block a marker closes rather than before it', function () {
     // Advancing first would put the block the writer wrote above the marker on the step below
     // it, which is the reverse of what they meant.
-    $pptx = slideDeck("# One\n\nFirst.\n<!-- v-click -->\n\nSecond.\n");
+    $pptx = slideDeck("# One\n\nFirst.\n::click\n\nSecond.\n");
 
     expect($pptx->texts(1))->toBe(['One', 'First.'])
         ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.']);
@@ -613,8 +683,8 @@ it('opens a step after the block a marker closes rather than before it', functio
 it('draws a marker on the last line as a step rather than as a note', function () {
     // A marker on the last line runs to the end of the slide, which is what a speaker note
     // does too. Read as a note it took the step with it: nothing on step two, and a notes
-    // pane reading "v-click" that a presenter would say out loud.
-    $pptx = slideDeck("# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n\n<!-- v-click -->\n");
+    // pane reading "::click" that a presenter would say out loud.
+    $pptx = slideDeck("# One\n\nFirst.\n\n::click\n\nSecond.\n\n::click\n");
 
     expect($pptx->slideCount())->toBe(2)
         ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.'])
@@ -624,12 +694,12 @@ it('draws a marker on the last line as a step rather than as a note', function (
 it('refuses a trailing marker it cannot draw rather than writing it in the notes pane', function () {
     // A marker this renderer cannot draw is a failure wherever it stands. Only the notes pane
     // was swallowing it, which turned a mistake into something a presenter would read aloud.
-    expect(fn () => slideDeck("# One\n\n<!-- v-click=two -->\n"))
-        ->toThrow(UnknownMarker::class, 'Slide 1 has a v-click step "two"');
+    expect(fn () => slideDeck("# One\n\n::click=two\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a step "two"');
 });
 
 it('gives every step of one source slide the same layout', function () {
-    $pptx = slideDeck("---\nlayout: title\n---\n# One\n\nFirst.\n\n<!-- v-click -->\n\nSecond.\n");
+    $pptx = slideDeck("---\nlayout: title\n---\n# One\n\nFirst.\n\n::click\n\nSecond.\n");
 
     expect($pptx->layoutOf(1))->toBe($pptx->layoutOf(2));
 });
@@ -642,7 +712,7 @@ it('names every step of a slide after the slide of the deck it came from', funct
 });
 
 it('counts the steps of every slide towards the file, not of one', function () {
-    $pptx = slideDeck("# One\n\nA.\n\n<!-- v-click -->\n\nB.\n\n---\n\n# Two\n\nC.\n\n<!-- v-click -->\n\nD.\n");
+    $pptx = slideDeck("# One\n\nA.\n\n::click\n\nB.\n\n---\n\n# Two\n\nC.\n\n::click\n\nD.\n");
 
     expect($pptx->slideCount())->toBe(4)
         ->and($pptx->slideText(4))->toBe('Two | C. | D.');

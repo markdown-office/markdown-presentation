@@ -1,6 +1,6 @@
 ---
 title: Steps
-description: What a v-click marker becomes when PowerPoint has no "press a key".
+description: What a ::click marker becomes when PowerPoint has no "press a key".
 ---
 
 # A build-up, in three steps
@@ -11,11 +11,11 @@ three times: once with the first step on it, once with two, and once with three.
 
 - First step.
 
-<!-- v-click -->
+::click
 
 - Second step.
 
-<!-- v-click -->
+::click
 
 - Third step, which arrived two clicks after the first.
 
@@ -26,31 +26,60 @@ three times: once with the first step on it, once with two, and once with three.
 A marker can name the step it opens, which is how a build-up skips the ones before
 it. The two steps in between carry whatever was written above the marker.
 
-<!-- v-click=3 -->
+::click=3
 
 - Step three, written after a marker that named it.
+
+---
+
+# A region that is a step of its own
+
+Three colons open one and three close it, so a build-up can be written as the
+parts it is made of rather than as a marker between each of them.
+
+:::click
+
+- The second part, on its own slide.
+
+- And the line under it, on the same one.
+
+:::
+
+The two lists above are one step and one shape each; open the second slide of this
+deck to see the difference.
 
 ---
 
 # Showing a marker rather than running one
 
 A marker is only a marker on a line of its own. Written the way this block is
-written it is shown instead, because a comment inside a fenced block is a line of
+written it is shown instead, because a marker inside a fenced block is a line of
 code:
 
 ```
-<!-- v-click -->
+::click
 ```
 
-A comment that is neither a marker on a line of its own nor the last thing on the
-slide is a failure, naming the two spellings that would have worked.
+A comment that is neither of this format's two spellings, nor the last thing on the
+slide, is a failure naming the two spellings that would have worked.
 
 ---
 
-# The last comment on a slide
+# The speaker note for this slide
 
-A comment that runs to the end of a slide is its speaker note, so a directive
-written in that position is a note rather than a refusal. Open the notes pane to
-read what this one was taken as.
+`::note` and a closing `::` carry what the presenter reads rather than what the
+audience sees. Open the notes pane to read what this one was taken as.
 
-<!-- v-if="$clicks > 1" -->
+::note
+
+This line never reaches the slide. The deck's content is everything before the
+opener, and the closing `::` ends the note.
+
+::
+
+---
+
+# What a comment is now
+
+A deck written for another tool can carry an HTML comment, and converting it
+stops rather than drawing the comment on the slide.

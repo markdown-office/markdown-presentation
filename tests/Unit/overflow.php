@@ -83,11 +83,11 @@ it('reports one entry for a run of paragraphs, because it is one shape', functio
 });
 
 it('names the slide and the step a block overflowed on', function () {
-    // A `v-click` build-up puts the same blocks on several slides, and step 2 is where the
+    // A `::click` build-up puts the same blocks on several slides, and step 2 is where the
     // second block arrives — so "slide 1" on its own does not say which drawing of that
     // slide ran out of room.
     $overflows = overflowing(
-        "# One\n\n" . str_repeat(FILLER, 20) . "<!-- v-click -->\n\n" . str_repeat("More.\n\n", 20),
+        "# One\n\n" . str_repeat(FILLER, 20) . "::click\n\n" . str_repeat("More.\n\n", 20),
     )->overflows();
 
     expect(array_column($overflows, 'slide'))->toBe(array_fill(0, count($overflows), 1))

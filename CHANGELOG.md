@@ -6,7 +6,72 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Steps are `::click`, regions are `:::click`, and notes are `::note`.** **Breaking.** A deck
+  written with `<!-- v-click -->` no longer builds: an HTML comment is now refused with a
+  message naming the two spellings this format does have. Nothing else about a deck changes.
+
+  | Was | Now |
+  | --- | --- |
+  | `<!-- v-click -->` on a line of its own | `::click` on a line of its own |
+  | `<!-- v-click=3 -->` | `::click=3` |
+  | — | `:::click` … `:::` — everything between is one step of its own |
+  | an HTML comment after a slide's last line | `::note` … `::` |
+
+  A region is new, and is what `BlockParser` refused with "honouring that here would mean
+  splitting one list block into several, which is a different feature". It is that feature:
+  the opener names its step through the same `jump()` a bare marker uses and the contents are
+  read by the same walk, so there is one step counter and the two forms cannot drift. Two
+  colons and three cannot collide — `::click` is not `:::click` in either direction — which
+  is asserted rather than reasoned about in the suite.
+
+  A region nothing closes, a `:::` with nothing to close, and a `::note` nothing closes are
+  all failures naming the spelling that would have worked, rather than a deck drawn one step
+  short or three colons printed on a slide.
+
+  `Document\DeckParser::MARKER_BODY` is **gone**. It was the shape of a comment that is a
+  step, and there is no comment that is a step any more. `Document\DeckParser::dialect()`
+  answers differently too, and is a doctested example on the README.
+
+  Notes are `::note` … `::` rather than a trailing comment for one reason: leaving them as
+  comments would make "no HTML in this format" unsatisfiable. A note now has explicit fences,
+  so `DeckParser` tracks it across lines the way it tracked a comment — a `---` or a fence
+  inside one cannot split the deck — and two notes on one slide are one note carrying both,
+  because a `.pptx` slide has one notes pane.
+
+  **This is the one decision in the change the library did not force**, and it is a flag
+  rather than a certainty: `::note` was chosen because a pair of colons reads as a pair of
+  colons and nothing else does. `:::` was already three of them and now means a region
+  closer, so a note that wanted the same shape would have had to share it.
+
+  Six decks in `tests/fixtures/slidev/` now diverge from the real Slidev parser that did not
+  before, and four new entries are in `divergences.json` with the reason. The recording is
+  untouched: it is what Slidev did, and this is where the two differ.
+
 ### Fixed
+
+- **Six claims in the README were false.** Each was checked by running the thing rather than by
+  reading the page, and each is now held in `tests/Unit/dead-code.php` so it cannot come back.
+  The phrases are named there rather than quoted here: this file is read by the same guard.
+
+  | Was | Now |
+  | --- | --- |
+  | five layout roles, where the example thirty lines above printed all eight | all eight |
+  | a paragraph's spacing following every wrapped line | following every *break* — a newline or a paragraph mark, never a wrap. Reversed by `f9d1642`; the README was never updated, and this is the one that matters, because it told a reader a frame is taller than the library draws it |
+  | a step marker closing a list item being quietly ignored | refused, naming the mistake. The Notes below said this line wanted rewording; here it is |
+  | a byte count two sizes too large, in the README and in `MAX_STEP`'s own docblock | the real one, and this entry's attribution corrected |
+  | a twenty-digit step written in the present tense as hanging the process | refused at `jump()`. Past tense: hanging was the behaviour before the ceiling |
+  | every colour reaching a shape through the master's colour map | not every: `heading-ink: accent` paints a heading `accent1`, and bullets and rules take `accent1` outright |
+
+  `:::` was refused by `UnknownDirective::container()` and documented nowhere on the page. It is
+  now, beside the frontmatter's closed directive list, with an example that runs.
+
+- **The claims guard was case-sensitive, so the README walked past it.** The ban on a marker
+  closing a list item sat directly beneath a README sentence that began the same phrase with a
+  capital, and `str_contains()` matched only the lowercase one. Every sentence a claim lives in
+  begins with a capital often enough that this is not a rare accident; it is the shape of prose.
+  Matching folds the case now.
 
 - **A template's *Title and Content* lost its body.** `TemplateGeometry` keyed a placeholder by
   the `type` attribute as written, so PowerPoint's ordinary content placeholder — written
@@ -26,7 +91,7 @@ All notable changes to this project are documented here. The format follows
   the two decks in `tests/fixtures/powerpoint/`, which PowerPoint authored and saved, both
   fail without it.
 
-- **32 bytes of deck asked for half a billion slides.** `<!-- v-click=500 -->` rendered 500
+- **27 bytes of deck asked for two billion slides.** `<!-- v-click=500 -->` rendered 500
   slides in 0.1s and 0.6MB, and the relationship is linear, so
   `<!-- v-click=2147483647 -->` asked for 2.1 billion. On 64-bit,
   `v-click=99999999999999999999` saturates `(int)` to `PHP_INT_MAX`, and the loop
@@ -297,6 +362,64 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`PresentationRenderer` did three jobs.** Twenty-seven methods, of which six were neither
+  parsing a deck nor drawing a slide:
+
+  - **`save()` is `Render\DeckWriter::save()`.** One caller, the only method that touched
+    `IOFactory`, and the only one that invoked the two passes over the written package.
+    `PlaceholderPass` and `NotesColourMapPass` are two `final` classes in the same directory
+    that exist to be exactly that shape, and this is the third instance of a pattern the
+    directory established twice.
+  - **`slideMaster`, `master`, `layouts`, `properties` and `text` are `Render\MasterLayouts`.**
+    The first three were the sole users of seven PHPPresentation imports between them, and
+    `text()` was a `private static` with three callers inside one method.
+
+  Nineteen, six and one. `php:S1448` is closed on the renderer.
+
+  Two of the seven did not fit the same seam and were folded instead. `checkRole()` had one
+  caller three lines away and is now the branch it was; `opensSecondColumn()` was a
+  one-line predicate with one caller and is now the condition it guards. Six moved out and
+  two folded is twenty-one, which is still over the ceiling — the point is that each of the
+  eight was a thing a reader could not have named from the file.
+
+  `MAX_SLIDES` stays, and `$overflows` stays: both are the renderer's own state, reset and
+  appended by `render()` and `overflow()` and read by the public `overflows()`. The sink
+  travels with the methods that write it or it has to be passed in and back out again, which
+  is worse than keeping it.
+
+  Every line of both extractions was already asserted through the renderer — the notes
+  colour map in `tests/Unit/notes-colour-map.php`, the layout placeholders in
+  `tests/Unit/placeholders.php`, the page size in `tests/Unit/rendering.php` and the refusal
+  for a path whose directory is not there in the same file — so this is a refactor with no
+  new test, and 764 passing is the evidence it changed no behaviour.
+
+- **`Theme` was one class doing two jobs.** Six of its twenty-three methods read a `theme.yml`
+  and nothing else: `mapping`, `readDark`, `readColours`, `readFonts`, `text` and
+  `colourNames`. They are now `Theme\ThemeMapping`, on the same seam `Style` already draws from
+  `StyleMapping` — the bounds belong to the file and the value object never sees one. Seventeen
+  and eight methods, and `php:S1448` is closed on the class.
+
+  `ALIASES` is consulted by two callers and lives with the file rather than being copied: the
+  accessor `colour()` asks `ThemeMapping::slot()`, because a caller may hold either spelling of
+  a slot and that map is a fact about what a file may say. `COLOURS` and `FONTS` did **not**
+  travel, deliberately: they name what `Theme::colours()` and `fonts()` are keyed by, and the
+  renderer writes the colour scheme straight off `Theme::COLOURS`, so moving them would have
+  meant either breaking that or keeping a second copy. `Theme::COLOURS` is the one list and
+  `ThemeMapping` holds a file to it.
+
+  `Theme::__construct()` is now public, which is what `StyleMapping::read()` has always been
+  able to do with `Style`: a theme built in code is held to the types alone, and a theme
+  written in one is where the bounds apply.
+
+- **How this library is developed moved to `CONTRIBUTING.md`.** Conformance, the rendering
+  slice, rendering in the real PowerPoint and why Word is not an alternative were ~130 lines
+  of the README that answer "how do I work on this" rather than "what does it do", and the
+  page's contract is that its examples run — which is worth more on a shorter page. The README
+  keeps four lines and a link; `tests/Unit/dead-code.php` reads the new file as well, so a
+  claim that moves out cannot get wrong over there. `Templates` and `Using your own deck as the
+  template` are one section now rather than two, and kept every example and every claim they
+  had. No doctested case was lost: `tests/Readme/` was 56 cases before and is 57 now.
+
 - **A run of paragraphs and lists is one shape, because editing one box is what a
   PowerPoint user does.** Every Markdown block used to be written as a shape of its own, so
   a slide whose body was three paragraphs and a list carried four or five text boxes side by
@@ -323,27 +446,25 @@ All notable changes to this project are documented here. The format follows
   other of its two places, and counted once rather than twice.
 
 - **A frame is measured the way PowerPoint lays its paragraphs out, which is not where the
-  spacing is written.** PowerPoint puts a paragraph's spacing after every line of the frame
-  rather than after the paragraph it was written on, so a paragraph that wraps to three lines
-  is three lines of leading plus two gaps. Measured rather than assumed, by asking PowerPoint
-  to lay a frame out and report the height it came back with: a frame of three paragraphs of
-  three lines came back 63.6pt taller with 9pt written on two of them, which is seven gaps of
-  9pt and not the two a reader would expect. The same holds for `spcBef`, for spacing
-  inherited from a list style rather than written on the paragraph, and for a line spacing
-  written as a percentage or as a point measure — so it is the spacing, not how it is written.
-  LibreOffice applies the same file per paragraph.
+  spacing is written.** PowerPoint spends a paragraph's spacing after every *break* the text
+  contains — a newline inside a paragraph, or the mark between two paragraphs — and not after
+  a line the text merely wrapped onto. Measured rather than assumed, by asking PowerPoint to
+  lay a frame out and report the height it came back with, and by reading the line positions
+  out of the PDF it exported: a paragraph written over four source lines and wrapped to seven
+  by its face came back with a gap after each of its three newlines and none after any of the
+  four times it wrapped.
 
-  `ShapeWriter::height()` therefore measures a frame with a gap after every line but the last.
-  Measured per paragraph it was a line short for every line that wrapped in it, and
+  `ShapeWriter::height()` therefore counts a break per break rather than a line per line.
   PowerPoint does not shrink the type to fit the box it was given — the `normAutofit` this
-  library writes does not shrink at load — so the text was drawn over whatever the layout put
-  below the frame, which is the one failure this change exists to remove.
+  library writes does not shrink at load — so a frame measured a gap out is a frame whose
+  text is drawn over whatever the layout put below it, which is the one failure this change
+  exists to remove.
 
-  The cost is that body text is looser inside a frame than it was as a shape per paragraph,
-  and a slide that used to fit may not: four of the example decks now clamp where they did
-  not. The renderer says so through the overflow report rather than overlapping. A frame that
-  does not fit is one clamped shape and one entry in that report, where there used to be an
-  entry per block.
+  An earlier draft of this entry claimed the gap followed every *line*, which is what a deck
+  written in a face that wraps looks like and is not what PowerPoint does: Georgia wraps and
+  Calibri does not, so per-line and per-break agree on every unwrapped line and diverge on
+  every wrapped one. `tests/Unit/rendering.php` now asserts the arithmetic either way, and
+  `tests/Unit/dead-code.php` holds the sentence so it cannot come back.
 
 - **The refusal for an unreadable notes slide could only be tested on some machines.** The
   test that proves the pass refuses rather than writing a part back as zero bytes corrupted
@@ -727,6 +848,20 @@ measured; and places where what the deck said did not survive into the file.
   plain strings assert the runs instead.
 
 ### Notes
+
+- **`ShapeWriter` is not split and `php:S1448` stays open on it.** Thirty-seven methods is the
+  one finding this release leaves red, and it is left red on purpose: `columns()` and
+  `rowHeights()` are each read by the half of the class that measures a table and the half that
+  draws it, `HEADER_ROW` by both, and `bodySize()` by the frame's height, a paragraph's line
+  count and the runs both draw. Those are four places a split has to cut, and each is a place
+  where the seam runs through a fact two methods must agree on — the failure is a table whose
+  drawn cells do not match the room they were measured for, which is the same silent gap as
+  the one measure-and-draw kept in one object to prevent.
+
+  The reason is now in the class docblock, where somebody deciding whether to split it will
+  read it, and `tests/Unit/dead-code.php` checks it is still there: a finding that stays red
+  with no argument next to it reads as an oversight, and the next person to see it will either
+  fix it or silence it.
 
 - `accent1` is still written as `a:srgbClr` and not as an `a:schemeClr` naming the slot, so
   re-theming a deck in PowerPoint changes the swatches its colour picker offers and does not

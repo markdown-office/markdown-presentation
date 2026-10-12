@@ -177,58 +177,70 @@ it('carries an HTML comment across lines without watching the delimiters on them
     expect(contents("<!-- a --><!--\nb\n-->\n\n# One\n"))->toBe(["<!-- a --><!--\nb\n-->\n\n# One"]);
 });
 
-it('reads a trailing HTML comment as the speaker note', function () {
-    $deck = (new DeckParser())->parse("# One\n\n<!--\nthe note\n-->\n");
+it('reads a ::note block as the speaker note', function () {
+    $deck = (new DeckParser())->parse("# One\n\n::note\nthe note\n::\n");
 
     expect($deck->slides()[0]->note())->toBe('the note')
         ->and($deck->slides()[0]->content())->toBe(ONE);
+});
+
+it('does not read a delimiter inside a note as a delimiter', function () {
+    // The same rule the fence and the HTML comment have, and for the same reason: a line of
+    // the notes pane is not a slide delimiter however much of a delimiter it looks like.
+    // Asserted on `raw` rather than `content` because the note has already been taken off
+    // the content by this point, and what is being checked is that the walk never split.
+    expect(split("# One\n\n::note\n---\n::\n")[0])
+        ->toMatchArray([
+            'raw' => "# One\n\n::note\n---\n::\n",
+            'content' => ONE,
+            'note' => "---",
+        ]);
+});
+
+it('carries a note across the fence inside it, so the fence does not end the split', function () {
+    // The fence branch and the note are both state the walk keeps, and a fence written
+    // inside a note is the one line that has to reach neither.
+    expect(split("# One\n\n::note\n```\n---\n```\n::\n")[0]['raw'])
+        ->toBe("# One\n\n::note\n```\n---\n```\n::\n");
 });
 
 it('reads a frontmatter block holding nothing but a comment as an empty block', function () {
     expect(split("---\n# nothing configured\n---\n\n# One\n")[0]['frontmatter'])->toBe([]);
 });
 
-it('reads no note from a closing marker with no comment around it', function () {
-    // The marker ends a note, but a note needs an opening marker too: a deck with a
-    // stray `-->` loses nothing rather than losing everything in front of it.
-    expect(split("# One\n\n-->\n")[0])->toMatchArray(['note' => null, 'content' => "# One\n\n-->"]);
+it('reads no note from a closing :: with nothing opening it', function () {
+    // A note needs an opener too: a deck with a stray `::` loses nothing rather than
+    // losing everything in front of it. The renderer refuses the stray one.
+    expect(split("# One\n\n::\n")[0])->toMatchArray(['note' => null, 'content' => "# One\n\n::"]);
 });
 
-it('leaves a comment in the middle of a slide in the content', function () {
-    expect(split("# One\n\n<!-- mid -->\n\nBody\n")[0]['note'])->toBeNull();
+it('reads no note from a ::note that nothing closes', function () {
+    // Taken as a note it would swallow the rest of the deck; left in the content it is a
+    // line of prose, and the renderer is what says it is neither.
+    expect(split("# One\n\n::note\nnote\n")[0])
+        ->toMatchArray(['note' => null, 'content' => "# One\n\n::note\nnote"]);
 });
 
-it('reads no note from a comment that does not reach the end of the slide', function () {
-    expect(split("# One\n\n<!--\nnote\n-->\n\nafter\n")[0]['note'])->toBeNull();
+it('reads no note from a closing :: with nothing opening it, in the middle of a slide', function () {
+    expect(split("# One\n\nBody\n\n::\n\nMore\n")[0]['note'])->toBeNull();
 });
 
-it('reads a trailing step marker as a marker rather than as a note', function () {
-    // It runs to the end of the slide because there is nothing after it, which is the whole
-    // of what made this look like a note: the deck lost a step and the notes pane gained the
-    // literal text "v-click".
-    expect(split("# One\n\nFirst.\n\n<!-- v-click -->\n")[0])
-        ->toMatchArray(['note' => null, 'content' => "# One\n\nFirst.\n\n<!-- v-click -->"]);
-});
-
-it('reads a trailing numbered step marker as a marker too', function (string $markdown) {
-    // Two of these are not steps this renderer can draw. Refusing them is its job and names
-    // the mistake; taking them as a note would hide it.
-    expect(split($markdown)[0])->toMatchArray(['note' => null]);
-})->with([
-    'named step' => "# One\n\n<!-- v-click=3 -->\n",
-    'a step that is not a number' => "# One\n\n<!-- v-click=two -->\n",
-    'an equals with nothing after it' => "# One\n\n<!-- v-click= -->\n",
-]);
-
-it('reads a note that only mentions a step marker as a note', function () {
-    // The note is a note because of what it says, not because of a word somewhere in it: a
+it('reads a note that mentions a step marker as a note', function () {
+    // The note is a note because of its fences, not because of a word somewhere in it: a
     // presenter who writes "click through to the last one" in the notes pane has written a
-    // note, and taking it for a marker would drop it.
-    expect(split("# One\n\n<!-- click v-click again to reveal the rest -->\n")[0])
+    // note, and reading it for a marker would drop it.
+    expect(split("# One\n\n::note\nclick ::click again to reveal the rest\n::\n")[0])
         ->toMatchArray([
-            'note' => 'click v-click again to reveal the rest',
+            'note' => 'click ::click again to reveal the rest',
             'content' => ONE,
         ]);
+});
+
+it('reads a note that carries markup as the text of it', function () {
+    // Markdown, so `**bold**` arrives at the notes pane with the asterisks still on it:
+    // PowerPoint's notes pane takes a string, not a deck, and this is what the deck wrote.
+    expect(split("# One\n\n::note\nSay **this**.\n::\n")[0])
+        ->toMatchArray(['note' => 'Say **this**.']);
 });
 
 it('takes the title from the frontmatter, then from a name, then from the first heading', function () {

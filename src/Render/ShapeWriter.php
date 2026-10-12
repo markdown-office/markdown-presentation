@@ -35,6 +35,17 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
  * pass and a shape drawn by another drift apart the first time somebody edits one of them,
  * and the drift shows up as a gap rather than as a failure.
  *
+ * That is also the answer to the obvious question about a class this size, and it is worth
+ * having written down: this is not split, and `php:S1448` is open on it on purpose. The
+ * crossings that make it one thing are visible in the calls rather than in the headings —
+ * `columns()` and `rowHeights()` are each read by the measure half *and* the draw half, and
+ * `HEADER_ROW` by both halves of the table, so a column width or a row height decided once in
+ * each place is a table whose drawn cells do not match the room they were measured for.
+ * `bodySize()` is the same crossing for text: the height of a frame, the line count of a
+ * paragraph and the runs both of them draw all read it. Those are the places a split would
+ * have to cut, and each is a place where the seam runs through a fact two methods must agree
+ * on.
+ *
  * Every shape is named after the kind of thing it was drawn from, so the whole mapping can be
  * read off `ppt/slides/slideN.xml` without opening the library. A {@see TextFrame} is the one
  * shape drawn from several blocks at once, and it is named for what it holds rather than for
