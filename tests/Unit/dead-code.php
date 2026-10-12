@@ -247,6 +247,13 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a deck of markers asks for more written slides than it has' => 'asks for 800 written slides',
     'a build-up is measured once per step' => 'each revealing everything the one before it had',
     'the two passes over the written package' => 'runs the two passes over it',
+    // Columns divided at a `##` until `::column` said otherwise. The phrase is the sentence
+    // the README, the gallery and the renderer's own docblock all gave as the reason, and
+    // none of them can now: a heading is an ordinary heading. `CHANGELOG.md` has to be able
+    // to name what a two-column deck used to be written in, so the phrase is the reasoning
+    // rather than the spelling — the entry says the slide divided at its first `##` without
+    // claiming that a heading divides anything.
+    'a heading is what puts a block in the next column' => 'a writer puts on a column of a slide',
 ]);
 
 it('has no decorative dividers in it', function () {

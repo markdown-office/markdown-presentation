@@ -8,6 +8,39 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`::column` moves the blocks after it into the next column.** **Breaking.** A two-column
+  slide no longer divides at its first `##`, because that is no longer how a column is
+  reached.
+
+  | Was | Now |
+  | --- | --- |
+  | `## Anything` divided a `two-column` or `image-text` slide in half | `::column` on a line of its own does |
+  | a `##` stayed in the first column when the slide had more than two | a `##` is an ordinary heading, in whichever column it is written |
+  | one `##` per slide: a second one was just another heading | one marker per column: a second one moves to the next |
+  | a role with one column ignored the `##` and drew everything in one column | refused, naming the role and how many columns it has |
+
+  The marker takes no argument. It means "the next column", which is the one direction a
+  block can move in, and it moves no step: a build-up written across two columns spends the
+  same clicks it would on one column. `::click` and `::column` share two colons and neither
+  is a prefix of the other, so the pair is checked in the suite in both directions rather
+  than reasoned about.
+
+  A column nothing was written in is still not an error. The alternative is guessing which
+  block was meant to be in it, which is the guess this library refuses everywhere else; a
+  deck that asked for a layout with columns and wrote one of them has said what it wants.
+
+  **A `::column` on a role with fewer columns than the deck asks for is a new failure**,
+  `Exception\UnsupportedColumn`, and it extends `InvalidInput`: the marker is well formed and
+  the slide is what cannot offer the column, which is the same shape as `UnsupportedLink` and
+  `UnsupportedImageFormat` rather than `UnknownMarker`. The message names the slide, the role
+  and how many columns it has. One refusal covers both ways of hitting it — a marker on a
+  one-column role, and a third marker on a two-column slide.
+
+  The column travels out of the parser as `Render\SlideBlocks`, the blocks and the column
+  each was written for in two lists of one length rather than a property on every block
+  class. `Render\PresentationRenderer::columns()` now reads what the parser recorded, and
+  `Render\BlockParser::parse()` returns that object.
+
 - **A step is an animation on one slide, not a slide of its own.** **Breaking.** A deck using
   `::click` now contains fewer slides: the markdown is unchanged and the file is a build-up
   rather than a run of copies of the same slide.
@@ -96,6 +129,24 @@ All notable changes to this project are documented here. The format follows
   untouched: it is what Slidev did, and this is where the two differ.
 
 ### Fixed
+
+- **A template-backed column was laid out and left empty.** `PresentationRenderer::splits()`
+  asked the geometry the constructor was handed rather than the merged one `render()` builds,
+  so a theme whose `template.pptx` gives a role two body placeholders was asked how many
+  columns it had and answered with the library's own count. A two-column role came back
+  "does not divide": the second box was laid out and no block was ever put in it, and nothing
+  anywhere said so. Reproduced against the code before this change with `content` mapped onto
+  *Two Content* — every shape at the first column's `x`, the second column's `x` unused.
+
+  The column count now comes from the merged geometry, which is what carries the template's
+  boxes as well as the theme's type. `::column` would have made it worse rather than better:
+  the first deck to write the marker on a template-backed role would have been refused, or
+  ignored, because of the same wrong question.
+
+  `splits()` is gone with it — there is no longer a rule to ask whether it divides — and so is
+  the constructor's `SlideGeometry` argument, which nothing read but that one method. A caller
+  passing it positionally gets an `ArgumentCountError` rather than a geometry that was
+  promised and never used.
 
 - **Six claims in the README were false.** Each was checked by running the thing rather than by
   reading the page, and each is now held in `tests/Unit/dead-code.php` so it cannot come back.

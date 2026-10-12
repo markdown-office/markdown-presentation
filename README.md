@@ -71,7 +71,7 @@ What the splitter produced, read through the API:
 ```php
 use MarkdownPresentation\Document\DeckParser;
 
-$deck = (new DeckParser())->parse("---\ntitle: Deck\n---\n\n# One\n\n---\nlayout: two-column\n---\n\n## Left\n");
+$deck = (new DeckParser())->parse("---\ntitle: Deck\n---\n\n# One\n\n---\nlayout: two-column\n---\n\n## Left\n\n::column\n\nRight.\n");
 
 echo $deck->frontmatterValue('title'), "\n";
 echo $deck->count(), " slides\n";
@@ -457,7 +457,7 @@ slide layout part per role the deck used, carrying the theme's name for it:
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Render\PresentationRenderer;
 
-$deck = (new DeckParser())->parse("---\nlayout: two-column\n---\n\n# Both\n\nLeft.\n\n## Right\n\nRight side.\n");
+$deck = (new DeckParser())->parse("---\nlayout: two-column\n---\n\n# Both\n\nLeft.\n\n::column\n\n## Right\n\nRight side.\n");
 $path = sys_get_temp_dir() . '/deck.pptx';
 (new PresentationRenderer())->render($deck, $path);
 
@@ -476,13 +476,41 @@ Two Content
 text heading text
 ```
 
-Two columns divide at the first `##` in the body, because that is the heading a writer puts
-on a column of a slide and there is nothing else to go on. A deck that never writes one fills
-the left column and leaves the right empty, which is honest: it asked for two columns and
-wrote one.
+`::column` on a line of its own moves everything below it into the next column. It is
+the only way there is: a `##` is an ordinary heading and stays in whichever column it is
+written, so the heading in the example above is drawn in the right one because the marker is
+above it and not because of anything about the heading. There is no argument and no way
+backwards — the marker means "the next column", which is the one direction a block can move
+in.
 
-The two `text` shapes are the paragraphs either side of the `##`, one shape each — see
+A deck that never writes one fills the first column and leaves the rest empty, which is
+honest: it asked for a layout with columns and wrote one of them.
+
+The two `text` shapes are the paragraphs either side of the marker, one shape each — see
 [What a slide becomes](#what-a-slide-becomes).
+
+A marker the layout cannot offer — one on a `content` slide, or a third on a two-column one —
+is a failure naming the role and how many columns it has, because the slide is what is
+missing them rather than the marker:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+try {
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse("# One\n\nLeft.\n\n::column\n\nRight.\n"),
+        sys_get_temp_dir() . '/deck.pptx',
+    );
+} catch (Exception $failure) {
+    echo get_class($failure), ": ", $failure->getMessage(), "\n";
+}
+```
+
+```text
+MarkdownPresentation\Exception\UnsupportedColumn: Slide 1 has a "::column", and the "content" layout has 1 column. "::column" moves the blocks after it into the next column, so a slide that uses one needs a layout with more columns than this.
+```
 
 The eight roles are `title`, `content`, `two-column`, `section`, `blank`, `image-text`,
 `image-title` and `image-slide`. Only the ones a deck uses are built, so a theme that maps two
@@ -503,8 +531,8 @@ a template can supply the boxes for each, and *Reset* restores them:
 | `image-title` | A large picture under a headline | One | Yes |
 | `image-slide` | The picture alone, full bleed | One, the whole page | No |
 
-`image-text` divides at the first `##` exactly as `two-column` does, so the picture — everything
-above the heading — is the left column. Its two columns are separated by the same gutter a
+`image-text` divides at a `::column` exactly as `two-column` does, so the picture — everything
+above the marker — is the left column. Its two columns are separated by the same gutter a
 bullet is from its text, not by a gap of its own, and the text column is wider than a picture's
 share of the page would suggest: `ShapeWriter` estimates wrapping from a table of Helvetica's
 widths and a theme's own face is wider than that, so a column narrow enough to need the
@@ -659,6 +687,10 @@ writes. *Two Content* has two columns, so a `two-column` slide gets two; *Pictur
 numbers its picture placeholder `idx="1"` and its caption `idx="2"`, so the picture goes in the
 first column and the caption under it.
 
+The number of placeholders is also the number of columns a role has, whatever the role is
+called: map `content` onto *Two Content* and a `::column` on a content slide splits it, because
+that is how many boxes the layout has.
+
 So the theme directory is the template plus the two files that name it:
 
 ```
@@ -699,7 +731,13 @@ Two colons for a boundary, three for a region:
 | `::click` | everything after it is the next step |
 | `::click=3` | everything after it is step three |
 | `:::click` … `:::` | everything between them is one step of its own |
+| `::column` | everything after it is in the next column |
 | `::note` … `::` | a speaker note, taken off the slide |
+
+`::click` and `::column` share two colons and neither is a prefix of the other, so a step
+marker is a step marker and a column marker is a column marker; the suite asks both directions
+rather than reasoning about them. `::column` moves no step, which is why a build-up written
+across two columns spends the same clicks it would on one column.
 
 A step is a click in a build-up on **one** slide. Every block of the slide is written onto it
 at once, and the steps a reader clicks through are written as a PowerPoint animation that
@@ -1058,7 +1096,7 @@ file where a whole one was expected.
 
 ### In the body of a slide
 
-This format is Markdown and two pairs of colons. Slidev nests content in a step comment, a
+This format is Markdown and pairs of colons. Slidev nests content in a step comment, a
 `v-*` element and a `:::` container fence, and neither of the other two lands where a person
 would read prose — so both are failures naming the spelling that would have worked, rather
 than shapes carrying the directive's own text. An HTML comment is refused too, because a step

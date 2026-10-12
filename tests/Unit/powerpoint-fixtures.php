@@ -206,7 +206,7 @@ it('draws both columns of a two-content slide where a real deck puts them', func
     $path = Scratch::file('two-columns.pptx', '');
 
     (new PresentationRenderer())->render(
-        (new DeckParser())->parse("---\ntheme: {$theme}\nlayout: two-column\n---\n# Both\n\nLeft.\n\n## Right\n\nRight side.\n"),
+        (new DeckParser())->parse("---\ntheme: {$theme}\nlayout: two-column\n---\n# Both\n\nLeft.\n\n::column\n\nRight side.\n"),
         $path,
     );
 
@@ -214,7 +214,7 @@ it('draws both columns of a two-content slide where a real deck puts them', func
 
     expect($shapes[1]['x'])->toBe(53.0)
         ->and($shapes[1]['width'])->toBe(329.0)
-        ->and($shapes[3]['x'])->toBe(401.0);
+        ->and($shapes[2]['x'])->toBe(401.0);
 });
 
 it('leaves a role whose layout the deck does not have where the library puts it', function () {

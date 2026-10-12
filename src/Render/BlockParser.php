@@ -21,7 +21,8 @@ use MarkdownPresentation\Render\Block\Table;
 
 /**
  * The block structure of a slide: its headings, paragraphs, lists, code, tables, quotes,
- * rules and images, in the order they were written and each on the step it appears.
+ * rules and images, in the order they were written, each on the step it appears and each in
+ * the column it was written for.
  *
  * One line-based pass, because the deck has already been split into slides and this only
  * has to describe what is inside one. The grammar is the subset a slide actually uses, and
@@ -53,6 +54,9 @@ final class BlockParser
 
     /** The step a slide with no marker in it is drawn at, which is every step's starting point. */
     private const FIRST_STEP = 1;
+
+    /** The column a slide with no marker in it is written for, which is the first of them. */
+    private const FIRST_COLUMN = 0;
 
     /** The opening fence of a code block. Capture 1 is the character and run. */
     private const FENCE = '/\A {0,3}(`{3,}|~{3,})(.*)\z/';
@@ -100,6 +104,22 @@ final class BlockParser
 
     /** The line a region closes on. Three colons and nothing else. */
     private const CLOSES_REGION = '/\A[ \t]*:::[ \t]*\z/';
+
+    /**
+     * A column boundary: `::column` alone on a line, and everything after it belongs to the
+     * next column.
+     *
+     * Two colons and the line has to be nothing but the marker, which is what {@see self::MARKER}
+     * asks of a step. Neither is a prefix of the other: after `::click` this pattern wants
+     * `column` and the marker wants `click`, and neither line matches the other — so a step is
+     * still a step and a column switch is still a column switch, which is checked in the suite
+     * rather than reasoned about, because the pair is the whole two-colon grammar.
+     *
+     * No capture and no argument, because the marker means one thing: the next column. A
+     * column named as a number would be a way to move backwards, and a block cannot go back to
+     * a column it has already been read out of.
+     */
+    private const COLUMN = '/\A[ \t]*::column[ \t]*\z/';
 
     /** A note opener {@see \MarkdownPresentation\Document\DeckParser} did not take off the slide. */
     private const NOTE = '~^[ \t]*::note[ \t]*$~m';
@@ -153,24 +173,24 @@ final class BlockParser
     }
 
     /**
-     * The blocks of one slide's content.
+     * The blocks of one slide's content, and the column each was written for.
      *
      * `$slide` and `$directory` are for the failures, and `$files` is the policy behind half
      * of them: an image that does not resolve, one that resolves outside the directories the
      * caller allowed, and a step that goes backwards are all read out of a slide its author
      * can go and find.
      *
-     * The union rather than {@see Block}, because it is the whole of what this method
-     * makes: a caller that adds a ninth kind of block has to say here that it is one.
-     *
-     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
+     * A {@see SlideBlocks} rather than a list of blocks because a `::column` is the deck's
+     * opinion about where a block belongs, and the parser is the only half of this library
+     * that sees it. The renderer decides whether the slide's layout has that column; the
+     * union of block kinds is the object's to carry.
      *
      * @throws ImageNotFound
      * @throws UnknownDirective
      * @throws UnknownMarker
      * @throws UnsupportedImageFormat
     */
-    public function parse(string $content, int $slide, string $directory, PathScope $files): array
+    public function parse(string $content, int $slide, string $directory, PathScope $files): SlideBlocks
     {
         $lines = explode("\n", str_replace("\r\n", "\n", $content));
 
@@ -179,24 +199,31 @@ final class BlockParser
         // less literally than one standing on a line of its own.
         self::refuse($slide, self::prose($lines));
 
-        return $this->blocks($lines, $slide, $directory, $files, self::FIRST_STEP);
+        return $this->blocks($lines, $slide, $directory, $files, self::FIRST_STEP, self::FIRST_COLUMN);
     }
 
     /**
-     * The walk itself, at a step the caller has already reached.
+     * The walk itself, at a step and a column the caller has already reached.
      *
      * A method of its own rather than the body of {@see self::parse()} because a region is
      * read by calling this again with the lines between its fences and the step its opener
      * named, and a slide has one walk and not one per region — a `::click` written inside a
-     * region moves the same counter from the step the region opened at.
+     * region moves the same counter from the step the region opened at. A region is a step
+     * boundary and not a column boundary, so what it holds stays in the column it was written
+     * in.
      *
      * @param list<string> $lines
-     *
-     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
      */
-    private function blocks(array $lines, int $slide, string $directory, PathScope $files, int $step): array
-    {
+    private function blocks(
+        array $lines,
+        int $slide,
+        string $directory,
+        PathScope $files,
+        int $step,
+        int $column,
+    ): SlideBlocks {
         $blocks = [];
+        $columns = [];
         $quote = [];
         $paragraph = [];
 
@@ -220,16 +247,20 @@ final class BlockParser
                 // everything inside is one step of its own, so the opener names that step
                 // through the same jump a bare marker does.
                 $end = self::closingRegion($lines, $index, $slide);
-                $this->flush($blocks, $quote, $paragraph, $step);
+                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
                 $step = self::jump($slide, $region[1] ?? null, $step);
 
-                array_push($blocks, ...$this->blocks(
+                $inside = $this->blocks(
                     array_slice($lines, $index, $end - $index),
                     $slide,
                     $directory,
                     $files,
                     $step,
-                ));
+                    $column,
+                );
+
+                array_push($blocks, ...$inside->blocks());
+                array_push($columns, ...$inside->columns());
 
                 $index = $end + 1;
 
@@ -242,14 +273,26 @@ final class BlockParser
                 // The step opens *after* the block the marker closes. Advancing first would
                 // put the block a writer wrote above the marker on the step below it, which
                 // is the reverse of what the author meant.
-                $this->flush($blocks, $quote, $paragraph, $step);
+                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
                 $step = self::jump($slide, $marker[1] ?? null, $step);
+
+                continue;
+            } elseif (preg_match(self::COLUMN, $line) === 1) {
+                // Whatever is open above the marker belongs to the column it was written in,
+                // so it is closed before the column moves — a paragraph with `::column` in the
+                // middle of it would be one shape drawn in the column it was started in.
+                //
+                // No step moves with it. `jump()` is the only thing in this class that may move
+                // one, and a marker that also opened a step would put a build-up written
+                // across two columns on step two onwards.
+                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
+                $column++;
 
                 continue;
             }
 
             if (trim($line) === '') {
-                $this->flush($blocks, $quote, $paragraph, $step);
+                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
 
                 continue;
             }
@@ -260,7 +303,7 @@ final class BlockParser
             // Only the first of them opens the block — the rest are still inside it.
             if (preg_match(self::QUOTE, $line, $quoted) === 1) {
                 if ($quote === []) {
-                    $this->flush($blocks, $quote, $paragraph, $step);
+                    $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
                 }
 
                 $quote[] = $quoted[1];
@@ -274,8 +317,9 @@ final class BlockParser
             $index = $end + 1;
 
             if ($block !== null) {
-                $this->flush($blocks, $quote, $paragraph, $step);
+                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
                 $blocks[] = $block;
+                $columns[] = $column;
 
                 continue;
             }
@@ -283,9 +327,9 @@ final class BlockParser
             $paragraph[] = trim($line);
         }
 
-        $this->flush($blocks, $quote, $paragraph, $step);
+        $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
 
-        return $blocks;
+        return new SlideBlocks($blocks, $columns);
     }
 
     /**
@@ -333,13 +377,14 @@ final class BlockParser
     }
 
     /**
-     * The slide's own text, with the two things this library acts on left out of it.
+     * The slide's own text, with the things this library acts on left out of it.
      *
-     * Code fences and step markers. A comment inside a fence is a line of code, and a deck
-     * quoting HTML in a code block is the ordinary way to show it — refusing there would be
-     * the loud failure pointed at the wrong line. A marker standing on a line of its own is
-     * the one comment the grammar acts on; one sharing its line with a word is not a marker,
-     * and what is left of that line is what the refusal below is looking at.
+     * Code fences, step markers and column markers. A comment inside a fence is a line of
+     * code, and a deck quoting HTML in a code block is the ordinary way to show it —
+     * refusing there would be the loud failure pointed at the wrong line. A marker standing on
+     * a line of its own is the one comment the grammar acts on; one sharing its line with a
+     * word is not a marker, and what is left of that line is what the refusal below is
+     * looking at.
      *
      * @param list<string> $lines
      */
@@ -356,7 +401,7 @@ final class BlockParser
                 continue;
             }
 
-            if (preg_match(self::MARKER, $lines[$index]) !== 1) {
+            if (preg_match(self::MARKER, $lines[$index]) !== 1 && preg_match(self::COLUMN, $lines[$index]) !== 1) {
                 $prose[] = $lines[$index];
             }
 
@@ -764,13 +809,15 @@ final class BlockParser
      * does, without being one.
      *
      * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     * @param list<int>                                                      $columns The column each block was written for, kept in step with `$blocks` here.
      * @param list<string>                                                   $quote
      * @param list<string>                                                   $paragraph
     */
-    private function flush(array &$blocks, array &$quote, array &$paragraph, int $step): void
+    private function flush(array &$blocks, array &$columns, array &$quote, array &$paragraph, int $step, int $column): void
     {
         if ($quote !== []) {
             $blocks[] = new Quote($this->inline->parse(implode("\n", $quote)), $step);
+            $columns[] = $column;
             $quote = [];
         }
 
@@ -779,6 +826,7 @@ final class BlockParser
         }
 
         $blocks[] = new Paragraph($this->inline->parse(implode("\n", $paragraph)), $step);
+        $columns[] = $column;
         $paragraph = [];
     }
 }

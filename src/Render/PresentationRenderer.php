@@ -16,6 +16,7 @@ use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
+use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Code;
@@ -144,7 +145,6 @@ final class PresentationRenderer
         private readonly string $directory = '.',
         private readonly ThemeResolver $themes = new ThemeResolver(),
         private readonly BlockParser $blocks = new BlockParser(),
-        private readonly SlideGeometry $geometry = new SlideGeometry(),
         private readonly bool $strict = false,
         array $imageRoots = [],
     ) {
@@ -291,7 +291,7 @@ final class PresentationRenderer
      * all — an image that does not resolve, a marker that goes backwards — is a failure with
      * no file written behind it, rather than one found after the first few slides are built.
      *
-     * @return array<int, list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>>
+     * @return array<int, SlideBlocks>
      *
      * @throws ImageNotFound
      * @throws UnknownDirective
@@ -473,10 +473,12 @@ final class PresentationRenderer
      * position in the slide's shape collection and the collection is the only place the
      * number is actually kept.
      *
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
-     * @param array<string, SlideLayout>                                     $layouts
+     * @param SlideBlocks             $content The slide's blocks and the column each was written for.
+     * @param array<string, SlideLayout> $layouts
      *
      * @return array<int, int> Shape id to the step it appears on, in write order.
+     *
+     * @throws UnsupportedColumn
      */
     private function write(
         PhpPresentation $presentation,
@@ -485,12 +487,12 @@ final class PresentationRenderer
         array $layouts,
         ShapeWriter $writer,
         SlideGeometry $geometry,
-        array $blocks,
+        SlideBlocks $content,
     ): array {
         $title = $geometry->title($role);
         $level = $source->frontmatterValue('level');
-        $blocks = $this->underTitle(
-            $blocks,
+        $content = $this->underTitle(
+            $content,
             $source,
             $title !== null,
             $this->depth($level, $source->index() + 1),
@@ -522,7 +524,7 @@ final class PresentationRenderer
             $next++;
         }
 
-        return $this->stack($slide, $blocks, $role, $writer, $source->index() + 1, $geometry, $next);
+        return $this->stack($slide, $content, $role, $writer, $source->index() + 1, $geometry, $next);
     }
 
     /**
@@ -591,19 +593,24 @@ final class PresentationRenderer
      * deep to read it: a blank layout draws its title as a heading, so `level:` would
      * otherwise govern nothing at all there.
      *
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks The slide's blocks, in reading order.
-     * @param ?int                                                        $depth What `level:` named.
+     * The columns go with the blocks rather than being renumbered. The title heading is
+     * wherever the deck wrote it, a `::column` above the slide's only block means column zero
+     * is empty and moving the block into it would be moving it backwards, and a title this
+     * method draws itself is a heading in front of everything the deck wrote, so it takes the
+     * first column.
      *
-     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
+     * @param ?int $depth What `level:` named.
      */
-    private function underTitle(array $blocks, SourceSlide $source, bool $hasTitleBox, ?int $depth): array
+    private function underTitle(SlideBlocks $content, SourceSlide $source, bool $hasTitleBox, ?int $depth): SlideBlocks
     {
         $title = $source->title();
 
         if ($title === null) {
-            return $blocks;
+            return $content;
         }
 
+        $blocks = $content->blocks();
+        $columns = $content->columns();
         $heading = null;
         $at = 0;
 
@@ -625,7 +632,9 @@ final class PresentationRenderer
             // the fifth version of it, after `author:`, `level:`, a trailing marker and a
             // directive in a body. The frontmatter title becomes a heading, which is what a
             // blank slide's title already is.
-            return $hasTitleBox ? $blocks : [$this->titleHeading($title, $depth), ...$blocks];
+            return $hasTitleBox
+                ? $content
+                : new SlideBlocks([$this->titleHeading($title, $depth), ...$blocks], [0, ...$columns]);
         }
 
         $drawn = $heading;
@@ -643,9 +652,14 @@ final class PresentationRenderer
         $blocks[$at] = $drawn;
         $kept = array_values($blocks);
 
-        return $hasTitleBox
-            ? array_merge(array_slice($kept, 0, $at), array_slice($kept, $at + 1))
-            : $kept;
+        if (!$hasTitleBox) {
+            return new SlideBlocks($kept, $columns);
+        }
+
+        return new SlideBlocks(
+            array_merge(array_slice($kept, 0, $at), array_slice($kept, $at + 1)),
+            array_merge(array_slice($columns, 0, $at), array_slice($columns, $at + 1)),
+        );
     }
 
     private function note(WrittenSlide $slide, string $text): void
@@ -671,20 +685,23 @@ final class PresentationRenderer
      * {@see ShapeWriter::write()} adds exactly one shape per call, which is what makes the
      * count and the file agree.
      *
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     * @param SlideBlocks $content The slide's blocks and the column each was written for.
      *
      * @return array<int, int> Shape id to the step it appears on, in write order.
+     *
+     * @throws UnsupportedColumn
      */
     private function stack(
         WrittenSlide $slide,
-        array $blocks,
+        SlideBlocks $content,
         LayoutRole $role,
         ShapeWriter $writer,
         int $number,
         SlideGeometry $geometry,
         int $first,
     ): array {
-        $columns = $this->columns($blocks, $role);
+        $blocks = $content->blocks();
+        $columns = $this->columns($content, $role, $geometry, $number);
         $steps = [];
 
         foreach ($geometry->body($role) as $column => $box) {
@@ -752,36 +769,37 @@ final class PresentationRenderer
     }
 
     /**
-     * Which column each block belongs to.
+     * Which column each block belongs to, once the slide's layout has agreed to them.
      *
-     * Two columns divide at the first heading of the second level, because that is the
-     * heading a writer puts on a column of a slide and there is nothing else to go on. A deck
-     * that never writes one fills the left column and leaves the right empty, which is
-     * honest: it asked for two columns and wrote one.
+     * What the deck wrote, read off the parser rather than guessed here: a `::column` moves
+     * the blocks after it into the next column and nothing else does, so a heading is a
+     * heading and a slide that writes no `::column` fills the first column and leaves the rest
+     * empty. A column nothing was written in is not an error either: the alternative is
+     * guessing which block was meant to be in it.
      *
-     * Both two-column roles divide the same way, so `image-text` reads as the layout it is
-     * named after: the picture and the text before the `##` on the left, everything after it
-     * on the right.
+     * The count is the layout's and not the library's, because the boxes are the fact: a
+     * template that gives a role three body placeholders has made it three columns whatever
+     * the role is called. That is why `$geometry` is the merged one {@see self::render()}
+     * built rather than a fresh {@see SlideGeometry} — the two disagreeing is what laid a
+     * template-backed column out and left it empty.
      *
-     * Decided once for the whole slide rather than per column, because a block that opens the
-     * second column belongs to the second column, and a per-column walk that decided
-     * otherwise after collecting it drew it in both.
-     *
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
+     * One refusal for both ways of asking for a column that is not there: a `::column` on a
+     * role with one, and a third `::column` on a slide with two. Both are the same deck
+     * wanting a layout this one cannot be.
      *
      * @return list<int>
-    */
-    private function columns(array $blocks, LayoutRole $role): array
+     *
+     * @throws UnsupportedColumn
+     */
+    private function columns(SlideBlocks $content, LayoutRole $role, SlideGeometry $geometry, int $slide): array
     {
-        $columns = [];
-        $current = 0;
+        $columns = $content->columns();
+        $available = count($geometry->body($role));
 
-        foreach ($blocks as $block) {
-            if ($this->splits($role) && $current === 0 && $block instanceof Heading && $block->level === 2) {
-                $current = 1;
+        foreach ($columns as $column) {
+            if ($column >= $available) {
+                throw UnsupportedColumn::beyond($slide, $role->value, $available);
             }
-
-            $columns[] = $current;
         }
 
         return $columns;
@@ -811,17 +829,4 @@ final class PresentationRenderer
 
         return $visible;
     }
-
-    /**
-     * Whether a role's blocks are divided between two columns at all.
-     *
-     * Asked of the geometry rather than read off a list of roles, because the boxes are the
-     * fact: a template that gives a role two body boxes has made it two columns whatever the
-     * role is called, and one that gives it one has not.
-     */
-    private function splits(LayoutRole $role): bool
-    {
-        return count($this->geometry->body($role)) > 1;
-    }
-
 }

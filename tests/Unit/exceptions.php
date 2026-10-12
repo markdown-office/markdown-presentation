@@ -18,6 +18,7 @@ use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
 use MarkdownPresentation\Exception\UnreadablePackage;
+use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Exception\UnsupportedLink;
 use MarkdownPresentation\Render\NotesColourMapPass;
@@ -94,6 +95,7 @@ it('reports what a deck author can fix under the class that says so', function (
         UnknownLayoutRole::class,
         UnknownMarker::class,
         UnknownStyleSlot::class,
+        UnsupportedColumn::class,
         UnsupportedImageFormat::class,
         UnsupportedLink::class,
     ];
@@ -202,7 +204,8 @@ it('names a slide and a file in every failure, because the fix is in the message
         ->toContain(LOGO_PATH)
         ->and(ContentOverflow::on(3, 2, 0, 'code', 1150, 396)->getMessage())
         ->toContain('Slide 3')
-        ->and(ContentOverflow::on(3, 2, 0, 'code', 1150, 396)->getMessage())->toContain('code');
+        ->and(ContentOverflow::on(3, 2, 0, 'code', 1150, 396)->getMessage())->toContain('code')
+        ->and(UnsupportedColumn::beyond(4, 'content', 1)->getMessage())->toContain('Slide 4');
 });
 
 it('names the alternatives wherever a failure is a name the author can change', function (string $message, string $alternative) {
@@ -262,6 +265,12 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'an equals with nothing after it' => [
         UnknownMarker::empty(2)->getMessage(),
         'with no number',
+    ],
+    'a column the layout has none to move a block into' => [
+        UnsupportedColumn::beyond(3, 'content', 1)->getMessage(),
+        'Slide 3 has a "::column", and the "content" layout has 1 column. '
+        . '"::column" moves the blocks after it into the next column, so a slide that uses one '
+        . 'needs a layout with more columns than this.',
     ],
     'an image that is not a file' => [
         ImageNotFound::at(1, 'logo.png', LOGO_PATH)->getMessage(),

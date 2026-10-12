@@ -43,15 +43,15 @@ A few of these are here because the render is the only honest evidence:
   rejected because of a stray asterisk is a deck nobody can show.
 - **`01`, second slide.** Four spaces of indent nest one level, not two, and
   `7. An ordered list starts at the number the deck wrote` renders as 7, 8.
-- **`02`, the `two-column` slide.** Everything above the first `##` goes left and
-  the `##` onward goes right, because that heading is what a writer puts on a
-  column of a slide and there is nothing else to go on.
+- **`02`, the `two-column` slide.** Everything above the `::column` marker goes left
+  and everything below it goes right. The marker is the only way there is, and the
+  `##` under it is an ordinary heading that lands in the column it was written.
 - **`02`, the `blank` slide.** `blank` has no title box — that is what makes it
   blank — so a frontmatter `title:` there is drawn as a heading in the body
   instead. A `##` in that body keeps its own depth and comes out smaller.
 - **`07`, the `image-text` slide.** The picture is in the *wider* column and the
   text in the narrower one, because a reader looks at the image first. It
-  divides at the first `##` exactly as `two-column` does.
+  divides at a `::column` exactly as `two-column` does.
 - **`07`, the `image-slide` slide.** The picture is the slide: no headline, and
   no margin either — the box it is fitted to is the whole page. The logo is
   square and the page is not, so the picture keeps its own proportions inside

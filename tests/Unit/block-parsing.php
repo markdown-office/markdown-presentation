@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnsupportedLink;
@@ -30,6 +31,7 @@ use MarkdownPresentation\Render\BlockParser;
 use MarkdownPresentation\Render\InlineParser;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\Run;
+use MarkdownPresentation\Render\SlideBlocks;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 
@@ -42,13 +44,31 @@ use MarkdownPresentation\Tests\Support\Scratch;
  */
 
 /**
+ * A slide's content as the parser read it: its blocks and the column each was written for.
+ */
+function slideContentOf(string $markdown): SlideBlocks
+{
+    return (new BlockParser())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()));
+}
+
+/**
  * The blocks of a slide, in order.
  *
  * @return list<Block>
 */
 function blocksOf(string $markdown): array
 {
-    return (new BlockParser())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()));
+    return slideContentOf($markdown)->blocks();
+}
+
+/**
+ * The column each block of a slide was written for, in the same order as the blocks.
+ *
+ * @return list<int>
+*/
+function writtenColumnsOf(string $markdown): array
+{
+    return slideContentOf($markdown)->columns();
 }
 
 /**
@@ -307,6 +327,55 @@ it('reads an image inside a paragraph as text', function () {
     imagepng(imagecreatetruecolor(2, 2), $png);
 
     expect(kindsOf(sprintf("see ![alt](%s) here\n", $png)))->toBe([Paragraph::class]);
+});
+
+it('records which column each block was written for', function () {
+    // The renderer cannot work this out from the blocks: two paragraphs are the same
+    // paragraph in either column, so what says which one a deck meant is what it wrote.
+    expect(writtenColumnsOf("Left.\n\n::column\n\nRight.\n"))->toBe([0, 1])
+        ->and(writtenColumnsOf("Left.\n\nRight.\n"))->toBe([0, 0]);
+});
+
+it('closes an open paragraph before a column marker', function () {
+    // Without the flush the two lines are one paragraph written either side of the marker,
+    // and a block cannot belong to two columns.
+    expect(kindsOf("Left.\n::column\nRight.\n"))->toBe([Paragraph::class, Paragraph::class])
+        ->and(writtenColumnsOf("Left.\n::column\nRight.\n"))->toBe([0, 1]);
+});
+
+it('closes an open quote before a column marker', function () {
+    expect(kindsOf("> Quoted.\n::column\nRight.\n"))->toBe([Quote::class, Paragraph::class])
+        ->and(writtenColumnsOf("> Quoted.\n::column\nRight.\n"))->toBe([0, 1]);
+});
+
+it('moves no step for a column marker', function () {
+    // The whole trap this one guards: `jump()` is the only thing that may move a step, and a
+    // marker that also moved one would put the right column on step two and shift every click
+    // on the slide by one.
+    $content = slideContentOf("Left.\n\n::column\n\nRight.\n\n::click\n\nThird.\n");
+    $steps = array_map(static fn (Block $block): int => $block->step(), $content->blocks());
+
+    expect($steps)->toBe([1, 1, 2])
+        ->and($content->columns())->toBe([0, 1, 1]);
+});
+
+it('leaves a ::click in the column it was written in', function () {
+    expect(writtenColumnsOf("Left.\n\n::click\n\nRight.\n\n::column\n\nThird.\n"))->toBe([0, 0, 1]);
+});
+
+it('keeps a region in the column it was written in', function () {
+    // Three colons open a step and not a column, so what is inside one belongs where the
+    // opener was rather than starting a walk of its own.
+    expect(writtenColumnsOf(":::click\n\nRight.\n\n:::\n\n::column\n\nThird.\n"))->toBe([0, 1])
+        ->and(writtenColumnsOf("Left.\n\n::column\n\n:::click\n\nRight.\n:::\n"))->toBe([0, 1]);
+});
+
+it('refuses a slide whose blocks and columns are not the same length', function () {
+    // The invariant the object exists to hold. It is a caller that built the pair wrongly
+    // rather than a deck that cannot be drawn, so it is not under `InvalidInput`: a deck
+    // author told to go and rename something would go and rename something.
+    expect(fn () => new SlideBlocks([new Paragraph([], 1)], []))
+        ->toThrow(Exception::class, 'A slide carries 1 blocks and 0 columns');
 });
 
 it('refuses an HTML comment that is neither a step nor a note', function () {
