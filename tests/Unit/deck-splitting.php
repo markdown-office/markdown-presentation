@@ -184,6 +184,14 @@ it('reads a ::note block as the speaker note', function () {
         ->and($deck->slides()[0]->content())->toBe(ONE);
 });
 
+it('reads a note opener written in either case as the note it opens', function () {
+    // The block parser refuses a `::Note` that nothing closes, in either case, so an opener
+    // left case-sensitive here would leave a correct deck refused as an unclosed one: the
+    // message would say a `::` closed nothing when it did.
+    expect((new DeckParser())->parse("# One\n\n::Note\nthe note\n::\n")->slides()[0]->note())->toBe('the note')
+        ->and((new DeckParser())->parse("# One\n\n::NOTE\nthe note\n::\n")->slides()[0]->note())->toBe('the note');
+});
+
 it('does not read a delimiter inside a note as a delimiter', function () {
     // The same rule the fence and the HTML comment have, and for the same reason: a line of
     // the notes pane is not a slide delimiter however much of a delimiter it looks like.

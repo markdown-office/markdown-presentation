@@ -260,6 +260,12 @@ it('does not claim again what the code does not do', function (string $claim) {
     // the layout against the count of markers now, so nothing a deck writes after its last
     // marker changes what happens to it, and no page may argue the other way.
     'whether a trailing ::column is refused depends on what follows it' => 'Refusing here would make the spelling of a column depend on what happens to follow it',
+    // A region used to keep its column to itself, which is what the walk's own docblock and a
+    // test in the suite both said. A column is where a block is drawn and a region is when it
+    // appears, so the marker written inside one now moves what follows the closer — and a page
+    // or a comment may not argue that what is inside a region is where the opener was.
+    'a region keeps its column to itself' => 'what it holds stays in the column it was written in',
+    'a region keeps the column it was written in' => 'what is inside one belongs where the opener was',
 ]);
 
 it('has no decorative dividers in it', function () {

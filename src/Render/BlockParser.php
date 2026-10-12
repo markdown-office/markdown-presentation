@@ -91,8 +91,12 @@ final class BlockParser
      * after two colons this pattern wants `click` and the region has a third colon, and
      * after three the region wants `click` and this has none. Both are checked rather than
      * assumed, because the pair is the whole grammar.
+     *
+     * The case is folded, here and in every marker and container pattern below, because a
+     * deck written by a model capitalises a directive as readily as it writes it in lower
+     * case, and `::Click` drawn on a slide is a marker its author thought they had read.
     */
-    private const MARKER = '/\A[ \t]*::click[ \t]*(?:=[ \t]*(.*?)[ \t]*)?[ \t]*\z/';
+    private const MARKER = '/\A[ \t]*::click[ \t]*(?:=[ \t]*(.*?)[ \t]*)?[ \t]*\z/i';
 
     /**
      * The same boundary, opened three times: what follows until `:::` is one step of its own.
@@ -100,7 +104,7 @@ final class BlockParser
      * Capture 1 is named by {@see self::MARKER} and means the same thing, because both go
      * through {@see self::jump()} against the one step counter.
     */
-    private const REGION = '/\A[ \t]*:::click[ \t]*(?:=[ \t]*(.*?)[ \t]*)?[ \t]*\z/';
+    private const REGION = '/\A[ \t]*:::click[ \t]*(?:=[ \t]*(.*?)[ \t]*)?[ \t]*\z/i';
 
     /** The line a region closes on. Three colons and nothing else. */
     private const CLOSES_REGION = '/\A[ \t]*:::[ \t]*\z/';
@@ -121,10 +125,10 @@ final class BlockParser
      * column it was in. {@see \MarkdownPresentation\Exception\UnknownMarker} names what would
      * have worked, where drawing it as a paragraph would put `::column=2` on the slide.
      */
-    private const COLUMN = '/\A[ \t]*::column[ \t]*(?:=[ \t]*(.*?)[ \t]*)?[ \t]*\z/';
+    private const COLUMN = '/\A[ \t]*::column[ \t]*(?:=[ \t]*(.*?)[ \t]*)?[ \t]*\z/i';
 
     /** A note opener {@see \MarkdownPresentation\Document\DeckParser} did not take off the slide. */
-    private const NOTE = '~^[ \t]*::note[ \t]*$~m';
+    private const NOTE = '~^[ \t]*::note[ \t]*$~mi';
 
     /** The info string of a fence, whose first word is the language. */
     private const LANGUAGE = '/\A(\S*)/';
@@ -160,7 +164,7 @@ final class BlockParser
      * opening, so neither is a container and neither is refused. Anything else under three
      * colons is.
      */
-    private const CONTAINER = '/^[ \t]*:::(?![ \t]*$)(?!click\b)[^\n]*/m';
+    private const CONTAINER = '/^[ \t]*:::(?![ \t]*$)(?!click\b)[^\n]*/mi';
 
     /**
      * `$inline` is public because a slide's title is normalised with the same parser its
@@ -201,7 +205,7 @@ final class BlockParser
         // less literally than one standing on a line of its own.
         self::refuse($slide, self::prose($lines));
 
-        return $this->blocks($lines, $slide, $directory, $files, self::FIRST_STEP, self::FIRST_COLUMN, 0);
+        return $this->blocks($lines, $slide, $directory, $files, self::FIRST_STEP, self::FIRST_COLUMN, 0)[0];
     }
 
     /**
@@ -210,13 +214,20 @@ final class BlockParser
      * A method of its own rather than the body of {@see self::parse()} because a region is
      * read by calling this again with the lines between its fences and the step its opener
      * named, and a slide has one walk and not one per region — a `::click` written inside a
-     * region moves the same counter from the step the region opened at. A region is a step
-     * boundary and not a column boundary, so what it holds stays in the column it was written
-     * in, which is why the markers counted so far are handed in rather than counted again: a
-     * walk that started its own count at nothing would return fewer markers than the column a
-     * block in it is in.
+     * region moves the same counter from the step the region opened at.
+     *
+     * What the walk hands back is the column it ended at, and that is the whole of what a region
+     * does not keep to itself: a column is where a block is drawn, so a `::column` written
+     * inside one moves what follows the closer with it. A step is when a block appears, and
+     * the walk around the region carries on from the step the region opened at rather than
+     * from the last one the region itself reached — so the step is not part of the answer.
+     *
+     * The markers counted so far are handed in rather than counted again: a walk that started
+     * its own count at nothing would return fewer markers than the column a block in it is in.
      *
      * @param list<string> $lines
+     *
+     * @return array{0: SlideBlocks, 1: int} What the walk read, and the column it ended at.
      */
     private function blocks(
         array $lines,
@@ -226,7 +237,7 @@ final class BlockParser
         int $step,
         int $column,
         int $columnMarkers,
-    ): SlideBlocks {
+    ): array {
         $blocks = [];
         $columns = [];
         $quote = [];
@@ -255,7 +266,9 @@ final class BlockParser
                 $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
                 $step = self::jump($slide, $region[1] ?? null, $step);
 
-                $inside = $this->blocks(
+                // The column comes back with the blocks and the step does not, which is the
+                // whole of what a marker written inside a region carries out.
+                [$inside, $column] = $this->blocks(
                     array_slice($lines, $index, $end - $index),
                     $slide,
                     $directory,
@@ -288,21 +301,9 @@ final class BlockParser
                 // Whatever is open above the marker belongs to the column it was written in,
                 // so it is closed before the column moves — a paragraph with `::column` in the
                 // middle of it would be one shape drawn in the column it was started in.
-                //
-                // No step moves with it. `jump()` is the only thing in this class that may move
-                // one, and a marker that also opened a step would put a build-up written
-                // across two columns on step two onwards.
-                //
-                // The count rather than the column itself, because a marker with nothing after
-                // it moves nothing and the renderer still has to know it was written. Refused
-                // first so that `::column=2` never reaches the count: it is not a marker.
-                if (isset($argument[1])) {
-                    throw UnknownMarker::argument($slide, $argument[1]);
-                }
-
                 $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
-                $column++;
-                $columnMarkers++;
+
+                [$column, $columnMarkers] = self::column($slide, $argument[1] ?? null, $column, $columnMarkers);
 
                 continue;
             }
@@ -345,7 +346,7 @@ final class BlockParser
 
         $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
 
-        return new SlideBlocks($blocks, $columns, $columnMarkers);
+        return [new SlideBlocks($blocks, $columns, $columnMarkers), $column];
     }
 
     /**
@@ -547,6 +548,38 @@ final class BlockParser
         }
 
         return $number;
+    }
+
+    /**
+     * The column a `::column` marker moves to, and the marker count beside it.
+     *
+     * The other half of the two-colon grammar from {@see self::jump()}, and asked of a marker
+     * the same way: what it names, with the argument it carried. There is no second grammar to
+     * drift away from.
+     *
+     * No step moves with it. {@see self::jump()} is the only thing in this class that may move
+     * one, and a marker that also opened a step would put a build-up written across two
+     * columns on step two onwards.
+     *
+     * The count moves beside the column rather than being derived from it, because a marker
+     * with nothing after it moves nothing and the renderer still has to know it was written.
+     *
+     * The four buffers are flushed by the caller rather than here: this method taking them as
+     * well is eight parameters, and `php:S107` fires above seven.
+     *
+     * @throws UnknownMarker
+     *
+     * @return array{0: int, 1: int} The column after the marker, and how many markers the slide has.
+     */
+    private static function column(int $slide, ?string $argument, int $column, int $columnMarkers): array
+    {
+        // Refused before anything is counted, so that `::column=2` never reaches the count: it
+        // is not a marker, and a column cannot be named as one.
+        if ($argument !== null) {
+            throw UnknownMarker::argument($slide, $argument);
+        }
+
+        return [$column + 1, $columnMarkers + 1];
     }
 
     /**

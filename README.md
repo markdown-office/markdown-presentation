@@ -134,8 +134,8 @@ is one slide carrying both, and `Deck::frontmatter()` returns its keys.
 step markers, not the splitter's.
 
 A speaker note is `::note` on a line of its own, its text, and a
-closing `::`. A `::note` nothing closes is part of the slide's text,
-and the renderer refuses it rather than drawing it.
+closing `::`, in either case. A `::note` nothing closes is part of
+the slide's text, and the renderer refuses it rather than drawing it.
 
 Two shapes are refused rather than read:
 
@@ -482,7 +482,10 @@ written, so the heading in the example above is drawn in the right one because t
 above it and not because of anything about the heading. There is no argument and no way
 backwards — the marker means "the next column", which is the one direction a block can move
 in. `::column=2` is a failure under `UnknownMarker` naming the marker that would have
-worked, rather than a paragraph reading `::column=2` drawn on the slide.
+worked, rather than a paragraph reading `::column=2` drawn on the slide. A marker written
+inside a `:::click` region moves what follows the closing `:::` as well: a column is where a
+block is drawn and a region is when it appears, so a region governs what a click reveals and
+not where the text sits.
 
 A deck that never writes one fills the first column and leaves the rest empty, which is
 honest: it asked for a layout with columns and wrote one of them.
@@ -740,7 +743,10 @@ Two colons for a boundary, three for a region:
 `::click` and `::column` share two colons and neither is a prefix of the other, so a step
 marker is a step marker and a column marker is a column marker; the suite asks both directions
 rather than reasoning about them. `::column` moves no step, which is why a build-up written
-across two columns spends the same clicks it would on one column.
+across two columns spends the same clicks it would on one column. Every marker in the table is
+recognised in either case, so `::Click`, `::Column`, `:::Click` and `::Note` are the markers they
+look like: a deck written by a model capitalises a directive as readily as it writes it in lower
+case, and a marker drawn on the slide is one its author thought they had read.
 
 A step is a click in a build-up on **one** slide. Every block of the slide is written onto it
 at once, and the steps a reader clicks through are written as a PowerPoint animation that
@@ -832,7 +838,9 @@ The third thing, written as a region.
 A region is the boundary and its fences in one: everything between them is read at the step its
 opener names, through the same counter a bare marker moves, so a build-up can be written as the
 parts it is made of. A `:::` with nothing to close, and a `::note` with nothing to close it, are
-failures naming the spelling that would have worked.
+failures naming the spelling that would have worked. A region keeps its own steps: the text after
+the closing `:::` goes back to the step the region opened at rather than to the last step inside
+it. Of the two markers, only `::column` carries past the closer.
 
 A step number that does not go forwards, a `::click=` with nothing after the equals, and a step
 that is not a number are all failures, and so is a `::column` carrying an argument: the marker

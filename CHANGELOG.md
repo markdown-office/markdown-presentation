@@ -8,6 +8,33 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A `::column` written inside a `:::click` region moves the text after the closing `:::`.**
+  **Breaking**, and only for a deck that writes both on one slide. A column is where a block is
+  drawn and a region is when it appears, so a region governs what a click reveals and not where
+  the text sits.
+
+  | Was | Now |
+  | --- | --- |
+  | the column counter died with the region's own walk | the region's walk hands back the column it ended at |
+  | the text after the closer went back to the column the region opened in | it is in the column the marker inside the region moved it to |
+
+  The step does not travel with it, and that asymmetry is deliberate: a region's own steps are its
+  own, so the text after the closing `:::` stays on the step the region opened at. A `::click` inside
+  a region still moves the one step counter of the slide, exactly as before. The markers a slide
+  wrote are still counted as the walk reaches them, so two `::column` markers inside one region on a
+  two-column slide are refused with `UnsupportedColumn` as the third marker at the top level is.
+
+- **Every two-colon marker is recognised in either case.** A `::Click`, `::Column`, `:::Click` or
+  `::Note` written with a capital is the marker it looks like rather than a paragraph reading it on
+  the slide. A deck written by a model capitalises a directive as readily as it writes it in lower
+  case, and a marker drawn on the slide is one its author thought they had read. `::Note` is taken off
+  the slide as a speaker note in either case, so it cannot be refused as a note nothing closes.
+
+  The refusal for a `:::` that is neither a region nor its closer is spelled with a lookahead, and it
+  folds the same way: `:::Click` opens a region rather than falling through to the container refusal,
+  while `:::Column` is still refused as the container it is. A marker inside a fenced block is still a
+  line of code.
+
 - **`::column` moves the blocks after it into the next column.** **Breaking.** A two-column
   slide no longer divides at its first `##`, because that is no longer how a column is
   reached.

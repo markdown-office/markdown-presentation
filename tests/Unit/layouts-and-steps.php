@@ -400,6 +400,17 @@ it('refuses a third ::column on a two-column slide with the same message', funct
             . 'layout with more columns than this.');
 });
 
+it('refuses two ::column markers inside one region on a two-column slide', function () {
+    // The one case the column leaving a region could have changed: the markers are counted as
+    // the walk reaches them and the column leaves the region with them, so a deck that asked
+    // for a third column inside a region has asked for one however it was written. It is
+    // refused where a third marker at the top level is, with the same message.
+    expect(fn () => slideDeck("---\nlayout: two-column\n---\n# Both\n\nLeft.\n\n:::click\n\n::column\n\nTwo.\n\n::column\n\nThree.\n:::\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "two-column" layout has 2 columns. '
+            . '"::column" moves the blocks after it into the next column, so a slide that uses one needs a '
+            . 'layout with more columns than this.');
+});
+
 it('names the slide a ::column the layout cannot offer is on', function () {
     // The slide is in the message because it is the half the author has to go and look at, and
     // a build-up of ten slides has nine other places this could have been written.

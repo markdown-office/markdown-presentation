@@ -365,10 +365,33 @@ it('leaves a ::click in the column it was written in', function () {
 });
 
 it('keeps a region in the column it was written in', function () {
-    // Three colons open a step and not a column, so what is inside one belongs where the
-    // opener was rather than starting a walk of its own.
+    // Neither of these regions writes a marker of its own: three colons open a step and not a
+    // column, so what is inside one starts where the opener was rather than at a walk of its
+    // own. The marker below each is the only thing that moves the column.
     expect(writtenColumnsOf(":::click\n\nRight.\n\n:::\n\n::column\n\nThird.\n"))->toBe([0, 1])
         ->and(writtenColumnsOf("Left.\n\n::column\n\n:::click\n\nRight.\n:::\n"))->toBe([0, 1]);
+});
+
+it('moves the text after a ::column written inside a region into the next column', function () {
+    // A column is where a block is drawn and a region is when it appears, so a region governs
+    // what a click reveals and not where the text sits. `::column` on a line of its own moves
+    // everything below it — including below the closer — which is the one reading of the
+    // marker there is and the only one a deck has to know.
+    expect(writtenColumnsOf("Left.\n\n:::click\n\nA.\n\n::column\n\nB.\n\n:::\n\nC.\n"))->toBe([0, 0, 1, 1])
+        ->and(writtenColumnsOf(":::click\n\nA.\n\n::column\n\nB.\n\n:::\n"))->toBe([0, 1]);
+});
+
+it('leaves the step of a region where the region opened, though its ::column has moved', function () {
+    // The other half of that asymmetry, and the half that needs pinning: the walk around the
+    // region carries on from the step the region opened at, and not from the last step the
+    // region itself reached. `D.` is on step two with `A.`, even though the region clicked
+    // twice before it closed — a step inside a region is that region's own, and the chain the
+    // slide clicks through is one where the region was already on it.
+    $content = slideContentOf(":::click\n\nA.\n\n::column\n\nB.\n\n::click\n\nC.\n\n:::\n\nD.\n");
+    $steps = array_map(static fn (Block $block): int => $block->step(), $content->blocks());
+
+    expect($steps)->toBe([2, 2, 3, 2])
+        ->and($content->columns())->toBe([0, 1, 1, 1]);
 });
 
 it('counts the column markers a slide was written with', function () {
@@ -478,6 +501,29 @@ it('refuses a ::: container, naming the alternatives', function () {
             . 'open a step region as ":::click" and close it as ":::"; divide a deck with a "---" line, '
             . 'write a section as a heading, and write a note as a quote: "> ".',
         );
+});
+
+it('reads a marker in either case as the marker it names', function () {
+    // A deck written by a model capitalises a directive as readily as it writes it in lower
+    // case. All three were drawn on the slide as literal text, which is the marker read back
+    // to an author who thought they had used it — the one outcome a marker must never have.
+    $clicked = slideContentOf("Left.\n\n::Click\n\nRight.\n");
+    $steps = array_map(static fn (Block $block): int => $block->step(), $clicked->blocks());
+
+    expect($steps)->toBe([1, 2])
+        ->and(writtenColumnsOf("Left.\n\n::Column\n\nRight.\n"))->toBe([0, 1])
+        ->and(writtenColumnsOf("Left.\n\n::COLUMN\n\nRight.\n"))->toBe([0, 1])
+        ->and(kindsOf(":::Click\n\nA.\n\n:::\n"))->toBe([Paragraph::class])
+        ->and(fn () => blocksOf("Left.\n\n::Note\n\nRight.\n"))
+        ->toThrow(UnknownDirective::class, 'Slide 1 opens a "::note" that nothing closes');
+});
+
+it('refuses a ::: container whose word is not a region opener, whatever its case', function () {
+    // The refusal's own lookahead is what leaves the three-colon grammar alone, and it is the
+    // one place case folding has to be seen to: a container check left behind the `i` flag
+    // would read `:::Click` as a container to refuse rather than as the region it is.
+    expect(fn () => blocksOf("# One\n\n:::Column\nSomething.\n:::\n"))
+        ->toThrow(UnknownDirective::class, 'Slide 1 opens the container ":::Column"');
 });
 
 it('refuses a directive in a table row as loudly as one on a line of its own', function () {

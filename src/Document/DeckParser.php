@@ -65,8 +65,8 @@ final class DeckParser
     /** An opening YAML code fence, which Slidev would read as frontmatter. */
     private const FENCED_YAML = '/\A[ \t]*`{3,}[ \t]*(?:yaml|yml)\b/';
 
-    /** A note opener: `::note` and nothing else on the line. */
-    private const OPENS_NOTE = '/\A[ \t]*::note[ \t]*\z/';
+    /** A note opener: `::note` and nothing else on the line. The case is folded, like every marker. */
+    private const OPENS_NOTE = '/\A[ \t]*::note[ \t]*\z/i';
 
     /** The line a note closes on: `::` and nothing else. */
     private const CLOSES_NOTE = '/\A[ \t]*::[ \t]*\z/';
@@ -79,7 +79,7 @@ final class DeckParser
      * has one note carrying both — a `.pptx` slide has one notes pane, and two notes is a
      * deck asking for something the format has one of.
      */
-    private const NOTE = '/\A([\s\S]*?)^[ \t]*::note[ \t]*\n([\s\S]*?)^[ \t]*::[ \t]*\z/m';
+    private const NOTE = '/\A([\s\S]*?)^[ \t]*::note[ \t]*\n([\s\S]*?)^[ \t]*::[ \t]*\z/mi';
     /**
      * The opening fence of a code block: three or more backticks or three or more
      * tildes, indented by no more than three spaces.
@@ -288,8 +288,8 @@ final class DeckParser
             step markers, not the splitter's.
 
             A speaker note is `::note` on a line of its own, its text, and a
-            closing `::`. A `::note` nothing closes is part of the slide's text,
-            and the renderer refuses it rather than drawing it.
+            closing `::`, in either case. A `::note` nothing closes is part of
+            the slide's text, and the renderer refuses it rather than drawing it.
 
             Two shapes are refused rather than read:
 
