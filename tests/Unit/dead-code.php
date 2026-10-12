@@ -270,6 +270,15 @@ it('does not claim again what the code does not do', function (string $claim) {
     // arguments is past `php:S107`, which is a number the signature no longer has to keep.
     // The reason it still gives is the one that holds: it is static and the flush is not.
     'a method keeps work out of it because of how many parameters it takes' => 'taking them as well is eight parameters',
+    // `SlideBlocks`'s second guard was described as reachable: the walk hands a region the
+    // marker count it was given rather than counting from nothing, so the two move together
+    // and no deck can leave a block in a column the count has not reached. The guard is for a
+    // caller that builds the value, and nothing in a deck reaches it.
+    'the region recursion can break the marker count' => 'a walk that reads a region returns a count of its own',
+    // `php:S1448` fires above twenty, so `BlockParser` at twenty-one was already a finding on
+    // new code rather than one still waiting for the next method. The class had been taken back
+    // from twenty-two for exactly this once already.
+    'one more method and the parser is over the ceiling' => 'the next method still breaks that gate',
 ]);
 
 it('has no decorative dividers in it', function () {

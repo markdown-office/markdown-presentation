@@ -44,10 +44,16 @@ final class SlideBlocks
      * @param int                                                            $columnMarkers How many `::column` markers the deck wrote, whether or not a block follows each one.
      *
      * @throws Exception When the two lists are not the same length, or when the marker count
-     *                   is below the column a block was written for — a caller that built the
-     *                   value wrongly rather than a deck that cannot be drawn, so
-     *                   {@see \MarkdownPresentation\Exception\InvalidInput}, whose contract is
-     *                   that the deck's author can fix it, would be the wrong type here.
+     *                   is below the column a block was written for.
+     *
+     * Both are a caller that built the value wrongly rather than a deck that cannot be drawn,
+     * which is why this is not an {@see \MarkdownPresentation\Exception\InvalidInput} — its
+     * contract is that the deck's author can fix it, and an author told to go and rename
+     * something would go and rename something. Neither is reachable from a deck, and the
+     * second is here for the caller that constructs the value itself: the walk in
+     * {@see \MarkdownPresentation\Render\BlockParser} moves the column and the marker count in
+     * the same breath, and hands a region the count it was given rather than counting from
+     * nothing, so a block is never in a column the count has not already reached.
      */
     public function __construct(
         private readonly array $blocks,

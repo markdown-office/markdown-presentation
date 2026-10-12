@@ -259,9 +259,9 @@ final class BlockParser
                 // Everything before the opener stays on the step it was written at, and
                 // everything inside is one step of its own, so the opener names that step
                 // through the same jump a bare marker does.
-                $end = self::closingRegion($lines, $index, $slide, self::spelling($line));
+                $end = self::closingRegion($lines, $index, $slide, $line);
                 $this->flush($open, $step, $column);
-                $step = self::jump($slide, $region[1] ?? null, $step, self::spelling($line));
+                $step = self::jump($slide, $region[1] ?? null, $step, $line);
 
                 // The column comes back with the blocks and the step does not, which is the
                 // whole of what a marker written inside a region carries out.
@@ -291,7 +291,7 @@ final class BlockParser
                 // put the block a writer wrote above the marker on the step below it, which
                 // is the reverse of what the author meant.
                 $this->flush($open, $step, $column);
-                $step = self::jump($slide, $marker[1] ?? null, $step, self::spelling($line));
+                $step = self::jump($slide, $marker[1] ?? null, $step, $line);
 
                 continue;
             } elseif (preg_match(self::COLUMN, $line, $argument) === 1) {
@@ -305,7 +305,7 @@ final class BlockParser
                     $argument[1] ?? null,
                     $column,
                     $columnMarkers,
-                    self::spelling($line),
+                    $line,
                 );
 
                 continue;
@@ -463,7 +463,8 @@ final class BlockParser
      *
      * The opener is handed in because the refusal quotes it and the walk is the only thing
      * holding it: `REGION` captures the step and not the line, so the spelling of `:::Click=3`
-     * is gone by the time this is asked. {@see self::spelling()} has already been applied to it.
+     * is gone by the time this is asked. It goes into the message as the deck wrote it —
+     * {@see \MarkdownPresentation\Exception\UnknownMarker} is what strips it.
      *
      * @param list<string> $lines
      * @param string       $opener The opener as the deck wrote it, for the refusal.
@@ -479,26 +480,6 @@ final class BlockParser
         }
 
         throw UnknownMarker::unclosed($slide, $opener);
-    }
-
-    /**
-     * A marker as the deck wrote it, with what a reader cannot see taken out of the quote.
-     *
-     * A message that quotes the canonical spelling is a message about a line the writer did
-     * not write: every two-colon marker is read in either case, so `::Column=2` is the same
-     * marker as `::column=2` and the refusal can only be found by comparing two lines rather
-     * than one.
-     *
-     * Whitespace goes because a quote whose difference from the line in the deck is invisible
-     * cannot be matched against it — `::click=  ` is refused as `::click=`, and quoting the two
-     * trailing spaces would only move the disagreement somewhere less visible. Control
-     * characters go for the reader rather than the writer: a carriage return or an escape
-     * sequence quoted into a refusal repaints the line or moves the cursor of the terminal or
-     * log the message is printed in, so a deck's own text would be what that terminal shows.
-     */
-    private static function spelling(string $line): string
-    {
-        return trim((string) preg_replace('/[[:cntrl:]]/', '', $line));
     }
 
     /**
@@ -550,7 +531,7 @@ final class BlockParser
      * argument and nothing else: the spelling of `::Click=` is in the line and not in the
      * capture, so the refusal has to be handed it rather than put it back together.
      *
-     * @param string $marker The marker as written, already through {@see self::spelling()}.
+     * @param string $marker The marker line as written, which the refusal quotes.
      *
      * @throws UnknownMarker
      */
@@ -565,7 +546,7 @@ final class BlockParser
         }
 
         if (preg_match('/\A\d+\z/', $argument) !== 1) {
-            throw UnknownMarker::notANumber($slide, self::spelling($argument));
+            throw UnknownMarker::notANumber($slide, $argument);
         }
 
         $number = (int) $argument;
@@ -602,7 +583,7 @@ final class BlockParser
      * count: this is a static method and {@see self::flush()} is not, because closing a quote
      * reads its runs through the inline parser.
      *
-     * @param string $marker The marker as written, already through {@see self::spelling()}.
+     * @param string $marker The marker line as written, which the refusal quotes.
      *
      * @throws UnknownMarker
      *

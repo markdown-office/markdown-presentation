@@ -842,6 +842,41 @@ it('quotes a marker the way the deck wrote it rather than the way it is spelled 
         ->toThrow(UnknownMarker::class, 'Slide 1 opens a ":::Click=3" region that nothing closes');
 });
 
+it('reports the marker the deck wrote and recommends the one this library reads', function () {
+    // The line a refusal reports and the marker it recommends are two different claims, and
+    // they take two different spellings. Every two-colon marker is read in either case, so a
+    // deck that wrote `::Click=` is told about `"::Click="` — naming `"::click"` would send its
+    // author looking for a line they did not write. The advice is a claim about this library's
+    // grammar rather than about that file, so it stays canonical whatever was written: advice
+    // that echoed the mistake would teach the mistake.
+    //
+    // Both halves are in the expected text rather than asserted one after the other, because a
+    // message that quoted both spellings, or advised both, would satisfy either on its own.
+    expect(fn () => slideDeck("# One\n\n::Click=\n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::Click=" step marker with no number. '
+            . 'Write "::click" for the next step.')
+        ->and(fn () => slideDeck("# One\n\nLeft.\n\n::Column=2\n\nRight.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::Column=2", which is not a column marker: the marker '
+            . 'takes no argument. Write "::column" on a line of its own')
+        ->and(fn () => slideDeck("# One\n\nFirst.\n\n:::Click=3\n\nSecond.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 opens a ":::Click=3" region that nothing closes. '
+            . 'A region ends at a ":::" on a line of its own.');
+});
+
+it('names a marker the layout cannot offer as advice, never as a line from the deck', function () {
+    // The other side of the same line, and the one with no quotation to balance it. This
+    // refusal is raised from a count of markers measured against a layout's boxes, so the line
+    // the deck wrote is gone by the time the sentence is built — there is nothing here to echo,
+    // and threading one would mean carrying the spelling of every marker on the slide through
+    // the renderer to name a marker the author already has in their file. A deck that wrote
+    // `::Column` is therefore told about `"::column"`, the marker this library documents.
+    expect(fn () => slideDeck("# One\n\nLeft.\n\n::Column\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "content" layout has 1 column. '
+            . '"::column" moves the blocks after it into the next column')
+        ->and(fn () => slideDeck("---\nlayout: two-column\n---\n# One\n\nOne.\n\n::Column\n\nTwo.\n\n::Column\n\n::Column\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "two-column" layout has 2 columns.');
+});
+
 it('quotes the whitespace out of a marker, because the writer cannot see it either', function () {
     // `::click=  ` is refused as a marker with no number, and the two trailing spaces are the
     // only difference between it and the `::click=` above. Quoting them would not have made

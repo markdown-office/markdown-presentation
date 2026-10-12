@@ -18,6 +18,13 @@ namespace MarkdownPresentation\Exception;
  * {@see UnsupportedLink} and {@see UnsupportedImageFormat} are the same shape as this — the
  * deck asked for something well spelled that the file cannot carry, and a consumer catching
  * it wants to know which of its limitations it hit.
+ *
+ * The `::column` named in the message is advice and is spelled the way this library writes it,
+ * never the way the deck wrote it: every two-colon marker is read in either case, so a message
+ * that echoed the capitalisation would be quoting a line it does not have. It cannot quote one
+ * anyway — the refusal is raised from a count of markers against a layout's boxes, by which
+ * point the line the deck wrote is gone. {@see UnknownMarker} is the other side of that line:
+ * a refusal about a marker quotes the marker as written.
  */
 final class UnsupportedColumn extends InvalidInput
 {

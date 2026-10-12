@@ -436,9 +436,10 @@ it('refuses a slide whose blocks and columns are not the same length', function 
 });
 
 it('refuses a marker count below the column a block was written for', function () {
-    // The other half of the same invariant, and the one the recursion can break: a walk that
-    // reads a region returns a count of its own, and a count of nothing beside a block in
-    // column one is a caller that built the value wrongly rather than a deck.
+    // The other half of the same invariant, and one no deck reaches: the walk moves the column
+    // and the count together, and hands a region the count it was given rather than counting
+    // from nothing, so no block is ever in a column the count has not reached. What the guard
+    // is left for is a caller that built the value itself.
     expect(fn () => new SlideBlocks([new Paragraph([], 1)], [1], 0))
         ->toThrow(Exception::class, 'A slide carries 0 "::column" markers and a block written in column 1; '
             . 'a marker moves what follows it into the next column, so there cannot be fewer markers than '

@@ -17,11 +17,17 @@ namespace MarkdownPresentation\Exception;
  * marker that is not one: the marker itself is refused, on the grounds that a column cannot be
  * named, where a well-formed marker the slide's layout cannot offer is the layout's failure.
  *
- * Every marker a refusal quotes is quoted the way the deck wrote it, and the parser hands the
- * line over for that rather than the spelling its patterns can be rebuilt from: all three are
- * read in either case, so `::Column=2` and `::column=2` are the same marker and only one of
- * them is a line in the author's file. {@see \MarkdownPresentation\Render\BlockParser::spelling()}
- * is what takes the whitespace and the control characters out of that quote.
+ * A quotation and the advice that follows it are two different claims, and these messages keep
+ * them apart. A quotation is a line in the author's file: every two-colon marker is read in
+ * either case, so a writer who typed `::Column=2` is told about `"::Column=2"` — only one of
+ * the two spellings is the line they wrote, and naming the other leaves them looking for it.
+ * The advice is a claim about this library's grammar rather than about that file, so it stays
+ * canonical whatever the deck wrote — `Write "::click"`, never `Write "::Click"` — because
+ * advice that echoed the mistake would teach the mistake. A message carries both, one after the
+ * other; a factory added here has to say which of its quoted markers is which.
+ *
+ * The parser hands the line over rather than the spelling its patterns can be rebuilt from, and
+ * {@see self::quoted()} is what takes the whitespace and the control characters out of it.
  */
 final class UnknownMarker extends InvalidInput
 {
@@ -36,9 +42,13 @@ final class UnknownMarker extends InvalidInput
     }
 
     /**
-     * @param int $maximum The most steps one slide may name, which the message repeats:
-     *                     a refusal that does not say what would have worked leaves the
-     *                     author to guess the number rather than to look it up.
+     * @param string $argument The argument as the deck wrote it, quoted rather than the number
+     *                         it casts to: `::click=99999999999999999999` saturates to
+     *                         `PHP_INT_MAX`, and a refusal naming what was written is the one
+     *                         an author can act on.
+     * @param int    $maximum The most steps one slide may name, which the message repeats:
+     *                        a refusal that does not say what would have worked leaves the
+     *                        author to guess the number rather than to look it up.
      */
     public static function tooLarge(int $slide, string $argument, int $maximum): self
     {
@@ -46,7 +56,7 @@ final class UnknownMarker extends InvalidInput
             'Slide %d has a step "%s", which is past the %d steps one slide may build up in. '
             . 'Write "::click" for the next step, or name one up to %d.',
             $slide,
-            $argument,
+            self::quoted($argument),
             $maximum,
             $maximum,
         ));
@@ -55,10 +65,7 @@ final class UnknownMarker extends InvalidInput
     /**
      * A step marker's argument that is not a number.
      *
-     * @param string $argument The argument as written, with the control characters a deck can
-     *                          put on that line taken out of it: a refusal is read in a
-     *                          terminal, and one carrying an escape sequence or a carriage
-     *                          return repaints the line it is printed on.
+     * @param string $argument The argument as the deck wrote it.
      */
     public static function notANumber(int $slide, string $argument): self
     {
@@ -66,7 +73,7 @@ final class UnknownMarker extends InvalidInput
             'Slide %d has a step "%s", which is not a number. Write "::click" for the next step, '
             . 'or "::click=2" for a named one.',
             $slide,
-            $argument,
+            self::quoted($argument),
         ));
     }
 
@@ -81,7 +88,7 @@ final class UnknownMarker extends InvalidInput
         return new self(sprintf(
             'Slide %d has a "%s" step marker with no number. Write "::click" for the next step.',
             $slide,
-            $marker,
+            self::quoted($marker),
         ));
     }
 
@@ -104,7 +111,7 @@ final class UnknownMarker extends InvalidInput
             . 'argument. Write "::column" on a line of its own to move the blocks after it into '
             . 'the next column.',
             $slide,
-            $marker,
+            self::quoted($marker),
         ));
     }
 
@@ -143,7 +150,28 @@ final class UnknownMarker extends InvalidInput
         return new self(sprintf(
             'Slide %d opens a "%s" region that nothing closes. A region ends at a ":::" on a line of its own.',
             $slide,
-            $opener,
+            self::quoted($opener),
         ));
+    }
+
+    /**
+     * A line of the deck as the message is to print it.
+     *
+     * Whitespace goes because a quote whose difference from the line in the deck is invisible
+     * cannot be matched against it: `::click=  ` is refused as `::click=`, and quoting the two
+     * trailing spaces would only move the disagreement somewhere less visible.
+     *
+     * Control characters go for the reader rather than for the writer. A marker line is the one
+     * place a deck gets to write bytes rather than words, and a refusal is read in a terminal or
+     * a CI log — a carriage return there moves the cursor to the start of the line and an escape
+     * sequence can clear it, so the author's own marker is what the reader is shown, above the
+     * sentence explaining what to do about it. Dropped rather than escaped: there is no reading
+     * of a step number in which a repainted line was the more useful one.
+     *
+     * @param string $written A line, or a part of one, exactly as the deck wrote it.
+     */
+    private static function quoted(string $written): string
+    {
+        return trim((string) preg_replace('/[[:cntrl:]]/', '', $written));
     }
 }

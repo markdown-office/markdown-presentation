@@ -175,11 +175,23 @@ All notable changes to this project are documented here. The format follows
   | `::Click=` | `::click=` | `::Click=` |
   | `:::Click=3` with nothing after it | `:::click` | `:::Click=3` |
 
-  The advice half of each message is unchanged and stays on the canonical spelling: a message that
-  says what to write next is not reporting what is in the file, and `::click` is what the README
-  documents. `UnknownMarker::strayCloser()` is unchanged for a reason worth keeping —
-  `CLOSES_REGION` admits three colons and nothing but whitespace, so every line that matches it
-  trims to the one spelling the message already quotes.
+  The two halves of one of these messages are two different claims, and which half a factory is on
+  decides which spelling it takes. **A quotation is a line in the author's file and echoes it** —
+  `::Column=2` is reported as `::Column=2`, because only one of the two spellings is the line they
+  wrote. **Advice is a claim about this library's grammar and stays canonical** — `Write "::click"`
+  whatever the deck wrote, because advice that echoed the mistake would teach the mistake. Both
+  halves sit in one sentence, so neither can be right on its own, and a test holds them together
+  rather than one after the other.
+
+  `UnsupportedColumn::beyond()` is on the advice side of that line, and stays there on purpose. It
+  says `Slide 1 has a "::column"` for a deck that may have written `::Column`, and it is not a
+  quotation: the refusal is raised from a *count* of markers measured against a layout's boxes, so
+  the line the deck wrote is gone by the time the sentence is built. There is nothing here to echo,
+  and threading one would mean carrying the spelling of every marker on the slide through the
+  renderer in order to name a marker the author already has in their file.
+  `UnknownMarker::strayCloser()` is on the advice side for a second reason: `CLOSES_REGION` admits
+  three colons and nothing but whitespace, so every line that matches it trims to the one spelling
+  the message already quotes.
 
   **A quoted spelling is trimmed and stripped of control characters.** A marker line is the one
   place in a deck where a writer gets to write bytes rather than words, and a refusal is read in a
@@ -187,7 +199,8 @@ All notable changes to this project are documented here. The format follows
   sequence can clear it, so the deck's own text would be what that terminal shows above the
   sentence explaining what to do about it. Whitespace goes for the reader rather than the writer:
   `::click=  ` is refused as `::click=`, and quoting the two trailing spaces would only move the
-  disagreement somewhere less visible.
+  disagreement somewhere less visible. Both happen in `UnknownMarker::quoted()` rather than in the
+  parser, so the reason a message is safe to print lives with the message.
 
 - **A template-backed column was laid out and left empty.** `PresentationRenderer::splits()`
   asked the geometry the constructor was handed rather than the merged one `render()` builds,
@@ -537,10 +550,15 @@ All notable changes to this project are documented here. The format follows
   parser — rather than because four buffers beside four arguments is eight parameters. The old
   claim is in `tests/Unit/dead-code.php` so it cannot come back.
 
-  `BlockParser` is at 21 methods and `php:S1448` is unchanged: the next method still breaks that
-  gate. `blocks()`'s cognitive complexity is unchanged too, at exactly 15 against a limit of 15 —
-  the control-flow structure of the walk is the same sequence of tokens it was, so nothing in the
-  refactor could have nested anything.
+  `BlockParser` is back at twenty methods and `php:S1448` is closed on it. The rule is above twenty,
+  and the class has been there once already: the `::click` change took it to twenty-two and it had
+  to be folded back. `spelling()` — the one method the quoting fix had added — has gone, and the
+  sanitising it did now sits in `UnknownMarker::quoted()`, where the sentence is built: a
+  deck-written string that is about to be printed belongs to whoever prints it, and the `@param`
+  lines promising a caller had already applied it are gone rather than left as a promise every
+  future caller has to keep. `blocks()`'s cognitive complexity is unchanged too, at exactly 15
+  against a limit of 15 — the control-flow structure of the walk is the same sequence of tokens it
+  was, so nothing in the refactor could have nested anything.
 
 - **`PresentationRenderer` did three jobs.** Twenty-seven methods, of which six were neither
   parsing a deck nor drawing a slide:

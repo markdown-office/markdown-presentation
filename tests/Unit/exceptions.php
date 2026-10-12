@@ -190,6 +190,41 @@ it('refuses a package with a part it cannot read', function () {
         ->and($refuses)->toThrow(Exception::class);
 });
 
+it('takes the deck\'s own line and hands back a sentence safe to print', function (string $message, string $quoted) {
+    // Every factory here that quotes a line the deck wrote takes it as written and strips it
+    // itself, rather than trusting the parser to have done so: a marker line is the one place
+    // a deck gets to write bytes rather than words, and a refusal is read in a terminal or a CI
+    // log — a carriage return there moves the cursor to the start of the line and an escape
+    // sequence can clear it, so the deck's own text would be what the reader is shown, above
+    // the sentence explaining what to do about it. Whitespace goes for the reader rather than
+    // for the writer, because a quote whose difference from the file is invisible cannot be
+    // matched against it.
+    expect($message)->not->toContain("\x1b")
+        ->and($message)->not->toContain("\r")
+        ->and($message)->toContain(sprintf('"%s"', $quoted));
+})->with([
+    'a marker with no number' => [
+        UnknownMarker::empty(1, "\r  ::Click=  \x1b")->getMessage(),
+        '::Click=',
+    ],
+    'a column marker with an argument' => [
+        UnknownMarker::argument(1, "  ::Column=2\r")->getMessage(),
+        '::Column=2',
+    ],
+    'an argument that is not a number' => [
+        UnknownMarker::notANumber(1, "two\x1b\rthree")->getMessage(),
+        'twothree',
+    ],
+    'a region nothing closes' => [
+        UnknownMarker::unclosed(1, "\x1b:::Click=3 \r")->getMessage(),
+        ':::Click=3',
+    ],
+    'a step past the ceiling' => [
+        UnknownMarker::tooLarge(1, "999\x1b\r", 500)->getMessage(),
+        '999',
+    ],
+]);
+
 it('names a slide and a file in every failure, because the fix is in the message', function () {
     // A message that says what is wrong but not where leaves the author hunting, and
     // hunting is what the loud failure was for.
