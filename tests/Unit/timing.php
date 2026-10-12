@@ -7,6 +7,7 @@ use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\TimingPass;
+use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\UnreadableArchive;
 
 /**
@@ -212,6 +213,67 @@ it('puts the build on the slide it belongs to', function () {
     expect($first)->toBe('')
         ->and($second)->toContain('<p:spTgt spid="2"/>')
         ->and($second)->toContain('<p:spTgt spid="3"/>');
+});
+
+it('builds a stepped deck up on the slide rather than beside it', function () {
+    // The wiring this pass was written for. A render used to stop at two passes and leave
+    // `TimingPass` called by nothing, so every shape of a build-up was on its slide from the
+    // start and the deck said nothing about which of them a click brought in.
+    $path = sys_get_temp_dir() . '/mdp-timing-wired-' . hash('xxh3', 'timing wired') . '.pptx';
+    $root = dirname(__DIR__, 2);
+
+    (new PresentationRenderer($root . '/examples/markdown'))->render(
+        (new DeckParser())->parse("# One\n\nFirst.\n\n::click\n\nSecond.\n"),
+        $path,
+    );
+
+    $pptx = Pptx::open($path);
+    $slide = $pptx->part('ppt/slides/slide1.xml');
+    $count = $pptx->slideCount();
+    $reveals = $pptx->reveals(1);
+
+    // Ids counted off the file rather than assumed: the shape tree's group is 1, the title is
+    // written before the body and so takes 2, and the two steps' text frames take 3 and 4. A
+    // `$builds` built on anything else points the effect at the title or at the first step,
+    // which is a deck that hides its own heading.
+    preg_match_all('/<p:cNvPr id="(\d+)" name="([^"]*)"/', $slide, $found, PREG_SET_ORDER);
+    $shapes = array_map(
+        static fn (array $shape): string => $shape[1] . '=' . $shape[2],
+        $found,
+    );
+
+    @unlink($path);
+
+    expect($count)->toBe(1)
+        ->and($shapes)->toBe(['1=', '2=title', '3=text', '4=text'])
+        ->and($slide)->toContain('<p:spTgt spid="4"/>')
+        ->and($slide)->toContain('<p:bldP spid="4" grpId="0"/>')
+        // The title and the first step are on the slide before any click, so neither is named.
+        ->and($slide)->not->toContain('<p:spTgt spid="2"/>')
+        ->and($slide)->not->toContain('<p:spTgt spid="3"/>')
+        ->and($reveals)->toBe([['text']]);
+});
+
+it('writes no build on a slide that has no steps', function () {
+    // A deck that does not build up is a deck with an empty `<p:timing>` written onto every
+    // slide: a part that is there and does nothing, and a repair prompt waiting for a reader
+    // of an older file to hit it.
+    $path = sys_get_temp_dir() . '/mdp-timing-none-' . hash('xxh3', 'timing none') . '.pptx';
+    $root = dirname(__DIR__, 2);
+
+    (new PresentationRenderer($root . '/examples/markdown'))->render(
+        (new DeckParser())->parse(TWO_SLIDES),
+        $path,
+    );
+
+    $pptx = Pptx::open($path);
+    $first = $pptx->part('ppt/slides/slide1.xml');
+    $reveals = [$pptx->reveals(1), $pptx->reveals(2)];
+
+    @unlink($path);
+
+    expect($first)->not->toContain('<p:timing')
+        ->and($reveals)->toBe([[], []]);
 });
 
 it('changes each slide part once, however many steps it has', function () {

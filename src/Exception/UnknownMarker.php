@@ -10,7 +10,8 @@ namespace MarkdownPresentation\Exception;
  * A step this renderer drops would leave a deck whose slides do not say what the author
  * wrote, so every way of getting it wrong — a number that goes backwards, a marker whose
  * argument is not a number, a region nothing closes — are refused with the form that would
- * have worked. So is a number larger than one slide could carry, because a step is a slide.
+ * have worked. So is a number past the ceiling on one slide's click chain, because a step is
+ * a position in a build-up and a position in the billions is not one anybody can mean.
  */
 final class UnknownMarker extends InvalidInput
 {
@@ -25,15 +26,15 @@ final class UnknownMarker extends InvalidInput
     }
 
     /**
-     * @param int $maximum The most steps one slide may carry, which the message repeats:
+     * @param int $maximum The most steps one slide may name, which the message repeats:
      *                     a refusal that does not say what would have worked leaves the
      *                     author to guess the number rather than to look it up.
      */
     public static function tooLarge(int $slide, string $argument, int $maximum): self
     {
         return new self(sprintf(
-            'Slide %d has a step "%s", which is past the %d steps one slide may carry: every step is '
-            . 'written as a slide of its own. Write "::click" for the next step, or name one up to %d.',
+            'Slide %d has a step "%s", which is past the %d steps one slide may build up in. '
+            . 'Write "::click" for the next step, or name one up to %d.',
             $slide,
             $argument,
             $maximum,

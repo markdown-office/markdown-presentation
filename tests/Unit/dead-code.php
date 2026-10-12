@@ -236,6 +236,17 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a frame carries a gap after every line it wrapped onto' => 'after every line of the frame',
     'a heading is painted in the theme accent and reaches the shape as a literal hex' => 'Everything that reaches a shape reaches',
     'the ceiling story reads as still hanging' => 'hangs the process rather than failing it',
+    // A step was a slide, and every page that said so had to be corrected at once. The
+    // phrases are what each of them said rather than the idea, and they are pinned to the
+    // `::click` spelling the live claims used: `CHANGELOG.md` quotes the old `v-click` message
+    // verbatim as history, and a guard that fires on it would be guarding the record of the
+    // change rather than the pages it changed.
+    'a step is a slide of its own' => 'every step of a build-up is written as a `.pptx` part',
+    'a marker writes another copy of the slide' => 'becomes the slides a presenter would click through',
+    'a step over the ceiling multiplied into written slides' => 'Every "::click" is written as a slide of its own',
+    'a deck of markers asks for more written slides than it has' => 'asks for 800 written slides',
+    'a build-up is measured once per step' => 'each revealing everything the one before it had',
+    'the two passes over the written package' => 'runs the two passes over it',
 ]);
 
 it('has no decorative dividers in it', function () {

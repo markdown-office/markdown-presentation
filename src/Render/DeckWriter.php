@@ -10,16 +10,18 @@ use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
 
 /**
- * Writes a finished presentation out, and runs the two passes over the written package.
+ * Writes a finished presentation out, and runs the three passes over the written package.
  *
- * Both passes are things the file needs that PHPPresentation does not write:
- * {@see PlaceholderPass} gives every layout part real placeholders, and {@see NotesColourMapPass}
- * gives every notes slide the colour map Keynote refuses to open a deck without. Neither can be
- * done through the writer's own API, so both are passes over the package afterwards — which is
- * what makes the file's last step one thing rather than a detail of every shape.
+ * All three are things the file needs that PHPPresentation does not write:
+ * {@see PlaceholderPass} gives every layout part real placeholders, {@see NotesColourMapPass}
+ * gives every notes slide the colour map Keynote refuses to open a deck without, and
+ * {@see TimingPass} gives a slide that builds up the click chain that builds it. None can be
+ * done through the writer's own API, so all three are passes over the package afterwards —
+ * which is what makes the file's last step one thing rather than a detail of every shape.
  *
  * @see PlaceholderPass
  * @see NotesColourMapPass
+ * @see TimingPass
  */
 final class DeckWriter
 {
@@ -28,7 +30,11 @@ final class DeckWriter
      * low-level "could not close zip file", after a broken archive has been left behind.
      * Saying so here is what makes the failure one a caller can act on.
      *
-     * @param list<LayoutRole> $roles The roles the deck used, in the order their layouts were built.
+     * @param list<LayoutRole>            $roles  The roles the deck used, in the order their layouts were built.
+     * @param array<int, list<list<int>>> $builds Slide number to the steps that build it up,
+     *        each step to the ids of the shapes it shows. A slide no entry names builds up not
+     *        at all, which is how a deck that steps only some of its slides comes out with a
+     *        click chain on those and none on the rest. See {@see TimingPass::applyTo()}.
      *
      * @throws Exception
      */
@@ -37,6 +43,7 @@ final class DeckWriter
         string $path,
         SlideGeometry $geometry,
         array $roles,
+        array $builds = [],
     ): string {
         $directory = dirname($path);
 
@@ -48,6 +55,7 @@ final class DeckWriter
 
         NotesColourMapPass::applyTo($path);
         PlaceholderPass::applyTo($path, $geometry, $roles);
+        TimingPass::applyTo($path, $builds);
 
         return $path;
     }

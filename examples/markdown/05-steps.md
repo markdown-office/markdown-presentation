@@ -1,13 +1,13 @@
 ---
 title: Steps
-description: What a ::click marker becomes when PowerPoint has no "press a key".
+description: What a ::click marker becomes when a step is a click on one slide.
 ---
 
 # A build-up, in three steps
 
-PowerPoint has no "press a key to reveal this", so a step marker on a line of its
-own becomes the slides a presenter would click through. This slide is written
-three times: once with the first step on it, once with two, and once with three.
+A step marker on a line of its own opens a click, so a build-up is one slide
+holding every step: run the slideshow and click. The first step is on the slide
+before you click anything, and each click after it reveals the next.
 
 - First step.
 
@@ -24,7 +24,8 @@ three times: once with the first step on it, once with two, and once with three.
 # Naming a step outright
 
 A marker can name the step it opens, which is how a build-up skips the ones before
-it. The two steps in between carry whatever was written above the marker.
+it. A step nothing was written on costs no click rather than a click that reveals
+nothing.
 
 ::click=3
 
@@ -39,14 +40,14 @@ parts it is made of rather than as a marker between each of them.
 
 :::click
 
-- The second part, on its own slide.
+- The second part, on its own click.
 
 - And the line under it, on the same one.
 
 :::
 
-The two lists above are one step and one shape each; open the second slide of this
-deck to see the difference.
+Both of the lists above arrive together: one click opens the step and the second
+shape joins it, rather than each costing a click of its own.
 
 ---
 

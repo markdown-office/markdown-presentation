@@ -246,8 +246,11 @@ it('leaves an image slide with no title placeholder to inherit', function () {
     $this->fail(sprintf('No slide is bound to the "Full Bleed Picture" layout in %s.', '07-images.md'));
 });
 
-it('reveals each step cumulatively', function () {
+it('reveals each step on a click of its own', function () {
     [$pptx] = builtDeck('05-steps.md');
 
-    expect($pptx->slideCount())->toBeGreaterThan(2);
+    // The first slide builds up in three steps, so it carries two clicks after the first
+    // step: a deck that wrote one slide per step would carry three slides here instead.
+    expect($pptx->reveals(1))->toHaveCount(2)
+        ->and($pptx->reveals(1)[0])->not->toBeEmpty();
 });

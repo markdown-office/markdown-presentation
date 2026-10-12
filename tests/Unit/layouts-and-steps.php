@@ -495,10 +495,10 @@ it('leaves a full-bleed picture where the library puts it rather than where the 
 });
 
 /**
- * A deck of `$slides` slides that each build up to `$steps`.
+ * A deck of `$slides` slides that each name `$steps` as a step.
  *
- * What a deck uses to get past a ceiling on one slide: every slide is inside it and the
- * deck is over it.
+ * What a deck looks like when a marker is pushed to the ceiling: every slide is inside
+ * {@see BlockParser::MAX_STEP} and the deck is over {@see PresentationRenderer::MAX_SLIDES}.
  */
 function steppedDeck(int $slides, int $steps): string
 {
@@ -508,15 +508,26 @@ function steppedDeck(int $slides, int $steps): string
 }
 
 /**
- * One slide of {@see steppedDeck()}, with `$steps` numbered steps in it.
+ * One slide of {@see steppedSlide()}, with `$steps` named as the step its text is on.
  *
- * Split out because the ceiling on a step and the deck written over the ceiling are the
- * same slide at two different numbers, and a reader of the second who cannot see the first
- * has to work out that `MAX_STEP` is the same shape as the `2` above it.
+ * Split out because the ceiling on a step and a deck of that many slides are two different
+ * questions now, and a reader of the second who cannot see the first has to work out that
+ * `MAX_STEP` and `MAX_SLIDES` are nothing to do with each other.
  */
 function steppedSlide(int $steps): string
 {
     return sprintf("# One\n\n::click=%d\n\nText.\n", $steps);
+}
+
+/**
+ * A deck of `$slides` slides that build up not at all.
+ *
+ * The deck ceiling, asked of the deck rather than of its markers: one source slide is one
+ * written slide, so the only way over it is to write that many slides.
+ */
+function slidesDeck(int $slides): string
+{
+    return str_repeat("# One\n\n---\n\n", $slides - 1) . "# One\n";
 }
 
 /** A slide whose one `::click` splits it in two, which is the smallest build-up. */
@@ -526,24 +537,58 @@ it('writes one slide for a slide with no steps', function () {
     expect(slideDeck("# One\n\nText.\n")->slideCount())->toBe(1);
 });
 
-it('writes a slide per step a ::click names', function () {
-    // PowerPoint has no "press a key to reveal this", so the build-up becomes the slides a
-    // presenter would click through anyway.
-    expect(slideDeck(ONE_STEP)->slideCount())->toBe(2);
+it('writes a build-up as one slide rather than one slide per step', function () {
+    // The whole of the change: `::click` used to mean "write this slide again with more on
+    // it", which put three copies of a slide in the package for a three-step build. It means
+    // "reveal this on the next click" now, and the click chain on the one slide is what says so.
+    expect(slideDeck(ONE_STEP)->slideCount())->toBe(1);
 });
 
-it('reveals each step on its own slide and keeps the earlier ones', function () {
+it('puts every step of a build-up on the slide, hidden until their click', function () {
+    // The shapes are all there from the start — that is what makes them animatable at all —
+    // and the steps a reader sees are read off the click chain rather than off which slides
+    // exist. So this asserts both halves: everything is written, and it is revealed in order.
     $pptx = slideDeck(ONE_STEP);
 
-    expect($pptx->texts(1))->toBe(['One', 'First.'])
-        ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.']);
+    expect($pptx->texts(1))->toBe(['One', 'First.', 'Second.'])
+        ->and($pptx->reveals(1))->toBe([['text']]);
 });
 
-it('writes a numbered step as the step it names', function () {
+it('leaves the first step off the click chain, because nothing hides it', function () {
+    // A branch in `<p:timing>` waits for a click. The first step is on the slide before the
+    // reader clicks anything, so naming it in a chain would cost a click that reveals a slide
+    // which was already showing — which is the same reason the title, written once and never
+    // changing, is in no step at all.
+    $pptx = slideDeck(ONE_STEP);
+
+    expect($pptx->shapeNames(1))->toBe(['title', 'text', 'text'])
+        ->and($pptx->reveals(1))->toBe([['text']]);
+});
+
+it('does not spend a click on a step nothing was written on', function () {
+    // `::click=3` leaves step two empty. It used to be written as a slide drawn exactly like
+    // the one before it, which is a click the reader spends to see no change; the chain drops
+    // it instead, so one click reaches the text.
     $pptx = slideDeck("# One\n\nFirst.\n\n::click=3\n\nThird.\n");
 
-    expect($pptx->slideCount())->toBe(3)
-        ->and($pptx->texts(3))->toBe(['One', 'First.', 'Third.']);
+    expect($pptx->slideCount())->toBe(1)
+        ->and($pptx->reveals(1))->toBe([['text']]);
+});
+
+it('gives one shape per click its own box rather than merging the text around it', function () {
+    // A frame is one shape and a shape is revealed whole, so a run of paragraphs either side
+    // of a marker cannot share one: the second click would bring the first click's text back
+    // with it. Two frames of one paragraph each are what a build-up is walked in — and they
+    // sit exactly where one frame of both put them, because the gap between two frames is the
+    // gap between two paragraphs of a frame and that is the same number either way. The
+    // equality below is that claim: the second paragraph starts at the same height either way.
+    $one = slideDeck("# One\n\nFirst.\n\nSecond.\n")->positions(1);
+    $split = slideDeck(ONE_STEP)->positions(1);
+
+    expect(array_column($one, 'name'))->toBe(['title', 'text'])
+        ->and(array_column($split, 'name'))->toBe(['title', 'text', 'text'])
+        ->and($split[1]['height'])->toBe($split[2]['height'])
+        ->and($one[1]['height'])->toBe($split[1]['height'] + ($split[2]['y'] - $split[1]['y']));
 });
 
 it('names the slide a ::click step is on', function () {
@@ -579,27 +624,35 @@ it('refuses a step too large to be held in an integer at all', function () {
         ->toThrow(UnknownMarker::class, 'Slide 1 has a step "99999999999999999999"');
 });
 
-it('renders a slide whose build-up is as long as one slide may carry', function () {
+it('renders a slide whose build-up is as long as one slide may name', function () {
     // The other side of the ceiling: a build-up that is long is not refused, so the bound
-    // cannot be met by drawing fewer steps than the deck wrote. Bounded on the way there,
-    // because the point is the number the marker accepts rather than the size of the file.
-    expect(slideDeck(steppedSlide(BlockParser::MAX_STEP))->slideCount())
-        ->toBe(BlockParser::MAX_STEP);
+    // cannot be met by dropping steps the deck wrote. It is the number the marker accepts
+    // rather than the size of the file that is being checked — a step no longer costs a slide,
+    // so this writes one however long the chain is.
+    $pptx = slideDeck(steppedSlide(BlockParser::MAX_STEP));
+
+    expect($pptx->slideCount())->toBe(1)
+        ->and(substr_count($pptx->part(SLIDE_ONE), '<p:cond delay="indefinite"/>'))->toBe(1);
 });
 
 it('refuses a deck with more slides than a presentation may carry', function () {
-    // BlockParser::MAX_STEP bounds one slide, so a deck gets past it by having several:
-    // three slides of 400 steps each is under the per-slide ceiling 1200 times over and
-    // 1200 written slides out of about 60 bytes of Markdown. The refusal comes before the
-    // first slide is built, so no file is written.
-    expect(fn () => slideDeck(steppedDeck(3, 400)))
-        ->toThrow(TooManySlides::class, 'This deck asks for 1200 slides, and one presentation may carry 1000');
+    // One source slide is one written slide, so the deck ceiling is the deck's own slide
+    // count: the amplification it used to exist for — forty slides of markers asking for
+    // hundreds of written slides out of forty lines — went with a step being an animation
+    // rather than a slide. The refusal still comes before the first slide is built.
+    expect(fn () => slideDeck(slidesDeck(PresentationRenderer::MAX_SLIDES + 1)))
+        ->toThrow(TooManySlides::class, sprintf(
+            'This deck asks for %d slides, and one presentation may carry %d.',
+            PresentationRenderer::MAX_SLIDES + 1,
+            PresentationRenderer::MAX_SLIDES,
+        ));
 });
 
 it('leaves a deck on the far side of the deck ceiling alone', function () {
     // The boundary again, from the other end: 1000 slides is rendered rather than refused,
     // because a ceiling that refuses the number it names is a limit nobody can rely on.
-    expect(slideDeck(steppedDeck(2, 500))->slideCount())->toBe(PresentationRenderer::MAX_SLIDES);
+    expect(slideDeck(slidesDeck(PresentationRenderer::MAX_SLIDES))->slideCount())
+        ->toBe(PresentationRenderer::MAX_SLIDES);
 });
 
 it('reads a :::click region as one step of its own', function () {
@@ -608,25 +661,27 @@ it('reads a :::click region as one step of its own', function () {
     // numbering path for the three-colon form to drift away from.
     $pptx = slideDeck("# One\n\nFirst.\n\n:::click\n\nSecond.\n\n:::\n\nThird.\n");
 
-    expect($pptx->slideCount())->toBe(2)
-        ->and($pptx->texts(1))->toBe(['One', 'First.'])
-        ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.', 'Third.']);
+    expect($pptx->slideCount())->toBe(1)
+        ->and($pptx->texts(1))->toBe(['One', 'First.', 'Second.', 'Third.'])
+        ->and($pptx->reveals(1))->toBe([['text']]);
 });
 
 it('names the step a region opener names, the way a bare marker does', function () {
+    // Step three with nothing on step two is one click, not two: the step nothing was written
+    // on is not a click a reader spends, whichever spelling named it.
     $pptx = slideDeck("# One\n\nFirst.\n\n:::click=3\n\nThird.\n\n:::\n");
 
-    expect($pptx->slideCount())->toBe(3)
-        ->and($pptx->texts(1))->toBe(['One', 'First.'])
-        ->and($pptx->texts(3))->toBe(['One', 'First.', 'Third.']);
+    expect($pptx->slideCount())->toBe(1)
+        ->and($pptx->texts(1))->toBe(['One', 'First.', 'Third.'])
+        ->and($pptx->reveals(1))->toBe([['text']]);
 });
 
 it('reads two regions as two steps rather than as one', function () {
     $pptx = slideDeck("# One\n\n:::click\n\nSecond.\n\n:::\n\n:::click\n\nThird.\n\n:::\n");
 
-    expect($pptx->slideCount())->toBe(3)
-        ->and($pptx->texts(2))->toBe(['One', 'Second.'])
-        ->and($pptx->texts(3))->toBe(['One', 'Second.', 'Third.']);
+    expect($pptx->slideCount())->toBe(1)
+        ->and($pptx->texts(1))->toBe(['One', 'Second.', 'Third.'])
+        ->and($pptx->reveals(1))->toBe([['text'], ['text']]);
 });
 
 it('moves the step on for a ::click written inside a region', function () {
@@ -634,17 +689,18 @@ it('moves the step on for a ::click written inside a region', function () {
     // marker inside them moves that same counter rather than starting a walk of its own.
     $pptx = slideDeck("# One\n\n:::click\n\nSecond.\n\n::click\n\nThird.\n\n:::\n");
 
-    expect($pptx->slideCount())->toBe(3)
-        ->and($pptx->texts(2))->toBe(['One', 'Second.'])
-        ->and($pptx->texts(3))->toBe(['One', 'Second.', 'Third.']);
+    expect($pptx->slideCount())->toBe(1)
+        ->and($pptx->texts(1))->toBe(['One', 'Second.', 'Third.'])
+        ->and($pptx->reveals(1))->toBe([['text'], ['text']]);
 });
 
 it('never matches a bare ::click as a region, or a :::click as a bare marker', function () {
     // The whole grammar rests on the pair not colliding, so both directions are asked rather
     // than reasoned about: the four lines below differ only in their colon count.
-    expect(slideDeck("# One\n\nFirst.\n\n::click\n\nSecond.\n")->slideCount())->toBe(2)
-        ->and(slideDeck("# One\n\nFirst.\n\n:::click\n\nSecond.\n\n:::\n")->slideCount())->toBe(2)
-        ->and(slideDeck("# One\n\nFirst.\n\n::click\n\nSecond.\n\n:::click\n\nThird.\n\n:::\n")->slideCount())->toBe(3);
+    expect(slideDeck("# One\n\nFirst.\n\n::click\n\nSecond.\n")->reveals(1))->toBe([['text']])
+        ->and(slideDeck("# One\n\nFirst.\n\n:::click\n\nSecond.\n\n:::\n")->reveals(1))->toBe([['text']])
+        ->and(slideDeck("# One\n\nFirst.\n\n::click\n\nSecond.\n\n:::click\n\nThird.\n\n:::\n")->reveals(1))
+        ->toBe([['text'], ['text']]);
 });
 
 it('refuses a region nothing closes, rather than reading the rest of the slide as it', function () {
@@ -673,11 +729,11 @@ it('refuses an HTML comment, which this format has no use for', function () {
 
 it('opens a step after the block a marker closes rather than before it', function () {
     // Advancing first would put the block the writer wrote above the marker on the step below
-    // it, which is the reverse of what they meant.
+    // it, which is the reverse of what they meant. It shows in which shape the click reveals.
     $pptx = slideDeck("# One\n\nFirst.\n::click\n\nSecond.\n");
 
-    expect($pptx->texts(1))->toBe(['One', 'First.'])
-        ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.']);
+    expect($pptx->texts(1))->toBe(['One', 'First.', 'Second.'])
+        ->and($pptx->shapeNames(1))->toBe(['title', 'text', 'text']);
 });
 
 it('draws a marker on the last line as a step rather than as a note', function () {
@@ -686,8 +742,9 @@ it('draws a marker on the last line as a step rather than as a note', function (
     // pane reading "::click" that a presenter would say out loud.
     $pptx = slideDeck("# One\n\nFirst.\n\n::click\n\nSecond.\n\n::click\n");
 
-    expect($pptx->slideCount())->toBe(2)
-        ->and($pptx->texts(2))->toBe(['One', 'First.', 'Second.'])
+    expect($pptx->slideCount())->toBe(1)
+        ->and($pptx->texts(1))->toBe(['One', 'First.', 'Second.'])
+        ->and($pptx->reveals(1))->toBe([['text']])
         ->and($pptx->parts())->not->toContain('ppt/notesSlides/notesSlide1.xml');
 });
 
@@ -698,22 +755,30 @@ it('refuses a trailing marker it cannot draw rather than writing it in the notes
         ->toThrow(UnknownMarker::class, 'Slide 1 has a step "two"');
 });
 
-it('gives every step of one source slide the same layout', function () {
+it('binds a slide that builds up to the layout its role names', function () {
+    // One slide out per slide in, so the question this used to ask — whether every step of a
+    // source slide got the same layout — cannot come up: there is one slide and it has the one
+    // its `layout:` named.
     $pptx = slideDeck("---\nlayout: title\n---\n# One\n\nFirst.\n\n::click\n\nSecond.\n");
 
-    expect($pptx->layoutOf(1))->toBe($pptx->layoutOf(2));
+    expect($pptx->layoutNames()[(int) $pptx->layoutOf(1)])->toBe('Title Slide');
 });
 
-it('names every step of a slide after the slide of the deck it came from', function () {
+it('names a slide after the slide of the deck it came from', function () {
     $pptx = slideDeck(ONE_STEP);
 
-    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('<p:cSld name="slide 1"')
-        ->and($pptx->part('ppt/slides/slide2.xml'))->toContain('<p:cSld name="slide 1"');
+    expect($pptx->part('ppt/slides/slide1.xml'))->toContain('<p:cSld name="slide 1"');
 });
 
-it('counts the steps of every slide towards the file, not of one', function () {
+it('gives each slide of a deck its own click chain rather than the first one', function () {
+    // The chains are keyed by slide number, so a deck that steps every slide writes a timing
+    // onto each of them — and a build-up on slide one must not be written onto slide two,
+    // which is a deck whose second slide reveals shapes that are not on it.
     $pptx = slideDeck("# One\n\nA.\n\n::click\n\nB.\n\n---\n\n# Two\n\nC.\n\n::click\n\nD.\n");
 
-    expect($pptx->slideCount())->toBe(4)
-        ->and($pptx->slideText(4))->toBe('Two | C. | D.');
+    expect($pptx->slideCount())->toBe(2)
+        ->and($pptx->slideText(1))->toBe('One | A. | B.')
+        ->and($pptx->slideText(2))->toBe('Two | C. | D.')
+        ->and($pptx->reveals(1))->toBe([['text']])
+        ->and($pptx->reveals(2))->toBe([['text']]);
 });

@@ -126,6 +126,58 @@ final class Pptx
     }
 
     /**
+     * What each click on a slide reveals, as the names of the shapes it shows.
+     *
+     * Read off the slide's own `<p:timing>` rather than counted from the shapes it carries:
+     * every shape of a build-up is on the slide from the start, so the shapes say what is
+     * *there* and only the click chain says what a reader sees and when.
+     *
+     * A click opens at the effect PowerPoint writes `nodeType="clickEffect"` and the shapes
+     * after it join it with `withEffect`, which is the whole of the difference between a step
+     * and one click per shape. An empty list means the slide carries no click chain at all.
+     *
+     * @return list<list<string>>
+     */
+    public function reveals(int $slide = 1): array
+    {
+        $xml = $this->part("ppt/slides/slide{$slide}.xml");
+
+        if (preg_match('#<p:timing>.*</p:timing>#s', $xml, $timing) !== 1) {
+            return [];
+        }
+
+        $names = [];
+        preg_match_all('/<p:cNvPr id="(\d+)" name="([^"]*)"/', $xml, $found, PREG_SET_ORDER);
+
+        foreach ($found as $shape) {
+            $names[(int) $shape[1]] = $shape[2];
+        }
+
+        preg_match_all(
+            '#nodeType="(clickEffect|withEffect)">(?:(?!nodeType=).)*?<p:spTgt spid="(\d+)"#s',
+            $timing[0],
+            $effects,
+            PREG_SET_ORDER,
+        );
+
+        $clicks = [];
+        $open = [];
+
+        foreach ($effects as $effect) {
+            if ($effect[1] === 'clickEffect') {
+                $clicks[] = $open;
+                $open = [];
+            }
+
+            $open[] = $names[(int) $effect[2]] ?? '';
+        }
+
+        $clicks[] = $open;
+
+        return array_values(array_filter($clicks));
+    }
+
+    /**
      * The colour scheme the theme part carries, as slot name to `#rrggbb`.
      *
      * @return array<string, string>
