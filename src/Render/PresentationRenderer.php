@@ -693,6 +693,12 @@ final class PresentationRenderer
             $visible = $this->visible($blocks, $columns, $column);
 
             foreach (TextFrame::group($visible) as $drawable) {
+                // A drawable that is a block is its own step; a {@see TextFrame} is several
+                // blocks drawn as one shape, and every block in a frame is on the same step —
+                // {@see TextFrame::group()} ends a run at a step boundary for exactly that
+                // reason — so the frame's step is its first block's.
+                $step = $drawable instanceof TextFrame ? $drawable->firstStep() : $drawable->step();
+
                 // A column whose contents are taller than its box runs off the bottom of it,
                 // and an image spends the whole of the room left — so both the cursor and
                 // the height are held inside the box. A shape that does not fit is drawn as
@@ -704,33 +710,16 @@ final class PresentationRenderer
                 $height = max(min($wanted, $room), SlideGeometry::MIN_SIZE);
 
                 if ($height < $wanted) {
-                    $this->overflow($number, $this->stepOf($drawable), $column, $drawable->name(), $wanted, $room);
+                    $this->overflow($number, $step, $column, $drawable->name(), $wanted, $room);
                 }
 
                 $writer->write($slide, $drawable, new Box($box->x, $y, $box->width, $height), $height);
-                $steps[$first++] = $this->stepOf($drawable);
+                $steps[$first++] = $step;
                 $y += $height + $geometry->style()->blockGap();
             }
         }
 
         return $steps;
-    }
-
-    /**
-     * The step a drawn shape belongs to.
-     *
-     * A drawable that is a block says so itself; a {@see TextFrame} does not, because it is
-     * several blocks drawn as one shape. Every block in a frame is on the same step —
-     * {@see TextFrame::group()} ends a run at a step boundary for exactly that reason — so
-     * the frame's step is its first block's.
-     *
-     * @param Code|TextFrame|Heading|Image|Quote|Rule|Table $drawable
-     */
-    private function stepOf(Code|TextFrame|Heading|Image|Quote|Rule|Table $drawable): int
-    {
-        return $drawable instanceof TextFrame
-            ? $drawable->firstStep()
-            : $drawable->step();
     }
 
     /**

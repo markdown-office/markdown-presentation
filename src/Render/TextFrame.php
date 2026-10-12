@@ -132,17 +132,14 @@ final class TextFrame
         $text = [];
 
         foreach ($blocks as $block) {
-            if (
-                (!$block instanceof Paragraph && !$block instanceof ListBlock)
-                || ($text !== [] && $text[0]->step() !== $block->step())
-            ) {
-                if ($text !== []) {
-                    $drawn[] = new TextFrame($text);
-                    $text = [];
-                }
+            $runnable = $block instanceof Paragraph || $block instanceof ListBlock;
+
+            if ($text !== [] && (!$runnable || $text[0]->step() !== $block->step())) {
+                $drawn[] = new TextFrame($text);
+                $text = [];
             }
 
-            if ($block instanceof Paragraph || $block instanceof ListBlock) {
+            if ($runnable) {
                 $text[] = $block;
 
                 continue;
