@@ -273,3 +273,13 @@ it('holds a picture back until its own click', function () {
     // step would put the picture on a slide of its own instead.
     expect($pptx->reveals(5))->toBe([['image'], ['text']]);
 });
+
+it('lays a two-column build out for a picture the first click has not shown', function () {
+    [$pptx] = builtDeck('05-steps.md');
+
+    // The last click is the picture, and it is in the right-hand column. The left column's own
+    // steps come before it because the columns are laid out in order, so the picture is measured
+    // into a column that has already been filled — which is the case a build-up has to get right
+    // and the one a single-column example cannot show.
+    expect($pptx->reveals(6))->toBe([['text', 'heading'], ['image']]);
+});

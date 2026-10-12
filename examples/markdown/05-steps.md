@@ -91,6 +91,29 @@ The text beside it, on the first step.
 And the last click, under the picture.
 
 ---
+layout: two-column
+---
+
+# A picture that finishes a two-column build
+
+The two cases a build-up runs into on its own, together. A two-column slide is
+measured column by column, and a picture takes the whole of the room it is given
+whether or not it has appeared — so the column it lands in is laid out for it
+before the click that shows it.
+
+Left, on the first step.
+
+::click
+
+Left, on the second.
+
+## The right column
+
+::click
+
+![A wide diagram under a headline](assets/landscape.webp)
+
+---
 
 # Showing a marker rather than running one
 
