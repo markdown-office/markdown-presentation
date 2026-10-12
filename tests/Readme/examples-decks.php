@@ -269,9 +269,9 @@ it('holds a picture back until its own click', function () {
     [$pptx] = builtDeck('05-steps.md');
 
     // A picture is measured into the room it will occupy whether or not it has appeared, so it
-    // is the only thing the first click of that slide carries. A renderer that wrote a slide per
-    // step would put the picture on a slide of its own instead.
-    expect($pptx->reveals(5))->toBe([['image'], ['text']]);
+    // is the only thing the click that shows it carries. A renderer that wrote a slide per step
+    // would put the picture on a slide of its own instead.
+    expect($pptx->reveals(5))->toBe([['image']]);
 });
 
 it('lays a two-column build out for a picture the first click has not shown', function () {

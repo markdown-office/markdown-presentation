@@ -80,15 +80,15 @@ else does. It is measured into the room it will occupy on every step, whether or
 not it has appeared yet — a build-up is laid out once, as its last click will
 look, not redrawn click by click.
 
+A picture takes the rest of the column it is in, so it ends one. A slide that
+wants text beside a picture names an image role instead — see `image-text` in
+Layouts.
+
 The text beside it, on the first step.
 
 ::click
 
 ![The office logo](assets/logo.png)
-
-::click
-
-And the last click, under the picture.
 
 ---
 layout: two-column
