@@ -652,14 +652,12 @@ final class PresentationRenderer
         $blocks[$at] = $drawn;
         $kept = array_values($blocks);
 
-        if (!$hasTitleBox) {
-            return new SlideBlocks($kept, $columns);
-        }
-
-        return new SlideBlocks(
-            array_merge(array_slice($kept, 0, $at), array_slice($kept, $at + 1)),
-            array_merge(array_slice($columns, 0, $at), array_slice($columns, $at + 1)),
-        );
+        return $hasTitleBox
+            ? new SlideBlocks(
+                array_merge(array_slice($kept, 0, $at), array_slice($kept, $at + 1)),
+                array_merge(array_slice($columns, 0, $at), array_slice($columns, $at + 1)),
+            )
+            : new SlideBlocks($kept, $columns);
     }
 
     private function note(WrittenSlide $slide, string $text): void
