@@ -238,10 +238,7 @@ final class BlockParser
         int $column,
         int $columnMarkers,
     ): array {
-        $blocks = [];
-        $columns = [];
-        $quote = [];
-        $paragraph = [];
+        $open = ['blocks' => [], 'columns' => [], 'quote' => [], 'paragraph' => []];
 
         $index = 0;
 
@@ -262,9 +259,9 @@ final class BlockParser
                 // Everything before the opener stays on the step it was written at, and
                 // everything inside is one step of its own, so the opener names that step
                 // through the same jump a bare marker does.
-                $end = self::closingRegion($lines, $index, $slide);
-                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
-                $step = self::jump($slide, $region[1] ?? null, $step);
+                $end = self::closingRegion($lines, $index, $slide, self::spelling($line));
+                $this->flush($open, $step, $column);
+                $step = self::jump($slide, $region[1] ?? null, $step, self::spelling($line));
 
                 // The column comes back with the blocks and the step does not, which is the
                 // whole of what a marker written inside a region carries out.
@@ -278,8 +275,8 @@ final class BlockParser
                     $columnMarkers,
                 );
 
-                array_push($blocks, ...$inside->blocks());
-                array_push($columns, ...$inside->columns());
+                array_push($open['blocks'], ...$inside->blocks());
+                array_push($open['columns'], ...$inside->columns());
                 $columnMarkers = $inside->columnMarkers();
 
                 $index = $end + 1;
@@ -293,23 +290,29 @@ final class BlockParser
                 // The step opens *after* the block the marker closes. Advancing first would
                 // put the block a writer wrote above the marker on the step below it, which
                 // is the reverse of what the author meant.
-                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
-                $step = self::jump($slide, $marker[1] ?? null, $step);
+                $this->flush($open, $step, $column);
+                $step = self::jump($slide, $marker[1] ?? null, $step, self::spelling($line));
 
                 continue;
             } elseif (preg_match(self::COLUMN, $line, $argument) === 1) {
                 // Whatever is open above the marker belongs to the column it was written in,
                 // so it is closed before the column moves — a paragraph with `::column` in the
                 // middle of it would be one shape drawn in the column it was started in.
-                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
+                $this->flush($open, $step, $column);
 
-                [$column, $columnMarkers] = self::column($slide, $argument[1] ?? null, $column, $columnMarkers);
+                [$column, $columnMarkers] = self::column(
+                    $slide,
+                    $argument[1] ?? null,
+                    $column,
+                    $columnMarkers,
+                    self::spelling($line),
+                );
 
                 continue;
             }
 
             if (trim($line) === '') {
-                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
+                $this->flush($open, $step, $column);
 
                 continue;
             }
@@ -319,11 +322,11 @@ final class BlockParser
             // indentation, the gap and the line height that one sentence would not have.
             // Only the first of them opens the block — the rest are still inside it.
             if (preg_match(self::QUOTE, $line, $quoted) === 1) {
-                if ($quote === []) {
-                    $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
+                if ($open['quote'] === []) {
+                    $this->flush($open, $step, $column);
                 }
 
-                $quote[] = $quoted[1];
+                $open['quote'][] = $quoted[1];
 
                 continue;
             }
@@ -334,19 +337,19 @@ final class BlockParser
             $index = $end + 1;
 
             if ($block !== null) {
-                $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
-                $blocks[] = $block;
-                $columns[] = $column;
+                $this->flush($open, $step, $column);
+                $open['blocks'][] = $block;
+                $open['columns'][] = $column;
 
                 continue;
             }
 
-            $paragraph[] = trim($line);
+            $open['paragraph'][] = trim($line);
         }
 
-        $this->flush($blocks, $columns, $quote, $paragraph, $step, $column);
+        $this->flush($open, $step, $column);
 
-        return [new SlideBlocks($blocks, $columns, $columnMarkers), $column];
+        return [new SlideBlocks($open['blocks'], $open['columns'], $columnMarkers), $column];
     }
 
     /**
@@ -458,11 +461,16 @@ final class BlockParser
      * everything after it would then be one step: a deck that meant three and wrote one is
      * a deck whose slides do not say what its author wrote.
      *
+     * The opener is handed in because the refusal quotes it and the walk is the only thing
+     * holding it: `REGION` captures the step and not the line, so the spelling of `:::Click=3`
+     * is gone by the time this is asked. {@see self::spelling()} has already been applied to it.
+     *
      * @param list<string> $lines
+     * @param string       $opener The opener as the deck wrote it, for the refusal.
      *
      * @throws UnknownMarker
      */
-    private static function closingRegion(array $lines, int $from, int $slide): int
+    private static function closingRegion(array $lines, int $from, int $slide, string $opener): int
     {
         for ($index = $from; $index < count($lines); $index++) {
             if (preg_match(self::CLOSES_REGION, $lines[$index]) === 1) {
@@ -470,7 +478,27 @@ final class BlockParser
             }
         }
 
-        throw UnknownMarker::unclosed($slide);
+        throw UnknownMarker::unclosed($slide, $opener);
+    }
+
+    /**
+     * A marker as the deck wrote it, with what a reader cannot see taken out of the quote.
+     *
+     * A message that quotes the canonical spelling is a message about a line the writer did
+     * not write: every two-colon marker is read in either case, so `::Column=2` is the same
+     * marker as `::column=2` and the refusal can only be found by comparing two lines rather
+     * than one.
+     *
+     * Whitespace goes because a quote whose difference from the line in the deck is invisible
+     * cannot be matched against it — `::click=  ` is refused as `::click=`, and quoting the two
+     * trailing spaces would only move the disagreement somewhere less visible. Control
+     * characters go for the reader rather than the writer: a carriage return or an escape
+     * sequence quoted into a refusal repaints the line or moves the cursor of the terminal or
+     * log the message is printed in, so a deck's own text would be what that terminal shows.
+     */
+    private static function spelling(string $line): string
+    {
+        return trim((string) preg_replace('/[[:cntrl:]]/', '', $line));
     }
 
     /**
@@ -518,20 +546,26 @@ final class BlockParser
      * question against the same counter: there is no second numbering path for the
      * three-colon form to drift away from.
      *
+     * `$marker` is the line as the deck wrote it, because `MARKER` and `REGION` capture the
+     * argument and nothing else: the spelling of `::Click=` is in the line and not in the
+     * capture, so the refusal has to be handed it rather than put it back together.
+     *
+     * @param string $marker The marker as written, already through {@see self::spelling()}.
+     *
      * @throws UnknownMarker
      */
-    private static function jump(int $slide, ?string $argument, int $step): int
+    private static function jump(int $slide, ?string $argument, int $step, string $marker): int
     {
         if ($argument === null) {
             return $step + 1;
         }
 
         if ($argument === '') {
-            throw UnknownMarker::empty($slide);
+            throw UnknownMarker::empty($slide, $marker);
         }
 
         if (preg_match('/\A\d+\z/', $argument) !== 1) {
-            throw UnknownMarker::notANumber($slide, $argument);
+            throw UnknownMarker::notANumber($slide, self::spelling($argument));
         }
 
         $number = (int) $argument;
@@ -564,19 +598,22 @@ final class BlockParser
      * The count moves beside the column rather than being derived from it, because a marker
      * with nothing after it moves nothing and the renderer still has to know it was written.
      *
-     * The four buffers are flushed by the caller rather than here: this method taking them as
-     * well is eight parameters, and `php:S107` fires above seven.
+     * The buffers are flushed by the caller rather than here, and it is not the parameter
+     * count: this is a static method and {@see self::flush()} is not, because closing a quote
+     * reads its runs through the inline parser.
+     *
+     * @param string $marker The marker as written, already through {@see self::spelling()}.
      *
      * @throws UnknownMarker
      *
      * @return array{0: int, 1: int} The column after the marker, and how many markers the slide has.
      */
-    private static function column(int $slide, ?string $argument, int $column, int $columnMarkers): array
+    private static function column(int $slide, ?string $argument, int $column, int $columnMarkers, string $marker): array
     {
         // Refused before anything is counted, so that `::column=2` never reaches the count: it
         // is not a marker, and a column cannot be named as one.
         if ($argument !== null) {
-            throw UnknownMarker::argument($slide, $argument);
+            throw UnknownMarker::argument($slide, $marker);
         }
 
         return [$column + 1, $columnMarkers + 1];
@@ -857,25 +894,33 @@ final class BlockParser
      * as it is written in. The line after a quote closes the quote the way a blank line
      * does, without being one.
      *
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
-     * @param list<int>                                                      $columns The column each block was written for, kept in step with `$blocks` here.
-     * @param list<string>                                                   $quote
-     * @param list<string>                                                   $paragraph
-    */
-    private function flush(array &$blocks, array &$columns, array &$quote, array &$paragraph, int $step, int $column): void
+     * One array rather than four parameters, and by reference: {@see self::blocks()} is at
+     * `php:S107`'s ceiling with the walk's own arguments, so a fourth buffer is a fifth
+     * parameter there, and anything extracted out of `blocks()` would rather be handed one
+     * argument than four. `columns` is appended in step with `blocks` here, and the pair is
+     * checked once — by {@see SlideBlocks}, which is handed both — rather than at each append.
+     *
+     * @param array{
+     *     blocks: list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>,
+     *     columns: list<int>,
+     *     quote: list<string>,
+     *     paragraph: list<string>
+     * } $open The four buffers the walk currently has open.
+     */
+    private function flush(array &$open, int $step, int $column): void
     {
-        if ($quote !== []) {
-            $blocks[] = new Quote($this->inline->parse(implode("\n", $quote)), $step);
-            $columns[] = $column;
-            $quote = [];
+        if ($open['quote'] !== []) {
+            $open['blocks'][] = new Quote($this->inline->parse(implode("\n", $open['quote'])), $step);
+            $open['columns'][] = $column;
+            $open['quote'] = [];
         }
 
-        if ($paragraph === []) {
+        if ($open['paragraph'] === []) {
             return;
         }
 
-        $blocks[] = new Paragraph($this->inline->parse(implode("\n", $paragraph)), $step);
-        $columns[] = $column;
-        $paragraph = [];
+        $open['blocks'][] = new Paragraph($this->inline->parse(implode("\n", $open['paragraph'])), $step);
+        $open['columns'][] = $column;
+        $open['paragraph'] = [];
     }
 }

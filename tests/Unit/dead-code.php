@@ -266,6 +266,10 @@ it('does not claim again what the code does not do', function (string $claim) {
     // or a comment may not argue that what is inside a region is where the opener was.
     'a region keeps its column to itself' => 'what it holds stays in the column it was written in',
     'a region keeps the column it was written in' => 'what is inside one belongs where the opener was',
+    // `column()` kept the buffers flushed by its caller because four of them beside its own
+    // arguments is past `php:S107`, which is a number the signature no longer has to keep.
+    // The reason it still gives is the one that holds: it is static and the flush is not.
+    'a method keeps work out of it because of how many parameters it takes' => 'taking them as well is eight parameters',
 ]);
 
 it('has no decorative dividers in it', function () {

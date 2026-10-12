@@ -827,6 +827,51 @@ it('refuses a ::: that closes nothing, rather than drawing three colons on a sli
         ->toThrow(UnknownMarker::class, 'Slide 1 has a ":::" that closes nothing');
 });
 
+it('quotes a marker the way the deck wrote it rather than the way it is spelled here', function () {
+    // Every two-colon marker is read in either case, so a refusal that named `::column=2` for
+    // a deck that wrote `::Column=2` is a report about a line its author does not have. The
+    // argument is not enough to answer for the line either: `MARKER`, `REGION` and `COLUMN`
+    // capture what is after the equals and nothing else, so these three factories were each
+    // rebuilding a marker rather than being told one — and a region opener that named a
+    // step was reported as the bare `:::click` it shares a pattern with.
+    expect(fn () => slideDeck("# One\n\nLeft.\n\n::Column=2\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::Column=2", which is not a column marker')
+        ->and(fn () => slideDeck("# One\n\n::Click=\n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::Click=" step marker with no number')
+        ->and(fn () => slideDeck("# One\n\nFirst.\n\n:::Click=3\n\nSecond.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 opens a ":::Click=3" region that nothing closes');
+});
+
+it('quotes the whitespace out of a marker, because the writer cannot see it either', function () {
+    // `::click=  ` is refused as a marker with no number, and the two trailing spaces are the
+    // only difference between it and the `::click=` above. Quoting them would not have made
+    // the message more exact — it would have put the disagreement somewhere the reader
+    // cannot compare it — so the quote is the trimmed line, which is what is in the file.
+    expect(fn () => slideDeck("# One\n\n  ::click=   \n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::click=" step marker with no number')
+        ->and(fn () => slideDeck("# One\n\n  :::Click  \n\nSecond.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 opens a ":::Click" region that nothing closes');
+});
+
+it('quotes a marker without the control characters a deck can put on that line', function () {
+    // The spelling in a refusal is the deck's own text, and a marker line is the one place a
+    // deck gets to write bytes rather than words. Quoted raw, a carriage return moves the
+    // cursor to the start of the line and an escape sequence can clear it — so the
+    // author's own marker is what a terminal or a CI log shows, above the sentence explaining
+    // what to do about it. Both are dropped rather than escaped: there is no reading of a
+    // step number in which a repainted line was more useful than a missing character.
+    $hostile = "two\x1b[2J\rthree";
+
+    try {
+        slideDeck("# One\n\n::click=" . $hostile . "\n\nText.\n");
+        $this->fail('A step marker carrying a control character was not refused.');
+    } catch (UnknownMarker $refusal) {
+        expect($refusal->getMessage())->toContain('Slide 1 has a step "two[2Jthree"')
+            ->and($refusal->getMessage())->not->toContain("\x1b")
+            ->and($refusal->getMessage())->not->toContain("\r");
+    }
+});
+
 it('refuses a ::note nothing closes, rather than taking the rest of the slide as the note', function () {
     // Read as a note it swallows every line after the opener into the notes pane, and a deck
     // whose slides are empty is not one anybody can act on.

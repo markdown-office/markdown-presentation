@@ -76,6 +76,32 @@ Left, on the third step.
 Right, on the second step — written after the third, and clicked before it.
 
 ---
+layout: two-column
+---
+
+# A column that comes out of a region
+
+A `::column` written inside a region moves the text after it, and the closing
+`:::` does not put it back. A region says what a click shows and a column says
+which side of the slide a block is drawn on, and the second does not end with the
+first.
+
+Left, above the region.
+
+:::click
+
+Left, on the step the region opened.
+
+::column
+
+Right, on the step the region opened.
+
+:::
+
+Right, after the closer — in the column the marker moved it to, and on the step
+the region opened at.
+
+---
 
 # A picture arriving on its own click
 

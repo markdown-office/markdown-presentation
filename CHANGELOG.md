@@ -163,6 +163,32 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A refusal named the marker the parser expects rather than the one the deck wrote.** Every
+  two-colon marker is read in either case, and `MARKER`, `REGION` and `COLUMN` capture only what
+  follows an equals — so three factories were rebuilding a marker out of its argument instead of
+  being handed the line. A writer who typed `::Column=2` was told about `::column=2`, which is a
+  line they did not write and have to go looking for.
+
+  | Deck writes | Was told about | Now |
+  | --- | --- | --- |
+  | `::Column=2` | `::column=2` | `::Column=2` |
+  | `::Click=` | `::click=` | `::Click=` |
+  | `:::Click=3` with nothing after it | `:::click` | `:::Click=3` |
+
+  The advice half of each message is unchanged and stays on the canonical spelling: a message that
+  says what to write next is not reporting what is in the file, and `::click` is what the README
+  documents. `UnknownMarker::strayCloser()` is unchanged for a reason worth keeping —
+  `CLOSES_REGION` admits three colons and nothing but whitespace, so every line that matches it
+  trims to the one spelling the message already quotes.
+
+  **A quoted spelling is trimmed and stripped of control characters.** A marker line is the one
+  place in a deck where a writer gets to write bytes rather than words, and a refusal is read in a
+  terminal or a CI log: a carriage return moves the cursor to the start of the line and an escape
+  sequence can clear it, so the deck's own text would be what that terminal shows above the
+  sentence explaining what to do about it. Whitespace goes for the reader rather than the writer:
+  `::click=  ` is refused as `::click=`, and quoting the two trailing spaces would only move the
+  disagreement somewhere less visible.
+
 - **A template-backed column was laid out and left empty.** `PresentationRenderer::splits()`
   asked the geometry the constructor was handed rather than the merged one `render()` builds,
   so a theme whose `template.pptx` gives a role two body placeholders was asked how many
@@ -494,6 +520,28 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`BlockParser::flush()` takes its four buffers as one array.** Six parameters become three, and
+  the walk above them declares one local rather than four. The refactor is in the arguments rather
+  than the behaviour: every block a slide ends up with, the column each was written for and the
+  `SlideBlocks` invariant that keeps the two lists the same length are what they were, and the 847
+  tests passing are the evidence.
+
+  The reason is `php:S107`. `blocks()` is at seven parameters with the walk's own arguments — the
+  lines, the slide, the directory, the scope, the step, the column and the marker count — and
+  `flush()` is called from six branches of it, so a fourth buffer is a fifth parameter there. What
+  the array buys is room for an extraction out of `blocks()` to be handed one argument instead of
+  four, which is the reason `column()` still flushes by its caller.
+
+  That reason changed, and so did its comment. The buffers are flushed by the caller because
+  `column()` is static and `flush()` is not — closing a quote reads its runs through the inline
+  parser — rather than because four buffers beside four arguments is eight parameters. The old
+  claim is in `tests/Unit/dead-code.php` so it cannot come back.
+
+  `BlockParser` is at 21 methods and `php:S1448` is unchanged: the next method still breaks that
+  gate. `blocks()`'s cognitive complexity is unchanged too, at exactly 15 against a limit of 15 —
+  the control-flow structure of the walk is the same sequence of tokens it was, so nothing in the
+  refactor could have nested anything.
+
 - **`PresentationRenderer` did three jobs.** Twenty-seven methods, of which six were neither
   parsing a deck nor drawing a slide:
 
@@ -650,6 +698,15 @@ The first slice of the PowerPoint half of `markdown-office`. It decides where a
 slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 
 ### Added
+
+- **A gallery slide for a `::column` written inside a `:::click` region.** `examples/markdown/05-steps.md`
+  had a region on one slide and column markers on two others, and never both on the same one — so
+  the case a reader most needs to see is the one the gallery was silent about: text after a
+  region's closing `:::` stays in the column the marker inside the region moved it to. The new
+  slide is after the two-column build-up, which is where both halves have already been introduced.
+
+  The build has six clamps before the slide and six after it, and `examples/README.md` names it
+  beside the `02` two-column slide that says where a column divides.
 
 - **`TimingPass`, which writes a click-triggered build onto a slide. Nothing calls it yet.**
   No deck a person writes changes, and a `v-click` step is still a slide of its own. It is here

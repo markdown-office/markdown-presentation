@@ -271,7 +271,21 @@ it('holds a picture back until its own click', function () {
     // A picture is measured into the room it will occupy whether or not it has appeared, so it
     // is the only thing the click that shows it carries. A renderer that wrote a slide per step
     // would put the picture on a slide of its own instead.
-    expect($pptx->reveals(5))->toBe([['image']]);
+    expect($pptx->reveals(6))->toBe([['image']]);
+});
+
+it('draws the text after a region in the column a marker inside that region moved it to', function () {
+    [$pptx] = builtDeck('05-steps.md');
+
+    // The sentence after the closing `:::` is the whole of this deck's claim about a region and
+    // a column on one slide, and the text alone cannot tell where it was drawn: a parser that
+    // kept the region to the column it opened in would put the same words at the left column's
+    // `x` and the page would read the same.
+    $shapes = $pptx->positions(5);
+
+    expect($pptx->slideText(5))->toContain('Right, after the closer')
+        ->and($shapes)->toHaveCount(4)
+        ->and($shapes[3]['x'])->toBeGreaterThan($shapes[2]['x']);
 });
 
 it('lays a two-column build out for a picture the first click has not shown', function () {
@@ -281,5 +295,5 @@ it('lays a two-column build out for a picture the first click has not shown', fu
     // steps come before it because the columns are laid out in order, so the picture is measured
     // into a column that has already been filled — which is the case a build-up has to get right
     // and the one a single-column example cannot show.
-    expect($pptx->reveals(6))->toBe([['text', 'heading'], ['image']]);
+    expect($pptx->reveals(7))->toBe([['text', 'heading'], ['image']]);
 });

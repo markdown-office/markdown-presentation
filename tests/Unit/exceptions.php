@@ -239,7 +239,7 @@ it('names the alternatives wherever a failure is a name the author can change', 
         'A note is "::note" on a line of its own',
     ],
     'a region nothing closes' => [
-        UnknownMarker::unclosed(2)->getMessage(),
+        UnknownMarker::unclosed(2, ':::click')->getMessage(),
         'A region ends at a ":::" on a line of its own',
     ],
     'a closer with nothing to close' => [
@@ -263,7 +263,7 @@ it('names the alternatives wherever a failure is a name the author can change', 
         'which is not a number',
     ],
     'an equals with nothing after it' => [
-        UnknownMarker::empty(2)->getMessage(),
+        UnknownMarker::empty(2, '::click=')->getMessage(),
         'with no number',
     ],
     'a column the layout has none to move a block into' => [
