@@ -254,3 +254,22 @@ it('reveals each step on a click of its own', function () {
     expect($pptx->reveals(1))->toHaveCount(2)
         ->and($pptx->reveals(1)[0])->not->toBeEmpty();
 });
+
+it('clicks a two-column build in the order the steps were written', function () {
+    [$pptx] = builtDeck('05-steps.md');
+
+    // The left column names step three, and the heading that opens the right column is at that
+    // step too, so the first click carries a shape from both columns at once. The step written
+    // after it comes second, so the chain runs in the order the deck was read rather than the
+    // order the two columns are laid out in.
+    expect($pptx->reveals(4))->toBe([['text', 'heading'], ['text']]);
+});
+
+it('holds a picture back until its own click', function () {
+    [$pptx] = builtDeck('05-steps.md');
+
+    // A picture is measured into the room it will occupy whether or not it has appeared, so it
+    // is the only thing the first click of that slide carries. A renderer that wrote a slide per
+    // step would put the picture on a slide of its own instead.
+    expect($pptx->reveals(5))->toBe([['image'], ['text']]);
+});

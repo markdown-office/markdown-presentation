@@ -50,6 +50,47 @@ Both of the lists above arrive together: one click opens the step and the second
 shape joins it, rather than each costing a click of its own.
 
 ---
+layout: two-column
+---
+
+# A build-up across two columns
+
+A two-column slide is written left column first, so the steps it asks for arrive
+in an order that need not be the order they were read in. The clicks still run
+in the order they were written.
+
+Left, on the first step.
+
+::click=3
+
+Left, on the third step.
+
+## The right column
+
+::click
+
+Right, on the second step — written after the third, and clicked before it.
+
+---
+
+# A picture arriving on its own click
+
+A picture is a shape like any other, so it waits for its step the way everything
+else does. It is measured into the room it will occupy on every step, whether or
+not it has appeared yet — a build-up is laid out once, as its last click will
+look, not redrawn click by click.
+
+The text beside it, on the first step.
+
+::click
+
+![The office logo](assets/logo.png)
+
+::click
+
+And the last click, under the picture.
+
+---
 
 # Showing a marker rather than running one
 

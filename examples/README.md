@@ -21,7 +21,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `02-layout-roles.md` | `02-layout-roles.pptx` | Every layout role, one per slide |
 | `03-themes.md` | three files | The same deck in `default`, `corporate-dark` and `minimal`, changed by nothing but the `theme:` line — so the three can be put side by side and compared. They differ in type scale, margins, rule weight and heading treatment, not only in palette |
 | `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does |
-| `05-steps.md` | `05-steps.pptx` | `::click` steps as click animations on one slide, a `:::click` region that is a step of its own, and a `::note` |
+| `05-steps.md` | `05-steps.pptx` | `::click` steps as click animations on one slide, a `:::click` region that is a step of its own, a build-up across two columns, a picture held back for its own click, and a `::note` |
 | `06-tables.md` | `06-tables.pptx` | Table alignment, a bold filled header, widths from content |
 | `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column, and the three layouts built around one: `image-text`, `image-title` and `image-slide` |
 | `08-code.md` | `08-code.pptx` | Code blocks |
