@@ -394,17 +394,26 @@ final class BlockTranslator
         // and nothing is left to a reader to infer.
         $explicit = $ordered && $data->start !== 1;
         $number = $data->start;
+        $first = true;
 
         foreach ($node->children() as $item) {
+            // The number the list was opened with, on its first item alone: an item that carries
+            // on from the one above it has no number of its own to draw. A numbering that
+            // begins above one is the exception, and every one of its items carries its own.
+            $start = $first ? $data->start : null;
+
+            if ($explicit) {
+                $start = $number;
+            }
+
             $items[] = [
                 'level' => $level,
                 'runs' => $this->itemRuns($item, $state),
                 'ordered' => $ordered,
-                // The number the list was opened with, on its first item alone: an item that
-                // carries on from the one above it has no number of its own to draw.
-                'start' => $ordered ? ($explicit ? $number : ($items === [] ? $data->start : null)) : null,
+                'start' => $ordered ? $start : null,
             ];
 
+            $first = false;
             $number++;
 
             foreach ($item->children() as $child) {

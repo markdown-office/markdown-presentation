@@ -232,10 +232,10 @@ it('keeps the number the first ordered item was written with', function () {
 
 it('starts a nested ordered list again at its own level', function () {
     // Three spaces, because `1. ` is three columns wide and a sub-item at two is a sibling.
-    // Only the first item carries a number: each level begins its own numbering at one, so a
-    // number on the sub-item would restate what the level already knows and on the way back
-    // `two` would restart a numbering that had not ended.
-    expect(array_column(blocksOf("1. one\n   1. sub\n2. two\n")[0]->items, 'start'))->toBe([1, null, null]);
+    // Each level opens its own numbering, so the sub-item carries that level's one and the item
+    // that comes back to the outer level carries nothing: writing a number there would restart
+    // a numbering that had not ended. A start of one is never written to the file at all.
+    expect(array_column(blocksOf("1. one\n   1. sub\n2. two\n")[0]->items, 'start'))->toBe([1, 1, null]);
 });
 
 it('keeps no number for a bulleted item', function () {
