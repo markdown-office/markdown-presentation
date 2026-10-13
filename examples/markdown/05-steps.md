@@ -46,8 +46,8 @@ parts it is made of rather than as a marker between each of them.
 
 :::
 
-Both of the lists above arrive together: one click opens the step and the second
-shape joins it, rather than each costing a click of its own.
+The list above arrives on one click, both bullets with it: a blank line between two of
+them does not end the list, so there is one shape here rather than two to join.
 
 ---
 layout: two-column

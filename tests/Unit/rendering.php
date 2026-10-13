@@ -451,13 +451,15 @@ it('numbers an ordered list rather than bulleting it', function () {
 it('starts an ordered list at the number the deck names', function () {
     // `3. three` drawn as `1.` is a list that does not say what the deck said.
     //
-    // The number is `startAt`, and PHPPresentation writes the start of a numbering on every
-    // paragraph of it the way PowerPoint does — both paragraphs say three, and the second
-    // counts on to four rather than beginning a numbering of its own.
+    // The number is `startAt`, written on every paragraph of a numbering that does not begin at
+    // one. PHPPresentation repeats the start and leaves PowerPoint to count on; LibreOffice
+    // restarts at each one instead, so each item carries its own number and no reader has to
+    // infer the continuation.
     $xml = renderDeck("3. three\n4. four\n")->part(SLIDE_ONE);
 
     expect($xml)->toContain('<a:buAutoNum type="arabicPeriod" startAt="3"/>')
-        ->and(substr_count($xml, 'startAt="3"'))->toBe(2);
+        ->and($xml)->toContain('<a:buAutoNum type="arabicPeriod" startAt="4"/>')
+        ->and(substr_count($xml, 'startAt="3"'))->toBe(1);
 });
 
 it('leaves a list that starts at one with no start of its own', function () {
@@ -466,14 +468,17 @@ it('leaves a list that starts at one with no start of its own', function () {
     expect(renderDeck(ORDERED_LIST)->part(SLIDE_ONE))->not->toContain('startAt');
 });
 
-it('numbers a nested ordered list as a list of its own', function () {
-    // Without a level of its own the sub-list is the same numbering as the one above it, so
-    // `1.` under `1.` comes out as `2.`
-    $xml = renderDeck("1. one\n  1. sub\n2. two\n")->part(SLIDE_ONE);
+it('needs the parent marker\'s width of indent before a sub-list is one', function () {
+    // `1. ` is three columns wide, so a sub-item under it starts at column three. Two spaces
+    // is short of that and CommonMark reads it as a sibling, which is why this is three items
+    // in one list rather than two in two. The hand-written walk nested it at two, so a deck
+    // relying on that loses a level.
+    $xml = renderDeck("1. one\n   1. sub\n2. two\n")->part(SLIDE_ONE);
 
     expect(substr_count($xml, '<a:buAutoNum'))->toBe(3)
-        ->and(substr_count($xml, 'lvl="1"'))->toBe(1)
-        ->and(substr_count($xml, 'startAt'))->toBe(1);
+        ->and(substr_count($xml, 'lvl="1"'))->toBe(1);
+
+    expect(substr_count(renderDeck("1. one\n  1. sub\n2. two\n")->part(SLIDE_ONE), 'lvl="1"'))->toBe(0);
 });
 
 

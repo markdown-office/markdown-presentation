@@ -5,6 +5,7 @@ declare(strict_types=1);
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use League\CommonMark\Node\Block\Paragraph as LeagueParagraph;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedLink;
@@ -28,9 +29,10 @@ const EXAMPLE_LINK = 'https://example.com';
 use MarkdownPresentation\Render\Block\Quote;
 use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
-use MarkdownPresentation\Render\BlockParser;
 use MarkdownPresentation\Render\CommonMark\BlockTranslator;
-use MarkdownPresentation\Render\InlineParser;
+use MarkdownPresentation\Render\CommonMark\InlineTranslator;
+use MarkdownPresentation\Render\CommonMark\SlideEnvironment;
+use MarkdownPresentation\Render\CommonMark\SlideState;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\Run;
 use MarkdownPresentation\Render\SlideBlocks;
@@ -50,7 +52,7 @@ use MarkdownPresentation\Tests\Support\Scratch;
  */
 function slideContentOf(string $markdown): SlideBlocks
 {
-    return (new BlockParser())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()));
+    return (new BlockTranslator())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()));
 }
 
 /**
@@ -64,13 +66,13 @@ function blocksOf(string $markdown): array
 }
 
 /**
- * The same, read through the league translator the hand-written parser is being replaced by.
+ * The runs one piece of inline Markdown makes, read through the translator the renderer uses.
  *
- * @return list<Block>
+ * @return list<Run>
  */
-function leagueBlocksOf(string $markdown): array
+function inlineRuns(string $markdown): array
 {
-    return (new BlockTranslator())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()))->blocks();
+    return (new InlineTranslator(SlideEnvironment::build()))->runsIn($markdown);
 }
 
 /**
@@ -168,10 +170,11 @@ it('ends a list at a fence', function () {
     expect(kindsOf("- one\n```\ncode\n```\n"))->toBe([ListBlock::class, Code::class]);
 });
 
-it('ends a list at a line that starts no item', function () {
-    // CommonMark ends a list at a paragraph line, so a line of text after a list is its own
-    // block rather than a fourth item.
-    expect(kindsOf("- one\nplain text\n"))->toBe([ListBlock::class, Paragraph::class]);
+it('takes a line of text after a list item as part of that item', function () {
+    // CommonMark's lazy continuation: a paragraph line with no blank line above it joins the
+    // item it follows rather than ending the list. The hand-written walk ended the list, and
+    // the comment it carried said CommonMark did the same, which it does not.
+    expect(kindsOf("- one\nplain text\n"))->toBe([ListBlock::class]);
 });
 
 it('reads a list written with a plus as a list', function () {
@@ -187,10 +190,11 @@ it('reads an ordered list written with a bracket as ordered', function () {
         ->and(blocksOf("1) one\n")[0]->items[0]['ordered'])->toBeTrue();
 });
 
-it('keeps each item\'s own marker where a list mixes them', function () {
-    // `ordered` was one flag for the whole block, taken from the first item, so a list
-    // written `- a`, `1. b`, `- c` came out as three bullets.
-    expect(array_column(blocksOf("- a\n1. b\n- c\n")[0]->items, 'ordered'))->toBe([false, true, false]);
+it('ends a list where the marker changes', function () {
+    // A change of marker starts a new list in CommonMark, so `- a`, `1. b`, `- c` is three
+    // lists. The hand-written walk made one list of three items and carried an `ordered` flag
+    // per item to draw it, which is a reading CommonMark does not have.
+    expect(kindsOf("- a\n1. b\n- c\n"))->toBe([ListBlock::class, ListBlock::class, ListBlock::class]);
 });
 
 it('reads a nested item as a deeper item', function () {
@@ -215,17 +219,23 @@ it('closes the levels an item comes back out of', function () {
 
 it('keeps the number the first ordered item was written with', function () {
     // The number is what the writer's `startAt` is, and it was captured into a variable
-    // nobody read: `3. three` came out as `1.` Only the item that begins a numbering carries
-    // it; the rest carry on from it, which is what makes `1. 2. 3.` three items of one list
-    // rather than three lists.
-    expect(array_column(blocksOf("3. three\n4. four\n")[0]->items, 'start'))->toBe([3, null]);
+    // nobody read: `3. three` came out as `1.` A numbering that does not begin at one carries
+    // its number on every item rather than on the first alone, because the same `startAt` is
+    // written on each of its paragraphs and a reader that restarts at each one would count
+    // `3. three` and `4. four` as two threes.
+    expect(array_column(blocksOf("3. three\n4. four\n")[0]->items, 'start'))->toBe([3, 4]);
+
+    // One that does begin at one carries it on the first item alone, because nothing is
+    // written for it and every reader counts on from one.
+    expect(array_column(blocksOf("1. one\n2. two\n")[0]->items, 'start'))->toBe([1, null]);
 });
 
 it('starts a nested ordered list again at its own level', function () {
-    // The sub-list begins a numbering of its own, and the item that comes back to the outer
-    // level restates the number: PHPPresentation ends a numbering when a paragraph at a
-    // deeper level interrupts it, so `2. two` is the only thing that reads as two.
-    expect(array_column(blocksOf("1. one\n  1. sub\n2. two\n")[0]->items, 'start'))->toBe([1, 1, 2]);
+    // Three spaces, because `1. ` is three columns wide and a sub-item at two is a sibling.
+    // Only the first item carries a number: each level begins its own numbering at one, so a
+    // number on the sub-item would restate what the level already knows and on the way back
+    // `two` would restart a numbering that had not ended.
+    expect(array_column(blocksOf("1. one\n   1. sub\n2. two\n")[0]->items, 'start'))->toBe([1, null, null]);
 });
 
 it('keeps no number for a bulleted item', function () {
@@ -271,14 +281,14 @@ it('reads a quote written across two lines as one block', function () {
 
     expect($blocks)->toHaveCount(1)
         ->and($blocks[0])->toBeInstanceOf(Quote::class)
-        ->and(InlineParser::text($blocks[0]->runs))->toBe("line one\nline two");
+        ->and(InlineTranslator::text($blocks[0]->runs))->toBe("line one\nline two");
 });
 
 it('reads a blank line as what ends a quote', function () {
     $blocks = blocksOf("> one\n\n> two\n");
 
     expect($blocks)->toHaveCount(2)
-        ->and(array_map(static fn (Block $block): string => InlineParser::text($block->runs), $blocks))
+        ->and(array_map(static fn (Block $block): string => InlineTranslator::text($block->runs), $blocks))
         ->toBe(['one', 'two']);
 });
 
@@ -300,14 +310,15 @@ it('reads a table as a header row, an alignment row and body rows', function () 
         ]);
 });
 
-it('reads a table row that stops short by leaving the cells it has', function () {
-    // A row with fewer cells than the header is a row with holes, not a row of blanks, and a
-    // renderer that invents cells would write words the author never did.
+it('pads a short row so every row is as wide as the header', function () {
+    // The cell it adds holds no runs, so nothing is written that the author did not write;
+    // what it buys is a row whose columns line up with the header rather than one that stops
+    // short of it. The hand-written walk left the row at its own width.
     $block = blocksOf("| A | B |\n| --- | --- |\n| 1 |\n")[0];
 
     expect($block->cells)->toEqual([
         [[new Run('A')], [new Run('B')]],
-        [[new Run('1')]],
+        [[new Run('1')], []],
     ]);
 });
 
@@ -344,6 +355,22 @@ it('reads an image that stands alone as a block', function () {
     expect($block)->toBeInstanceOf(Image::class)
         ->and($block->alt)->toBe('alt text')
         ->and($block->written)->toBe($png);
+});
+
+it('finds a picture whose name has a space in it', function () {
+    // CommonMark has no bare space in a destination, so `a picture.png` on a line of its own is
+    // a paragraph and `a%20picture.png` is the picture. Looking for the encoded spelling on
+    // disk is looking for a file nobody has, which is what the deck would have got.
+    $png = imageDirectory() . '/a picture.png';
+    imagepng(imagecreatetruecolor(2, 2), $png);
+
+    // The whole path, with only the space encoded: league reads an absolute path as one and
+    // would treat an encoded separator as part of a file name.
+    $written = str_replace(' ', '%20', $png);
+
+    expect(blocksOf(sprintf("![alt](%s)\n", $written))[0])->toBeInstanceOf(Image::class)
+        ->and(blocksOf(sprintf("![alt](%s)\n", $written))[0]->written)->toBe($png)
+        ->and(kindsOf(sprintf("![alt](%s)\n", basename($png))))->toBe([Paragraph::class]);
 });
 
 it('reads an image inside a paragraph as text', function () {
@@ -597,29 +624,6 @@ it('leaves a directive written inside a quote or a list item as the text it is',
         ->and(refusalOf(fn () => blocksOf("# One\n\n- ::bogus\n")))->toBe('DRAWN');
 });
 
-it('refuses a leaf directive the same way through either parser', function () {
-    // The message is half of what two parsers have to agree on: the differential test compares
-    // the class and the text, so two messages that differ are a divergence however good each
-    // is on its own. `DRAWN` is asserted rather than assumed, because two parsers that both
-    // drew the directive would otherwise pass this on their own.
-    $hand = refusalOf(fn () => blocksOf("# One\n\n::bogus{x=1}\n"));
-    $league = refusalOf(fn () => leagueBlocksOf("# One\n\n::bogus{x=1}\n"));
-
-    expect($hand)->not->toBe('DRAWN')
-        ->and($league)->toBe($hand);
-});
-
-it('reads a leaf directive the same way through either parser, refused or drawn', function () {
-    foreach ([
-        '::bogus', '::bogus{x=1}', '::bogus[hello]', '::BOGUS', ':: bogus',
-        '::note[label]', '::note', '::click', '::Click', '::column', '::COLUMN',
-        ":::click\n::bogus\n:::", ":::click\n::click\n:::", '   ::bogus', '    ::bogus',
-        "> ::bogus", "- ::bogus", "Ratio is 3::2", 'Status :green[go]',
-    ] as $markdown) {
-        expect(refusalOf(fn () => leagueBlocksOf($markdown)))
-            ->toBe(refusalOf(fn () => blocksOf($markdown)), $markdown);
-    }
-});
 
 it('refuses a directive in a table row as loudly as one on a line of its own', function () {
     // The whole slide is judged before it is parsed into blocks, so a directive that a block
@@ -647,11 +651,11 @@ it('leaves a directive inside an unclosed code block to the code block too', fun
 });
 
 it('reads plain text as one run with nothing emphasised', function () {
-    expect((new InlineParser())->parse('plain'))->toEqual([new Run('plain')]);
+    expect(inlineRuns('plain'))->toEqual([new Run('plain')]);
 });
 
 it('reads bold, italic and code as separate runs', function () {
-    expect((new InlineParser())->parse('**b** *i* `c`'))->toEqual([
+    expect(inlineRuns('**b** *i* `c`'))->toEqual([
         new Run('b', bold: true),
         new Run(' '),
         new Run('i', italic: true),
@@ -664,7 +668,7 @@ it('reads a run of bold italic as one run carrying both', function () {
     // The italic pattern matched the inner `**` first, so `***bold italic***` came out as
     // `"*"`, `"bolditalic"` and `"* here"` — three runs with the delimiters printed on the
     // slide and the space between the words gone.
-    expect((new InlineParser())->parse('***bold italic***'))->toEqual([
+    expect(inlineRuns('***bold italic***'))->toEqual([
         new Run('bold italic', bold: true, italic: true),
     ]);
 });
@@ -672,12 +676,12 @@ it('reads a run of bold italic as one run carrying both', function () {
 it('keeps the words around a run of bold italic', function () {
     expect(array_map(
         static fn (Run $run): string => $run->text,
-        (new InlineParser())->parse('a ***b*** c'),
+        inlineRuns('a ***b*** c'),
     ))->toBe(['a ', 'b', ' c']);
 });
 
 it('reads underscores as bold and italic the way asterisks are', function () {
-    expect((new InlineParser())->parse('__bold__ and _italic_'))->toEqual([
+    expect(inlineRuns('__bold__ and _italic_'))->toEqual([
         new Run('bold', bold: true),
         new Run(' and '),
         new Run('italic', italic: true),
@@ -685,13 +689,13 @@ it('reads underscores as bold and italic the way asterisks are', function () {
 });
 
 it('reads two tildes as strikethrough', function () {
-    expect((new InlineParser())->parse('~~gone~~'))->toEqual([new Run('gone', strike: true)]);
+    expect(inlineRuns('~~gone~~'))->toEqual([new Run('gone', strike: true)]);
 });
 
 it('leaves an underscore inside a word as the character it is', function () {
     // CommonMark's rule, and the one that keeps a variable name a variable name: `_*_`
     // between two word characters is not an emphasis delimiter.
-    expect((new InlineParser())->parse('a `snake_case` b'))->toEqual([
+    expect(inlineRuns('a `snake_case` b'))->toEqual([
         new Run('a '),
         new Run('snake_case', code: true),
         new Run(' b'),
@@ -699,7 +703,7 @@ it('leaves an underscore inside a word as the character it is', function () {
 });
 
 it('does not read the underscores inside a code span as emphasis', function () {
-    expect((new InlineParser())->parse('`_not italic_`'))->toEqual([
+    expect(inlineRuns('`_not italic_`'))->toEqual([
         new Run('_not italic_', code: true),
     ]);
 });
@@ -707,11 +711,11 @@ it('does not read the underscores inside a code span as emphasis', function () {
 it('leaves an unclosed tilde pair as the characters they are', function () {
     // The same rule as an unclosed asterisk: a deck that renders is worth more here than
     // one that refuses a paragraph because of a typo.
-    expect((new InlineParser())->parse('~~unclosed'))->toEqual([new Run('~~unclosed')]);
+    expect(inlineRuns('~~unclosed'))->toEqual([new Run('~~unclosed')]);
 });
 
 it('reads a link as its text with a target', function () {
-    expect((new InlineParser())->parse('[text](https://example.com)'))->toEqual([
+    expect(inlineRuns('[text](https://example.com)'))->toEqual([
         new Run('text', link: EXAMPLE_LINK),
     ]);
 });
@@ -722,19 +726,25 @@ it('refuses a link target a reader would act on rather than open', function () {
     // renders the deck as a document and in every pipeline that converts one to HTML, and
     // `data:` is the same thing with the script inlined. Refused where it is written rather
     // than carried into a file somebody opens.
-    // No closing parenthesis in any of them: the link pattern stops at one, so
-    // `javascript:alert(1)` would be refused as `javascript:alert(1`.
+    // Asserted on the refusal rather than on the exact spelling, because league percent-encodes
+    // a target on the way in and the message quotes what it was handed: `data:text/html,<b>x`
+    // arrives as `%3Cb%3Ex`. What matters is that the target is refused and named.
     foreach (['javascript:alert', 'vbscript:msgbox', 'data:text/html,<b>x', 'phar://payload.phar/x', 'file:///etc/passwd'] as $target) {
-        expect(fn () => (new InlineParser())->parse(sprintf('[click](%s)', $target)))
-            ->toThrow(UnsupportedLink::class, sprintf('The link "%s" is not a URL a deck may carry', $target));
+        expect(fn () => inlineRuns(sprintf('[click](%s)', $target)))
+            ->toThrow(UnsupportedLink::class, 'is not a URL a deck may carry');
     }
+
+    // The closing parenthesis is kept, which the hand-written pattern could not do: it stopped
+    // at the first `)`, so this target was refused as `javascript:alert(1`.
+    expect(fn () => inlineRuns('[click](javascript:alert(1))'))
+        ->toThrow(UnsupportedLink::class, 'The link "javascript:alert(1)" is not a URL a deck may carry');
 });
 
 it('refuses a Windows share, which is a credential relay to whoever answers', function () {
     // Both spellings, because the follower is not a browser: `\\host\share\payload.exe` is
     // an SMB connection made with no prompt, and the reader's credentials go with it.
     foreach (['\\\\host\\share\\payload.exe', '//host/share/payload.exe'] as $target) {
-        expect(fn () => (new InlineParser())->parse(sprintf('[click](%s)', $target)))
+        expect(fn () => inlineRuns(sprintf('[click](%s)', $target)))
             ->toThrow(UnsupportedLink::class, 'is not a URL a deck may carry');
     }
 });
@@ -745,15 +755,17 @@ it('keeps a link whose target is a path relative to the deck', function () {
     // one would fail to render under an allow-list. A relative target is a file beside the
     // deck, not something a reader's machine acts on.
     imagepng(imagecreatetruecolor(2, 2), imageDirectory() . '/2x2.png');
-    $runs = (new InlineParser())->parse('see ![alt](2x2.png) here');
+    $runs = inlineRuns('see ![alt](2x2.png) here');
 
     expect(array_map(static fn (Run $run): ?string => $run->link, $runs))->toBe([null, '2x2.png', null]);
 });
 
 it('keeps a Windows drive letter, which is a path rather than a scheme', function () {
     // One letter before the colon: `C:\logo.png` is a picture on the disk, and RFC 3986's
-    // one-character scheme is a reader's problem rather than a deck author's.
-    expect((new InlineParser())->parse('![alt](C:\\logo.png)')[1])->toEqual(new Run('alt', link: 'C:\\logo.png'));
+    // one-character scheme is a reader's problem rather than a deck author's. league hands the
+    // target over percent-encoded, so the run carries `C:%5Clogo.png`; the shape it draws
+    // decodes it back before looking for the file.
+    expect(inlineRuns('![alt](C:\\logo.png)')[1])->toEqual(new Run('alt', link: 'C:%5Clogo.png'));
 });
 
 it('keeps runs in the order they were written rather than the order of the patterns', function () {
@@ -761,56 +773,54 @@ it('keeps runs in the order they were written rather than the order of the patte
     // and which pattern is looked for first must not decide it.
     expect(array_map(
         static fn (Run $run): string => $run->text,
-        (new InlineParser())->parse('**bold** and `code`'),
+        inlineRuns('**bold** and `code`'),
     ))->toBe(['bold', ' and ', 'code']);
 });
 
 it('keeps a code span before a bold that follows it in the same order', function () {
     expect(array_map(
         static fn (Run $run): string => $run->text,
-        (new InlineParser())->parse('`code` then **bold**'),
+        inlineRuns('`code` then **bold**'),
     ))->toBe(['code', ' then ', 'bold']);
 });
 
 it('does not read the asterisks inside a code span as emphasis', function () {
     // Code first in the pattern list, so `*` inside a code span is the character it is.
-    expect((new InlineParser())->parse('`**not bold**`'))->toEqual([new Run('**not bold**', code: true)]);
+    expect(inlineRuns('`**not bold**`'))->toEqual([new Run('**not bold**', code: true)]);
 });
 
 it('leaves an unclosed asterisk as the character it is', function () {
-    expect((new InlineParser())->parse('2 * 3'))->toEqual([new Run('2 * 3')]);
+    expect(inlineRuns('2 * 3'))->toEqual([new Run('2 * 3')]);
 });
 
 it('leaves an unclosed bold marker as the characters they are', function () {
-    expect((new InlineParser())->parse('**unclosed'))->toEqual([new Run('**unclosed')]);
+    expect(inlineRuns('**unclosed'))->toEqual([new Run('**unclosed')]);
 });
 
 it('leaves an unclosed code span as the characters they are', function () {
-    expect((new InlineParser())->parse('`unclosed'))->toEqual([new Run('`unclosed')]);
+    expect(inlineRuns('`unclosed'))->toEqual([new Run('`unclosed')]);
 });
 
 it('reads an italic between two words', function () {
-    expect((new InlineParser())->parse('a *b* c'))->toEqual([new Run('a '), new Run('b', italic: true), new Run(' c')]);
+    expect(inlineRuns('a *b* c'))->toEqual([new Run('a '), new Run('b', italic: true), new Run(' c')]);
 });
 
-it('reads a link with no text as a run with nothing in it', function () {
-    // A writer who did that wrote nothing to show; the target is still kept so the link is
-    // not silently discarded.
-    expect((new InlineParser())->parse('[](https://example.com)'))->toEqual([
-        new Run('', link: EXAMPLE_LINK),
-    ]);
+it('draws nothing for a link with no text in it', function () {
+    // A writer who wrote that wrote nothing to show. The hand-written walk made one empty run
+    // to hang the target on, which drew nothing either and carried a link nothing could click.
+    expect(inlineRuns('[](https://example.com)'))->toBe([]);
 });
 
 it('reads a link with a title and keeps only its target', function () {
     // The title is for a reader hovering the link; PowerPoint has a tooltip for it and a
     // `.pptx` hyperlink does not carry one, so the target is what the run gets.
-    expect((new InlineParser())->parse('[text](https://example.com "A title")'))->toEqual([
+    expect(inlineRuns('[text](https://example.com "A title")'))->toEqual([
         new Run('text', link: EXAMPLE_LINK),
     ]);
 });
 
 it('reads an empty span as nothing', function () {
-    expect((new InlineParser())->parse('**') )->toEqual([new Run('**')]);
+    expect(inlineRuns('**') )->toEqual([new Run('**')]);
 });
 
 it('refuses a deck description that is not a string, and names the key', function () {
@@ -834,4 +844,37 @@ it('writes the cells a ragged table has and stops where the row stops', function
     );
 
     expect(Pptx::open($path)->texts(1))->toBe(['A', 'B', '1', '2']);
+});
+
+it('reads four spaces of indent as a code block, and a marker inside one as code', function () {
+    // A marker is a marker on a line of its own. Indented four it is an indented code block,
+    // so the `::click` in it is characters rather than a step, which is what CommonMark does
+    // with any block that starts four spaces in.
+    expect(kindsOf("    ::click\n"))->toBe([Code::class])
+        ->and(kindsOf("    plain words\n"))->toBe([Code::class]);
+});
+
+it('reads an HTML block as the words it carries', function () {
+    // A tag this library does not act on is text, and an element is not one of the eight
+    // shapes a slide draws. The `v-*` element is the one it refuses instead, which `Refusals`
+    // does before this walk begins.
+    expect(kindsOf("<div>\nSome words.\n</div>\n"))->toBe([Paragraph::class]);
+});
+
+it('refuses an HTML comment nothing closes', function () {
+    // The parser cannot tell where an unclosed comment ends, so it stays in the text — which
+    // is the one case where a comment would be drawn as prose, and the prose would be `<!--`.
+    expect(fn () => blocksOf("# One\n\na comment <!-- never closed\n"))
+        ->toThrow(UnknownDirective::class, 'has the HTML comment <!-- never closed');
+});
+
+it('has no lines for a node the parser built for itself', function () {
+    // league counts lines for the blocks it read out of the deck and not for the nodes it
+    // assembled around them, and reading a line that is not there has to be an empty answer
+    // rather than a warning: a table's rows carry their text and no line of the deck.
+    $state = new SlideState(1, __DIR__, deckScope(__DIR__), ['# One']);
+    $built = new LeagueParagraph();
+
+    expect($state->lines($built))->toBe([])
+        ->and($state->written($built))->toBe('');
 });

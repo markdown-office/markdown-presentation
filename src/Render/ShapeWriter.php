@@ -525,10 +525,11 @@ final class ShapeWriter
             $cells = $created->getCells();
 
             foreach ($row as $index => $runs) {
-                if (!isset($cells[$index])) {
-                    break;
-                }
-
+                // Every row is as wide as the header, because that is where the width is
+                // established: a row with fewer cells is padded and one with more is drawn as
+                // far as the header goes. There was a guard here for a row wider than the
+                // header, and it could not fire — a table that stopped drawing half a row was
+                // the worse of the two failures anyway.
                 $cell = $cells[$index];
                 $cell->setWidth($columns[$index]);
                 $paragraph = $cell->getActiveParagraph();

@@ -276,9 +276,9 @@ it('does not claim again what the code does not do', function (string $claim) {
     // and no deck can leave a block in a column the count has not reached. The guard is for a
     // caller that builds the value, and nothing in a deck reaches it.
     'the region recursion can break the marker count' => 'a walk that reads a region returns a count of its own',
-    // `php:S1448` fires above twenty, so `BlockParser` at twenty-one was already a finding on
-    // new code rather than one still waiting for the next method. The class had been taken back
-    // from twenty-two for exactly this once already.
+    // `php:S1448` fires above twenty, so the parser was at twenty-one once already and was a
+    // finding on new code rather than one still waiting for the next method. The claim was
+    // about the block parser of the time, which `BlockTranslator` has now replaced.
     'one more method and the parser is over the ceiling' => 'the next method still breaks that gate',
 ]);
 

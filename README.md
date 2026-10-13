@@ -366,7 +366,7 @@ try {
 ```
 
 ```text
-The link "javascript:alert(1" is not a URL a deck may carry. A .pptx hyperlink is followed by the person who opens it: a Windows share is a credential relay, and a javascript: target is a script in any reader that renders the deck. Write it as "https://…", "http://…" or "mailto:…".
+The link "javascript:alert(1)" is not a URL a deck may carry. A .pptx hyperlink is followed by the person who opens it: a Windows share is a credential relay, and a javascript: target is a script in any reader that renders the deck. Write it as "https://…", "http://…" or "mailto:…".
 ```
 
 The missing closing parenthesis is the link pattern's own: `[text](target)` stops at the
@@ -854,7 +854,7 @@ Two ceilings, and they no longer bound one thing between them:
 
 | Ceiling | Value | Bounds |
 | --- | --- | --- |
-| `Render\BlockParser::MAX_STEP` | 500 | the steps one slide may build up in |
+| `Render\CommonMark\BlockTranslator::MAX_STEP` | 500 | the steps one slide may build up in |
 | `Render\PresentationRenderer::MAX_SLIDES` | 1000 | the slides one deck may write |
 
 Both are refused by name, with the number that would have worked in the message. `MAX_STEP` is
@@ -1120,6 +1120,28 @@ refused too, because a step is `::click` here and a comment is a deck written fo
 whose step marker this one does not read. A plain HTML tag is none of those and is still
 text: `<b>` is not a directive, and this library has no opinion about what a deck says about
 HTML.
+
+### What Slidev writes and this does not read
+
+Slidev's in-slide spelling for two of those is different, and a deck carrying it is refused
+rather than drawn. Each refusal names what would have worked:
+
+| Slidev writes | Here |
+| --- | --- |
+| `<!-- v-click -->` | `::click` on a line of its own |
+| `<!-- v-click="3" -->` | `::click=3` on a line of its own |
+| `::left::` and `::right::` | `::column` once per column |
+
+The first two arrive as an HTML comment and are refused as one, quoting the comment; the
+last arrives as a leaf directive under a name this library does not draw, and is refused as
+one. Nothing is inferred from either: a step marker is `::click` here, and a column is a
+marker rather than a named half.
+
+Slidev also puts two columns in the frontmatter, under `layout: two-cols`. The role here is
+`two-column`, and `two-cols` is refused as a name this library does not have. A `::column`
+needs a layout with more than one column to move into — under `layout: content` it is
+refused as a column that layout has no room for, which is the same refusal in the other
+direction.
 
 ```php
 use MarkdownPresentation\Document\DeckParser;
