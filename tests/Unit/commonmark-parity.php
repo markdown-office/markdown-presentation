@@ -5,6 +5,7 @@ declare(strict_types=1);
 use League\CommonMark\Node\Block\Paragraph;
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\ImageNotFound;
+use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Image;
@@ -400,16 +401,13 @@ it('reads every string the suite builds the way the hand-written parser does', f
         ->and(array_diff_key($recorded, $differing))->toBe([]);
 });
 
-it('draws a directive it does not read as the words the deck wrote it as', function () {
-    // Not one of the two refusals — a container and a `::note` — so there is nothing to
-    // refuse here and something to draw. It is drawn literally, which is the outcome this
-    // library had for every directive until it started refusing them, and is the honest one
-    // for the rest: a deck with `::foo` on it gets `::foo` on the slide and no pretence that
-    // the directive was read. Written as the deck wrote it too — `{a=1}` rather than the
-    // `{a="1"}` a serialiser would round-trip it through.
-    $content = parityOf((new BlockTranslator())->parse('::foo[bar]{a=1}', 1, __DIR__, deckScope(__DIR__)));
-
-    expect($content)->toContain('Paragraph step=1 column=0 [::foo[bar]{a=1}]');
+it('refuses a leaf directive it does not read, naming what would have worked', function () {
+    // A block leaf is a directive the slide could have acted on and did not, which is the one
+    // case the other refusals left alone: it is a name rather than a spelling, so nothing was
+    // looking for it. Drawn literally it reached the slide as prose reading `::foo`, which is
+    // the outcome the container and the comment refusals were written to stop.
+    expect(fn () => (new BlockTranslator())->parse('::foo[bar]{a=1}', 1, __DIR__, deckScope(__DIR__)))
+        ->toThrow(UnknownDirective::class, 'opens the directive "::foo[bar]{a=1}"');
 });
 
 it('draws a directive written in a sentence the way the extension serialises it', function () {

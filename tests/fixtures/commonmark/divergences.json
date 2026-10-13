@@ -5,7 +5,7 @@
   },
   {
     "name": "examples/markdown/05-steps.md slide 3",
-    "why": "Two bullets with a blank line between them: two shapes here and one list there. The slide says so \u2014 \"one click opens the step and the second shape joins it\" \u2014 so switching parsers makes this page wrong unless the sentence is rewritten."
+    "why": "Two bullets with a blank line between them: two shapes here and one list there. The slide says so — \"one click opens the step and the second shape joins it\" — so switching parsers makes this page wrong unless the sentence is rewritten."
   },
   {
     "name": "examples/markdown/06-tables.md slide 2",
@@ -21,7 +21,7 @@
   },
   {
     "name": "examples/markdown/09-inline-markup.md slide 2",
-    "why": "Emphasis inside a link's label. The hand-written link pattern takes the label as raw text, so a link written `[**heading**](\u2026)` draws a pair of asterisks on the slide; CommonMark keeps the emphasis and the link, which is what a reader sees in every other renderer."
+    "why": "Emphasis inside a link's label. The hand-written link pattern takes the label as raw text, so a link written `[**heading**](…)` draws a pair of asterisks on the slide; CommonMark keeps the emphasis and the link, which is what a reader sees in every other renderer."
   },
   {
     "name": "slidev: fence indented four spaces, closed flush slide 1",
@@ -53,7 +53,7 @@
   },
   {
     "name": "tests/Unit/rendering.php: <dc:title>The deck</dc:title> slide 0",
-    "why": "An angle-bracketed string with a scheme in it is an autolink in CommonMark and text here, so a tag written with one becomes a link \u2014 and a link to `dc:title` is a target this library refuses."
+    "why": "An angle-bracketed string with a scheme in it is an autolink in CommonMark and text here, so a tag written with one becomes a link — and a link to `dc:title` is a target this library refuses."
   },
   {
     "name": "tests/Unit/rendering.php: <dc:description>About it</dc:description> slide 0",
@@ -77,7 +77,7 @@
   },
   {
     "name": "tests/Unit/rendering.php: - a\\x0a1. b\\x0a- c slide 0",
-    "why": "A list that changes its marker is one list here, with an `ordered` flag per item, and three lists there. CommonMark is right about the syntax; `Render\\Block\\ListBlock`'s own docblock \u2014 a deck mixes the markers \u2014 would have to go with it."
+    "why": "A list that changes its marker is one list here, with an `ordered` flag per item, and three lists there. CommonMark is right about the syntax; `Render\\Block\\ListBlock`'s own docblock — a deck mixes the markers — would have to go with it."
   },
   {
     "name": "tests/Unit/rendering.php: #<a:r>\\s*<a:rPr[^>]*\\bb=\"1\"[^>]*>.*?</a:rPr>\\s*<a:t><!\\[CDATA\\[Name\\]\\ slide 0",
@@ -157,7 +157,7 @@
   },
   {
     "name": "tests/Unit/commonmark-parity.php: Ship it :badge[X]{a=1} today. slide 0",
-    "why": "The quoted attribute above, on a text directive in the middle of a sentence \u2014 the shape the Generic Directives RFC is for, and the one shape a deck is most likely to carry from another tool."
+    "why": "The quoted attribute above, on a text directive in the middle of a sentence — the shape the Generic Directives RFC is for, and the one shape a deck is most likely to carry from another tool."
   },
   {
     "name": "tests/Unit/powerpoint-fixtures.php: #<cp:lastModifiedBy>([^<]*)</cp:lastModifiedBy># slide 0",
@@ -221,7 +221,7 @@
   },
   {
     "name": "tests/Unit/theme-resolver.php: <dc:creator>Somebody</dc:creator> slide 0",
-    "why": "An angle-bracketed string with a scheme in it is an autolink in CommonMark and text here, so a tag written with one becomes a link \u2014 and a link to `dc:title` is a target this library refuses."
+    "why": "An angle-bracketed string with a scheme in it is an autolink in CommonMark and text here, so a tag written with one becomes a link — and a link to `dc:title` is a target this library refuses."
   },
   {
     "name": "tests/Unit/layouts-and-steps.php: two\\x1b[2J\\x0dthree slide 0",
@@ -266,5 +266,13 @@
   {
     "name": "tests/Support/Pptx.php: #Target=\"\\.\\./slideLayouts/slideLayout(\\d+)\\.xml\"# slide 0",
     "why": "The escape rule above: `\\.` is a dot rather than a backslash and a dot, so the pattern reads as a path rather than as the pattern that matches it."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: - ::bogus slide 0",
+    "why": "A directive-shaped line inside a list item. The hand-written walk reads a bullet by its text after the `- `, so the item reads `::click`; league builds the line as a directive and the bullet arrives with its marker still on it, so it reads `- ::click`. Nothing here is about the directive being refused or read — both parsers draw the line, and differ only in which words reach the bullet. The hand-written reading is the one a reader expects, so cutting over to league changes what this deck looks like and the sentence on the slide would have to say so."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: # One\\x0a\\x0a- ::bogus slide 0",
+    "why": "A directive-shaped line inside a list item. The hand-written walk reads a bullet by its text after the `- `, so the item reads `::click`; league builds the line as a directive and the bullet arrives with its marker still on it, so it reads `- ::click`. Nothing here is about the directive being refused or read — both parsers draw the line, and differ only in which words reach the bullet. The hand-written reading is the one a reader expects, so cutting over to league changes what this deck looks like and the sentence on the slide would have to say so."
   }
 ]

@@ -19,7 +19,6 @@ use League\CommonMark\Extension\Table\TableSection;
 use League\CommonMark\Node\Block\Paragraph;
 use League\CommonMark\Node\Node;
 use League\CommonMark\Parser\MarkdownParser;
-use MarkdownOffice\CommonMark\Directive\Node\DirectiveBlock;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownMarker;
@@ -167,7 +166,7 @@ final class BlockTranslator
         return match (true) {
             $node instanceof Marker => match ($node->kind()) {
                 MarkerKind::Closer => throw UnknownMarker::strayCloser($state->slide),
-                MarkerKind::Container => throw UnknownDirective::container($state->slide, self::oneLine($node->written())),
+                MarkerKind::Container => throw UnknownDirective::container($state->slide, Refusals::oneLine($node->written())),
                 MarkerKind::Column => $this->column($node, $state),
                 MarkerKind::Step, MarkerKind::Region => $this->step($node, $state),
             },
@@ -178,7 +177,10 @@ final class BlockTranslator
             $node instanceof BlockQuote => $this->quote($node, $state),
             $node instanceof LeagueTable => $this->placed($this->table($node, $state), $state),
             $node instanceof HtmlBlock => $this->placed($this->html($node, $state), $state),
-            $node instanceof DirectiveBlock => $this->directive($node, $state),
+            // No arm for a directive, and that is the invariant rather than an omission:
+            // {@see Refusals::guard()} has refused every leaf whose name this library does not
+            // draw, a container is a `MarkerKind::Container` in the first arm, and `::click` and
+            // `::column` are markers too. A directive that got this far is a paragraph.
             default => $this->paragraph($node, $state),
         };
     }
@@ -520,33 +522,6 @@ final class BlockTranslator
     }
 
     /**
-     * A directive this library does not draw.
-     *
-     * Drawn as the words the deck wrote it as, because a `::foo` is not a shape a slide has
-     * and not a directive this library acts on — and drawing it literally is what this
-     * library did with every directive before it refused them, which is the outcome it
-     * stopped having. The two that are refused outright, a container and a `::note`, are
-     * refused before the walk and by the grammar of {@see MarkerKind}, not here.
-     *
-     * The line the deck wrote rather than the directive's own spelling, because the spelling
-     * round-trips through league's attribute grammar: a deck writing `::foo{a=1}` gets
-     * `::foo{a="1"}` back, and a slide should carry what was written rather than what a
-     * serialiser decided to write.
-     *
-     * One run and not the inline markup, because a line that is a leaf directive is one
-     * directive: the label and the attributes are part of it, so there is nothing else on the
-     * line for a second delimiter to close.
-     *
-     * @return list<array{0: Code|Heading|ImageBlock|ListBlock|ParagraphBlock|Quote|Rule|Table, 1: int}>
-     */
-    private function directive(DirectiveBlock $node, SlideState $state): array
-    {
-        $written = new Run($state->written($node));
-
-        return $this->placed(new ParagraphBlock([$written], $state->step), $state);
-    }
-
-    /**
      * The picture on a line of its own, as the shape it is drawn as.
      *
      * The alt text is the label's words with its markup taken out, which is what a screen
@@ -600,14 +575,5 @@ final class BlockTranslator
     private function placed(Block $block, SlideState $state): array
     {
         return [[$block, $state->column]];
-    }
-
-    /**
-     * A line as a refusal quotes it: one line, however many it was written in, and with the
-     * runs of spaces in it reduced to one.
-     */
-    private static function oneLine(string $written): string
-    {
-        return trim((string) preg_replace('/\s+/', ' ', $written));
     }
 }

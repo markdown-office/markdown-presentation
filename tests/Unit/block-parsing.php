@@ -29,6 +29,7 @@ use MarkdownPresentation\Render\Block\Quote;
 use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
 use MarkdownPresentation\Render\BlockParser;
+use MarkdownPresentation\Render\CommonMark\BlockTranslator;
 use MarkdownPresentation\Render\InlineParser;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\Run;
@@ -60,6 +61,30 @@ function slideContentOf(string $markdown): SlideBlocks
 function blocksOf(string $markdown): array
 {
     return slideContentOf($markdown)->blocks();
+}
+
+/**
+ * The same, read through the league translator the hand-written parser is being replaced by.
+ *
+ * @return list<Block>
+ */
+function leagueBlocksOf(string $markdown): array
+{
+    return (new BlockTranslator())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()))->blocks();
+}
+
+/**
+ * What a refusal says, or `DRAWN` where the slide was read rather than refused.
+ */
+function refusalOf(callable $read): string
+{
+    try {
+        $read();
+    } catch (UnknownDirective $refusal) {
+        return $refusal->getMessage();
+    }
+
+    return 'DRAWN';
 }
 
 /**
@@ -525,6 +550,75 @@ it('refuses a ::: container whose word is not a region opener, whatever its case
     // would read `:::Click` as a container to refuse rather than as the region it is.
     expect(fn () => blocksOf("# One\n\n:::Column\nSomething.\n:::\n"))
         ->toThrow(UnknownDirective::class, 'Slide 1 opens the container ":::Column"');
+});
+
+it('refuses a leaf directive under a name this format does not draw', function () {
+    // Painted onto the slide as the words the deck wrote, this is the failure the comment, the
+    // element and the container refusals exist to prevent — a deck that renders, showing the
+    // mistake as prose — reached by the one form in the grammar that none of them looks at.
+    expect(fn () => blocksOf("# One\n\n::bogus\n"))
+        ->toThrow(
+            UnknownDirective::class,
+            'Slide 1 opens the directive "::bogus", which is not something a slide draws. Two colons '
+            . 'mark a step as "::click" or a column as "::column"; three open a step region as '
+            . '":::click" and close it as ":::"; write a note as "::note", its text, and a closing "::".',
+        );
+});
+
+it('refuses a leaf directive on its name rather than on what it carries', function () {
+    // The label and the attributes are what the author was writing; the name is what says the
+    // slide cannot act on it, so each of these is refused for the same reason and quoted whole.
+    foreach (['::bogus{x=1}', '::bogus[hello]', '::BOGUS', ':: bogus'] as $written) {
+        expect(fn () => blocksOf("# One\n\n" . $written . "\n"))
+            ->toThrow(UnknownDirective::class, sprintf('opens the directive "%s"', $written));
+    }
+});
+
+it('leaves a directive this format draws alone, whatever case it is written in', function () {
+    // The other half of the refusal: a name the library acts on is not a mistake, and one
+    // capitalised by a model is still the name it was looking for.
+    foreach (['::click', '::Click', '::column', '::COLUMN'] as $written) {
+        expect(refusalOf(fn () => blocksOf("# One\n\nLeft.\n\n" . $written . "\n\nRight.\n")))->toBe('DRAWN');
+    }
+});
+
+it('reads a leaf directive a region opens as one the slide cannot draw', function () {
+    // A `:::` region is raw lines in the content, so a directive inside one is on the same
+    // footing as one on the slide: refused, and refused by name.
+    expect(fn () => blocksOf("# One\n\n:::click\n::bogus\n:::\n"))
+        ->toThrow(UnknownDirective::class, 'Slide 1 opens the directive "::bogus"');
+});
+
+it('leaves a directive written inside a quote or a list item as the text it is', function () {
+    // A quote and a list item write their marker in front of every line, so nothing in one is
+    // a line the slide reads. `::click` is already drawn as text there, and refusing an
+    // unknown name in that position and not a known one would make nesting an error on its own.
+    expect(refusalOf(fn () => blocksOf("# One\n\n> ::bogus\n")))->toBe('DRAWN')
+        ->and(refusalOf(fn () => blocksOf("# One\n\n- ::bogus\n")))->toBe('DRAWN');
+});
+
+it('refuses a leaf directive the same way through either parser', function () {
+    // The message is half of what two parsers have to agree on: the differential test compares
+    // the class and the text, so two messages that differ are a divergence however good each
+    // is on its own. `DRAWN` is asserted rather than assumed, because two parsers that both
+    // drew the directive would otherwise pass this on their own.
+    $hand = refusalOf(fn () => blocksOf("# One\n\n::bogus{x=1}\n"));
+    $league = refusalOf(fn () => leagueBlocksOf("# One\n\n::bogus{x=1}\n"));
+
+    expect($hand)->not->toBe('DRAWN')
+        ->and($league)->toBe($hand);
+});
+
+it('reads a leaf directive the same way through either parser, refused or drawn', function () {
+    foreach ([
+        '::bogus', '::bogus{x=1}', '::bogus[hello]', '::BOGUS', ':: bogus',
+        '::note[label]', '::note', '::click', '::Click', '::column', '::COLUMN',
+        ":::click\n::bogus\n:::", ":::click\n::click\n:::", '   ::bogus', '    ::bogus',
+        "> ::bogus", "- ::bogus", "Ratio is 3::2", 'Status :green[go]',
+    ] as $markdown) {
+        expect(refusalOf(fn () => leagueBlocksOf($markdown)))
+            ->toBe(refusalOf(fn () => blocksOf($markdown)), $markdown);
+    }
 });
 
 it('refuses a directive in a table row as loudly as one on a line of its own', function () {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Render;
 
+use MarkdownOffice\CommonMark\Directive\Directive\DirectiveSyntax;
+use MarkdownOffice\CommonMark\Directive\DirectiveType;
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\UnknownDirective;
@@ -11,6 +13,7 @@ use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Code;
+use MarkdownPresentation\Render\CommonMark\Refusals;
 use MarkdownPresentation\Render\Block\Heading;
 use MarkdownPresentation\Render\Block\Image;
 use MarkdownPresentation\Render\Block\ListBlock;
@@ -517,6 +520,25 @@ final class BlockParser
 
         if (preg_match(self::NOTE, $content, $note) === 1) {
             throw UnknownDirective::unclosedNote($slide);
+        }
+
+        // A leaf directive under a name this library does not draw. Asked of the grammar rather
+        // than of a pattern written here, because the grammar is where a directive is defined
+        // and the league parse replacing this one asks that same question of it.
+        foreach (preg_split('/\R/', $content) ?: [] as $line) {
+            // Up to three spaces are a block starting indented, which is CommonMark's rule and
+            // what the league parse has already taken off before it asks the grammar anything.
+            // A fourth makes it a code block, and a code block is prose.
+            $written = (string) preg_replace('/\A {0,3}/', '', $line);
+            $leaf = DirectiveSyntax::matchBlock($written);
+
+            if (
+                $leaf !== null
+                && $leaf[1] < DirectiveType::Container->minimumColons()
+                && !in_array(strtolower($leaf[2] ?? ''), Refusals::LEAF, true)
+            ) {
+                throw UnknownDirective::leaf($slide, $oneLine($written));
+            }
         }
     }
 

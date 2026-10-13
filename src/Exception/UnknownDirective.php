@@ -14,9 +14,10 @@ namespace MarkdownPresentation\Exception;
  * matter rather than re-reading the page to find out which half of the library is missing.
  *
  * The body of a slide is closed on the same terms. Slidev's in-slide vocabulary is the step
- * comment, the `v-*` elements and the `:::` container fences, and any of the other two lands
- * where a person would read prose. This format has replaced the step comment with `::click`,
- * so a comment here is a deck written for a tool whose step marker this one does not read.
+ * comment, the `v-*` elements, the `:::` container fences and a leaf directive under any name
+ * but the three this format reads, and all four land where a person would read prose. This
+ * format has replaced the step comment with `::click`, so a comment here is a deck written
+ * for a tool whose step marker this one does not read.
  * Every one of them used to be painted onto the slide as the
  * literal text of the directive, which is the worst of both outcomes: the deck renders, and
  * what it renders is the mistake. A plain HTML tag is not in that vocabulary and is still
@@ -115,6 +116,26 @@ final class UnknownDirective extends InvalidInput
             'Slide %d opens a "::note" that nothing closes. A note is "::note" on a line of its own, '
             . 'its text, and a closing "::" on a line of its own.',
             $slide,
+        ));
+    }
+
+    /**
+     * A `::name` leaf under a name this format does not read.
+     *
+     * The container fence and the unclosed note each have a message of their own, so this one
+     * is only reached by a name that is neither: `::bogus`, `::note[label]`. Drawn as text it
+     * is the same failure {@see self::comment()} exists to prevent, reached by the spelling
+     * the grammar admits and the other three refusals do not look at.
+     */
+    public static function leaf(int $slide, string $directive): self
+    {
+        return new self(sprintf(
+            'Slide %d opens the directive "%s", which is not something a slide draws. Two colons '
+            . 'mark a step as "::click" or a column as "::column"; three open a step region as '
+            . '":::click" and close it as ":::"; write a note as "::note", its text, and a '
+            . 'closing "::".',
+            $slide,
+            $directive,
         ));
     }
 }

@@ -218,6 +218,7 @@ it('does not claim again what the code does not do', function (string $claim) {
     'an unknown theme falls back to the default one' => 'falls back to the default theme',
     'a styles.yml value reaches the shapes' => 'styles.yml value is applied',
     'a directive nobody acts on is passed over' => 'an unknown directive is ignored',
+    'a directive nobody reads is drawn as the words the deck wrote it' => 'draws a directive it does not read',
     'a v-click marker closing a list item is honoured' => 'a marker closing a list item',
     // The old spellings, as claims rather than as syntax: `CHANGELOG.md` has to be able to
     // name what a deck used to be written in, so a phrase that only says "<!-- v-click"

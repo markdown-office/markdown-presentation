@@ -55,6 +55,23 @@ final class Refusals
     private const NOTE = 'note';
 
     /**
+     * The leaf directives a slide draws.
+     *
+     * A note is not among them because a note is not a leaf: it is `::note`, its text, and a
+     * closing `::`. {@see self::notes()} has already taken a bare one off the content or
+     * refused it as unclosed, so a leaf still carrying the name at this point is one written
+     * with a label or attributes on it, which is not the note this library means.
+     *
+     * Read by {@see \MarkdownPresentation\Render\BlockParser::refuse()} as well, which is the
+     * other place this library decides what a slide cannot carry. It is written down here once
+     * because two lists of the directives a slide draws are two lists that can disagree, and
+     * {@see \MarkdownPresentation\Render\BlockParser} goes away with the hand-written parse.
+     *
+     * @var list<string>
+     */
+    public const LEAF = ['click', 'column'];
+
+    /**
      * @throws UnknownDirective
      */
     public static function guard(Node $node, SlideState $state): void
@@ -62,6 +79,19 @@ final class Refusals
         self::comments($node, $state);
         self::elements($node, $state);
         self::notes($node, $state);
+        self::leaves($node, $state);
+    }
+
+    /**
+     * A line as a refusal quotes it: one line, however many it was written in, and with the
+     * runs of spaces in it reduced to one.
+     *
+     * One home for it, because a message and the string inside it have to agree and the two
+     * are reached from different walks.
+     */
+    public static function oneLine(string $written): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', $written));
     }
 
     /**
@@ -135,6 +165,46 @@ final class Refusals
             }
 
             self::notes($child, $state);
+        }
+    }
+
+    /**
+     * A leaf directive under a name this library does not draw.
+     *
+     * The other three refusals each have one spelling to look for, and a leaf has a name
+     * rather than a spelling: `::bogus`, `::note[label]`, `::anything=2`. Drawn as text each of
+     * them is the outcome {@see UnknownDirective::comment()} exists to prevent — a deck that
+     * renders, showing the mistake as prose — reached by the one form the three above never
+     * look at.
+     *
+     * Into a container and not into a quotation, which is where a step marker is read from
+     * too. A `:::` region is raw lines in the slide's content, so a directive inside one is a
+     * line this library sees; a quote and a list item write their marker in front of every
+     * line, so a directive written in one is text inside it and is drawn as text, exactly as
+     * `::click` is drawn as text there. Refusing it in the one place and not the other would
+     * make this the only directive whose being nested is an error.
+     *
+     * Last, so that a `::note` keeps the message about the `::` that would close it rather
+     * than being told its name is not one this library draws.
+     *
+     * @throws UnknownDirective
+     */
+    private static function leaves(Node $node, SlideState $state): void
+    {
+        foreach ($node->children() as $child) {
+            if ($child instanceof DirectiveBlock) {
+                $name = $child->getName();
+
+                if (!$child->isContainer() && !in_array(strtolower($name ?? ''), self::LEAF, true)) {
+                    throw UnknownDirective::leaf($state->slide, self::oneLine($state->written($child)));
+                }
+            }
+
+            // A `:::click` region is a {@see Marker} rather than a directive, so it is the
+            // other kind of node a directive line can be written inside.
+            if ($child instanceof DirectiveBlock || $child instanceof Marker) {
+                self::leaves($child, $state);
+            }
         }
     }
 
