@@ -161,6 +161,32 @@ All notable changes to this project are documented here. The format follows
   before, and four new entries are in `divergences.json` with the reason. The recording is
   untouched: it is what Slidev did, and this is where the two differ.
 
+### Added
+
+- **A second reader for a slide, and a test that compares the two.** `Render\CommonMark\BlockTranslator`
+  reads a slide with [league/commonmark](https://commonmark.thephpleague.com/) plus
+  [markdown-office/commonmark-generic-directives](https://github.com/markdown-office/commonmark-generic-directives)
+  and produces the same blocks `Render\BlockParser` produces, so that nothing downstream of the
+  parser can tell which one read the deck. `league/commonmark` does not include GFM tables and the
+  shipped themes' column widths are measured from a table's alignment, so `TableExtension` is
+  registered rather than optional; `StrikethroughExtension` is registered for the same reason
+  (`~~struck~~` is a run of its own).
+
+  **Not user-visible yet: no deck renders differently.** `PresentationRenderer` still calls
+  `BlockParser`, `tests/Unit/commonmark-parity.php` is what holds the two together, and nothing
+  in the public API has moved.
+
+  Every deck in the repository goes through both parsers — every slide of every deck in
+  `examples/markdown/`, every slide of every deck in `tests/fixtures/slidev/expected.json`, and
+  every string literal and heredoc the suite itself holds — and every place they disagree is
+  recorded in `tests/fixtures/commonmark/divergences.json` with the reason the other answer is
+  the right one. There are sixty-eight of them and they are a decision, not a bug list: a
+  bullet followed by an unindented sentence, a ragged table row, a `===` underline, backslash
+  escapes, an autolink on `<dc:title>`, and a lone carriage return are all read differently, and
+  most of them are read better. Both directions are asserted: a difference nobody recorded is a
+  behaviour change nobody decided on, and a record whose deck stopped differing is a strictness
+  that went quietly.
+
 ### Fixed
 
 - **A refusal named the marker the parser expects rather than the one the deck wrote.** Every
