@@ -25,7 +25,7 @@
         "ext-gd": "*",
         "ext-zip": "*",
         "league/commonmark": "^2.10",
-        "markdown-office/commonmark-generic-directives": "dev-main#3fa56b2f0ec03fab8830a9c5e46bad5c354874c4",
+        "markdown-office/commonmark-generic-directives": "^0.2.0",
         "phpoffice/phppresentation": "dev-master#54586957f0fbbce0e3a9434c88cb6050f6cc0759",
         "php": "^8.2",
         "symfony/yaml": "^7.2 || ^8.0"
