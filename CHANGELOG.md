@@ -8,6 +8,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A leaf directive under a name this library does not draw is refused rather than drawn.**
+  **Breaking**, and only for a deck that writes one. `::foo`, `::foo[label]{attrs}` and
+  `::anything=2` were painted onto the slide as the words the deck wrote them as, which is the
+  outcome the comment, the element and the container refusals were written to stop: the deck
+  renders, and what it renders is the mistake.
+
+  | Was | Now |
+  | --- | --- |
+  | `::bogus` became a paragraph reading `::bogus` | it is refused, naming `::click` and `::column` as the two a leaf may carry |
+
+  It was missed rather than allowed, because those three refusals each look for one spelling and
+  a leaf is identified by a name, so nothing was looking for `::name` at all. A `::note` carrying
+  a label or attributes is refused the same way, since a note is `::note`, its text and a closing
+  `::` rather than a leaf. A directive written inside a quote or a list item is still drawn as the
+  text it is, exactly as `::click` already was in that position.
+
 - **A `::column` written inside a `:::click` region moves the text after the closing `:::`.**
   **Breaking**, and only for a deck that writes both on one slide. A column is where a block is
   drawn and a region is when it appears, so a region governs what a click reveals and not where

@@ -1111,10 +1111,15 @@ file where a whole one was expected.
 This format is Markdown and pairs of colons. Slidev nests content in a step comment, a
 `v-*` element and a `:::` container fence, and neither of the other two lands where a person
 would read prose — so both are failures naming the spelling that would have worked, rather
-than shapes carrying the directive's own text. An HTML comment is refused too, because a step
-is `::click` here and a comment is a deck written for a tool whose step marker this one does
-not read. A plain HTML tag is none of those and is still text: `<b>` is not a directive, and
-this library has no opinion about what a deck says about HTML.
+than shapes carrying the directive's own text. A leaf directive under a name this library
+does not draw is a third, and refused the same way: `::foo`, `::foo[label]{attrs}` painted
+onto the slide would reach it as prose reading `::foo`, which is a deck that renders while
+showing the mistake. The two names a leaf may carry are `click` and `column`, and `note` is
+not one of them because a note is `::note`, its text, and a closing `::`. An HTML comment is
+refused too, because a step is `::click` here and a comment is a deck written for a tool
+whose step marker this one does not read. A plain HTML tag is none of those and is still
+text: `<b>` is not a directive, and this library has no opinion about what a deck says about
+HTML.
 
 ```php
 use MarkdownPresentation\Document\DeckParser;
