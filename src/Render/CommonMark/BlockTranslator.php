@@ -161,48 +161,26 @@ final class BlockTranslator
      */
     private function block(Node $node, SlideState $state): array
     {
-        if ($node instanceof Marker) {
-            return match ($node->kind()) {
+        // `match (true)` rather than an `if` per arm: the arms are tried in order, and a
+        // marker is a block this walk asks about while everything after it is a block it
+        // draws. An `if` per arm is the same dispatch with a return per arm on top.
+        return match (true) {
+            $node instanceof Marker => match ($node->kind()) {
                 MarkerKind::Closer => throw UnknownMarker::strayCloser($state->slide),
                 MarkerKind::Container => throw UnknownDirective::container($state->slide, self::oneLine($node->written())),
                 MarkerKind::Column => $this->column($node, $state),
                 MarkerKind::Step, MarkerKind::Region => $this->step($node, $state),
-            };
-        }
-
-        if ($node instanceof LeagueHeading) {
-            return $this->placed(new Heading($this->inline->runs($node), $node->getLevel(), $state->step), $state);
-        }
-
-        if ($node instanceof ThematicBreak) {
-            return $this->placed(new Rule($state->step), $state);
-        }
-
-        if ($node instanceof FencedCode || $node instanceof IndentedCode) {
-            return $this->placed($this->code($node, $state), $state);
-        }
-
-        if ($node instanceof LeagueList) {
-            return $this->placed(new ListBlock($this->items($node, 1, [], $state), $state->step), $state);
-        }
-
-        if ($node instanceof BlockQuote) {
-            return $this->quote($node, $state);
-        }
-
-        if ($node instanceof LeagueTable) {
-            return $this->placed($this->table($node, $state), $state);
-        }
-
-        if ($node instanceof HtmlBlock) {
-            return $this->placed($this->html($node, $state), $state);
-        }
-
-        if ($node instanceof DirectiveBlock) {
-            return $this->directive($node, $state);
-        }
-
-        return $this->paragraph($node, $state);
+            },
+            $node instanceof LeagueHeading => $this->placed(new Heading($this->inline->runs($node), $node->getLevel(), $state->step), $state),
+            $node instanceof ThematicBreak => $this->placed(new Rule($state->step), $state),
+            $node instanceof FencedCode || $node instanceof IndentedCode => $this->placed($this->code($node, $state), $state),
+            $node instanceof LeagueList => $this->placed(new ListBlock($this->items($node, 1, [], $state), $state->step), $state),
+            $node instanceof BlockQuote => $this->quote($node, $state),
+            $node instanceof LeagueTable => $this->placed($this->table($node, $state), $state),
+            $node instanceof HtmlBlock => $this->placed($this->html($node, $state), $state),
+            $node instanceof DirectiveBlock => $this->directive($node, $state),
+            default => $this->paragraph($node, $state),
+        };
     }
 
     /**
@@ -493,23 +471,37 @@ final class BlockTranslator
             $header = $section instanceof TableSection && $section->isHead();
 
             foreach ($section->children() as $row) {
-                $cells = [];
-
-                foreach ($row->children() as $cell) {
-                    $cells[] = $this->inline->runs($cell);
-
-                    if ($header) {
-                        $align[] = $cell instanceof TableCell && $cell->getAlign() !== null
-                            ? $cell->getAlign()
-                            : 'left';
-                    }
-                }
+                [$cells, $columns] = $this->row($row, $header);
 
                 $rows[] = $cells;
+                array_push($align, ...$columns);
             }
         }
 
         return new Table($rows, $align, $state->step);
+    }
+
+    /**
+     * One row of a table: the runs of its cells, and the alignment of its columns where it is
+     * the header row. A body row's second half is empty, because how a column lines up is
+     * written on the header row and nowhere else.
+     *
+     * @return array{0: list<list<Run>>, 1: list<string>}
+     */
+    private function row(Node $row, bool $header): array
+    {
+        $cells = [];
+        $align = [];
+
+        foreach ($row->children() as $cell) {
+            $cells[] = $this->inline->runs($cell);
+
+            if ($header) {
+                $align[] = $cell instanceof TableCell && $cell->getAlign() !== null ? $cell->getAlign() : 'left';
+            }
+        }
+
+        return [$cells, $align];
     }
 
     /**

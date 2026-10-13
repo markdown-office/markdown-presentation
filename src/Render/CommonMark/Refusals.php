@@ -70,19 +70,22 @@ final class Refusals
     private static function comments(Node $node, SlideState $state): void
     {
         foreach ($node->children() as $child) {
-            if ($child instanceof HtmlBlock || $child instanceof HtmlInline) {
-                if (($found = self::comment($child->getLiteral())) !== null) {
-                    throw UnknownDirective::comment($state->slide, $found);
-                }
+            if (
+                ($child instanceof HtmlBlock || $child instanceof HtmlInline)
+                && ($found = self::comment($child->getLiteral())) !== null
+            ) {
+                throw UnknownDirective::comment($state->slide, $found);
             }
 
             // A comment nothing closes is not a node: the parser cannot tell where it ends,
             // so it stays in the text — which is the one case where a comment would be drawn
             // as prose, and the prose would be `<!--`.
-            if ($child instanceof Text && str_contains($child->getLiteral(), '<!--')) {
-                if (($found = self::comment($child->getLiteral())) !== null) {
-                    throw UnknownDirective::comment($state->slide, $found);
-                }
+            if (
+                $child instanceof Text
+                && str_contains($child->getLiteral(), '<!--')
+                && ($found = self::comment($child->getLiteral())) !== null
+            ) {
+                throw UnknownDirective::comment($state->slide, $found);
             }
 
             self::comments($child, $state);
