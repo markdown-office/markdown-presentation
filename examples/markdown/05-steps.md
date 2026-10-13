@@ -36,7 +36,9 @@ nothing.
 # A region that is a step of its own
 
 Three colons open one and three close it, so a build-up can be written as the
-parts it is made of rather than as a marker between each of them.
+parts it is made of rather than as a marker between each of them. Both of the
+bullets below arrive together on one click: a blank line between two of them does
+not end the list, so there is one shape here rather than two to join.
 
 :::click
 
@@ -45,9 +47,6 @@ parts it is made of rather than as a marker between each of them.
 - And the line under it, on the same one.
 
 :::
-
-The list above arrives on one click, both bullets with it: a blank line between two of
-them does not end the list, so there is one shape here rather than two to join.
 
 ---
 layout: two-column
