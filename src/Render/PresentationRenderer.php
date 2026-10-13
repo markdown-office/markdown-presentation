@@ -711,8 +711,10 @@ final class PresentationRenderer
             $y = $box->y;
             $bottom = $box->y + $box->height;
             $visible = $this->visible($blocks, $columns, $column);
+            $drawables = TextFrame::group($visible);
+            $last = count($drawables) - 1;
 
-            foreach (TextFrame::group($visible) as $drawable) {
+            foreach ($drawables as $at => $drawable) {
                 // A drawable that is a block is its own step; a {@see TextFrame} is several
                 // blocks drawn as one shape, and every block in a frame is on the same step —
                 // {@see TextFrame::group()} ends a run at a step boundary for exactly that
@@ -735,7 +737,17 @@ final class PresentationRenderer
 
                 $writer->write($slide, $drawable, new Box($box->x, $y, $box->width, $height), $height);
                 $steps[$first++] = $step;
-                $y += $height + $geometry->style()->blockGap();
+
+                // The air between two shapes is the air between the two blocks at the seam,
+                // which is the pair {@see TextFrame::group()} put next to one another — so a
+                // table under a paragraph gets the room a table wants whatever the frame
+                // around either of them, and a heading's own air above it is spent between
+                // shapes as it is spent between paragraphs. Nothing is added after the last
+                // one: room below the last shape of a column is the column's, not the
+                // layout's, and spending it there is what pushes a slide off its own bottom.
+                if ($at < $last) {
+                    $y += $height + (int) round($geometry->gapBetween($drawable, $drawables[$at + 1]));
+                }
             }
         }
 

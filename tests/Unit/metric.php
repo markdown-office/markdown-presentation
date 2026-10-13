@@ -177,13 +177,13 @@ it('measures a heading by the lines it wraps to', function () {
         // seven lines of the 32px a line at that size is.
         // A heading first, because the first heading of a slide is its title and is drawn in
         // the title box rather than in the body: this is the second one that is measured.
-        expect(measured("# Lead\n\n## " . str_repeat('h', 500) . "\n")->positionOf('heading')['height'])
+        expect(measured("# Lead\n\n## " . str_repeat('h', 500) . "\n")->positionOf('text')['height'])
             ->toBe(224.0);
 });
 
 it('measures a quote by the lines it wraps to', function () {
     // A quote is indented by a gutter and set at 15pt, which is 24px a line.
-    expect(measured('> ' . str_repeat('q', 500) . "\n")->positionOf('quote')['height'])
+    expect(measured('> ' . str_repeat('q', 500) . "\n")->positionOf('text')['height'])
         ->toBe(120.0);
 });
 

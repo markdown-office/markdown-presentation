@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Render;
 
+use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
 use MarkdownPresentation\Render\Block\Image;
@@ -14,7 +15,7 @@ use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
 
 /**
- * A run of paragraphs and lists, drawn as one text frame.
+ * A run of the blocks that are only type, drawn as one text frame.
  *
  * One shape per block is what a renderer falls into: it measures a block, writes a box, moves
  * down to the next one. It is also what makes the result miserable to edit in PowerPoint.
@@ -23,21 +24,31 @@ use MarkdownPresentation\Render\Block\Table;
  * own measured height — two of them can be drawn over one another. A frame cannot: PowerPoint
  * lays its paragraphs out itself, inside the one box the height was measured for.
  *
+ * That is also why the frame is worth widening as far as it goes. A block of type the reader
+ * cannot lift out of its box is a block the renderer got to position wrongly with no way to
+ * be wrong twice: the measurement is made once, for the whole run, and `normAutofit` is
+ * behind all of it. One estimate the renderer can be short by, rather than one per block.
+ *
  * A list is in the frame for the same reason. A bullet list is paragraphs, and the marker is
  * a property of a paragraph rather than a shape of its own, so a reader editing one types
- * into the frame instead of into a box that happens to be next to it.
+ * into the frame instead of into a box that happens to be next to it. A heading is a
+ * paragraph with its own runs, and a quote is a paragraph indented and italic: neither needs
+ * a box of its own to say what a box of its own could say, and markdown-word has always said
+ * it as `Heading1` and `IntenseQuote` — paragraph styles, positioned by the reader rather
+ * than by us.
  *
- * Everything else is a shape of its own, and ends the run. A heading is a different size,
- * colour and face; a table, a picture and a code block are not text at all; and a quote is
- * drawn a gutter in from the margin at another size in another colour, which is one frame's
- * paragraphs cannot each be while sharing one box.
+ * What is left is what is not type, or is type with something painted behind it. A table, a
+ * picture and a rule are shapes, and a code block is a filled one — a fill or a border over
+ * part of a text frame is not something the format can express — so each of those is a shape
+ * of its own, and each ends the run.
  *
- * The two unions here are not the same on purpose: a paragraph and a list reach a slide only
- * inside a frame, so nothing downstream has to handle one of them on its own.
+ * The two unions here are not the same on purpose: the blocks that reach a slide only inside a
+ * frame are {@see FrameBlock}, so nothing downstream has to handle one of them on its own.
  *
- * @phpstan-type FrameParagraph Paragraph|array{level: int, runs: list<Run>, ordered: bool, start: ?int}
+ * @phpstan-type FrameParagraph Heading|Paragraph|Quote|array{level: int, runs: list<Run>, ordered: bool, start: ?int}
+ * @phpstan-type FrameBlock Heading|Paragraph|Quote|ListBlock
  * @phpstan-type DrawnBlock Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table
- * @phpstan-type Drawable Code|Heading|Image|Quote|Rule|Table|TextFrame
+ * @phpstan-type Drawable Code|Image|Rule|Table|TextFrame
  */
 final class TextFrame
 {
@@ -45,8 +56,8 @@ final class TextFrame
     public const NAME = 'text';
 
     /**
-     * @param non-empty-list<Paragraph|ListBlock> $blocks What the frame holds, in reading
-     *        order. A list is one block here and several paragraphs in {@see self::paragraphs()},
+     * @param non-empty-list<FrameBlock> $blocks What the frame holds, in reading order. A
+     *        list is one block here and several paragraphs in the shape it is written as,
      *        because it is one thing the deck wrote and several lines of type.
      */
     public function __construct(
@@ -79,47 +90,67 @@ final class TextFrame
     }
 
     /**
-     * Every paragraph of the frame, a list item being a paragraph of its own — which is what
-     * it is in the file, and what makes the gap between two of them one question rather than
-     * one per block.
+     * The blocks the frame holds, in reading order, a list being one of them.
      *
-     * @return list<FrameParagraph>
+     * The air between two paragraphs of a frame is a property of the two *blocks* they belong
+     * to rather than of the paragraphs: the gap after a list is the gap after a list whatever
+     * how many lines its items took. So the measure and the draw both walk this list and expand
+     * a list into its items underneath, rather than a flattened list of paragraphs that has
+     * forgotten which block each of them came from.
+     *
+     * @return non-empty-list<FrameBlock>
      */
-    public function paragraphs(): array
+    public function blocks(): array
     {
-        $paragraphs = [];
+    return $this->blocks;
+    }
 
-        foreach ($this->blocks as $block) {
-            if ($block instanceof ListBlock) {
-                foreach ($block->items as $item) {
-                    $paragraphs[] = $item;
-                }
+/**
+ * The block at the top of the frame, which is what carries the air above it.
+ *
+ * A frame opens on whatever the deck wrote first, and that is what decides how much room
+ * the shape above it has to leave: a frame that opens on a heading has to clear the
+ * heading's own air, and one that opens on a paragraph has nothing to clear but the
+ * block above it. {@see \MarkdownPresentation\Render\SlideGeometry::spaceAbove()} asks
+ * this rather than being told what the frame holds, so that the gap between two shapes
+ * and the gap between two paragraphs of a frame cannot be two different answers to the
+ * same question.
+ *
+ * @return FrameBlock
+ */
+    public function leading(): Block
+    {
+        return $this->blocks[0];
+    }
 
-                continue;
-            }
-
-            $paragraphs[] = $block;
-        }
-
-        return $paragraphs;
+    /**
+     * The block at the foot of the frame, which is what carries the air below it.
+     *
+     * The mirror of {@see self::leading()}, for the same reason.
+     *
+     * @return FrameBlock
+     */
+    public function trailing(): Block
+    {
+        return $this->blocks[count($this->blocks) - 1];
     }
 
     /**
      * The blocks of a column as the shapes they are drawn as: each run of text as one frame,
      * and every other block as itself.
      *
-     * Runs rather than whole blocks, and the distinction is the point: a heading, a picture or
-     * a code block drawn *inside* the frame of the paragraphs around it would be a shape the
-     * reader cannot move on its own and the frame's own height would say nothing about where
-     * it goes.
+     * Runs rather than whole blocks, and the distinction is the point: a table, a picture or a
+     * code block drawn *inside* the frame of the type around it would be a shape the reader
+     * cannot move on its own and the frame's own height would say nothing about where it
+     * goes.
      *
-     * A step ends a run as surely as a heading does, and this is the one place that has to
-     * know it: a frame is one shape and an animation reveals one shape on one click, so a
-     * frame holding a step's paragraphs and the next step's would put two clicks' worth of
-     * text on the slide at the first of them. Splitting there costs nothing in the file —
-     * {@see \MarkdownPresentation\Render\ShapeWriter::textFrame()} puts the gap between two
+     * A step ends a run as surely as a table does, and this is the one place that has to know
+     * it: a frame is one shape and an animation reveals one shape on one click, so a frame
+     * holding a step's paragraphs and the next step's would put two clicks' worth of text on
+     * the slide at the first of them. Splitting there costs nothing in the file —
+     * {@see \MarkdownPresentation\Render\ShapeWriter::textFrame()} writes the air between two
      * paragraphs of a frame on every paragraph but the last, and two frames of one paragraph
-     * each are given that same gap by the column's own arithmetic — and the reader editing
+     * each are given that same air by the column's own arithmetic — and the reader editing
      * the result gets one box per click, which is the unit a build-up is walked in.
      *
      * @param list<DrawnBlock> $blocks
@@ -132,20 +163,32 @@ final class TextFrame
         $text = [];
 
         foreach ($blocks as $block) {
-            $runnable = $block instanceof Paragraph || $block instanceof ListBlock;
+            if (
+                $block instanceof Code
+                || $block instanceof Image
+                || $block instanceof Rule
+                || $block instanceof Table
+            ) {
+                if ($text !== []) {
+                    $drawn[] = new TextFrame($text);
+                    $text = [];
+                }
 
-            if ($text !== [] && (!$runnable || $text[0]->step() !== $block->step())) {
-                $drawn[] = new TextFrame($text);
-                $text = [];
-            }
-
-            if ($runnable) {
-                $text[] = $block;
+                $drawn[] = $block;
 
                 continue;
             }
 
-            $drawn[] = $block;
+            // A step ends a run as surely as a table does: a frame is one shape and an
+            // animation reveals one shape on one click, so a frame holding a step's
+            // paragraphs and the next step's would put two clicks' worth of text on the slide
+            // at the first of them.
+            if ($text !== [] && $text[0]->step() !== $block->step()) {
+                $drawn[] = new TextFrame($text);
+                $text = [];
+            }
+
+            $text[] = $block;
         }
 
         if ($text !== []) {
@@ -154,4 +197,5 @@ final class TextFrame
 
         return $drawn;
     }
+
 }

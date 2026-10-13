@@ -1,0 +1,9 @@
+layouts:
+  title: Title Slide
+  content: Title and Content
+  two-column: Two Content
+  section: Section Header
+  blank: Blank
+  image-text: Picture Left
+  image-title: Picture with Caption
+  image-slide: Full Bleed Picture

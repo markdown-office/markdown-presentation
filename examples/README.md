@@ -1,6 +1,6 @@
 # Examples
 
-Ten decks, each demonstrating one thing. `build.php` converts every one into a
+Eleven decks, each demonstrating one thing. `build.php` converts every one into a
 real `.pptx` under `out/` and renders **one PNG per slide** beside it, so the
 result can be checked without PowerPoint. One file per slide rather than one per
 deck: a deck's whole question is usually whether slide three overflows, which is
@@ -27,6 +27,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `08-code.md` | `08-code.pptx` | Code blocks |
 | `09-inline-markup.md` | `09-inline-markup.pptx` | A `title:` carrying `**bold**` and `*italic*` |
 | `10-rejected.md` | **nothing** | Conditional content the way Slidev writes it |
+| `11-type-scale.md` | two files | The same slides in `default` and in `dense`, the one theme whose whole scale is smaller at once — body, title, margins, gutter, block gap and rule. The table and the code block are twelve points in both, because those two sizes are the library's, which is what leaves them to read the two pages against |
 
 ## The one that is not built
 
@@ -60,7 +61,7 @@ A few of these are here because the render is the only honest evidence:
   no margin either — the box it is fitted to is the whole page. The logo is
   square and the page is not, so the picture keeps its own proportions inside
   that box and the air either side of it is the shape not filling it.
-- **`03`, the same slide in each of the three themes.** The difference is not
+- **`03`, the same slide in each of the three themed decks.** The difference is not
   the palette. `default` is Office's colours at the library's own scale with a
   40px margin and a 2px rule; `minimal` is a serif deck with 64px margins, a
   1px rule and headings in their own face's reading weight rather than a
@@ -70,5 +71,13 @@ A few of these are here because the render is the only honest evidence:
 - **`03-themes-corporate-dark`.** The only one of the three with a dark page,
   and the only one whose text is painted in the theme's light token rather than
   its dark one.
+- **`11`, the same slide in each of the two files.** `dense` is the one theme
+  whose numbers are all smaller than the default's at once: a 13pt body against
+  a 16pt one, a 28px margin against 40, and an 8px gap after a paragraph against
+  12 — the gap the rest of the rhythm is a fraction of, so a table above a
+  paragraph takes 12px here against 17px there. A table and a fenced block stay
+  at twelve points in both files, because those two sizes belong to the library
+  rather than to a theme, so they are the one thing on the slide that does not
+  move and the page around them is what the pair is for.
 - **`09`.** The title is `Ops **runbook**: what *changed*` and is drawn with the
   emphasis, once, and is not repeated in the body.

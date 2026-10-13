@@ -262,7 +262,7 @@ it('clicks a two-column build in the order the steps were written', function () 
     // step too, so the first click carries a shape from both columns at once. The step written
     // after it comes second, so the chain runs in the order the deck was read rather than the
     // order the two columns are laid out in.
-    expect($pptx->reveals(4))->toBe([['text', 'heading'], ['text']]);
+    expect($pptx->reveals(4))->toBe([['text', 'text'], ['text']]);
 });
 
 it('holds a picture back until its own click', function () {
@@ -295,5 +295,5 @@ it('lays a two-column build out for a picture the first click has not shown', fu
     // steps come before it because the columns are laid out in order, so the picture is measured
     // into a column that has already been filled — which is the case a build-up has to get right
     // and the one a single-column example cannot show.
-    expect($pptx->reveals(7))->toBe([['text', 'heading'], ['image']]);
+    expect($pptx->reveals(7))->toBe([['text', 'text'], ['image']]);
 });

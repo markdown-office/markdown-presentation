@@ -253,12 +253,12 @@ be read off `ppt/slides/slideN.xml` without the library:
 
 | Markdown | Shape | Notes |
 | --- | --- | --- |
-| `# Heading` | `title`, then `heading` | The first heading becomes the title and is not drawn twice, whatever markup it carries |
+| `# Heading` | `title`, then `text` | The first heading becomes the title and is not drawn twice, whatever markup it carries. A heading in the body is a paragraph of the frame around it, at the size of its level |
 | A paragraph | `text` | `**bold**`, `*italic*`, `***both***`, `__bold__`, `_italic_`, `~~struck~~`, `` `code` `` and `[text](url)` are runs, not characters. A link target is checked — see [Links](#links) |
 | `- a` / `1. a` | `text` | Ordered lists are numbered, not bulleted, from the number the deck writes; nesting is the indent |
 | ```` ```lang ```` | `code` | Mono font, filled with `bg2`, the language in the shape's description. No colouring |
 | `\| a \| b \|` under an alignment row | `table` | Alignment comes from the row; a ragged row keeps the cells it has; a cell carries the same inline markup a paragraph does. The header row is bold, filled with `bg2`, and the columns are as wide as what they hold |
-| `> a` | `quote` | Italic, in `tx2`, indented. Written over several lines it is one shape |
+| `> a` | `text` | Italic, in `tx2`, indented by a paragraph margin. Written over several lines it is one paragraph |
 | `***` | `rule` | A bar in `accent1`. `---` is a slide delimiter and never reaches here |
 | A line that is only `![alt](path)` | `image` | Fitted to its box, aspect kept, centred. The alt text is the shape's description, and the written path stands in where the deck named none. A path that is not a file is a failure |
 
@@ -268,11 +268,16 @@ plain text, because nothing on the other end of a metadata field reads a pair of
 
 ### One box for a run of text
 
-A run of paragraphs and lists is drawn as **one** shape holding one paragraph each — the way a
-person builds a slide, by clicking into a placeholder and typing. Three paragraphs with a
-list between them are one box, so clicking any of them selects all of them, moving one moves
-the lot, and PowerPoint lays them out inside the one box they were measured for rather than
-six boxes that might not agree about where they are.
+A run of paragraphs, lists, headings and quotes is drawn as **one** shape holding one
+paragraph each — the way a person builds a slide, by clicking into a placeholder and typing.
+Three paragraphs with a list between them are one box, so clicking any of them selects all
+of them, moving one moves the lot, and PowerPoint lays them out inside the one box they were
+measured for rather than six boxes that might not agree about where they are.
+
+A heading and a quote are in that box because in the file they *are* paragraphs: a heading is
+one whose runs carry the heading's size, weight, face and ink, and a quote is one indented,
+italic and in the quiet ink. markdown-word has always said it the same way, as `Heading1` and
+`IntenseQuote` — paragraph styles positioned by the reader rather than by us.
 
 ```php
 use MarkdownPresentation\Document\DeckParser;
@@ -299,14 +304,46 @@ title: 1 paragraphs
 text: 4 paragraphs
 ```
 
-A heading, a quote, a rule, a table, a picture and a code block are shapes of their own, and
-any of them ends the run: a heading is a different size and colour, and the others are not
-text. A quote ends it because it is drawn a gutter in from the margin at another size in
-another colour, which one box's paragraphs cannot each be.
+A rule, a table, a picture and a code block are shapes of their own, and any of them ends the
+run: they are not type, or they are type with something painted behind them. A fill or a
+border over part of a text frame is not something the format can express, so a code block
+keeps its panel by being a box.
 
-The gap between two paragraphs is the theme's own `block:` spacing, written into the shape as
-`a:spcAft` — the same number the layout spends between two shapes of a column, spent in the
-other of its two places, and counted once rather than twice.
+### The air between blocks
+
+The gap is not one number. `block:` sets the gap **after a paragraph**, and everything else
+is a fraction of it or a function of its own type, because a block reads differently
+depending on what it is next to:
+
+| Between | What decides it | At the library's own numbers |
+| --- | --- | --- |
+| two paragraphs | `block:` | 12px |
+| two list items | a quarter of `block:` a side | 6px |
+| a paragraph and a table, a code block, a rule or a picture | 0.9 of `block:` a side | 17px |
+| a heading and the text above it | 0.7 em of the **heading's own size** | 19px at a 20pt `##` |
+| a heading and the text below it | 0.35 em of the heading's size | 9px |
+
+Two things in that table are worth reading twice. A block with an edge of its own takes more
+of the air than a paragraph, because the ink of a paragraph stops short of the bottom of its
+box — by the text inset, and by the slack in the last line's leading — while a table's border
+is drawn exactly on the edge; the same number separates a paragraph from a paragraph further
+than it separates a paragraph from a table. And a heading's air is a function of how big the
+heading is, so a theme with a larger `headings` scale gets more room around its headings
+rather than the same room around much bigger type. It is more above than below, because a
+heading belongs to the text that follows it — which is why markdown-word writes a heading's
+`space before` at twice its `space after`, and puts `keepNext` on top of that.
+
+One gap, spent once, in either of its two places: the air between two paragraphs is written
+into the shape as `a:spcAft` and `a:spcBef`, and the same number is added to the cursor
+between two shapes of a column. A frame measured with the gap *and* written with it is a gap
+taller than the text it separates. Each paragraph carries half a gap at each end rather than
+a whole one, because PowerPoint adds a paragraph's spacing before and after rather than
+taking the larger of the two — a gap carried entirely on one side reads as a bigger gap above
+a paragraph than below it.
+
+The gap between two shapes is the air below the first added to the air above the second. A
+block that starts a frame carries its own: a frame that opens on a heading has to clear the
+heading's air, and one that opens on a paragraph has nothing to clear but the block above it.
 
 One thing about that gap is worth knowing, because it is measured rather than assumed:
 **PowerPoint spends a paragraph's spacing after every break the text contains — a newline
@@ -321,8 +358,15 @@ makes a per-line measurement wrong by however many lines a deck happens to wrap 
 A frame of text that does not fit its slide is clamped to the room left and reported as one
 shape, because one is what it is.
 
-Shapes stack down the body box, each one starting where the one above it ended with a gap
-between them.
+Shapes stack down the body box, each one starting where the one above it ended with the gap
+the pair of them asked for. Nothing is added after the last one: room below the last shape of
+a column is the column's, and spending it there is what pushes a slide off its own bottom.
+
+A title is a box of its own above the body, and it does not grow into it: the band a title may
+occupy is the room between the top it is drawn at and the top of the body box, less the air
+underneath it, so a title that wraps onto a second line has its type shrunk to fit rather than
+putting its second line on the first line of the body. The body is read in the same place on
+every slide, which is why the title gives way and not the body.
 
 Every block is measured before it is drawn: `Render\TextMetric` counts the lines it will
 wrap to, from an advance-width table bundled in the package. It is an estimate and says so
@@ -473,7 +517,7 @@ echo implode(' ', array_slice($names[1], 1)), "\n";
 
 ```text
 Two Content
-text heading text
+text text
 ```
 
 `::column` on a line of its own moves everything below it into the next column. It is
@@ -1188,8 +1232,8 @@ The tools that come with the library are in `tools/`:
 | `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: nothing in the test suite needs it, because CI has no PowerPoint |
 | `tools/build-powerpoint-fixtures.sh` | Rebuilds the two decks in `tests/fixtures/powerpoint/`, which were authored in PowerPoint rather than written by hand |
 
-Three themes ship with the library, and they are three different decks rather than one deck in
-three swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
+Four themes ship with the library, and they are four different decks rather than one deck in
+four swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
 which is the file on disk:
 
 ```yaml path=themes/corporate-dark/theme.yml
@@ -1337,8 +1381,8 @@ try {
 ```
 
 ```text
-corporate-dark, default, minimal
-There is no theme named "corprate-dark". Available: corporate-dark, default, minimal.
+corporate-dark, default, dense, minimal
+There is no theme named "corprate-dark". Available: corporate-dark, default, dense, minimal.
 ```
 
 Falling back to the default theme instead would produce a deck in the wrong colours
@@ -1434,7 +1478,7 @@ palette and nothing else.
 | --- | --- | --- |
 | `margin` | The space left all the way round the page. Every band on the slide is a multiple of it, so widening the margin moves the title, the body and the gap between them together | px |
 | `gutter` | The gap that separates rather than encloses: two columns, a bullet from its text, one level of a list from the one above | px |
-| `block` | The gap left between two blocks in a column | px |
+| `block` | The gap after a paragraph — in a frame and between two shapes. Every other gap is a fraction of this, or a function of a heading's own size | px |
 | `rule` | How thick a thematic break's bar is drawn. The room it occupies is the layout's, not the theme's | px |
 | `body` | The size body text and list items are drawn at | pt |
 | `title` | The size a content slide's title is drawn at | pt |
@@ -1471,11 +1515,24 @@ would make a deck with a large body unreadable in its own tables. And a **title'
 body ink whatever `heading-ink` says, because `heading-ink` is about a heading *in a body*; a
 slide whose title were a different colour from its own text would read as two decks.
 
-The three shipped themes are deliberately far apart on every one of these axes, which is what
-makes the three files in `examples/out/03-themes-*.pptx` comparable: `default` is Office's
-palette at the library's own scale, `corporate-dark` is larger and heavier throughout with its
-headings in the accent, and `minimal` is a serif deck with the widest margins, a hairline rule
-and headings in their own face's reading weight rather than a synthesised bold.
+The four shipped themes are deliberately far apart on every one of these axes, which is what
+makes the files in `examples/out/03-themes-*.pptx` and `examples/out/11-type-scale-*.pptx`
+comparable: `default` is Office's palette at the library's own scale, `corporate-dark` is
+larger and heavier throughout with its headings in the accent, `minimal` is a serif deck with
+the widest margins, a hairline rule and headings in their own face's reading weight rather
+than a synthesised bold, and `dense` is the one where the whole scale moves down at once — a
+13pt body on a 28px margin, for a deck that has to hold a page rather than make a point.
+
+Note that the names are about different axes: `minimal` is *dense in content*, with the
+widest margins and the largest light-theme body, while `dense` is *dense in type*. A deck
+that wants a great deal of text on a slide wants `minimal`; a deck that wants the type itself
+smaller wants `dense`.
+
+Because the air between blocks is a fraction of `block:` or a function of a heading's own
+size, it follows a theme's type scale rather than standing still while the type moves: at
+`dense`'s 13pt body a paragraph gap is 8px and at `corporate-dark`'s 18pt body it is 16px,
+and a heading's air above it follows whatever that theme's `headings` scale says. The two
+`11-type-scale` decks exist to be looked at side by side for exactly that reason.
 
 ### Style slots
 

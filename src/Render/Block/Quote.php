@@ -17,11 +17,6 @@ final class Quote implements Block
     ) {
     }
 
-    public function name(): string
-    {
-        return 'quote';
-    }
-
     public function step(): int
     {
         return $this->step;

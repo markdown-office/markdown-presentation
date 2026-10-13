@@ -18,11 +18,6 @@ final class Heading implements Block
     ) {
     }
 
-    public function name(): string
-    {
-        return 'heading';
-    }
-
     public function step(): int
     {
         return $this->step;

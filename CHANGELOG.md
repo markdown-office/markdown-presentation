@@ -6,7 +6,65 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A fourth theme, `dense`, and a deck that exists to be looked at twice.**
+  `themes/corporate-dark` is the one that was larger than the library's own scale; nothing
+  shipped that was smaller, and a spacing model that is a fraction of a type size is only
+  demonstrable at two of them. `dense` is the whole scale down at once — a 13pt body on a 28px
+  margin — and `examples/markdown/11-type-scale.md` is built twice, once per theme, so the
+  same words at two sizes can be put side by side. The air between its blocks follows: 8px
+  after a paragraph rather than 12, and a heading's air above it follows whatever that
+  theme's `headings` scale says.
+
 ### Changed
+
+- **The air between blocks is per-block rather than one number, and a heading and a quote
+  are paragraphs of the frame around them rather than shapes of their own.**
+  `block:` was the gap between two blocks everywhere, which is one number doing the work of
+  a rhythm. It is still the gap after a paragraph, and everything else is a fraction of it or
+  a function of its own type:
+
+  | Between | What decides it | At the library's own numbers |
+  | --- | --- | --- |
+  | two paragraphs | `block:` | 12px, unchanged |
+  | two list items | a quarter of `block:` a side | 6px |
+  | a paragraph and a table, code block, rule or picture | 0.9 of `block:` a side | 17px |
+  | a heading and the text above it | 0.7 em of the heading's own size | 19px at a 20pt `##` |
+  | a heading and the text below it | 0.35 em of the heading's size | 9px |
+
+  Two things in that table are the reason for it. A block with an edge of its own takes more
+  of the air than a paragraph, because a paragraph's ink stops short of the bottom of its box
+  — by the text inset, and by the slack in the last line's leading — while a table's border is
+  drawn exactly on the edge, so one number read as generous between two sentences and cramped
+  above a table. And a heading's air follows the heading's own size rather than a body's,
+  because a 34-point heading under the same air as a 14-point one is either crowded or
+  marooned; it is more above than below, for the same reason markdown-word writes a heading's
+  `space before` at twice its `space after`.
+
+  A heading is now a paragraph of the frame around it, carrying its own size, weight, face and
+  ink, and a quote is one carrying an indent, italic and the quiet ink — which is what each
+  already was in the file. A slide whose body is text and nothing else is now *one* box
+  rather than a box per block, so the height is measured once and `normAutofit` stands behind
+  all of it, and a deck that was a page of headings and quotes is no longer a page of boxes a
+  reader cannot move one of at a time. A rule, a table, a picture and a code block are still
+  shapes of their own: they are not type, or they are type with something painted behind them,
+  and a fill over part of a text frame is not something the format can express.
+
+  The gap between two paragraphs is written as a half at each end — `a:spcAft` under one and
+  `a:spcBef` over the other — because PowerPoint adds a paragraph's spacing before and after
+  rather than taking the larger of the two, and a gap carried entirely on one side reads as a
+  bigger gap above a paragraph than below it. The two halves add back up to what a deck got
+  before.
+
+- **A title is a box that no longer grows into the one below it.**
+  The title band asked for two lines of the role's own title size and the body started at a
+  fixed band, and nothing compared the two: at the library's own numbers the title box ended
+  ten pixels *below* the top of the body box, so a title that wrapped onto a second line put
+  its second line on the first line of the body. It is clamped to the room between the two
+  now, and `normAutofit` shrinks a long title to fit rather than the body moving down with it
+  — a slide's body is read in the same place on every slide, which is why the title gives way.
+  A one-line title is unchanged and looks identical.
 
 - **A slide is read by league/commonmark, and this library's own block parser is gone.**
   The two agreed on 2 691 of the 2 760 slide contents the differential test compared, and this

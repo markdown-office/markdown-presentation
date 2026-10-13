@@ -370,7 +370,7 @@ it('keeps a heading that only repeats the title, because it is not the one that 
     // author wrote and dropping every heading that reads like the title would take it out.
     $pptx = renderDeck("---\ntitle: One\n---\n\n# One\n\n## One\n");
 
-    expect($pptx->shapeNames())->toBe(['title', 'heading'])
+    expect($pptx->shapeNames())->toBe(['title', 'text'])
         ->and($pptx->texts(1))->toBe(['One', 'One']);
 });
 
@@ -396,7 +396,7 @@ it('writes the deck title into the document properties as text, without its mark
 it('draws a heading that is not the title in the body', function () {
     $pptx = renderDeck("# Title\n\n## A section\n");
 
-    expect($pptx->shapeNames())->toBe(['title', 'heading']);
+    expect($pptx->shapeNames())->toBe(['title', 'text']);
 });
 
 it('leaves a heading that became the title out of the body', function () {
@@ -406,7 +406,7 @@ it('leaves a heading that became the title out of the body', function () {
 it('draws a heading that is not the first heading of the slide', function () {
     $pptx = renderDeck("# One\n\n## Two\n\n## Three\n");
 
-    expect($pptx->shapeNames())->toBe(['title', 'heading', 'heading']);
+    expect($pptx->shapeNames())->toBe(['title', 'text']);
 });
 
 it('keeps a title written in the frontmatter even when the content has no heading', function () {
@@ -660,12 +660,15 @@ it('starts the block after a table below the rows the table writes', function ()
     // written at 38, so four rows declared 104px and the next block landed on the last one.
     $pptx = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |\n| 7 | 8 |\n\nAfter.\n");
 
+    // 17 and not 12: the air is the table's own and the paragraph's, and a table has an edge
+    // of its own and takes more of it than a paragraph does — which is the whole of what
+    // {@see SlideGeometry::spaceBelow()} and {@see SlideGeometry::spaceAbove()} are for.
     expect($pptx->positionOf('table')['height'])->toBe(5.0 * 38.0)
-        ->and($pptx->positionOf('text')['y'])->toBe(104.0 + 5 * 38.0 + 12.0);
+        ->and($pptx->positionOf('text')['y'])->toBe(104.0 + 5 * 38.0 + 17.0);
 });
 
-it('renders a block quote as a quote shape', function () {
-    expect(renderDeck("> quoted\n")->shapeNames())->toBe(['quote']);
+it('renders a block quote as a paragraph of the frame, not a shape of its own', function () {
+    expect(renderDeck("> quoted\n")->shapeNames())->toBe(['text']);
 });
 
 it('draws a quote written across two lines as one shape', function () {
@@ -673,15 +676,16 @@ it('draws a quote written across two lines as one shape', function () {
     // Markdown meant by writing it over two lines.
     $pptx = renderDeck("> line one\n> line two\n");
 
-    expect($pptx->shapeNames())->toBe(['quote'])
+    expect($pptx->shapeNames())->toBe(['text'])
         ->and($pptx->texts(1))->toBe(["line one\nline two"]);
 });
 
 it('indents a block quote from the margin', function () {
-    // The number rather than "greater than 40": the shape is 860 of the 880 the body box is,
-    // which is what "indented by a gutter" has to mean if the block below it is to keep its
-    // full width.
-    expect(renderDeck("> quoted\n")->positionOf('quote')['x'])->toBe(60.0);
+    // The paragraph margin rather than the shape's offset: a quote that moved the frame as
+    // well as the text would push everything below it a gutter to the left, and the gutter
+    // is there to indent the text inside the frame rather than to move the frame.
+    expect(renderDeck("> quoted\n")->positionOf('text')['x'])->toBe(40.0)
+        ->and(renderDeck("> quoted\n")->part(SLIDE_ONE))->toContain('marL="190500"');
 });
 
 it('renders a thematic break as a rule rather than dropping it', function () {
@@ -759,21 +763,28 @@ it('leaves a gap between two shapes of a column', function () {
     // Every shape is written with `setSpacingBefore(0)`, so without a gap in the layout two
     // shapes drawn one after the other abut with nothing between them: the last line of one
     // against the first line of the next.
+    //
+    // 17 and not 12: the air is the paragraph's half and the code block's, and a code block
+    // has a panel painted to the edge of its box and takes more of it than a paragraph does.
     $shapes = renderDeck("First.\n\n```\nx\n```\n")->positions();
+    $between = $shapes[1]['y'] - ($shapes[0]['y'] + $shapes[0]['height']);
 
-    expect($shapes[1]['y'] - ($shapes[0]['y'] + $shapes[0]['height']))->toBe(12.0);
+    expect($between)->toBe(17.0)
+        ->and($between)->toBeGreaterThan(12.0);
 });
 
 it('leaves the theme\'s own gap between two paragraphs of one frame', function () {
-    // The gap a reader sees between two paragraphs is now written into the frame rather than
-    // taken out of the column between two boxes, and it is the same number either way:
-    // `a:spcAft` in hundredths of a point, on every paragraph that has another under it.
+    // The gap a reader sees between two paragraphs is written into the frame rather than
+    // taken out of the column between two boxes, and it is the same number either way — in
+    // two halves, because PowerPoint adds a paragraph's spacing before and after rather than
+    // taking the larger of the two, and a gap carried entirely on one side reads as a bigger
+    // gap above a paragraph than below it.
     $xml = renderDeck("First.\n\nSecond.\n")->part(SLIDE_ONE);
 
-    // 12px of block gap is 9pt at 96 dpi, and the two paragraphs of the frame carry one gap
-    // between them: the first, and not the second.
-    expect(preg_match_all('#<a:spcAft>\s*<a:spcPts val="900"/>#', $xml))->toBe(1)
-        ->and(preg_match_all('#<a:spcAft>#', $xml))->toBe(2);
+    // 12px of block gap is 9pt at 96 dpi, half of that on each side, and `a:spcPts` is in
+    // hundredths of a point: 450 written under the first paragraph and 450 over the second.
+    expect(preg_match_all('#<a:spcAft>\s*<a:spcPts val="450"/>#', $xml))->toBe(1)
+        ->and(preg_match_all('#<a:spcBef>\s*<a:spcPts val="450"/>#', $xml))->toBe(1);
 });
 
 it('measures a frame the way PowerPoint lays it out, which is a gap after every break', function () {

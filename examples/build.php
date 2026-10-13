@@ -47,6 +47,7 @@ const SOURCES = __DIR__ . '/markdown';
  */
 const VARIANTS = [
     '03-themes' => ['theme' => ['default', 'corporate-dark', 'minimal']],
+    '11-type-scale' => ['theme' => ['default', 'dense']],
 ];
 
 /**
@@ -64,6 +65,8 @@ const DESCRIPTIONS = [
     '07-images' => 'A picture per slide, one of them converted on the way in.',
     '08-code' => 'Fenced blocks, the language in the shape description, and a block that does not fit.',
     '09-inline-markup' => 'The eight things a paragraph turns into runs.',
+    '11-type-scale-default' => 'One deck at the library\'s own type scale.',
+    '11-type-scale-dense' => 'The same slides at thirteen points, with the gaps with them.',
 ];
 
 $assets = SOURCES . '/assets';
