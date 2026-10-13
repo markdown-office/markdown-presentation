@@ -24,14 +24,15 @@ layout: two-column
 
 # Two columns
 
-Left column. Everything above the first `##` in the body is the left one, because
-that is the heading a writer puts on a column of a slide and there is nothing else
-to go on.
+Left column. Everything above the `::column` marker is the left one.
+
+::column
 
 ## The right column
 
-Right column. A deck that never writes a `##` asks for two columns and fills one,
-which is honest and which this library does not paper over.
+Right column. The marker moves the blocks below it into the next column, and the `##` above it is an ordinary heading that lands in whichever column it is written.
+
+A deck that never writes the marker asks for two columns and fills one, which is honest and which this library does not paper over.
 
 ---
 layout: section

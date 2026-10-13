@@ -10,6 +10,7 @@ use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
+use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Render\BlockParser;
 use MarkdownPresentation\Render\Box;
 use MarkdownPresentation\Render\PresentationRenderer;
@@ -312,24 +313,135 @@ it('refuses a level that is not a positive integer, on a slide built by hand', f
         ->toThrow(MalformedFrontmatter::class, 'has a "level" that is not a positive integer');
 });
 
-it('puts everything before the second heading in the left column and everything after in the right', function () {
-    // The heading is what divides the columns, so it belongs to the column it opens and the
-    // text above it stays in the one that was already there.
-    $shapes = slideDeck("---\nlayout: two-column\n---\n# Both\n\nLeft.\n\n## Right\n\nRight side.\n")->positions();
+it('moves the blocks after a ::column into the next column', function () {
+    // The marker is what divides the columns, so the blocks below it belong to the column it
+    // opens and the text above it stays in the one that was already there.
+    //
+    // The text is asserted as well as the geometry, and it is the marker claim: a renderer
+    // that has never heard of `::column` puts both paragraphs in the first column and prints
+    // the marker on the slide, and the text is what says so.
+    $pptx = slideDeck("---\nlayout: two-column\n---\n# Both\n\nLeft.\n\n::column\n\nRight side.\n");
+    $shapes = $pptx->positions();
 
-    expect(array_map(static fn (array $shape): string => $shape['name'], $shapes))
-        ->toBe(['title', 'text', 'heading', 'text'])
-        ->and($shapes[1]['x'])->toBeLessThan($shapes[2]['x'])
-        ->and($shapes[2]['x'])->toBe($shapes[3]['x']);
+    expect($pptx->texts(1))->toBe(['Both', 'Left.', 'Right side.'])
+        ->and(array_map(static fn (array $shape): string => $shape['name'], $shapes))
+        ->toBe(['title', 'text', 'text'])
+        ->and($shapes[1]['x'])->toBeLessThan($shapes[2]['x']);
 });
 
-it('leaves the right column empty for a two-column slide that writes no second heading', function () {
-    // It asked for two columns and wrote one, which is honest: the alternative would be
-    // guessing which block was meant to be the other column.
+it('leaves a heading in the column it was written in', function () {
+    // A `##` is an ordinary heading now. It used to be the only way to reach the second
+    // column, so one written above a `::column` stays with the text above it — which is what
+    // a reader of the deck would have to check every one of these slides to find out.
+    //
+    // The text is asserted with the geometry because a heading is a claim about what is
+    // drawn: the positions say which column a shape is in, and only the text says that the
+    // shape in it is the heading the deck wrote above the marker.
+    $pptx = slideDeck("---\nlayout: two-column\n---\n# Both\n\n## Above\n\nLeft.\n\n::column\n\nRight.\n");
+    $shapes = $pptx->positions();
+
+    expect($pptx->texts(1))->toBe(['Both', 'Above', 'Left.', 'Right.'])
+        ->and(array_map(static fn (array $shape): string => $shape['name'], $shapes))
+        ->toBe(['title', 'heading', 'text', 'text'])
+        ->and($shapes[1]['x'])->toBe($shapes[2]['x'])
+        ->and($shapes[2]['x'])->toBeLessThan($shapes[3]['x']);
+});
+
+it('leaves the right column empty for a two-column slide that writes no ::column', function () {
+    // It asked for a layout with two columns and wrote one, which is honest: the alternative
+    // would be guessing which block was meant to be the other column.
     $shapes = slideDeck("---\nlayout: two-column\n---\n# Both\n\nOnly left.\n")->positions();
 
     expect(array_map(static fn (array $shape): string => $shape['name'], $shapes))
         ->toBe(['title', 'text']);
+});
+
+it('draws nothing for a ::column nothing was written after, because the layout has the column', function () {
+    // The marker is consumed rather than drawn as a paragraph, and the text says so: the
+    // literal `::column` on the slide would be a marker the deck drew instead of reading.
+    // Whether the slide renders is the layout's question and not this one's — the same marker
+    // on a role with one column is refused below, and nothing about the two decks differs
+    // except what is written under it.
+    $pptx = slideDeck("---\nlayout: two-column\n---\n# Both\n\nLeft.\n\n::column\n");
+
+    expect($pptx->texts(1))->toBe(['Both', 'Left.'])
+        ->and($pptx->shapeNames())->toBe(['title', 'text']);
+});
+
+it('refuses a ::column nothing was written after, on a layout with too few columns', function () {
+    // Measured by what the deck wrote rather than by the block it left behind, because a rule
+    // that turned on what follows the last marker of a slide would make a deck's spelling
+    // depend on its last line. Both decks here rendered before: one marker past the end of a
+    // one-column slide, and two more markers than a two-column layout has columns for.
+    expect(fn () => slideDeck("# One\n\nLeft.\n\n::column\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "content" layout has 1 column. '
+            . '"::column" moves the blocks after it into the next column, so a slide that uses one needs a '
+            . 'layout with more columns than this.')
+        ->and(fn () => slideDeck("---\nlayout: two-column\n---\n# One\n\nOne.\n\n::column\n\nTwo.\n\n::column\n\n::column\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "two-column" layout has 2 columns. '
+            . '"::column" moves the blocks after it into the next column, so a slide that uses one needs a '
+            . 'layout with more columns than this.');
+});
+
+it('refuses a ::column on a role with one column, naming the role and what it has', function () {
+    expect(fn () => slideDeck("# One\n\nLeft.\n\n::column\n\nRight.\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "content" layout has 1 column. '
+            . '"::column" moves the blocks after it into the next column, so a slide that uses one needs a '
+            . 'layout with more columns than this.');
+});
+
+it('refuses a third ::column on a two-column slide with the same message', function () {
+    // The same deck wanting a layout this one cannot be, and not a misspelled marker. One
+    // refusal for every way of reaching it: a marker on a one-column role, a third marker on a
+    // two-column slide, and either of those at the end of a slide where nothing follows.
+    expect(fn () => slideDeck("---\nlayout: two-column\n---\n# Both\n\nOne.\n\n::column\n\nTwo.\n\n::column\n\nThree.\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "two-column" layout has 2 columns. '
+            . '"::column" moves the blocks after it into the next column, so a slide that uses one needs a '
+            . 'layout with more columns than this.');
+});
+
+it('refuses two ::column markers inside one region on a two-column slide', function () {
+    // The one case the column leaving a region could have changed: the markers are counted as
+    // the walk reaches them and the column leaves the region with them, so a deck that asked
+    // for a third column inside a region has asked for one however it was written. It is
+    // refused where a third marker at the top level is, with the same message.
+    expect(fn () => slideDeck("---\nlayout: two-column\n---\n# Both\n\nLeft.\n\n:::click\n\n::column\n\nTwo.\n\n::column\n\nThree.\n:::\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "two-column" layout has 2 columns. '
+            . '"::column" moves the blocks after it into the next column, so a slide that uses one needs a '
+            . 'layout with more columns than this.');
+});
+
+it('names the slide a ::column the layout cannot offer is on', function () {
+    // The slide is in the message because it is the half the author has to go and look at, and
+    // a build-up of ten slides has nine other places this could have been written.
+    expect(fn () => slideDeck("# One\n\n---\n\n# Two\n\nLeft.\n\n::column\n\nRight.\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 2 has a "::column", and the "content" layout has 1 column.');
+});
+
+it('never reads a ::column as a step, or a ::click as a column', function () {
+    // The whole two-colon grammar rests on the pair not colliding, so both directions are asked
+    // rather than reasoned about. A `::column` that also opened a step would put the right
+    // column's blocks on step two and cost a click the reader spends to see no change.
+    //
+    // The shapes are what ask the first half: a marker that moved a step draws the same three
+    // shapes and still opens no chain on its own, so `reveals()` on its own is satisfied by a
+    // parser that has no `::column` in it at all. What is drawn has to be in the test.
+    $columns = slideDeck("---\nlayout: two-column\n---\n# One\n\nLeft.\n\n::column\n\nRight.\n");
+    $clicked = slideDeck("---\nlayout: two-column\n---\n# One\n\nLeft.\n\n::column\n\nRight.\n\n::click\n\nThird.\n");
+
+    expect($columns->shapeNames(1))->toBe(['title', 'text', 'text'])
+        ->and($columns->reveals(1))->toBe([])
+        ->and($clicked->reveals(1))->toBe([['text']]);
+});
+
+it('keeps a build-up written across two columns on the steps the deck named', function () {
+    // Both directions at once: the `::column` moves the block to the right column and moves no
+    // step, so the click after it is still the first click the reader spends.
+    $pptx = slideDeck("---\nlayout: two-column\n---\n# One\n\nLeft.\n\n::column\n\nRight.\n\n::click\n\nThird.\n");
+
+    expect($pptx->texts(1))->toBe(['One', 'Left.', 'Right.', 'Third.'])
+        ->and($pptx->reveals(1))->toBe([['text']])
+        ->and($pptx->positions()[2]['x'])->toBeGreaterThan($pptx->positions()[1]['x']);
 });
 
 it('keeps both columns of a two-column layout the same height', function () {
@@ -392,17 +504,17 @@ it('gives the two columns of an image-text layout the same height and the same t
         ->and($picture->y)->toBe($text->y);
 });
 
-it('splits an image-text slide at the first heading of the second level', function () {
-    // The same rule `two-column` divides by, so the layout a deck names is the one it gets:
-    // picture and text before the `##` on the left, everything after it on the right.
-    $shapes = slideDeck("---\nlayout: image-text\n---\n# Both\n\nLeft.\n\n## Right\n\nRight side.\n")->positions();
+it('splits an image-text slide at its ::column', function () {
+    // The marker rather than the role decides, so the layout a deck names is the one it gets:
+    // the picture and the text before the marker on the left, everything after it on the right.
+    $shapes = slideDeck("---\nlayout: image-text\n---\n# Both\n\nLeft.\n\n::column\n\n## Right\n\nRight side.\n")->positions();
 
     expect($shapes[1]['x'])->toBeLessThan($shapes[2]['x'])
         ->and($shapes[2]['x'])->toBe($shapes[3]['x']);
 });
 
 it('gives an image-text layout a title box and a body placeholder for each of its columns', function () {
-    $pptx = slideDeck("---\nlayout: image-text\n---\n# One\n\nLeft.\n\n## Right\n\nRight side.\n");
+    $pptx = slideDeck("---\nlayout: image-text\n---\n# One\n\nLeft.\n\n::column\n\nRight side.\n");
 
     expect($pptx->layoutNames())->toBe([1 => 'Picture Left'])
         ->and(array_keys($pptx->layoutPlaceholders()))->toBe([TITLE_SLOT, BODY_ONE_SLOT, BODY_TWO_SLOT]);
@@ -713,6 +825,86 @@ it('refuses a region nothing closes, rather than reading the rest of the slide a
 it('refuses a ::: that closes nothing, rather than drawing three colons on a slide', function () {
     expect(fn () => slideDeck("# One\n\nFirst.\n\n:::\n"))
         ->toThrow(UnknownMarker::class, 'Slide 1 has a ":::" that closes nothing');
+});
+
+it('quotes a marker the way the deck wrote it rather than the way it is spelled here', function () {
+    // Every two-colon marker is read in either case, so a refusal that named `::column=2` for
+    // a deck that wrote `::Column=2` is a report about a line its author does not have. The
+    // argument is not enough to answer for the line either: `MARKER`, `REGION` and `COLUMN`
+    // capture what is after the equals and nothing else, so these three factories were each
+    // rebuilding a marker rather than being told one — and a region opener that named a
+    // step was reported as the bare `:::click` it shares a pattern with.
+    expect(fn () => slideDeck("# One\n\nLeft.\n\n::Column=2\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::Column=2", which is not a column marker')
+        ->and(fn () => slideDeck("# One\n\n::Click=\n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::Click=" step marker with no number')
+        ->and(fn () => slideDeck("# One\n\nFirst.\n\n:::Click=3\n\nSecond.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 opens a ":::Click=3" region that nothing closes');
+});
+
+it('reports the marker the deck wrote and recommends the one this library reads', function () {
+    // The line a refusal reports and the marker it recommends are two different claims, and
+    // they take two different spellings. Every two-colon marker is read in either case, so a
+    // deck that wrote `::Click=` is told about `"::Click="` — naming `"::click"` would send its
+    // author looking for a line they did not write. The advice is a claim about this library's
+    // grammar rather than about that file, so it stays canonical whatever was written: advice
+    // that echoed the mistake would teach the mistake.
+    //
+    // Both halves are in the expected text rather than asserted one after the other, because a
+    // message that quoted both spellings, or advised both, would satisfy either on its own.
+    expect(fn () => slideDeck("# One\n\n::Click=\n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::Click=" step marker with no number. '
+            . 'Write "::click" for the next step.')
+        ->and(fn () => slideDeck("# One\n\nLeft.\n\n::Column=2\n\nRight.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::Column=2", which is not a column marker: the marker '
+            . 'takes no argument. Write "::column" on a line of its own')
+        ->and(fn () => slideDeck("# One\n\nFirst.\n\n:::Click=3\n\nSecond.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 opens a ":::Click=3" region that nothing closes. '
+            . 'A region ends at a ":::" on a line of its own.');
+});
+
+it('names a marker the layout cannot offer as advice, never as a line from the deck', function () {
+    // The other side of the same line, and the one with no quotation to balance it. This
+    // refusal is raised from a count of markers measured against a layout's boxes, so the line
+    // the deck wrote is gone by the time the sentence is built — there is nothing here to echo,
+    // and threading one would mean carrying the spelling of every marker on the slide through
+    // the renderer to name a marker the author already has in their file. A deck that wrote
+    // `::Column` is therefore told about `"::column"`, the marker this library documents.
+    expect(fn () => slideDeck("# One\n\nLeft.\n\n::Column\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "content" layout has 1 column. '
+            . '"::column" moves the blocks after it into the next column')
+        ->and(fn () => slideDeck("---\nlayout: two-column\n---\n# One\n\nOne.\n\n::Column\n\nTwo.\n\n::Column\n\n::Column\n"))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "two-column" layout has 2 columns.');
+});
+
+it('quotes the whitespace out of a marker, because the writer cannot see it either', function () {
+    // `::click=  ` is refused as a marker with no number, and the two trailing spaces are the
+    // only difference between it and the `::click=` above. Quoting them would not have made
+    // the message more exact — it would have put the disagreement somewhere the reader
+    // cannot compare it — so the quote is the trimmed line, which is what is in the file.
+    expect(fn () => slideDeck("# One\n\n  ::click=   \n\nText.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::click=" step marker with no number')
+        ->and(fn () => slideDeck("# One\n\n  :::Click  \n\nSecond.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 opens a ":::Click" region that nothing closes');
+});
+
+it('quotes a marker without the control characters a deck can put on that line', function () {
+    // The spelling in a refusal is the deck's own text, and a marker line is the one place a
+    // deck gets to write bytes rather than words. Quoted raw, a carriage return moves the
+    // cursor to the start of the line and an escape sequence can clear it — so the
+    // author's own marker is what a terminal or a CI log shows, above the sentence explaining
+    // what to do about it. Both are dropped rather than escaped: there is no reading of a
+    // step number in which a repainted line was more useful than a missing character.
+    $hostile = "two\x1b[2J\rthree";
+
+    try {
+        slideDeck("# One\n\n::click=" . $hostile . "\n\nText.\n");
+        $this->fail('A step marker carrying a control character was not refused.');
+    } catch (UnknownMarker $refusal) {
+        expect($refusal->getMessage())->toContain('Slide 1 has a step "two[2Jthree"')
+            ->and($refusal->getMessage())->not->toContain("\x1b")
+            ->and($refusal->getMessage())->not->toContain("\r");
+    }
 });
 
 it('refuses a ::note nothing closes, rather than taking the rest of the slide as the note', function () {

@@ -218,6 +218,7 @@ it('does not claim again what the code does not do', function (string $claim) {
     'an unknown theme falls back to the default one' => 'falls back to the default theme',
     'a styles.yml value reaches the shapes' => 'styles.yml value is applied',
     'a directive nobody acts on is passed over' => 'an unknown directive is ignored',
+    'a directive nobody reads is drawn as the words the deck wrote it' => 'draws a directive it does not read',
     'a v-click marker closing a list item is honoured' => 'a marker closing a list item',
     // The old spellings, as claims rather than as syntax: `CHANGELOG.md` has to be able to
     // name what a deck used to be written in, so a phrase that only says "<!-- v-click"
@@ -247,6 +248,38 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a deck of markers asks for more written slides than it has' => 'asks for 800 written slides',
     'a build-up is measured once per step' => 'each revealing everything the one before it had',
     'the two passes over the written package' => 'runs the two passes over it',
+    // Columns divided at a `##` until `::column` said otherwise. The phrase is the sentence
+    // the README, the gallery and the renderer's own docblock all gave as the reason, and
+    // none of them can now: a heading is an ordinary heading. `CHANGELOG.md` has to be able
+    // to name what a two-column deck used to be written in, so the phrase is the reasoning
+    // rather than the spelling — the entry says the slide divided at its first `##` without
+    // claiming that a heading divides anything.
+    'a heading is what puts a block in the next column' => 'a writer puts on a column of a slide',
+    // Whether a trailing `::column` was refused used to depend on whether a block followed
+    // it: the marker at the end of a slide was drawn where the same marker with text after
+    // it was a failure, and the test above it said that was deliberate. The renderer measures
+    // the layout against the count of markers now, so nothing a deck writes after its last
+    // marker changes what happens to it, and no page may argue the other way.
+    'whether a trailing ::column is refused depends on what follows it' => 'Refusing here would make the spelling of a column depend on what happens to follow it',
+    // A region used to keep its column to itself, which is what the walk's own docblock and a
+    // test in the suite both said. A column is where a block is drawn and a region is when it
+    // appears, so the marker written inside one now moves what follows the closer — and a page
+    // or a comment may not argue that what is inside a region is where the opener was.
+    'a region keeps its column to itself' => 'what it holds stays in the column it was written in',
+    'a region keeps the column it was written in' => 'what is inside one belongs where the opener was',
+    // `column()` kept the buffers flushed by its caller because four of them beside its own
+    // arguments is past `php:S107`, which is a number the signature no longer has to keep.
+    // The reason it still gives is the one that holds: it is static and the flush is not.
+    'a method keeps work out of it because of how many parameters it takes' => 'taking them as well is eight parameters',
+    // `SlideBlocks`'s second guard was described as reachable: the walk hands a region the
+    // marker count it was given rather than counting from nothing, so the two move together
+    // and no deck can leave a block in a column the count has not reached. The guard is for a
+    // caller that builds the value, and nothing in a deck reaches it.
+    'the region recursion can break the marker count' => 'a walk that reads a region returns a count of its own',
+    // `php:S1448` fires above twenty, so `BlockParser` at twenty-one was already a finding on
+    // new code rather than one still waiting for the next method. The class had been taken back
+    // from twenty-two for exactly this once already.
+    'one more method and the parser is over the ceiling' => 'the next method still breaks that gate',
 ]);
 
 it('has no decorative dividers in it', function () {

@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownDirective;
+use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedLink;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Block;
@@ -27,9 +29,11 @@ use MarkdownPresentation\Render\Block\Quote;
 use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
 use MarkdownPresentation\Render\BlockParser;
+use MarkdownPresentation\Render\CommonMark\BlockTranslator;
 use MarkdownPresentation\Render\InlineParser;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\Run;
+use MarkdownPresentation\Render\SlideBlocks;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 
@@ -42,13 +46,55 @@ use MarkdownPresentation\Tests\Support\Scratch;
  */
 
 /**
+ * A slide's content as the parser read it: its blocks and the column each was written for.
+ */
+function slideContentOf(string $markdown): SlideBlocks
+{
+    return (new BlockParser())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()));
+}
+
+/**
  * The blocks of a slide, in order.
  *
  * @return list<Block>
 */
 function blocksOf(string $markdown): array
 {
-    return (new BlockParser())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()));
+    return slideContentOf($markdown)->blocks();
+}
+
+/**
+ * The same, read through the league translator the hand-written parser is being replaced by.
+ *
+ * @return list<Block>
+ */
+function leagueBlocksOf(string $markdown): array
+{
+    return (new BlockTranslator())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()))->blocks();
+}
+
+/**
+ * What a refusal says, or `DRAWN` where the slide was read rather than refused.
+ */
+function refusalOf(callable $read): string
+{
+    try {
+        $read();
+    } catch (UnknownDirective $refusal) {
+        return $refusal->getMessage();
+    }
+
+    return 'DRAWN';
+}
+
+/**
+ * The column each block of a slide was written for, in the same order as the blocks.
+ *
+ * @return list<int>
+*/
+function writtenColumnsOf(string $markdown): array
+{
+    return slideContentOf($markdown)->columns();
 }
 
 /**
@@ -309,6 +355,122 @@ it('reads an image inside a paragraph as text', function () {
     expect(kindsOf(sprintf("see ![alt](%s) here\n", $png)))->toBe([Paragraph::class]);
 });
 
+it('records which column each block was written for', function () {
+    // The renderer cannot work this out from the blocks: two paragraphs are the same
+    // paragraph in either column, so what says which one a deck meant is what it wrote.
+    expect(writtenColumnsOf("Left.\n\n::column\n\nRight.\n"))->toBe([0, 1])
+        ->and(writtenColumnsOf("Left.\n\nRight.\n"))->toBe([0, 0]);
+});
+
+it('closes an open paragraph before a column marker', function () {
+    // Without the flush the two lines are one paragraph written either side of the marker,
+    // and a block cannot belong to two columns.
+    expect(kindsOf("Left.\n::column\nRight.\n"))->toBe([Paragraph::class, Paragraph::class])
+        ->and(writtenColumnsOf("Left.\n::column\nRight.\n"))->toBe([0, 1]);
+});
+
+it('closes an open quote before a column marker', function () {
+    expect(kindsOf("> Quoted.\n::column\nRight.\n"))->toBe([Quote::class, Paragraph::class])
+        ->and(writtenColumnsOf("> Quoted.\n::column\nRight.\n"))->toBe([0, 1]);
+});
+
+it('moves no step for a column marker', function () {
+    // The whole trap this one guards: `jump()` is the only thing that may move a step, and a
+    // marker that also moved one would put the right column on step two and shift every click
+    // on the slide by one.
+    $content = slideContentOf("Left.\n\n::column\n\nRight.\n\n::click\n\nThird.\n");
+    $steps = array_map(static fn (Block $block): int => $block->step(), $content->blocks());
+
+    expect($steps)->toBe([1, 1, 2])
+        ->and($content->columns())->toBe([0, 1, 1]);
+});
+
+it('leaves a ::click in the column it was written in', function () {
+    expect(writtenColumnsOf("Left.\n\n::click\n\nRight.\n\n::column\n\nThird.\n"))->toBe([0, 0, 1]);
+});
+
+it('keeps a region in the column it was written in', function () {
+    // Neither of these regions writes a marker of its own: three colons open a step and not a
+    // column, so what is inside one starts where the opener was rather than at a walk of its
+    // own. The marker below each is the only thing that moves the column.
+    expect(writtenColumnsOf(":::click\n\nRight.\n\n:::\n\n::column\n\nThird.\n"))->toBe([0, 1])
+        ->and(writtenColumnsOf("Left.\n\n::column\n\n:::click\n\nRight.\n:::\n"))->toBe([0, 1]);
+});
+
+it('moves the text after a ::column written inside a region into the next column', function () {
+    // A column is where a block is drawn and a region is when it appears, so a region governs
+    // what a click reveals and not where the text sits. `::column` on a line of its own moves
+    // everything below it — including below the closer — which is the one reading of the
+    // marker there is and the only one a deck has to know.
+    expect(writtenColumnsOf("Left.\n\n:::click\n\nA.\n\n::column\n\nB.\n\n:::\n\nC.\n"))->toBe([0, 0, 1, 1])
+        ->and(writtenColumnsOf(":::click\n\nA.\n\n::column\n\nB.\n\n:::\n"))->toBe([0, 1]);
+});
+
+it('leaves the step of a region where the region opened, though its ::column has moved', function () {
+    // The other half of that asymmetry, and the half that needs pinning: the walk around the
+    // region carries on from the step the region opened at, and not from the last step the
+    // region itself reached. `D.` is on step two with `A.`, even though the region clicked
+    // twice before it closed — a step inside a region is that region's own, and the chain the
+    // slide clicks through is one where the region was already on it.
+    $content = slideContentOf(":::click\n\nA.\n\n::column\n\nB.\n\n::click\n\nC.\n\n:::\n\nD.\n");
+    $steps = array_map(static fn (Block $block): int => $block->step(), $content->blocks());
+
+    expect($steps)->toBe([2, 2, 3, 2])
+        ->and($content->columns())->toBe([0, 1, 1, 1]);
+});
+
+it('counts the column markers a slide was written with', function () {
+    // What the renderer measures a layout against. A marker with nothing after it leaves no
+    // block to count, and it is still the only thing on the slide that says the deck asked
+    // for a second column.
+    expect(slideContentOf("Left.\n\n::column\n\nRight.\n")->columnMarkers())->toBe(1)
+        ->and(slideContentOf("Left.\n\n::column\n")->columnMarkers())->toBe(1)
+        ->and(slideContentOf("Left.\n\nRight.\n")->columnMarkers())->toBe(0)
+        ->and(slideContentOf("::column\n")->columnMarkers())->toBe(1);
+});
+
+it('counts a column marker before a region into the region as well', function () {
+    // A region is read by its own walk, at the column and the count the one around it had
+    // reached. A walk that began its own count at nothing would report fewer markers than
+    // the column a block in it is written for — which is the invariant below, and the
+    // reason the count is handed in rather than added up on the way out.
+    $content = slideContentOf("Left.\n\n::column\n\n:::click\n\nRight.\n:::\n\nThird.\n");
+
+    expect($content->columns())->toBe([0, 1, 1])
+        ->and($content->columnMarkers())->toBe(1);
+});
+
+it('refuses a column marker with an argument, naming what would have worked', function () {
+    // The marker means the next column and cannot be named as one, so there is no argument
+    // for it to take. Drawn as a paragraph it put `::column=2` on the slide, which is the
+    // marker read back to the author as text.
+    expect(fn () => slideContentOf("Left.\n\n::column=2\n\nRight.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::column=2", which is not a column marker: the marker '
+            . 'takes no argument. Write "::column" on a line of its own to move the blocks after it into the '
+            . 'next column.')
+        ->and(fn () => slideContentOf("Left.\n\n::column=\n\nRight.\n"))
+        ->toThrow(UnknownMarker::class, 'Slide 1 has a "::column=", which is not a column marker');
+});
+
+it('refuses a slide whose blocks and columns are not the same length', function () {
+    // The invariant the object exists to hold. It is a caller that built the pair wrongly
+    // rather than a deck that cannot be drawn, so it is not under `InvalidInput`: a deck
+    // author told to go and rename something would go and rename something.
+    expect(fn () => new SlideBlocks([new Paragraph([], 1)], [], 0))
+        ->toThrow(Exception::class, 'A slide carries 1 blocks and 0 columns');
+});
+
+it('refuses a marker count below the column a block was written for', function () {
+    // The other half of the same invariant, and one no deck reaches: the walk moves the column
+    // and the count together, and hands a region the count it was given rather than counting
+    // from nothing, so no block is ever in a column the count has not reached. What the guard
+    // is left for is a caller that built the value itself.
+    expect(fn () => new SlideBlocks([new Paragraph([], 1)], [1], 0))
+        ->toThrow(Exception::class, 'A slide carries 0 "::column" markers and a block written in column 1; '
+            . 'a marker moves what follows it into the next column, so there cannot be fewer markers than '
+            . 'the column a block is in.');
+});
+
 it('refuses an HTML comment that is neither a step nor a note', function () {
     // Drawn as a paragraph it became a slide with the literal text `<!-- v-if false -->` on
     // it, which is a deck that renders the mistake rather than one that reports it.
@@ -365,6 +527,98 @@ it('refuses a ::: container, naming the alternatives', function () {
             . 'open a step region as ":::click" and close it as ":::"; divide a deck with a "---" line, '
             . 'write a section as a heading, and write a note as a quote: "> ".',
         );
+});
+
+it('reads a marker in either case as the marker it names', function () {
+    // A deck written by a model capitalises a directive as readily as it writes it in lower
+    // case. All three were drawn on the slide as literal text, which is the marker read back
+    // to an author who thought they had used it — the one outcome a marker must never have.
+    $clicked = slideContentOf("Left.\n\n::Click\n\nRight.\n");
+    $steps = array_map(static fn (Block $block): int => $block->step(), $clicked->blocks());
+
+    expect($steps)->toBe([1, 2])
+        ->and(writtenColumnsOf("Left.\n\n::Column\n\nRight.\n"))->toBe([0, 1])
+        ->and(writtenColumnsOf("Left.\n\n::COLUMN\n\nRight.\n"))->toBe([0, 1])
+        ->and(kindsOf(":::Click\n\nA.\n\n:::\n"))->toBe([Paragraph::class])
+        ->and(fn () => blocksOf("Left.\n\n::Note\n\nRight.\n"))
+        ->toThrow(UnknownDirective::class, 'Slide 1 opens a "::note" that nothing closes');
+});
+
+it('refuses a ::: container whose word is not a region opener, whatever its case', function () {
+    // The refusal's own lookahead is what leaves the three-colon grammar alone, and it is the
+    // one place case folding has to be seen to: a container check left behind the `i` flag
+    // would read `:::Click` as a container to refuse rather than as the region it is.
+    expect(fn () => blocksOf("# One\n\n:::Column\nSomething.\n:::\n"))
+        ->toThrow(UnknownDirective::class, 'Slide 1 opens the container ":::Column"');
+});
+
+it('refuses a leaf directive under a name this format does not draw', function () {
+    // Painted onto the slide as the words the deck wrote, this is the failure the comment, the
+    // element and the container refusals exist to prevent — a deck that renders, showing the
+    // mistake as prose — reached by the one form in the grammar that none of them looks at.
+    expect(fn () => blocksOf("# One\n\n::bogus\n"))
+        ->toThrow(
+            UnknownDirective::class,
+            'Slide 1 opens the directive "::bogus", which is not something a slide draws. Two colons '
+            . 'mark a step as "::click" or a column as "::column"; three open a step region as '
+            . '":::click" and close it as ":::"; write a note as "::note", its text, and a closing "::".',
+        );
+});
+
+it('refuses a leaf directive on its name rather than on what it carries', function () {
+    // The label and the attributes are what the author was writing; the name is what says the
+    // slide cannot act on it, so each of these is refused for the same reason and quoted whole.
+    foreach (['::bogus{x=1}', '::bogus[hello]', '::BOGUS', ':: bogus'] as $written) {
+        expect(fn () => blocksOf("# One\n\n" . $written . "\n"))
+            ->toThrow(UnknownDirective::class, sprintf('opens the directive "%s"', $written));
+    }
+});
+
+it('leaves a directive this format draws alone, whatever case it is written in', function () {
+    // The other half of the refusal: a name the library acts on is not a mistake, and one
+    // capitalised by a model is still the name it was looking for.
+    foreach (['::click', '::Click', '::column', '::COLUMN'] as $written) {
+        expect(refusalOf(fn () => blocksOf("# One\n\nLeft.\n\n" . $written . "\n\nRight.\n")))->toBe('DRAWN');
+    }
+});
+
+it('reads a leaf directive a region opens as one the slide cannot draw', function () {
+    // A `:::` region is raw lines in the content, so a directive inside one is on the same
+    // footing as one on the slide: refused, and refused by name.
+    expect(fn () => blocksOf("# One\n\n:::click\n::bogus\n:::\n"))
+        ->toThrow(UnknownDirective::class, 'Slide 1 opens the directive "::bogus"');
+});
+
+it('leaves a directive written inside a quote or a list item as the text it is', function () {
+    // A quote and a list item write their marker in front of every line, so nothing in one is
+    // a line the slide reads. `::click` is already drawn as text there, and refusing an
+    // unknown name in that position and not a known one would make nesting an error on its own.
+    expect(refusalOf(fn () => blocksOf("# One\n\n> ::bogus\n")))->toBe('DRAWN')
+        ->and(refusalOf(fn () => blocksOf("# One\n\n- ::bogus\n")))->toBe('DRAWN');
+});
+
+it('refuses a leaf directive the same way through either parser', function () {
+    // The message is half of what two parsers have to agree on: the differential test compares
+    // the class and the text, so two messages that differ are a divergence however good each
+    // is on its own. `DRAWN` is asserted rather than assumed, because two parsers that both
+    // drew the directive would otherwise pass this on their own.
+    $hand = refusalOf(fn () => blocksOf("# One\n\n::bogus{x=1}\n"));
+    $league = refusalOf(fn () => leagueBlocksOf("# One\n\n::bogus{x=1}\n"));
+
+    expect($hand)->not->toBe('DRAWN')
+        ->and($league)->toBe($hand);
+});
+
+it('reads a leaf directive the same way through either parser, refused or drawn', function () {
+    foreach ([
+        '::bogus', '::bogus{x=1}', '::bogus[hello]', '::BOGUS', ':: bogus',
+        '::note[label]', '::note', '::click', '::Click', '::column', '::COLUMN',
+        ":::click\n::bogus\n:::", ":::click\n::click\n:::", '   ::bogus', '    ::bogus',
+        "> ::bogus", "- ::bogus", "Ratio is 3::2", 'Status :green[go]',
+    ] as $markdown) {
+        expect(refusalOf(fn () => leagueBlocksOf($markdown)))
+            ->toBe(refusalOf(fn () => blocksOf($markdown)), $markdown);
+    }
 });
 
 it('refuses a directive in a table row as loudly as one on a line of its own', function () {

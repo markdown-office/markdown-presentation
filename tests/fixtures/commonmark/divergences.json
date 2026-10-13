@@ -1,0 +1,278 @@
+[
+  {
+    "name": "examples/markdown/01-kitchen-sink.md slide 2",
+    "why": "A blank line between numbered items. The hand-written walk ends the list at the blank and starts again at the number the deck wrote, so `7.` becomes the first number of a second list; CommonMark keeps one list whose numbering carries on. The walk also gives an item whose predecessor carried no number its own number again, which draws `1. 2. 3.` correctly by coincidence and `1. 1. 1.` as three numbers."
+  },
+  {
+    "name": "examples/markdown/05-steps.md slide 3",
+    "why": "Two bullets with a blank line between them: two shapes here and one list there. The slide says so — \"one click opens the step and the second shape joins it\" — so switching parsers makes this page wrong unless the sentence is rewritten."
+  },
+  {
+    "name": "examples/markdown/06-tables.md slide 2",
+    "why": "A code span written with two backticks around one. The hand-written pattern cannot see a run longer than one and matches the pair inside it, so the cell draws four runs of punctuation; CommonMark reads the two-backtick span as the code it is."
+  },
+  {
+    "name": "examples/markdown/06-tables.md slide 4",
+    "why": "A row with more cells than the header has. The hand-written table keeps the fourth cell; CommonMark draws the row as far as the header goes, which is what this deck and the README both say a ragged row does."
+  },
+  {
+    "name": "examples/markdown/09-inline-markup.md slide 1",
+    "why": "An emphasis delimiter that opens and never closes. The hand-written walk pairs it with a pair three lines later, so a paragraph about unclosed emphasis is drawn in bold and the code span after it is split down the middle; CommonMark leaves the `**` as the characters it is and reads the code span whole. This is the difference the hand-written parser was written to have."
+  },
+  {
+    "name": "examples/markdown/09-inline-markup.md slide 2",
+    "why": "Emphasis inside a link's label. The hand-written link pattern takes the label as raw text, so a link written `[**heading**](…)` draws a pair of asterisks on the slide; CommonMark keeps the emphasis and the link, which is what a reader sees in every other renderer."
+  },
+  {
+    "name": "slidev: fence indented four spaces, closed flush slide 1",
+    "why": "Four spaces of indentation is a code block in CommonMark and a paragraph here, so a fence written that way is drawn as characters on the slide."
+  },
+  {
+    "name": "slidev: delimiter inside an indented code block slide 1",
+    "why": "The same rule as above, for an indented `---`: a code block there and a paragraph with the dashes on it here."
+  },
+  {
+    "name": "slidev: fence inside a comment slide 1",
+    "why": "The refusal is the same one and the comment it quotes is not. The hand-written prose pass reads the fences inside the comment as a code block, so it quotes `<!-- -->`; league quotes the whole comment, which is what the author wrote and what has to be found in the deck to be fixed."
+  },
+  {
+    "name": "slidev: lone carriage return slide 1",
+    "why": "A lone carriage return is a line ending to league and not to this library: one line of text here, two paragraphs there."
+  },
+  {
+    "name": "slidev: fence nested in a list slide 1",
+    "why": "A fence indented under a bullet: a code block after the list here, words inside the bullet there, because a shape nested in a list item has nowhere of its own to be drawn."
+  },
+  {
+    "name": "tests/Unit/rendering.php: ![a dot](%s) slide 0",
+    "why": "An image target is percent-encoded before it is looked for, so `%` becomes `%25`, a space becomes `%20` and a backslash becomes `%5C`. A deck that names a file with any of those in it looks for a different file, and the failure quotes the other name."
+  },
+  {
+    "name": "tests/Unit/rendering.php: ![wide](%s) slide 0",
+    "why": "The percent-encoded image target above, on another of this file's image paths."
+  },
+  {
+    "name": "tests/Unit/rendering.php: <dc:title>The deck</dc:title> slide 0",
+    "why": "An angle-bracketed string with a scheme in it is an autolink in CommonMark and text here, so a tag written with one becomes a link — and a link to `dc:title` is a target this library refuses."
+  },
+  {
+    "name": "tests/Unit/rendering.php: <dc:description>About it</dc:description> slide 0",
+    "why": "The autolink above, on another tag."
+  },
+  {
+    "name": "tests/Unit/rendering.php: <dc:creator>Fabi</dc:creator> slide 0",
+    "why": "The autolink above, on a person's name written inside a tag."
+  },
+  {
+    "name": "tests/Unit/rendering.php: <dc:creator>markdown-office</dc:creator> slide 0",
+    "why": "The autolink above, on the same tag with another value."
+  },
+  {
+    "name": "tests/Unit/rendering.php: <dc:title>Ops runbook</dc:title> slide 0",
+    "why": "The autolink above, on a tag inside an assertion rather than a deck."
+  },
+  {
+    "name": "tests/Unit/rendering.php: 1. one\\x0a  1. sub\\x0a2. two slide 0",
+    "why": "A sub-item indented two spaces under `1. `. The hand-written walk counts any indent as a level; CommonMark counts the item's own content indent, which is three, so two spaces is a sibling and a sub-list has to be written at three spaces or more."
+  },
+  {
+    "name": "tests/Unit/rendering.php: - a\\x0a1. b\\x0a- c slide 0",
+    "why": "A list that changes its marker is one list here, with an `ordered` flag per item, and three lists there. CommonMark is right about the syntax; `Render\\Block\\ListBlock`'s own docblock — a deck mixes the markers — would have to go with it."
+  },
+  {
+    "name": "tests/Unit/rendering.php: #<a:r>\\s*<a:rPr[^>]*\\bb=\"1\"[^>]*>.*?</a:rPr>\\s*<a:t><!\\[CDATA\\[Name\\]\\ slide 0",
+    "why": "Backslash escapes are resolved: `\\[` is the two characters `\\[` rather than the three the deck wrote. A regular expression rather than a deck here, but it is the rule that decides whether a deck writes one backslash or two."
+  },
+  {
+    "name": "tests/Unit/rendering.php: #<a:r>\\s*<a:rPr[^>]*>(?:(?!</a:rPr>).)*<a:latin typeface=\"[^\"]*\"/>(?:( slide 0",
+    "why": "The escape rule above, on the second of the two patterns this file holds."
+  },
+  {
+    "name": "tests/Unit/rendering.php: #<a:hlinkClick[^>]*/>(?:(?!</a:r>).)*<a:t><!\\[CDATA\\[lk\\]\\]></a:t>#s slide 0",
+    "why": "The escape rule above, on the third pattern: `\\[CDATA\\[` is one backslash fewer than it was."
+  },
+  {
+    "name": "tests/Unit/rendering.php: ![A dot](%s) slide 0",
+    "why": "The percent-encoded image target above, on another of this file's image paths."
+  },
+  {
+    "name": "tests/Unit/rendering.php: ![](%s) slide 0",
+    "why": "The percent-encoded image target above, on a picture with no alt text."
+  },
+  {
+    "name": "tests/Unit/rendering.php: ![a dot](%s \"A dot\") slide 0",
+    "why": "The percent-encoded image target above, on a picture with a title."
+  },
+  {
+    "name": "tests/Unit/paths.php: /dot\\x00.png slide 0",
+    "why": "A NUL byte in a filename is replaced with U+FFFD before anything looks at the file, so a file with a NUL in its name is not found."
+  },
+  {
+    "name": "tests/Unit/deck-splitting.php: ---\\x0atitle: \"unclosed\\x0a---\\x0a\\x0a# One\\x0a slide 0",
+    "why": "The `---` under a line of text is a setext heading in CommonMark, so the line above it becomes a heading where it is a paragraph here. DeckParser refuses this deck before it reaches a slide, so nothing renders differently; the rule is real all the same inside a quote or a bullet item, where no `---` ever reaches DeckParser."
+  },
+  {
+    "name": "tests/Unit/deck-splitting.php: ---\\x0atitle: 42\\x0a---\\x0a\\x0a# One\\x0a slide 0",
+    "why": "The setext heading above, on a deck DeckParser refuses."
+  },
+  {
+    "name": "tests/Unit/deck-splitting.php: ---\\x0alevel: 0\\x0a---\\x0a\\x0a# One\\x0a slide 0",
+    "why": "The setext heading above, on a deck DeckParser refuses."
+  },
+  {
+    "name": "tests/Unit/deck-splitting.php: ```yaml\\x0atitle: Deck\\x0a---\\x0a\\x0a# One\\x0a slide 0",
+    "why": "A code block carries one empty line less here: its content ends with a newline, so reading the deck's own lines gives the lines it was written as where splitting the block's text on newlines gives a last one that holds nothing."
+  },
+  {
+    "name": "tests/Unit/timing.php: ~^ppt/slides/slide\\d+\\.xml$~ slide 0",
+    "why": "A tilde on each side is a strikethrough in league's dialect, which takes one tilde or two, and nothing at all here, which takes two. The `\\.` is the escape rule above."
+  },
+  {
+    "name": "tests/Unit/theme-style.php: ---\\x0atheme: %s\\x0a---\\x0a\\x0a# T\\x0a\\x0a## Sub\\x0a\\x0aBody.\\x0a\\x0a* slide 0",
+    "why": "The `---` under a line of text is a setext heading in CommonMark, so the line above it becomes a heading where it is a paragraph here. DeckParser refuses this deck before it reaches a slide, so nothing renders differently; the rule is real all the same inside a quote or a bullet item, where no `---` ever reaches DeckParser."
+  },
+  {
+    "name": "tests/Unit/theme-style.php: - slide 0",
+    "why": "A dash alone is a bullet with no text in CommonMark and a dash here. It cannot reach a slide as part of a `---` line, which DeckParser splits on, but a `-` on a line of its own becomes a shape with nothing in it."
+  },
+  {
+    "name": "tests/Unit/theme-style.php: ---\\x0atheme: %s\\x0a---\\x0a\\x0a# T\\x0a\\x0aOne.\\x0a\\x0aTwo.\\x0a\\x0a```\\ slide 0",
+    "why": "The setext heading above, on a deck with a code block in it."
+  },
+  {
+    "name": "tests/Unit/theme-style.php: ---\\x0atheme: %s\\x0a---\\x0a\\x0a# T\\x0a\\x0aOne.\\x0a\\x0aTwo.\\x0a slide 0",
+    "why": "The setext heading above, on the same deck without the code block."
+  },
+  {
+    "name": "tests/Unit/metric.php: # Lead\\x0a\\x0a## slide 0",
+    "why": "Hashes at the end of a line are an empty heading in CommonMark 0.30 and a paragraph here. Nothing is drawn either way, but the block the shape is measured from is a heading rather than a paragraph."
+  },
+  {
+    "name": "tests/Unit/metric.php: - slide 0",
+    "why": "The lone dash above, on a string in the text-measurement tests."
+  },
+  {
+    "name": "tests/Unit/metric.php: | b |\\x0a| --- | --- |\\x0a| slide 0",
+    "why": "A header row with fewer cells than its alignment row is not a table in CommonMark. The table it would have been here carries one column and two alignments: a table drawn against a header it does not have."
+  },
+  {
+    "name": "tests/Unit/commonmark-parity.php: Ship it :badge[X]{a=1} today. slide 0",
+    "why": "The quoted attribute above, on a text directive in the middle of a sentence — the shape the Generic Directives RFC is for, and the one shape a deck is most likely to carry from another tool."
+  },
+  {
+    "name": "tests/Unit/powerpoint-fixtures.php: #<cp:lastModifiedBy>([^<]*)</cp:lastModifiedBy># slide 0",
+    "why": "The autolink above: `<cp:lastModifiedBy>` is a URI with a scheme in it, so a pattern that matches a part of a package is read as a link target and refused."
+  },
+  {
+    "name": "tests/Unit/powerpoint-fixtures.php: #<dc:creator>([^<]*)</dc:creator># slide 0",
+    "why": "The autolink above, on the pattern for the creator field."
+  },
+  {
+    "name": "tests/Unit/powerpoint-fixtures.php: #(/Users/|/home/|[A-Z]:\\\\Users\\\\)# slide 0",
+    "why": "The escape rule above: `\\\\` is one backslash."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: - one\\x0aplain text slide 0",
+    "why": "A sentence on the line after a bullet, with no blank line between them, is a lazy continuation of that bullet in CommonMark: the bullet absorbs it and there is no paragraph. This is the one difference here that changes the shape count of an ordinary slide."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: - a\\x0a1. b\\x0a- c slide 0",
+    "why": "A list that changes its marker is one list here and three there; see the rendering copy of this one."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: 1. one\\x0a  1. sub\\x0a2. two slide 0",
+    "why": "The two-space sub-item above, on the block parser's own copy of the same deck."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: | A | B |\\x0a| --- | --- |\\x0a| 1 | slide 0",
+    "why": "A row with fewer cells than the header is given an empty cell so that every row is as wide as the header. The empty cell draws nothing."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: ![alt text](%s) slide 0",
+    "why": "The percent-encoded image target above, on the block parser's own copy."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: \\\\host\\share\\payload.exe slide 0",
+    "why": "The escape rule above: `\\\\` is one backslash, on the string the parser refuses as a link target when it is written as one."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: ![alt](C:\\logo.png) slide 0",
+    "why": "An image target with a backslash in it is percent-encoded, so the failure quotes `C:%5Clogo.png` where it quotes what the deck wrote."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: [](https://example.com) slide 0",
+    "why": "A link with an empty label is one empty run here and no runs at all there. Nothing is drawn either way."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: | A | B |\\x0a| --- | --- |\\x0a| 1 | 2 | 3 | slide 0",
+    "why": "A row with more cells than the header is drawn as far as the header goes, which is what the test above it in this file says a ragged row does."
+  },
+  {
+    "name": "tests/Unit/exceptions.php: #new\\s+\\\\?(?:Runtime|Logic)?Exception\\s*\\(# slide 0",
+    "why": "The escape rule above on the first half of the pattern, and the unclosed emphasis above on the second: `**Exception` opens a bold run that nothing closes, so the hand-written parser draws the last `**` as text and league draws nothing there at all."
+  },
+  {
+    "name": "tests/Unit/exceptions.php: two\\x1b\\x0dthree slide 0",
+    "why": "A lone carriage return is a line ending to league and not to this library: one line of text here, two paragraphs there."
+  },
+  {
+    "name": "tests/Unit/theme-resolver.php: ---\\x0atheme: %s\\x0a---\\x0a# One\\x0a slide 0",
+    "why": "The `---` under a line of text is a setext heading in CommonMark, so the line above it becomes a heading where it is a paragraph here. DeckParser refuses this deck before it reaches a slide, so nothing renders differently; the rule is real all the same inside a quote or a bullet item, where no `---` ever reaches DeckParser."
+  },
+  {
+    "name": "tests/Unit/theme-resolver.php: <dc:creator>Somebody</dc:creator> slide 0",
+    "why": "An angle-bracketed string with a scheme in it is an autolink in CommonMark and text here, so a tag written with one becomes a link — and a link to `dc:title` is a target this library refuses."
+  },
+  {
+    "name": "tests/Unit/layouts-and-steps.php: two\\x1b[2J\\x0dthree slide 0",
+    "why": "The lone carriage return above, beside a control character."
+  },
+  {
+    "name": "tests/Readme/examples.php: /composer require ([\\w.-]+\\/[\\w.-]+)/ slide 0",
+    "why": "The escape rule above: `\\/` is one backslash and a slash."
+  },
+  {
+    "name": "tests/Readme/examples-decks.php: /`(\\d{2}-[a-z-]+)\\.md`\\s*\\|\\s*\\*\\*nothing\\*\\*/ slide 0",
+    "why": "Three rules at once on a pattern quoting a deck filename: escapes are resolved, `\\|` is a bar rather than a column delimiter, and the `**nothing**` is one bold run with a code span inside it here."
+  },
+  {
+    "name": "tests/Support/Contrast.php: # slide 0",
+    "why": "The empty heading above."
+  },
+  {
+    "name": "tests/Support/Doctest.php: <?php\\x0a\\x0arequire slide 0",
+    "why": "An unclosed `<?php` opens an HTML block that runs to the end of the slide, so the blank line and the line after it are part of one paragraph. The same is true of `<script`, `<pre` and `<style` written without a closer."
+  },
+  {
+    "name": "tests/Support/Scratch.php: - slide 0",
+    "why": "The lone dash above."
+  },
+  {
+    "name": "tests/Support/Pptx.php: #^ppt/slides/slide\\d+\\.xml$# slide 0",
+    "why": "The escape rule above: `\\.` is a dot."
+  },
+  {
+    "name": "tests/Support/Pptx.php: #<a:t>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?</a:t>#s slide 0",
+    "why": "The escape rule above, on four escaped brackets."
+  },
+  {
+    "name": "tests/Support/Pptx.php: # slide 0",
+    "why": "The empty heading above."
+  },
+  {
+    "name": "tests/Support/Pptx.php: #^ppt/slideLayouts/slideLayout(\\d+)\\.xml$# slide 0",
+    "why": "The escape rule above, on a pattern this file holds twice."
+  },
+  {
+    "name": "tests/Support/Pptx.php: #Target=\"\\.\\./slideLayouts/slideLayout(\\d+)\\.xml\"# slide 0",
+    "why": "The escape rule above: `\\.` is a dot rather than a backslash and a dot, so the pattern reads as a path rather than as the pattern that matches it."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: - ::bogus slide 0",
+    "why": "A directive-shaped line inside a list item. The hand-written walk reads a bullet by its text after the `- `, so the item reads `::click`; league builds the line as a directive and the bullet arrives with its marker still on it, so it reads `- ::click`. Nothing here is about the directive being refused or read — both parsers draw the line, and differ only in which words reach the bullet. The hand-written reading is the one a reader expects, so cutting over to league changes what this deck looks like and the sentence on the slide would have to say so."
+  },
+  {
+    "name": "tests/Unit/block-parsing.php: # One\\x0a\\x0a- ::bogus slide 0",
+    "why": "A directive-shaped line inside a list item. The hand-written walk reads a bullet by its text after the `- `, so the item reads `::click`; league builds the line as a directive and the bullet arrives with its marker still on it, so it reads `- ::click`. Nothing here is about the directive being refused or read — both parsers draw the line, and differ only in which words reach the bullet. The hand-written reading is the one a reader expects, so cutting over to league changes what this deck looks like and the sentence on the slide would have to say so."
+  }
+]

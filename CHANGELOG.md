@@ -8,6 +8,88 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A leaf directive under a name this library does not draw is refused rather than drawn.**
+  **Breaking**, and only for a deck that writes one. `::foo`, `::foo[label]{attrs}` and
+  `::anything=2` were painted onto the slide as the words the deck wrote them as, which is the
+  outcome the comment, the element and the container refusals were written to stop: the deck
+  renders, and what it renders is the mistake.
+
+  | Was | Now |
+  | --- | --- |
+  | `::bogus` became a paragraph reading `::bogus` | it is refused, naming `::click` and `::column` as the two a leaf may carry |
+
+  It was missed rather than allowed, because those three refusals each look for one spelling and
+  a leaf is identified by a name, so nothing was looking for `::name` at all. A `::note` carrying
+  a label or attributes is refused the same way, since a note is `::note`, its text and a closing
+  `::` rather than a leaf. A directive written inside a quote or a list item is still drawn as the
+  text it is, exactly as `::click` already was in that position.
+
+- **A `::column` written inside a `:::click` region moves the text after the closing `:::`.**
+  **Breaking**, and only for a deck that writes both on one slide. A column is where a block is
+  drawn and a region is when it appears, so a region governs what a click reveals and not where
+  the text sits.
+
+  | Was | Now |
+  | --- | --- |
+  | the column counter died with the region's own walk | the region's walk hands back the column it ended at |
+  | the text after the closer went back to the column the region opened in | it is in the column the marker inside the region moved it to |
+
+  The step does not travel with it, and that asymmetry is deliberate: a region's own steps are its
+  own, so the text after the closing `:::` stays on the step the region opened at. A `::click` inside
+  a region still moves the one step counter of the slide, exactly as before. The markers a slide
+  wrote are still counted as the walk reaches them, so two `::column` markers inside one region on a
+  two-column slide are refused with `UnsupportedColumn` as the third marker at the top level is.
+
+- **Every two-colon marker is recognised in either case.** A `::Click`, `::Column`, `:::Click` or
+  `::Note` written with a capital is the marker it looks like rather than a paragraph reading it on
+  the slide. A deck written by a model capitalises a directive as readily as it writes it in lower
+  case, and a marker drawn on the slide is one its author thought they had read. `::Note` is taken off
+  the slide as a speaker note in either case, so it cannot be refused as a note nothing closes.
+
+  The refusal for a `:::` that is neither a region nor its closer is spelled with a lookahead, and it
+  folds the same way: `:::Click` opens a region rather than falling through to the container refusal,
+  while `:::Column` is still refused as the container it is. A marker inside a fenced block is still a
+  line of code.
+
+- **`::column` moves the blocks after it into the next column.** **Breaking.** A two-column
+  slide no longer divides at its first `##`, because that is no longer how a column is
+  reached.
+
+  | Was | Now |
+  | --- | --- |
+  | `## Anything` divided a `two-column` or `image-text` slide in half | `::column` on a line of its own does |
+  | a `##` stayed in the first column when the slide had more than two | a `##` is an ordinary heading, in whichever column it is written |
+  | one `##` per slide: a second one was just another heading | one marker per column: a second one moves to the next |
+  | a role with one column ignored the `##` and drew everything in one column | refused, naming the role and how many columns it has |
+
+  The marker takes no argument. It means "the next column", which is the one direction a
+  block can move in, and it moves no step: a build-up written across two columns spends the
+  same clicks it would on one column. `::click` and `::column` share two colons and neither
+  is a prefix of the other, so the pair is checked in the suite in both directions rather
+  than reasoned about. `::column=2` is a failure under `UnknownMarker` naming the marker that
+  would have worked, rather than a paragraph reading `::column=2` drawn on the slide.
+
+  A column nothing was written in is still not an error. The alternative is guessing which
+  block was meant to be in it, which is the guess this library refuses everywhere else; a
+  deck that asked for a layout with columns and wrote one of them has said what it wants.
+  Whether there was a block after the marker does not enter into it: the marker is measured
+  by what the deck wrote and by the role it was written for, so a deck's spelling cannot
+  depend on its last line.
+
+  **A `::column` on a role with fewer columns than the deck asks for is a new failure**,
+  `Exception\UnsupportedColumn`, and it extends `InvalidInput`: the marker is well formed and
+  the slide is what cannot offer the column, which is the same shape as `UnsupportedLink` and
+  `UnsupportedImageFormat` rather than `UnknownMarker`. The message names the slide, the role
+  and how many columns it has. One refusal covers every way of hitting it — a marker on a
+  one-column role, a third marker on a two-column slide, and either of those written at the
+  end of a slide where nothing follows.
+
+  The column travels out of the parser as `Render\SlideBlocks`, the blocks and the column
+  each was written for in two lists of one length, with the count of markers beside them,
+  rather than a property on every block class. `Render\PresentationRenderer::columns()`
+  measures the layout against that count rather than against the column a block landed in,
+  and `Render\BlockParser::parse()` returns that object.
+
 - **A step is an animation on one slide, not a slide of its own.** **Breaking.** A deck using
   `::click` now contains fewer slides: the markdown is unchanged and the file is a build-up
   rather than a run of copies of the same slide.
@@ -95,7 +177,92 @@ All notable changes to this project are documented here. The format follows
   before, and four new entries are in `divergences.json` with the reason. The recording is
   untouched: it is what Slidev did, and this is where the two differ.
 
+### Added
+
+- **A second reader for a slide, and a test that compares the two.** `Render\CommonMark\BlockTranslator`
+  reads a slide with [league/commonmark](https://commonmark.thephpleague.com/) plus
+  [markdown-office/commonmark-generic-directives](https://github.com/markdown-office/commonmark-generic-directives)
+  and produces the same blocks `Render\BlockParser` produces, so that nothing downstream of the
+  parser can tell which one read the deck. `league/commonmark` does not include GFM tables and the
+  shipped themes' column widths are measured from a table's alignment, so `TableExtension` is
+  registered rather than optional; `StrikethroughExtension` is registered for the same reason
+  (`~~struck~~` is a run of its own).
+
+  **Not user-visible yet: no deck renders differently.** `PresentationRenderer` still calls
+  `BlockParser`, `tests/Unit/commonmark-parity.php` is what holds the two together, and nothing
+  in the public API has moved.
+
+  Every deck in the repository goes through both parsers — every slide of every deck in
+  `examples/markdown/`, every slide of every deck in `tests/fixtures/slidev/expected.json`, and
+  every string literal and heredoc the suite itself holds — and every place they disagree is
+  recorded in `tests/fixtures/commonmark/divergences.json` with the reason the other answer is
+  the right one. There are sixty-eight of them and they are a decision, not a bug list: a
+  bullet followed by an unindented sentence, a ragged table row, a `===` underline, backslash
+  escapes, an autolink on `<dc:title>`, and a lone carriage return are all read differently, and
+  most of them are read better. Both directions are asserted: a difference nobody recorded is a
+  behaviour change nobody decided on, and a record whose deck stopped differing is a strictness
+  that went quietly.
+
 ### Fixed
+
+- **A refusal named the marker the parser expects rather than the one the deck wrote.** Every
+  two-colon marker is read in either case, and `MARKER`, `REGION` and `COLUMN` capture only what
+  follows an equals — so three factories were rebuilding a marker out of its argument instead of
+  being handed the line. A writer who typed `::Column=2` was told about `::column=2`, which is a
+  line they did not write and have to go looking for.
+
+  | Deck writes | Was told about | Now |
+  | --- | --- | --- |
+  | `::Column=2` | `::column=2` | `::Column=2` |
+  | `::Click=` | `::click=` | `::Click=` |
+  | `:::Click=3` with nothing after it | `:::click` | `:::Click=3` |
+
+  The two halves of one of these messages are two different claims, and which half a factory is on
+  decides which spelling it takes. **A quotation is a line in the author's file and echoes it** —
+  `::Column=2` is reported as `::Column=2`, because only one of the two spellings is the line they
+  wrote. **Advice is a claim about this library's grammar and stays canonical** — `Write "::click"`
+  whatever the deck wrote, because advice that echoed the mistake would teach the mistake. Both
+  halves sit in one sentence, so neither can be right on its own, and a test holds them together
+  rather than one after the other.
+
+  `UnsupportedColumn::beyond()` is on the advice side of that line, and stays there on purpose. It
+  says `Slide 1 has a "::column"` for a deck that may have written `::Column`, and it is not a
+  quotation: the refusal is raised from a *count* of markers measured against a layout's boxes, so
+  the line the deck wrote is gone by the time the sentence is built. There is nothing here to echo,
+  and threading one would mean carrying the spelling of every marker on the slide through the
+  renderer in order to name a marker the author already has in their file.
+  `UnknownMarker::strayCloser()` is on the advice side for a second reason: `CLOSES_REGION` admits
+  three colons and nothing but whitespace, so every line that matches it trims to the one spelling
+  the message already quotes.
+
+  **A quoted spelling is trimmed and stripped of control characters.** A marker line is the one
+  place in a deck where a writer gets to write bytes rather than words, and a refusal is read in a
+  terminal or a CI log: a carriage return moves the cursor to the start of the line and an escape
+  sequence can clear it, so the deck's own text would be what that terminal shows above the
+  sentence explaining what to do about it. Whitespace goes for the reader rather than the writer:
+  `::click=  ` is refused as `::click=`, and quoting the two trailing spaces would only move the
+  disagreement somewhere less visible. Both happen in `UnknownMarker::quoted()` rather than in the
+  parser, so the reason a message is safe to print lives with the message.
+
+- **A template-backed column was laid out and left empty.** `PresentationRenderer::splits()`
+  asked the geometry the constructor was handed rather than the merged one `render()` builds,
+  so a theme whose `template.pptx` gives a role two body placeholders was asked how many
+  columns it had and answered with the library's own count. A two-column role came back
+  "does not divide": the second box was laid out and no block was ever put in it, and nothing
+  anywhere said so. Reproduced against the code before this change with `content` mapped onto
+  *Two Content* — every shape at the first column's `x`, the second column's `x` unused.
+
+  The column count now comes from the merged geometry, which is what carries the template's
+  boxes as well as the theme's type. `::column` would have made it worse rather than better:
+  the first deck to write the marker on a template-backed role would have been refused, or
+  ignored, because of the same wrong question.
+
+  `splits()` is gone with it — there is no longer a rule to ask whether it divides — and so is
+  the constructor's `SlideGeometry` argument, which nothing read but that one method. A caller
+  passing it positionally gets a `TypeError`, because argument four is `$strict` now and a
+  `SlideGeometry` is not a `bool`; a caller naming it gets `Error: Unknown named parameter
+  $geometry`. Both are loud, which is the point: a geometry that was promised and never used
+  is not something to accept quietly either.
 
 - **Six claims in the README were false.** Each was checked by running the thing rather than by
   reading the page, and each is now held in `tests/Unit/dead-code.php` so it cannot come back.
@@ -408,6 +575,33 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`BlockParser::flush()` takes its four buffers as one array.** Six parameters become three, and
+  the walk above them declares one local rather than four. The refactor is in the arguments rather
+  than the behaviour: every block a slide ends up with, the column each was written for and the
+  `SlideBlocks` invariant that keeps the two lists the same length are what they were, and the 847
+  tests passing are the evidence.
+
+  The reason is `php:S107`. `blocks()` is at seven parameters with the walk's own arguments — the
+  lines, the slide, the directory, the scope, the step, the column and the marker count — and
+  `flush()` is called from six branches of it, so a fourth buffer is a fifth parameter there. What
+  the array buys is room for an extraction out of `blocks()` to be handed one argument instead of
+  four, which is the reason `column()` still flushes by its caller.
+
+  That reason changed, and so did its comment. The buffers are flushed by the caller because
+  `column()` is static and `flush()` is not — closing a quote reads its runs through the inline
+  parser — rather than because four buffers beside four arguments is eight parameters. The old
+  claim is in `tests/Unit/dead-code.php` so it cannot come back.
+
+  `BlockParser` is back at twenty methods and `php:S1448` is closed on it. The rule is above twenty,
+  and the class has been there once already: the `::click` change took it to twenty-two and it had
+  to be folded back. `spelling()` — the one method the quoting fix had added — has gone, and the
+  sanitising it did now sits in `UnknownMarker::quoted()`, where the sentence is built: a
+  deck-written string that is about to be printed belongs to whoever prints it, and the `@param`
+  lines promising a caller had already applied it are gone rather than left as a promise every
+  future caller has to keep. `blocks()`'s cognitive complexity is unchanged too, at exactly 15
+  against a limit of 15 — the control-flow structure of the walk is the same sequence of tokens it
+  was, so nothing in the refactor could have nested anything.
+
 - **`PresentationRenderer` did three jobs.** Twenty-seven methods, of which six were neither
   parsing a deck nor drawing a slide:
 
@@ -564,6 +758,15 @@ The first slice of the PowerPoint half of `markdown-office`. It decides where a
 slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 
 ### Added
+
+- **A gallery slide for a `::column` written inside a `:::click` region.** `examples/markdown/05-steps.md`
+  had a region on one slide and column markers on two others, and never both on the same one — so
+  the case a reader most needs to see is the one the gallery was silent about: text after a
+  region's closing `:::` stays in the column the marker inside the region moved it to. The new
+  slide is after the two-column build-up, which is where both halves have already been introduced.
+
+  The build has six clamps before the slide and six after it, and `examples/README.md` names it
+  beside the `02` two-column slide that says where a column divides.
 
 - **`TimingPass`, which writes a click-triggered build onto a slide. Nothing calls it yet.**
   No deck a person writes changes, and a `v-click` step is still a slide of its own. It is here

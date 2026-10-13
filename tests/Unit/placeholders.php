@@ -57,7 +57,7 @@ it('gives a layout part a placeholder for its title and one for its body', funct
 it('gives a two-column layout a body placeholder for each of its columns', function () {
     // Two columns are the reason the role exists, so the layout has to say so in the one
     // place PowerPoint looks: `idx` 1 and `idx` 2.
-    expect(placeholderDeck("---\nlayout: two-column\n---\n# One\n\nLeft.\n\n## Right\n\nRight side.\n")
+    expect(placeholderDeck("---\nlayout: two-column\n---\n# One\n\nLeft.\n\n::column\n\nRight side.\n")
         ->layoutPlaceholders())
         ->toHaveKeys(['title', BODY_ONE, 'body 2']);
 });
@@ -78,7 +78,7 @@ it('writes a layout\'s placeholders where the slides are drawn', function () {
 it('gives each role\'s layout its own placeholders rather than one layout\'s', function () {
     // A pass that numbered the layouts wrongly would put `two-column`'s two columns in the
     // part the content slides are bound to, and every slide would inherit the wrong one.
-    $pptx = placeholderDeck("---\nlayout: content\n---\n# One\n\nText.\n\n---\nlayout: two-column\n---\n# Two\n\nLeft.\n\n## Right\n\nRight side.\n");
+    $pptx = placeholderDeck("---\nlayout: content\n---\n# One\n\nText.\n\n---\nlayout: two-column\n---\n# Two\n\nLeft.\n\n::column\n\nRight side.\n");
 
     expect(array_keys($pptx->layoutPlaceholders(1)))->toBe(['title', BODY_ONE])
         ->and(array_keys($pptx->layoutPlaceholders(2)))->toBe(['title', BODY_ONE, 'body 2'])

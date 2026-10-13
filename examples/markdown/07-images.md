@@ -33,6 +33,8 @@ layout: two-column
 
 ![A diagram](assets/diagram.svg)
 
+::column
+
 ## The right column
 
 A vector is taken on its extension and never measured, and it is the only one of
@@ -43,8 +45,7 @@ $renderer = new PresentationRenderer(__DIR__);
 $renderer->render($deck, 'deck.pptx');
 ```
 
-Columns divide at the first `##` in the body, so everything above this one —
-the picture included — is the left column.
+The `::column` above is what divides the two, so the picture — everything above it — is the left column.
 
 ---
 layout: image-text
@@ -54,13 +55,14 @@ layout: image-text
 
 ![The office logo, beside the text rather than above it](assets/logo.png)
 
+::column
+
 ## The text beside the picture
 
 The picture takes the **wider** column, because a reader looks at it first.
 The two are separated by the same gutter a bullet is from its text.
 
-`image-text` divides at the first `##` exactly as `two-column` does, so the
-picture above is the left column.
+`image-text` divides at a `::column` exactly as `two-column` does, so the picture above is the left column.
 
 ---
 layout: image-title

@@ -21,7 +21,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `02-layout-roles.md` | `02-layout-roles.pptx` | Every layout role, one per slide |
 | `03-themes.md` | three files | The same deck in `default`, `corporate-dark` and `minimal`, changed by nothing but the `theme:` line — so the three can be put side by side and compared. They differ in type scale, margins, rule weight and heading treatment, not only in palette |
 | `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does |
-| `05-steps.md` | `05-steps.pptx` | `::click` steps as click animations on one slide, a `:::click` region that is a step of its own, a build-up across two columns, a picture held back for its own click, and a `::note` |
+| `05-steps.md` | `05-steps.pptx` | `::click` steps as click animations on one slide, a `:::click` region that is a step of its own, a build-up across two columns, a `::column` written inside a region, a picture held back for its own click, and a `::note` |
 | `06-tables.md` | `06-tables.pptx` | Table alignment, a bold filled header, widths from content |
 | `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column, and the three layouts built around one: `image-text`, `image-title` and `image-slide` |
 | `08-code.md` | `08-code.pptx` | Code blocks |
@@ -43,15 +43,19 @@ A few of these are here because the render is the only honest evidence:
   rejected because of a stray asterisk is a deck nobody can show.
 - **`01`, second slide.** Four spaces of indent nest one level, not two, and
   `7. An ordered list starts at the number the deck wrote` renders as 7, 8.
-- **`02`, the `two-column` slide.** Everything above the first `##` goes left and
-  the `##` onward goes right, because that heading is what a writer puts on a
-  column of a slide and there is nothing else to go on.
+- **`02`, the `two-column` slide.** Everything above the `::column` marker goes left
+  and everything below it goes right. The marker is the only way there is, and the
+  `##` under it is an ordinary heading that lands in the column it was written.
 - **`02`, the `blank` slide.** `blank` has no title box — that is what makes it
   blank — so a frontmatter `title:` there is drawn as a heading in the body
   instead. A `##` in that body keeps its own depth and comes out smaller.
+- **`05`, the `two-column` slide with a region in it.** Its `::column` is written
+  inside a `:::click` region, and the sentence after the closing `:::` is drawn in
+  the right column with it. A region says what a click shows; a column says where a
+  block is drawn, and the closer ends the first and not the second.
 - **`07`, the `image-text` slide.** The picture is in the *wider* column and the
   text in the narrower one, because a reader looks at the image first. It
-  divides at the first `##` exactly as `two-column` does.
+  divides at a `::column` exactly as `two-column` does.
 - **`07`, the `image-slide` slide.** The picture is the slide: no headline, and
   no margin either — the box it is fitted to is the whole page. The logo is
   square and the page is not, so the picture keeps its own proportions inside

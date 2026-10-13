@@ -59,17 +59,47 @@ A two-column slide is written left column first, so the steps it asks for arrive
 in an order that need not be the order they were read in. The clicks still run
 in the order they were written.
 
+The `::column` below moves the blocks after it across, and moves no step.
+
 Left, on the first step.
 
 ::click=3
 
 Left, on the third step.
 
+::column
+
 ## The right column
 
 ::click
 
 Right, on the second step — written after the third, and clicked before it.
+
+---
+layout: two-column
+---
+
+# A column that comes out of a region
+
+A `::column` written inside a region moves the text after it, and the closing
+`:::` does not put it back. A region says what a click shows and a column says
+which side of the slide a block is drawn on, and the second does not end with the
+first.
+
+Left, above the region.
+
+:::click
+
+Left, on the step the region opened.
+
+::column
+
+Right, on the step the region opened.
+
+:::
+
+Right, after the closer — in the column the marker moved it to, and on the step
+the region opened at.
 
 ---
 
@@ -106,6 +136,8 @@ Left, on the first step.
 ::click
 
 Left, on the second.
+
+::column
 
 ## The right column
 

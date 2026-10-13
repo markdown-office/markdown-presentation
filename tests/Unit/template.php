@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\MalformedTemplate;
+use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SlideGeometry;
 use MarkdownPresentation\Render\TemplateGeometry;
@@ -152,12 +153,44 @@ it('draws a slide in the geometry its theme\'s template states', function () {
 
 it('draws both columns of a two-column slide where the template puts them', function () {
     $shapes = templatedDeck(
-        themed(templatedTheme(), "layout: two-column\n", "# Both\n\nLeft.\n\n## Right\n\nRight side.\n"),
+        themed(templatedTheme(), "layout: two-column\n", "# Both\n\nLeft.\n\n::column\n\nRight side.\n"),
     )->positions();
 
     expect($shapes[1]['x'])->toBe(66.0)
         ->and($shapes[1]['width'])->toBe(394.0)
-        ->and($shapes[3]['x'])->toBe(500.0);
+        ->and($shapes[2]['x'])->toBe(500.0);
+});
+
+it('splits a role the template gives two columns to, whatever the role is called', function () {
+    // The boxes are the fact and not the role: `content` is *Two Content* here, so it has two
+    // columns even though the library's own `content` has one. This is the case `splits()`
+    // used to get wrong too — it asked the constructor's default geometry rather than the
+    // merged one, so the second box was laid out and left empty with nothing saying so.
+    $theme = ThemeDirectory::create([
+        'theme.yml' => "name: Two Columns\n",
+        'layouts.yml' => "layouts:\n  content: Two Content\n",
+        'template.pptx' => file_get_contents(templatedTheme() . TEMPLATED_PPTX),
+    ]);
+
+    $path = Scratch::file('templated.pptx', '');
+
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse(themed($theme, "layout: content\n", "# One\n\nLeft.\n\n::column\n\nRight.\n")),
+        $path,
+    );
+
+    $shapes = Pptx::open($path)->positions();
+
+    expect($shapes[1]['x'])->toBe(66.0)
+        ->and($shapes[2]['x'])->toBe(500.0);
+});
+
+it('refuses a ::column the template\'s own layout has no second box for', function () {
+    // The other half of the same question, and the half that is visible: *Title and Content*
+    // gives `content` one column, so the marker is refused rather than moving a block into a
+    // box the template never drew.
+    expect(fn () => templatedDeck(themed(templatedTheme(), '', "# One\n\nLeft.\n\n::column\n\nRight.\n")))
+        ->toThrow(UnsupportedColumn::class, 'Slide 1 has a "::column", and the "content" layout has 1 column.');
 });
 
 it('draws a run of paragraphs in the box the template gives the body', function () {

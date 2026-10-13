@@ -112,7 +112,7 @@ it('reports a block that fitted its own step but not the slide it is on', functi
 it('reports the column a block overflowed in', function () {
     // Two columns overflow independently, and the second is the one a reader looks at last.
     $overflows = overflowing(
-        "---\nlayout: two-column\n---\n\n# Both\n\n" . str_repeat("Left.\n\n", 20) . "## Right\n\n"
+        "---\nlayout: two-column\n---\n\n# Both\n\n" . str_repeat("Left.\n\n", 20) . "::column\n\n"
         . str_repeat("Right.\n\n", 20),
     )->overflows();
 
