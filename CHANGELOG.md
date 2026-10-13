@@ -8,6 +8,40 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A slide is read by league/commonmark, and this library's own block parser is gone.**
+  The two agreed on 2 691 of the 2 760 slide contents the differential test compared, and this
+  is the other side of that bargain: the differences below are now the behaviour rather than a
+  recorded note. `Render\BlockParser` and `Render\InlineParser` are removed, and
+  `Render\CommonMark\BlockTranslator` is what `PresentationRenderer` parses with.
+
+  Nothing about how a deck is *written* changes. `::click`, `::click=3`, `::column`,
+  `:::click` … `:::` and `::note` … `::` are all still read, because the markers are claimed in
+  front of the directive grammar and `::note` is taken off the slide by `DeckParser` before the
+  renderer sees it.
+
+  The differences that reach a slide, each of which is the other parser being wrong:
+
+  | Was | Now |
+  | --- | --- |
+  | a line of text after a list item ended the list | it is a lazy continuation of that item, which is what CommonMark says |
+  | a change of marker carried on one list, with `ordered` per item | it starts a new list |
+  | a sub-item two spaces under `1.` nested | a sub-item needs the parent marker's width, three spaces for `1. ` |
+  | `**unclosed` paired with a later `**` and drew bold | the `**` stays the characters it is |
+  | `[**label**](…)` drew a pair of asterisks | the emphasis and the link both survive |
+  | `[](…)` drew an empty run carrying the target | an empty label is nothing to draw |
+  | a link pattern stopped at the first `)` | `javascript:alert(1)` is refused whole |
+  | a short table row was left short | it is padded with an empty cell, so rows line up |
+
+- **A `\\host\share` link is refused again.** league percent-encodes a target on the way in, so
+  the share arrived as `%5Chost%5Cshare` and a check written against the raw string saw a path.
+  The check now reads the decoded form, which also catches an encoded scheme, and it refuses any
+  target beginning with a path separator — one separator, because league reduces `\\host` to a
+  single one on the way in. A picture's source is checked for a scheme but not for a share: it is
+  resolved on disk inside the directories the caller allowed rather than followed by a reader.
+
+- **`Render\CommonMark\BlockTranslator::MAX_STEP`** is where the ceiling on a step number lives,
+  where `Render\BlockParser::MAX_STEP` was. The number is unchanged.
+
 - **A leaf directive under a name this library does not draw is refused rather than drawn.**
   **Breaking**, and only for a deck that writes one. `::foo`, `::foo[label]{attrs}` and
   `::anything=2` were painted onto the slide as the words the deck wrote them as, which is the
@@ -179,31 +213,45 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **A second reader for a slide, and a test that compares the two.** `Render\CommonMark\BlockTranslator`
-  reads a slide with [league/commonmark](https://commonmark.thephpleague.com/) plus
+- **A slide is read by league/commonmark.**
+  `Render\CommonMark\BlockTranslator` reads a slide with
+  [league/commonmark](https://commonmark.thephpleague.com/) plus
   [markdown-office/commonmark-generic-directives](https://github.com/markdown-office/commonmark-generic-directives)
-  and produces the same blocks `Render\BlockParser` produces, so that nothing downstream of the
-  parser can tell which one read the deck. `league/commonmark` does not include GFM tables and the
-  shipped themes' column widths are measured from a table's alignment, so `TableExtension` is
-  registered rather than optional; `StrikethroughExtension` is registered for the same reason
-  (`~~struck~~` is a run of its own).
+  and is what `PresentationRenderer` parses with. `league/commonmark` does not include GFM tables
+  and the shipped themes' column widths are measured from a table's alignment, so
+  `TableExtension` is registered rather than optional; `StrikethroughExtension` is registered for
+  the same reason (`~~struck~~` is a run of its own).
 
-  **Not user-visible yet: no deck renders differently.** `PresentationRenderer` still calls
-  `BlockParser`, `tests/Unit/commonmark-parity.php` is what holds the two together, and nothing
-  in the public API has moved.
+  It arrived in two steps. The first added it beside the parser it replaces, with
+  `tests/Unit/commonmark-parity.php` holding the two together over every slide of every deck in
+  the repository and every string literal the suite itself holds, and every place they disagreed
+  recorded in `tests/fixtures/commonmark/divergences.json` with the reason the other answer was
+  the right one — sixty-nine of them. Both directions were asserted: a difference nobody recorded
+  is a behaviour change nobody decided on, and a record whose deck stopped differing is a
+  strictness that went quietly. Sixty-three of the sixty-nine were on test-source strings rather
+  than on a deck; the six that reached a slide are the table under **Changed**.
 
-  Every deck in the repository goes through both parsers — every slide of every deck in
-  `examples/markdown/`, every slide of every deck in `tests/fixtures/slidev/expected.json`, and
-  every string literal and heredoc the suite itself holds — and every place they disagree is
-  recorded in `tests/fixtures/commonmark/divergences.json` with the reason the other answer is
-  the right one. There are sixty-eight of them and they are a decision, not a bug list: a
-  bullet followed by an unindented sentence, a ragged table row, a `===` underline, backslash
-  escapes, an autolink on `<dc:title>`, and a lone carriage return are all read differently, and
-  most of them are read better. Both directions are asserted: a difference nobody recorded is a
-  behaviour change nobody decided on, and a record whose deck stopped differing is a strictness
-  that went quietly.
+  The second step is the cutover above, and it took the differential test with it: there is one
+  reader now, and "do the two agree" is not a question the repository can ask any more. What
+  replaced it is coverage of the constructs themselves — an indented marker read as code, an HTML
+  block read as its words, a lazy continuation, a padded table row, a scheme a reader would act
+  on — each asserted where it is decided.
 
 ### Fixed
+
+- **A numbered list that begins above one counts on.** `7.` and `8.` rendered as `7.` and `7.`
+  outside PowerPoint. PHPPresentation writes the start of a numbering on every paragraph of it
+  and leaves the reader to count on, which PowerPoint does and LibreOffice does not — it restarts
+  at each one. Every item of such a list now carries its own number, and the file says what to
+  draw rather than leaving it to be inferred. A list that begins at one is unchanged: nothing is
+  written for it at all, and every reader counts on from one.
+  Found by rendering the gallery slide and looking at it.
+
+- **A picture whose name has a space in it is found.** CommonMark has no bare space in a
+  destination, so `a picture.png` is a paragraph and `a%20picture.png` is the picture —
+  and the encoded spelling was what the file lookup was given, so a deck written
+  correctly was refused with `ImageNotFound`. The target is decoded before the file is
+  looked for.
 
 - **A refusal named the marker the parser expects rather than the one the deck wrote.** Every
   two-colon marker is read in either case, and `MARKER`, `REGION` and `COLUMN` capture only what

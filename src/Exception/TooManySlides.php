@@ -8,7 +8,7 @@ namespace MarkdownPresentation\Exception;
  * A deck that asks for more slides than a presentation is.
  *
  * Not a step: a step is bounded where it is written, by
- * {@see \MarkdownPresentation\Render\BlockParser::MAX_STEP}, and a deck of steps that are
+ * {@see \MarkdownPresentation\Render\CommonMark\BlockTranslator::MAX_STEP}, and a deck of steps that are
  * each inside it passes every one of those checks and still writes one slide. This is the
  * total, counted before the first slide is built rather than while they are — and unlike
  * when a step was a slide of its own, it is a deck that really is that long rather than a

@@ -27,6 +27,8 @@ use MarkdownPresentation\Render\Block\Paragraph;
 use MarkdownPresentation\Render\Block\Quote;
 use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
+use MarkdownPresentation\Render\CommonMark\BlockTranslator;
+use MarkdownPresentation\Render\CommonMark\InlineTranslator;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
 use MarkdownPresentation\Theme\ThemeResolver;
@@ -57,7 +59,7 @@ use PhpOffice\PhpPresentation\Slide\SlideLayout;
  *
  * And one it does: a directive in the body of a slide it cannot draw — a `v-*` element, a
  * `:::` fence, an HTML comment, an unclosed `::note` — is a
- * failure from {@see \MarkdownPresentation\Render\BlockParser} rather than a shape carrying
+ * failure from {@see \MarkdownPresentation\Render\CommonMark\BlockTranslator} rather than a shape carrying
  * the directive's own text. That last one is the case this library exists for: a deck
  * written by a model, a directive it does not know, and a slide with the directive printed
  * on it reads as a rendered deck.
@@ -144,7 +146,7 @@ final class PresentationRenderer
     public function __construct(
         private readonly string $directory = '.',
         private readonly ThemeResolver $themes = new ThemeResolver(),
-        private readonly BlockParser $blocks = new BlockParser(),
+        private readonly BlockTranslator $blocks = new BlockTranslator(),
         private readonly bool $strict = false,
         array $imageRoots = [],
     ) {
@@ -215,7 +217,7 @@ final class PresentationRenderer
         // without them this file cannot be loaded at all, so every test that renders a deck
         // fails on the 8.2 job and nothing local says why.
         $geometry = (new SlideGeometry(style: $theme->theme()->style()))->with($this->template($theme, $used));
-        $layouts = MasterLayouts::build($presentation, $deck, $theme, $used, $this->blocks->inline);
+        $layouts = MasterLayouts::build($presentation, $deck, $theme, $used, $this->blocks->inline());
 
         $writer = new ShapeWriter($theme->theme(), $geometry);
         $blocks = $this->blocks($deck);
@@ -515,7 +517,7 @@ final class PresentationRenderer
 
             $writer->title(
                 $slide,
-                $this->blocks->inline->parse($source->title()),
+                $this->blocks->inline()->runsIn($source->title()),
                 $title['box'],
                 $size === null ? $title['size'] : $geometry->titleSize($title['size'], $size),
                 $title['alignment'],
@@ -564,7 +566,7 @@ final class PresentationRenderer
     private function titleHeading(string $title, ?int $depth): Heading
     {
         return new Heading(
-            $this->blocks->inline->parse($title),
+            $this->blocks->inline()->runsIn($title),
             $depth === null ? 1 : max(1, $depth - 1),
             self::FIRST_STEP,
         );
@@ -584,7 +586,7 @@ final class PresentationRenderer
      * heading further down the slide is content the author put there.
      *
      * The two are told apart by their text and not by their markup, both sides stripped by
-     * the one {@see InlineParser} that read the heading: `# Release **v2** notes` is the
+     * the one {@see InlineTranslator} that read the heading: `# Release **v2** notes` is the
      * title of a slide titled `Release **v2** notes`, not a heading drawn a second time on
      * top of it. A strip is lossy, so two titles that read the same are one title — which is
      * what a reader of the slide would say too.
@@ -627,7 +629,7 @@ final class PresentationRenderer
 
         if (
             $heading === null
-            || InlineParser::text($heading->runs) !== $this->blocks->inline->plain($title)
+            || InlineTranslator::text($heading->runs) !== $this->blocks->inline()->plain($title)
         ) {
             // A role with no title box has nothing but its body to draw a title in, and a
             // title it does not draw is the silence this library refuses everywhere else —

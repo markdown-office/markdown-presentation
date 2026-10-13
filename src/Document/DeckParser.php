@@ -358,7 +358,7 @@ final class DeckParser
     /**
      * The note is a `::note` block and its closing `::`, and only that: an opener with
      * nothing closing it is part of the slide's text, which is what
-     * {@see \MarkdownPresentation\Render\BlockParser} refuses it for.
+     * {@see \MarkdownPresentation\Render\CommonMark\BlockTranslator} refuses it for.
      *
      * @return array{0: string, 1: ?string} The content without the note, and the note.
     */

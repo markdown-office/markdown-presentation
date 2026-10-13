@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Render\CommonMark\InlineTranslator;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
 use MarkdownPresentation\Theme\Theme;
@@ -44,7 +45,7 @@ final class MasterLayouts
         Deck $deck,
         LoadedTheme $theme,
         array $roles,
-        InlineParser $inline,
+        InlineTranslator $inline,
     ): array {
         $presentation->getLayout()->setDocumentLayout(DocumentLayout::LAYOUT_SCREEN_16X9);
 
@@ -150,7 +151,7 @@ final class MasterLayouts
         PhpPresentation $presentation,
         Deck $deck,
         LoadedTheme $theme,
-        InlineParser $inline,
+        InlineTranslator $inline,
     ): void {
         $properties = $presentation->getDocumentProperties();
 

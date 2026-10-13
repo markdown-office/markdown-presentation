@@ -11,7 +11,7 @@ run, drawn with their own weight, face and colour.
 
 ***
 
-## Emphasis is deliberately not CommonMark's
+## Emphasis is CommonMark's, unclosed delimiters and all
 
 A delimiter that does not close is left as the characters it was written as, so
 **unclosed is text. An underscore inside a word is not a delimiter, so

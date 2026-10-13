@@ -61,12 +61,6 @@ final class Refusals
      * closing `::`. {@see self::notes()} has already taken a bare one off the content or
      * refused it as unclosed, so a leaf still carrying the name at this point is one written
      * with a label or attributes on it, which is not the note this library means.
-     *
-     * Read by {@see \MarkdownPresentation\Render\BlockParser::refuse()} as well, which is the
-     * other place this library decides what a slide cannot carry. It is written down here once
-     * because two lists of the directives a slide draws are two lists that can disagree, and
-     * {@see \MarkdownPresentation\Render\BlockParser} goes away with the hand-written parse.
-     *
      * @var list<string>
      */
     public const LEAF = ['click', 'column'];

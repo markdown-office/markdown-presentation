@@ -15,6 +15,9 @@ both text, and so is snake_case_name.
 
 ## Lists
 
+7. An ordered list starts at the number the deck wrote
+8. Eight, not seven
+
 - A bullet with **bold** in it
 - Another bullet
     - Four spaces of indent are one level, not two
@@ -24,9 +27,6 @@ both text, and so is snake_case_name.
 1. First
 2. Second
 3. Third
-
-7. An ordered list starts at the number the deck wrote
-8. Eight, not seven
 
 ---
 

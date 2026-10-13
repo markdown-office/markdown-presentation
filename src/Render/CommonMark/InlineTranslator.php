@@ -25,17 +25,14 @@ use MarkdownPresentation\Render\Run;
  * league/commonmark's inline nodes as the runs a slide draws.
  *
  * The style is carried down the tree rather than read off each node, because CommonMark
- * nests one emphasis inside another where {@see \MarkdownPresentation\Render\InlineParser}
- * reads a single delimiter pair: `*one **two** three*` is three runs here and one run of
- * asterisks there. Both are honest about what a reader sees, and this is the one that keeps
- * the bold.
+ * nests one emphasis inside another, and a single delimiter pair cannot say which: `*one
+ * **two** three*` is three runs, and the middle one is both italic and bold.
  *
  * Runs of the same style are joined as they are written, because a line break is a node of
  * its own: `one\ntwo` is one run of text to a reader, and three would draw the same words in
  * three shapes.
  *
- * A link's target is checked here for the reason
- * {@see \MarkdownPresentation\Render\InlineParser} checks it. A target in a `.pptx` is
+ * A link's target is checked here rather than left to the reader. A target in a `.pptx` is
  * followed when a reader clicks it, so `javascript:` and a UNC share are refused at parse
  * time rather than written into a file somebody opens.
  */
@@ -60,10 +57,17 @@ final class InlineTranslator
     private const SCHEME = '#\A[a-zA-Z][a-zA-Z0-9+.-]+:#';
 
     /**
-     * A Windows or UNC share, in either spelling: `\\host\share\payload.exe` and
-     * `//host/share`.
+     * A target that begins with a path separator, which is a Windows or UNC share in either
+     * spelling — `\\host\share\payload.exe` and `//host/share` — or a path rooted at the
+     * reader's own machine.
+     *
+     * One separator rather than the two that spell a share, because league reduces `\\host` to
+     * `/host` on the way in and a pattern waiting for two would never see the share it was
+     * written for. A single leading separator is already the thing to refuse on its own: a
+     * reader resolves it against the machine the deck is opened on or against the deck's own
+     * folder, which is never what a deck means by a link.
      */
-    private const SHARE = '#\A[/\\\\]{2}#';
+    private const SHARE = '#\A[/\\\\]#';
 
     /**
      * The style a run is written in before anything has emphasised it.
@@ -117,6 +121,34 @@ final class InlineTranslator
         (new InlineParserEngine($this->environment, new ReferenceMap()))->parse($markdown, $paragraph);
 
         return $this->runs($paragraph, $break);
+    }
+
+    /**
+     * What a reader sees of these runs, which is the text with its markup taken out.
+     *
+     * The comparison a title is made against goes through here and through
+     * {@see self::plain()} and nothing else, so the two sides of it cannot be normalised
+     * differently and then found unequal.
+     *
+     * @param list<Run> $runs
+     */
+    public static function text(array $runs): string
+    {
+        return implode('', array_map(static fn (Run $run): string => $run->text, $runs));
+    }
+
+    /**
+     * The text as a reader reads it: parsed and laid back out, so the markup is gone.
+     *
+     * An instance method rather than a static one because the strip is this translator's: a
+     * title and a heading normalised by two translators are two strings that agree only
+     * while the two translators do.
+     *
+     * @throws UnsupportedLink
+     */
+    public function plain(string $text): string
+    {
+        return self::text($this->runsIn($text));
     }
 
     /**
@@ -218,7 +250,7 @@ final class InlineTranslator
         $this->append($runs, new Run('!'));
 
         $style = self::PLAIN;
-        $style['link'] = self::target($node->getUrl());
+        $style['link'] = self::source($node->getUrl());
 
         $this->walk($node->children(), $runs, $style);
     }
@@ -249,13 +281,42 @@ final class InlineTranslator
      */
     private static function target(string $target): string
     {
+        return self::check($target, true);
+    }
+
+    /**
+     * A picture's source, which is a path this library resolves rather than a target a reader
+     * follows.
+     *
+     * The scheme is refused and the share is not, which is the difference between the two: a
+     * picture is looked for on disk inside the directories the caller allowed, so a leading
+     * separator is an ordinary path and not a machine the reader would connect to. A scheme
+     * still has nothing to do with a file, so it is refused here as it is for a link.
+     */
+    private static function source(string $source): string
+    {
+        return self::check($source, false);
+    }
+
+    private static function check(string $target, bool $followed): string
+    {
+        // The check reads the decoded form and the link keeps what league handed over. That is
+        // not a convenience: league percent-encodes a target on the way in, so `\\host\share`
+        // arrives as `%5Chost%5Cshare` and a check written against the raw string sees a path
+        // rather than the share it is — the one refusal here that a reader would have acted on.
+        // Decoding for the check also catches an encoded scheme, which is the same trick the
+        // refusal exists for.
+        $read = rawurldecode($target);
+
         foreach (self::LINK_SCHEMES as $scheme) {
-            if (stripos($target, $scheme) === 0) {
+            if (stripos($read, $scheme) === 0) {
                 return $target;
             }
         }
 
-        if (preg_match(self::SCHEME, $target) === 1 || preg_match(self::SHARE, $target) === 1) {
+        $share = $followed && preg_match(self::SHARE, $read) === 1;
+
+        if (preg_match(self::SCHEME, $read) === 1 || $share) {
             throw UnsupportedLink::target($target);
         }
 

@@ -11,7 +11,7 @@ use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedColumn;
-use MarkdownPresentation\Render\BlockParser;
+use MarkdownPresentation\Render\CommonMark\BlockTranslator;
 use MarkdownPresentation\Render\Box;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SlideGeometry;
@@ -610,7 +610,7 @@ it('leaves a full-bleed picture where the library puts it rather than where the 
  * A deck of `$slides` slides that each name `$steps` as a step.
  *
  * What a deck looks like when a marker is pushed to the ceiling: every slide is inside
- * {@see BlockParser::MAX_STEP} and the deck is over {@see PresentationRenderer::MAX_SLIDES}.
+ * {@see BlockTranslator::MAX_STEP} and the deck is over {@see PresentationRenderer::MAX_SLIDES}.
  */
 function steppedDeck(int $slides, int $steps): string
 {
@@ -725,8 +725,8 @@ it('refuses a ::click step larger than one slide could carry', function () {
     // written is the ceiling plus one, not the twenty-digit one, so the suite cannot be the
     // thing that asks for two billion -- and the message quotes the number back rather than
     // the `PHP_INT_MAX` it saturated to.
-    expect(fn () => slideDeck(steppedSlide(BlockParser::MAX_STEP + 1)))
-        ->toThrow(UnknownMarker::class, sprintf('Slide 1 has a step "%d"', BlockParser::MAX_STEP + 1));
+    expect(fn () => slideDeck(steppedSlide(BlockTranslator::MAX_STEP + 1)))
+        ->toThrow(UnknownMarker::class, sprintf('Slide 1 has a step "%d"', BlockTranslator::MAX_STEP + 1));
 });
 
 it('refuses a step too large to be held in an integer at all', function () {
@@ -741,7 +741,7 @@ it('renders a slide whose build-up is as long as one slide may name', function (
     // cannot be met by dropping steps the deck wrote. It is the number the marker accepts
     // rather than the size of the file that is being checked — a step no longer costs a slide,
     // so this writes one however long the chain is.
-    $pptx = slideDeck(steppedSlide(BlockParser::MAX_STEP));
+    $pptx = slideDeck(steppedSlide(BlockTranslator::MAX_STEP));
 
     expect($pptx->slideCount())->toBe(1)
         ->and(substr_count($pptx->part(SLIDE_ONE), '<p:cond delay="indefinite"/>'))->toBe(1);
@@ -901,7 +901,7 @@ it('quotes a marker without the control characters a deck can put on that line',
         slideDeck("# One\n\n::click=" . $hostile . "\n\nText.\n");
         $this->fail('A step marker carrying a control character was not refused.');
     } catch (UnknownMarker $refusal) {
-        expect($refusal->getMessage())->toContain('Slide 1 has a step "two[2Jthree"')
+        expect($refusal->getMessage())->toContain('Slide 1 has a step "two[2J"')
             ->and($refusal->getMessage())->not->toContain("\x1b")
             ->and($refusal->getMessage())->not->toContain("\r");
     }

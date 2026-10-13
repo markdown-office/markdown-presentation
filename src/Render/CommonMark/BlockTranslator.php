@@ -34,14 +34,12 @@ use MarkdownPresentation\Render\Block\Paragraph as ParagraphBlock;
 use MarkdownPresentation\Render\Block\Quote;
 use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
-use MarkdownPresentation\Render\BlockParser;
 use MarkdownPresentation\Render\ImageConverter;
-use MarkdownPresentation\Render\InlineParser;
 use MarkdownPresentation\Render\Run;
 use MarkdownPresentation\Render\SlideBlocks;
 
 /**
- * A slide read by league/commonmark, as the blocks {@see BlockParser} produces.
+ * A slide read by league/commonmark, as the blocks a slide is made of.
  *
  * Nothing downstream of this class knows it exists: the blocks it returns are the same
  * objects the hand-written walk returns, in the same order, with the same step and the same
@@ -66,6 +64,15 @@ final class BlockTranslator
      */
     private const QUOTE = '/\A {0,3}>[ \t]?(.*)\z/';
 
+    /**
+     * The steps one slide may build up in.
+     *
+     * 500 is two orders of magnitude above any build-up a person writes — a slide with five
+     * hundred clicks on it is not a slide — and unlike the ceiling it replaces it costs the
+     * renderer nothing to be generous with.
+     */
+    public const MAX_STEP = 500;
+
     private readonly EnvironmentInterface $environment;
 
     private readonly InlineTranslator $inline;
@@ -74,6 +81,19 @@ final class BlockTranslator
     {
         $this->environment = SlideEnvironment::build();
         $this->inline = new InlineTranslator($this->environment);
+    }
+
+    /**
+     * The inline translator this one parses its own runs with.
+     *
+     * Public because the renderer reads a title and a heading with the same translator the
+     * blocks were read with. Two would be two definitions of what the text of a run of markup
+     * is, and the comparison between a title and the heading that may be it would then be
+     * between two parsers' opinions.
+     */
+    public function inline(): InlineTranslator
+    {
+        return $this->inline;
     }
 
     /**
@@ -303,8 +323,8 @@ final class BlockTranslator
         // Cast first and quoted second: a twenty-digit step saturates to `PHP_INT_MAX` rather
         // than overflowing, so the refusal names the twenty digits the deck wrote rather than
         // the number PHP could hold.
-        if ($number > BlockParser::MAX_STEP) {
-            throw UnknownMarker::tooLarge($slide, $argument, BlockParser::MAX_STEP);
+        if ($number > self::MAX_STEP) {
+            throw UnknownMarker::tooLarge($slide, $argument, self::MAX_STEP);
         }
 
         if ($number <= $step) {
@@ -366,15 +386,35 @@ final class BlockTranslator
         $data = $node->getListData();
         $ordered = $data->type === LeagueList::TYPE_ORDERED;
 
+        // A numbering that begins at one needs nothing: no `startAt` is written for it at all,
+        // and every reader counts on from one. One that begins at any other number has the same
+        // `startAt` written on each of its paragraphs — which is what PowerPoint expects, and
+        // continues itself — and LibreOffice restarts at each one instead, so `7.` and `8.` read
+        // as `7.` and `7.` there. Every item of such a list therefore carries its own number,
+        // and nothing is left to a reader to infer.
+        $explicit = $ordered && $data->start !== 1;
+        $number = $data->start;
+        $first = true;
+
         foreach ($node->children() as $item) {
+            // The number the list was opened with, on its first item alone: an item that carries
+            // on from the one above it has no number of its own to draw. A numbering that
+            // begins above one is the exception, and every one of its items carries its own.
+            $start = $first ? $data->start : null;
+
+            if ($explicit) {
+                $start = $number;
+            }
+
             $items[] = [
                 'level' => $level,
                 'runs' => $this->itemRuns($item, $state),
                 'ordered' => $ordered,
-                // The number the list was opened with, on its first item alone: an item that
-                // carries on from the one above it has no number of its own to draw.
-                'start' => $items === [] ? $data->start : null,
+                'start' => $ordered ? $start : null,
             ];
+
+            $first = false;
+            $number++;
 
             foreach ($item->children() as $child) {
                 if ($child instanceof LeagueList) {
@@ -534,7 +574,11 @@ final class BlockTranslator
      */
     private function image(Image $node, SlideState $state): ImageBlock
     {
-        $written = $node->getUrl();
+        // Decoded, because that is how a name with a space in it is written: CommonMark has no
+        // bare space in a destination, so `my picture.png` is a paragraph and `my%20picture.png`
+        // is the picture. league hands the target over encoded, and looking for the encoded
+        // spelling on disk is looking for a file nobody has.
+        $written = rawurldecode($node->getUrl());
 
         if (PathScope::isUrl($written)) {
             throw ImageNotFound::aUrl($state->slide, $written);
@@ -560,7 +604,7 @@ final class BlockTranslator
             $written,
             $resolved,
             $this->images->png($state->slide, $written, $resolved),
-            InlineParser::text($this->inline->runs($node)),
+            InlineTranslator::text($this->inline->runs($node)),
             $state->step,
         );
     }

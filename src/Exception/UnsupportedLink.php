@@ -25,7 +25,7 @@ namespace MarkdownPresentation\Exception;
  * draws as text rather than a link somebody will follow: refusing every relative target
  * would refuse every deck that writes one.
  *
- * No slide number in the message: {@see \MarkdownPresentation\Render\InlineParser} is
+ * No slide number in the message: {@see \MarkdownPresentation\Render\CommonMark\InlineTranslator} is
  * handed the text of one paragraph and is reached from the deck's title, its description and
  * its frontmatter as well as from a slide's body, so there is no one number to name. What
  * the message quotes is the target itself, which is what an author greps for.

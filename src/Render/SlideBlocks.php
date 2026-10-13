@@ -51,7 +51,7 @@ final class SlideBlocks
      * contract is that the deck's author can fix it, and an author told to go and rename
      * something would go and rename something. Neither is reachable from a deck, and the
      * second is here for the caller that constructs the value itself: the walk in
-     * {@see \MarkdownPresentation\Render\BlockParser} moves the column and the marker count in
+     * {@see \MarkdownPresentation\Render\CommonMark\BlockTranslator} moves the column and the marker count in
      * the same breath, and hands a region the count it was given rather than counting from
      * nothing, so a block is never in a column the count has not already reached.
      */
