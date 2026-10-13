@@ -126,6 +126,7 @@ final class Refusals
             if (
                 $child instanceof DirectiveBlock
                 && !$child->isContainer()
+                && $child->getName() !== null
                 && strtolower($child->getName()) === self::NOTE
                 && $child->getLabel() === null
                 && count($child->getAttributes()) === 0
