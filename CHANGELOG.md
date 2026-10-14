@@ -19,7 +19,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- **The air between blocks is per-block rather than one number, and a heading and a quote
+- **Public methods removed from `Render\SlideGeometry`, `Render\TextFrame` and
+  `Render\ShapeWriter`.** All of them went because the behaviour they served went:
+
+  | Removed | Replaced by |
+  | --- | --- |
+  | `SlideGeometry::paragraphSpace(): float` | the `block:` theme value, which is where the gap is decided now |
+  | `SlideGeometry::headingHeight(int $level, int $lines): int` | `headingSize()` plus the geometry that reserves the room |
+  | `TextFrame::paragraphs(): array` | `blocks()`, `leading()` and `trailing()` |
+  | `ShapeWriter::height()` and `ShapeWriter::write()` narrowing | the parameter union is now `Code\|TextFrame\|Image\|Rule\|Table` |
+
+  The last is the one that can break a caller rather than warn one: passing a `Heading` or a
+  `Quote` to either method is now a `TypeError` rather than a shape. Both are paragraphs of a
+  `TextFrame` — which is where they were being written anyway — so a caller holding one should
+  wrap it.
+
+, and a heading and a quote
   are paragraphs of the frame around them rather than shapes of their own.**
   `block:` was the gap between two blocks everywhere, which is one number doing the work of
   a rhythm. It is still the gap after a paragraph, and everything else is a fraction of it or
@@ -28,10 +43,14 @@ All notable changes to this project are documented here. The format follows
   | Between | What decides it | At the library's own numbers |
   | --- | --- | --- |
   | two paragraphs | `block:` | 12px, unchanged |
-  | two list items | a quarter of `block:` a side | 6px |
+  | two lists | a quarter of `block:` a side | 6px |
   | a paragraph and a table, code block, rule or picture | 0.9 of `block:` a side | 17px |
-  | a heading and the text above it | 0.7 em of the heading's own size | 19px at a 20pt `##` |
-  | a heading and the text below it | 0.35 em of the heading's size | 9px |
+  | a heading and the text above it | 0.7 em of the heading's own size, plus the 6px the paragraph leaves | 19px + 6px = 25px |
+  | a heading and the text below it | 0.35 em of the heading's size, plus the 6px the paragraph leaves | 9px + 6px = 15px |
+
+  The 6px is between two **lists**. The items of one list are lines of one frame and are set with
+  no gap between them, and the heading rows are the heading's own air *plus* the paragraph's: at
+  a 20pt `##` the heading asks for 19px above and 9px below, and the reader sees 25px and 15px.
 
   Two things in that table are the reason for it. A block with an edge of its own takes more
   of the air than a paragraph, because a paragraph's ink stops short of the bottom of its box
@@ -296,6 +315,24 @@ All notable changes to this project are documented here. The format follows
   on — each asserted where it is decided.
 
 ### Fixed
+
+- **A small SVG could take gigabytes to refuse.** The ceiling on a picture is on the pixels,
+  and for a vector those pixels were allocated before anything asked whether they were allowed:
+  `vector()` drew the file and measured the result. A file of **152 bytes** declaring a
+  16000-square drawing is refused now in **0.07s with a 4 MB peak**, where drawing it first
+  wanted a 1.9 GB pixel canvas — and this machine's ImageMagick allows `AREA 192 Gpixel`, so
+  the larger the host the more it takes. `SvgRasteriser::measures()` reads the header with
+  `pingImage()` and the ceiling is applied there, before anything is drawn.
+
+  The justification in the previous version — that *nothing short of rendering one knows the
+  answer* — was wrong, and so was the obvious fallback. ImageMagick's own resource limits were
+  measured against a 4000-square SVG and **did not refuse it at all**, at
+  `-limit area 1000 -limit memory 4MiB -limit map 4MiB` on the command line: the SVG coder is
+  not bounded by them. So there is no second line of defence, and a file whose header cannot be
+  read is **refused rather than drawn** rather than drawn with no ceiling on it.
+
+  A drawing is now also **drawn once per file rather than once per reference**: a deck naming
+  the same SVG on every slide paid for a render and a header read on every one of them.
 
 - **An SVG was embedded as a vector, which is a deck PowerPoint opens with the picture
   missing.** The format does carry `image/svg+xml` and PHPPresentation declared it, so

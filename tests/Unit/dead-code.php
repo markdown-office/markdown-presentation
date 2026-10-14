@@ -248,6 +248,15 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a deck of markers asks for more written slides than it has' => 'asks for 800 written slides',
     'a build-up is measured once per step' => 'each revealing everything the one before it had',
     'the two passes over the written package' => 'runs the two passes over it',
+    'the air between two items of one list is a quarter of block: a side' => 'two list items | a quarter of',
+    'a list leaves less air between its items than a paragraph leaves between two of them' => 'less air between its items than a paragraph',
+    'a heading and the text above it are 19px apart' => '| a heading and the text above it | 0.7 em of the **heading\'s own size** | 19px |',
+    'the shape union names seven members' => 'naming the seven is what says so',
+    'the shape union has a tenth kind' => 'a tenth kind of shape',
+    'three passes make the same refusal' => 'one type for the three passes',
+    'a note has no name()' => 'and Quote::name()',
+    'a frame spaces every paragraph but the last' => 'on every paragraph but the last',
+
     // Columns divided at a `##` until `::column` said otherwise. The phrase is the sentence
     // the README, the gallery and the renderer's own docblock all gave as the reason, and
     // none of them can now: a heading is an ordinary heading. `CHANGELOG.md` has to be able

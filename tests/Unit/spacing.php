@@ -111,9 +111,14 @@ it('gives a filled code block and a rule that air too', function () {
         ->and($geometry->gapBetween($paragraph, $paragraph))->toBe(12.0);
 });
 
-it('leaves a list less air between its items than a paragraph leaves between two of them', function () {
-    // A list is one block to the deck and several lines of type to the reader, and it reads as
-    // a list by the air between its items being the smaller of the two.
+it('leaves a list less air around it than a paragraph leaves around itself', function () {
+    // Around the list, not between its items: the items of one list are lines of a single
+    // frame set with no gap between them, which is what makes them read as a list. This asks
+    // about the two blocks either side of the boundary — two lists here, two paragraphs for
+    // the comparison — and it is `LIST_GAP` that decides the first number.
+    //
+    // Named for what it measures. An earlier version of this said "between its items", which
+    // is a claim about a gap the renderer does not write.
     $geometry = new SlideGeometry();
     $list = new ListBlock([['level' => 1, 'runs' => [], 'ordered' => false, 'start' => null]], 1);
 

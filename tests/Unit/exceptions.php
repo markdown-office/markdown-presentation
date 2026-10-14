@@ -313,7 +313,7 @@ it('names the alternatives wherever a failure is a name the author can change', 
     ],
     'an image no package can carry and nothing can decode' => [
         UnsupportedImageFormat::undecodable(3, 'chart.tiff', 'tiff')->getMessage(),
-        'Convert it to GIF, JPEG, PNG or SVG first',
+        'Convert it to GIF, JPEG or PNG first',
     ],
     'a package this process cannot open at all' => [
         UnreadablePackage::cannotOpen(DECK_PATH)->getMessage(),

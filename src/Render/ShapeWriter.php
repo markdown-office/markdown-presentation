@@ -76,8 +76,8 @@ final class ShapeWriter
      * `$box` is the column the shape is laid out in rather than the shape's own box: the
      * width text wraps in is the column's, and a shape is measured before it has a box.
      *
-     * The union rather than `Block`, because it is exhaustive: a tenth kind of shape is not
-     * something this method can guess a height for, and naming the seven is what says so at
+     * The union rather than `Block`, because it is exhaustive: another kind of shape is not
+     * something this method can guess a height for, and naming the five is what says so at
      * the type rather than at run time. A heading, a quote, a paragraph and a list are all in
      * it as a {@see TextFrame} rather than as themselves: they are type rather than shape,
      * they reach a slide only inside a frame, and a frame measured apart from its paragraphs
@@ -825,8 +825,9 @@ final class ShapeWriter
      * Spacing is zeroed here rather than left at PowerPoint's default because
      * {@see self::height()} decides where the next shape starts, and a leading gap the
      * heights do not know about is what puts one shape on top of the one before it. A
-     * {@see TextFrame} puts the gap between its own paragraphs back on top of it, on every
-     * paragraph that has another one under it.
+     * A {@see TextFrame} puts its own air back on top of that at its first block and its last,
+     * and leaves the blocks between them at zero: they are paragraphs of one thing, so the gap
+     * the frame asks for is the gap around it rather than a gap inside it.
      *
      * @param list<Run> $runs
     */

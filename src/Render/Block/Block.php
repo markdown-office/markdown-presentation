@@ -13,9 +13,11 @@ namespace MarkdownPresentation\Render\Block;
  *
  * A block is not necessarily a shape. A paragraph and a list are drawn as paragraphs of one
  * {@see \MarkdownPresentation\Render\TextFrame} whatever else the column holds, which is
- * what a reader would build by clicking into a box and typing; a heading, a quote, a rule, a
+ * what a reader would build by clicking into a box and typing; a rule, a
  * table, a picture and a code block are shapes of their own, and those are the classes that
- * carry a `name()` for the shape the file holds.
+ * carry a `name()` for the shape the file holds. A heading and a quote used to be in that list
+ * and are not any more: they reach a slide as paragraphs of a {@see \MarkdownPresentation\Render\TextFrame}
+ * like a paragraph does, and there is no longer a `name()` on either of them to carry.
 */
 interface Block
 {

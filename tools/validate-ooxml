@@ -115,7 +115,7 @@ for path in "$@"; do
 			continue
 		fi
 
-		if ! vocabulary="$(xmllint --xpath 'string(namespace-uri(/*))' "$WORK/deck/$part" 2> /dev/null)"; then
+		if ! vocabulary="$(xmllint --nonet --xpath 'string(namespace-uri(/*))' "$WORK/deck/$part" 2> /dev/null)"; then
 			# Well-formedness comes first because the vocabulary is what tells a part apart, so a
 			# part that does not parse cannot be told from one the schemas do not describe. It is
 			# reported rather than passed over: PowerPoint opens a deck holding one as `[Repaired]`

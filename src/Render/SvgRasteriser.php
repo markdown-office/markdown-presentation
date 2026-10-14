@@ -57,14 +57,62 @@ class SvgRasteriser
     private ?bool $answer = null;
 
     /**
+     * How big the drawing is, in pixels, read without drawing it.
+     *
+     * `pingImage()` reads the header and stops. That matters because the alternative — drawing
+     * it and measuring the result — is what a 152-byte file can use to take gigabytes: the
+     * ceiling is on the *canvas*, and the canvas exists before anything has decided whether it
+     * is allowed to. Measured this way the same file is refused in milliseconds and allocates
+     * nothing.
+     *
+     * The number is worth trusting because the delegate sizes the canvas from the same header:
+     * a file that declares `width`/`height` of 10 beside a `viewBox` of 9000 is drawn at 10,
+     * not at 9000, so understating the header does not buy a caller a large canvas. What this
+     * replaces is a measurement taken after the drawing, which is one allocation too late to be
+     * a ceiling.
+     *
+     * Null is the file rather than the build: a caller that has already asked
+     * {@see self::available()} knows a build that cannot draw has been dealt with, and what is
+     * left is a file with no readable header — which is why {@see ImageConverter} refuses it
+     * rather than drawing something it has not measured.
+     *
+     * @return array{int, int}|null width and height, or null where neither could be read
+     */
+    public function measures(string $path): ?array
+    {
+        $image = new Imagick();
+
+        try {
+            $image->pingImage($path);
+
+            return [$image->getImageWidth(), $image->getImageHeight()];
+        } catch (Throwable) {
+            return null;
+        } finally {
+            $image->clear();
+        }
+    }
+
+    /** @var array<string, ConvertedImage> */
+    private array $drawn = [];
+
+    /**
      * The PNG an SVG becomes, or null when this build will not draw this file.
      *
      * A null is the file rather than the build: a caller that has already asked
      * {@see self::available()} knows a build that cannot draw has been dealt with, and
      * what is left is markup this delegate will not read.
+     *
+     * The result is kept per path. A deck may name the same drawing on every slide, and
+     * drawing it once per reference makes a repeated picture cost a repeated render — with
+     * the header read that refuses an oversized one paid for once per reference too.
      */
     public function png(string $path): ?ConvertedImage
     {
+        if (isset($this->drawn[$path])) {
+            return $this->drawn[$path];
+        }
+
         $image = new Imagick();
 
         try {
@@ -77,7 +125,11 @@ class SvgRasteriser
             // icon drawn over a coloured panel comes out with a halo round it.
             $image->setImageFormat('png32');
 
-            return new ConvertedImage($image->getImageBlob(), $image->getImageWidth(), $image->getImageHeight());
+            return $this->drawn[$path] = new ConvertedImage(
+                $image->getImageBlob(),
+                $image->getImageWidth(),
+                $image->getImageHeight(),
+            );
         } catch (Throwable) {
             return null;
         } finally {

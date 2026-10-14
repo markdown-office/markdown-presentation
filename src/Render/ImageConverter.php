@@ -109,12 +109,16 @@ final class ImageConverter
     /**
      * The PNG an SVG is drawn as, or the refusal for a build that cannot draw it.
      *
-     * The ceiling is {@see self::MAX_PIXELS} and it is measured on the raster rather than
-     * on the file, because the file does not say how big a picture it is — it says how big
-     * a coordinate system it uses. That is one rendering behind the check the other
-     * formats get, and the reason is that nothing short of rendering one knows the answer:
-     * a `viewBox` in user units is not a pixel count until a delegate has chosen the
-     * density to read it at.
+     * The ceiling is {@see self::MAX_PIXELS}, and it is enforced on the *header* rather than on
+     * the file's size, because a vector says how big a picture it is by describing one and the
+     * picture is what takes the memory. Reading the size is what keeps the ceiling a ceiling:
+     * measured after the drawing, a file of a couple of hundred bytes declaring a 16000-square
+     * picture has already had its canvas before anything asks whether it may have one.
+     *
+     * A file whose size cannot be read is refused rather than drawn. That is the strict end of
+     * a short line — the same reader that cannot find the header will not find the drawing — and
+     * it is taken because the alternative is a draw with no ceiling on it, which is the whole
+     * thing this is here to prevent.
      *
      * @throws UnsupportedImageFormat
      */
@@ -130,22 +134,40 @@ final class ImageConverter
             ));
         }
 
+        $measured = $this->svg->measures($path);
+
+        if ($measured === null) {
+            throw self::undecodable($slide, $written);
+        }
+
+        if ($measured[0] * $measured[1] > self::MAX_PIXELS) {
+            throw UnsupportedImageFormat::tooLarge($slide, $written, $measured[0], $measured[1], self::MAX_PIXELS);
+        }
+
         $raster = $this->svg->png($path);
 
         if ($raster === null) {
-            throw new UnsupportedImageFormat(sprintf(
-                'Slide %d shows "%s", which this build\'s SVG delegate would not draw. Convert it to PNG and '
-                . 'put that in the deck instead.',
-                $slide,
-                $written,
-            ));
-        }
-
-        if ($raster->width * $raster->height > self::MAX_PIXELS) {
-            throw UnsupportedImageFormat::tooLarge($slide, $written, $raster->width, $raster->height, self::MAX_PIXELS);
+            throw self::undecodable($slide, $written);
         }
 
         return $raster;
+    }
+
+    /**
+     * A refusal for a file this build will not draw, said once for the two ways of finding out.
+     *
+     * They are the same fact about the same file — the delegate cannot read it — reached either
+     * from its header or from the draw itself, and a reader told "it would not draw" is not
+     * misled by being told it after a measurement rather than after a picture.
+     */
+    private static function undecodable(int $slide, string $written): UnsupportedImageFormat
+    {
+        return new UnsupportedImageFormat(sprintf(
+            'Slide %d shows "%s", which this build\'s SVG delegate would not draw. Convert it to PNG and '
+            . 'put that in the deck instead.',
+            $slide,
+            $written,
+        ));
     }
 
     /**

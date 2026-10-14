@@ -217,6 +217,12 @@ it('falls back to the format colour map when the deck has no slide master to cop
     $path = Scratch::file('no-master.pptx', '');
     $zip = new ZipArchive();
     $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('ppt/presentation.xml', '<p:presentation><p:sldIdLst/></p:presentation>');
+    $zip->addFromString('ppt/_rels/presentation.xml.rels', '<Relationships/>');
+    $zip->addFromString('[Content_Types].xml', '<Types/>');
+    // No slide master, which is the point — but a theme, because one every master needs is a
+    // part the pass reads rather than invents, and a package without one is refused outright.
+    $zip->addFromString('ppt/theme/theme1.xml', '<a:theme name="office"/>');
     $zip->addFromString('ppt/slides/slide1.xml', '<p:sld/>');
     $zip->addFromString(
         'ppt/slides/_rels/slide1.xml.rels',
@@ -256,7 +262,15 @@ it('does not list the notes master twice in a package that already lists it', fu
         'ppt/presentation.xml',
         '<p:presentation><p:notesMasterIdLst><p:notesMasterId r:id="rId2"/></p:notesMasterIdLst><p:sldIdLst/></p:presentation>',
     );
-    $zip->addFromString('ppt/_rels/presentation.xml.rels', '<Relationships Id="rId2"/>');
+    // A real `Relationship` element, not an `Id` on the root: the pass reads the relationships
+    // out of this part, and an attribute on the root is not one of them. With the attribute the
+    // part held no relationship at all, the pass added a second `notesMaster` of its own, and
+    // the half-linked state this test exists for was never the state under test.
+    $zip->addFromString(
+        'ppt/_rels/presentation.xml.rels',
+        '<Relationships><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006'
+            . '/relationships/notesMaster" Target="notesMasters/notesMaster1.xml"/></Relationships>',
+    );
     $zip->addFromString(
         '[Content_Types].xml',
         '<Types><Override PartName="/ppt/notesMasters/notesMaster1.xml"'
@@ -269,6 +283,7 @@ it('does not list the notes master twice in a package that already lists it', fu
             . ' Target="../notesSlides/notesSlide1.xml"/></Relationships>',
     );
     $zip->addFromString('ppt/notesSlides/notesSlide1.xml', '<p:notes/>');
+    $zip->addFromString('ppt/theme/theme1.xml', '<a:theme name="office"/>');
     $zip->close();
 
     expect(NotesChainPass::applyTo($path))->toBe(1);
@@ -278,6 +293,63 @@ it('does not list the notes master twice in a package that already lists it', fu
     expect(substr_count($pptx->part('ppt/presentation.xml'), '<p:notesMasterIdLst>'))->toBe(1)
         ->and(substr_count($pptx->part('[Content_Types].xml'), 'notesMaster1.xml'))->toBe(1)
         ->and(relationshipsOf($pptx, 'ppt/notesSlides/notesSlide1.xml'))->toHaveKey('notesMaster');
+
+    // And the presentation is not left naming one notes master twice. The relationship it
+    // already had is the one `notesMasterIdLst` points at, so adding a second of the same kind
+    // would leave the list naming an id and the part holding two of them.
+    //
+    // Read from the part rather than through `relationshipsOf()`, which keys by type and keeps
+    // no ids — and the id is the whole point, because it is what the list has to agree with.
+    preg_match_all(
+        '~<Relationship Id="([^"]+)" Type="[^"]*/notesMaster" Target="([^"]+)"/>~',
+        $pptx->part('ppt/_rels/presentation.xml.rels'),
+        $found,
+    );
+
+    expect($found[1])->toHaveCount(1)
+        ->and($pptx->part('ppt/presentation.xml'))
+        ->toContain(sprintf('<p:notesMasterId r:id="%s"/>', $found[1][0]));
+});
+
+it('refuses a package it would have to invent a part for, rather than writing that part empty', function () {
+    // A notes master needs a theme of its own, a presentation needs to exist to be added to,
+    // and a package needs to say what its parts are. Where one of those is missing, the pass
+    // used to write an empty part in its place — a notes master pointing at a zero-byte theme,
+    // which PowerPoint repairs silently and which every other check here calls clean.
+    //
+    // Refusing is also the smaller promise: the deck was already broken by whatever removed the
+    // part, and the best a pass can do is decline rather than make it differently broken.
+    foreach ([
+        'the theme the notes master copies' => 'ppt/theme/theme1.xml',
+        'the presentation it adds the list to' => 'ppt/presentation.xml',
+        'the relationships that name the notes master' => 'ppt/_rels/presentation.xml.rels',
+        'the part that declares what the parts are' => '[Content_Types].xml',
+    ] as $missing => $part) {
+        $path = Scratch::file('missing.pptx', '');
+        $zip = new ZipArchive();
+        $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        $parts = [
+            'ppt/presentation.xml' => '<p:presentation><p:sldIdLst/></p:presentation>',
+            'ppt/_rels/presentation.xml.rels' => '<Relationships/>',
+            '[Content_Types].xml' => '<Types/>',
+            'ppt/theme/theme1.xml' => '<a:theme name="office"/>',
+            'ppt/slides/slide1.xml' => '<p:sld/>',
+            'ppt/slides/_rels/slide1.xml.rels' => '<Relationships><Relationship Id="rId1"'
+                . ' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide"'
+                . ' Target="../notesSlides/notesSlide1.xml"/></Relationships>',
+            'ppt/notesSlides/notesSlide1.xml' => '<p:notes/>',
+        ];
+        unset($parts[$part]);
+
+        foreach ($parts as $name => $contents) {
+            $zip->addFromString($name, $contents);
+        }
+
+        $zip->close();
+
+        expect(fn () => NotesChainPass::applyTo($path))
+            ->toThrow(UnreadablePackage::class, sprintf('Unable to read "%s"', $part), $missing);
+    }
 });
 
 it('says so when the presentation cannot be read at all', function () {

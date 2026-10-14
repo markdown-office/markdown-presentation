@@ -148,8 +148,9 @@ final class TextFrame
      * it: a frame is one shape and an animation reveals one shape on one click, so a frame
      * holding a step's paragraphs and the next step's would put two clicks' worth of text on
      * the slide at the first of them. Splitting there costs nothing in the file —
-     * {@see \MarkdownPresentation\Render\ShapeWriter::textFrame()} writes the air between two
-     * paragraphs of a frame on every paragraph but the last, and two frames of one paragraph
+     * {@see \MarkdownPresentation\Render\ShapeWriter::textFrame()} writes a frame's air at its
+     * first block and its last, and zeroes it between the blocks of the frame, because those are
+     * paragraphs of one thing rather than blocks in their own right; two frames of one paragraph
      * each are given that same air by the column's own arithmetic — and the reader editing
      * the result gets one box per click, which is the unit a build-up is walked in.
      *

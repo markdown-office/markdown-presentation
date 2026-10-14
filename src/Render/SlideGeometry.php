@@ -162,13 +162,17 @@ final class SlideGeometry
     private const PARAGRAPH_GAP = 0.5;
 
     /**
-     * How much of the paragraph gap a list item leaves on either side of itself.
+     * How much of the paragraph gap a list leaves on either side of itself.
      *
-     * Less, because a list is one block to the deck and several lines of type to the reader,
-     * and it reads as a list by the air between its items being smaller than the air between
-     * the things around it. {@see \MarkdownPresentation\Render\CommonMark\BlockTranslator}
-     * numbers a list's items as paragraphs of the frame, so this is what a reader sees
-     * between two of them rather than between two blocks.
+     * Less than a paragraph's, because a list is one block to the deck and several lines of
+     * type to the reader, and the air around it is what keeps it reading as one thing rather
+     * than as a run of paragraphs.
+     *
+     * Between two *lists*, not between the items of one. A list's items are paragraphs of a
+     * single frame and are set with no gap between them — that is what makes them read as a
+     * list — so this is the air a reader sees between a list and whatever is beside it. Naming
+     * it after the item is what a reader takes from the name, and the two are not the same
+     * number: measured on a built deck, the items of one list are set at `spcAft=0`.
      */
     private const LIST_GAP = 0.25;
 

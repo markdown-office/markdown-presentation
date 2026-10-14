@@ -136,8 +136,8 @@ final class NotesChainPass
             return 0;
         }
 
-        $presentation = self::read($zip, 'ppt/presentation.xml', $path) ?? '';
-        $presentationRels = self::read($zip, 'ppt/_rels/presentation.xml.rels', $path) ?? '';
+        $presentation = self::required($zip, 'ppt/presentation.xml', $path);
+        $presentationRels = self::required($zip, 'ppt/_rels/presentation.xml.rels', $path);
         $id = self::freeRelationshipId($presentationRels);
         [$theme, $themeXml] = self::notesTheme($zip, $names, $path);
 
@@ -157,7 +157,7 @@ final class NotesChainPass
         );
         $pending['ppt/presentation.xml'] = self::addNotesMasterId($presentation, $id);
         $pending['[Content_Types].xml'] = self::addContentTypes(
-            self::read($zip, '[Content_Types].xml', $path) ?? '',
+            self::required($zip, '[Content_Types].xml', $path),
             [
                 self::NOTES_MASTER => self::NOTES_MASTER_TYPE,
                 $theme => self::THEME_TYPE,
@@ -295,9 +295,26 @@ final class NotesChainPass
         return 'rId' . ($highest + 1);
     }
 
+    /**
+     * A relationship added, or the part left as it was where it is already there.
+     *
+     * Guarded for the reason {@see self::addNotesMasterId()} is, and it needs to be: a package
+     * can already name a notes master while its notes slide is not linked to one, which is the
+     * half-linked state this pass exists to finish. Without the guard that package comes out
+     * naming the same notes master twice — once from what it already had and once from here —
+     * while `notesMasterIdLst`, which is guarded and so stays as it was, names only one.
+     */
     private static function addRelationship(string $rels, string $id, string $type, string $target): string
     {
-        return self::relationships([...self::parse($rels), $id => [$type, $target]]);
+        $existing = self::parse($rels);
+
+        foreach ($existing as $relationship) {
+            if ($relationship === [$type, $target]) {
+                return $rels;
+            }
+        }
+
+        return self::relationships([...$existing, $id => [$type, $target]]);
     }
 
     /**
@@ -410,7 +427,9 @@ final class NotesChainPass
             }
         }
 
-        $theme = self::read($zip, $source, $path) ?? '';
+        // Refused rather than written empty: a notes master pointing at a zero-byte theme is a
+        // package PowerPoint repairs, and the repair is silent everywhere else.
+        $theme = self::required($zip, $source, $path);
         $copy = self::freeThemeName($names);
 
         return [$copy, $theme];
@@ -435,6 +454,28 @@ final class NotesChainPass
         }
 
         return sprintf('ppt/theme/theme%d.xml', $highest + 1);
+    }
+
+    /**
+     * A part this pass has to rewrite, refused rather than invented where it is not there.
+     *
+     * Writing an empty part in its place produces a package that is missing the very part the
+     * link belongs in — a notes master with a relationship to a zero-byte theme, a presentation
+     * with no slide list, a content-types part declaring nothing — and the failure surfaces in
+     * PowerPoint rather than here. A deck in that state is already broken, so the honest answer
+     * is to say so and leave it alone.
+     *
+     * @throws UnreadablePackage When the part is not in the package at all.
+     */
+    private static function required(ZipArchive $zip, string $part, string $path): string
+    {
+        $contents = self::read($zip, $part, $path);
+
+        if ($contents === null) {
+            throw UnreadablePackage::cannotRead($path, $part);
+        }
+
+        return $contents;
     }
 
     /**

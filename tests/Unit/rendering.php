@@ -113,8 +113,12 @@ const NO_RASTERISER = 'This build cannot rasterise an SVG, so there is nothing t
 final class GivenSvgRasteriser extends SvgRasteriser
 {
     /** `$drawing` is null for a build that will not read the file it was asked about. */
-    public function __construct(private readonly bool $draws, private readonly ?ConvertedImage $drawing)
-    {
+    public function __construct(
+        private readonly bool $draws,
+        private readonly ?ConvertedImage $drawing,
+        /** What a header read answers, or null for a file that has no readable header. */
+        private readonly ?array $measures = null,
+    ) {
     }
 
     public function available(): bool
@@ -122,10 +126,26 @@ final class GivenSvgRasteriser extends SvgRasteriser
         return $this->draws;
     }
 
+    /** @return array{int, int}|null */
+    public function measures(string $path): ?array
+    {
+        return $this->measures;
+    }
+
+    /** Whether a draw was actually asked for, which a refusal before the draw must not change. */
+    public function drawWasAskedFor(): bool
+    {
+        return $this->asked > 0;
+    }
+
     public function png(string $path): ?ConvertedImage
     {
+        $this->asked++;
+
         return $this->drawing;
     }
+
+    private int $asked = 0;
 }
 
 /**
@@ -1323,6 +1343,10 @@ it('answers the same thing every time it is asked whether this build can draw an
 });
 
 it('tells ink on the page from a page with none on it', function () {
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
     // The two answers the probe exists to distinguish, asked directly because a build that
     // cannot draw an SVG only ever produces one of them. Made rather than drawn: an opaque
     // rectangle is not a glyph, but `drewAnything()` asks about alpha and not about what put
@@ -1342,6 +1366,10 @@ it('tells ink on the page from a page with none on it', function () {
 });
 
 it('says a build cannot draw when the drawing itself cannot be read', function () {
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
     // The failure the probe has to survive: `readImageBlob()` raises before any histogram
     // exists, so a delegate that rejects the file answers false rather than crashing the
     // render. Bytes that are not an SVG at all, which is what a truncated or an
@@ -1382,11 +1410,84 @@ it('embeds an SVG as a PNG rather than as a vector no reader can draw', function
         // about the vendor writer rather than about this deck — and it would pass on the
         // broken version too, which is the worst property an assertion here can have.
         ->and(array_filter(
-            array_keys($pptx->parts()),
+            $pptx->parts(),
             static fn (string $part): bool => str_ends_with($part, '.svg'),
         ))->toBe([])
         ->and($pptx->part('ppt/slides/_rels/slide1.xml.rels'))->toContain('/' . basename($media[0]))
         ->and($pptx->shapeNames())->toBe(['image']);
+});
+
+it('measures a drawing from its header without drawing it', function () {
+    // What `vector()` asks before it draws anything. A header read is milliseconds and
+    // allocates nothing; the draw it replaces is where the memory goes, so the two have to be
+    // asked apart rather than measured the same way.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    $path = imageDirectory() . '/measured.svg';
+
+    file_put_contents(
+        $path,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" viewBox="0 0 120 60">'
+        . '<rect width="120" height="60" fill="#0ac81e"/></svg>',
+    );
+
+    expect((new SvgRasteriser())->measures($path))->toBe([120, 60]);
+});
+
+it('answers null for a size it cannot read rather than guessing one', function () {
+    // A guess is what the ceiling is standing in front of. There is no drawing here to measure,
+    // so the answer is that there is no measurement — and the draw that follows is bounded by
+    // the area limit instead, which is the case this exists to keep reachable.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    expect((new SvgRasteriser())->measures(imageDirectory() . '/never-written.svg'))->toBeNull();
+});
+
+it('refuses a drawing whose size it cannot read rather than drawing it unbounded', function () {
+    // The short end of the line the ceiling stands on. Both ways of not being able to draw a
+    // file are the same fact about the same file, so both are refused the same way — and the
+    // refusal here is the strict one, because a draw with nothing on it is the case the header
+    // read exists to prevent.
+    $path = imageDirectory() . '/headerless.svg';
+    file_put_contents($path, 'this is not a drawing whatever it is called');
+
+    $rasteriser = new GivenSvgRasteriser(true, new ConvertedImage('x', 10, 10), null);
+    $converter = new ImageConverter($rasteriser);
+
+    expect(fn () => $converter->png(4, 'headerless.svg', $path))
+        ->toThrow(UnsupportedImageFormat::class, 'which this build\'s SVG delegate would not draw')
+        ->and($rasteriser->drawWasAskedFor())->toBeFalse();
+});
+
+it('draws the same file once however many times a deck names it', function () {
+    // A deck may put the same drawing on every slide. Without this the delegate is asked once
+    // per reference, so a repeated picture costs a repeated render — and the header read that
+    // refuses an oversized one would be paid for once per reference too.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    $path = imageDirectory() . '/once.svg';
+
+    file_put_contents(
+        $path,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20" viewBox="0 0 40 20">'
+        . '<rect width="40" height="20" fill="#0ac81e"/></svg>',
+    );
+
+    $rasteriser = new SvgRasteriser();
+    $first = $rasteriser->png($path);
+
+    unlink($path);
+
+    // The file is gone, so a second draw has nothing to read: what comes back is the answer
+    // kept, and identity rather than equality is what says it was not drawn again.
+    expect($first)->not->toBeNull()
+        ->and($rasteriser->png($path))->toBe($first);
 });
 
 it('draws an SVG as a PNG of what this build actually renders', function () {
@@ -1462,7 +1563,10 @@ it('refuses an SVG this build cannot draw rather than writing a blank one', func
 
     file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"/>');
 
-    $converter = new ImageConverter(new GivenSvgRasteriser(true, null));
+    // A size is given so this reaches the draw and fails there rather than at the header read:
+    // the file is read well enough to be measured and then not drawn, which is a different
+    // failure from not being measured at all and is refused the same way.
+    $converter = new ImageConverter(new GivenSvgRasteriser(true, null, [40, 20]));
 
     expect(fn () => $converter->png(2, 'diagram.svg', $path))
         ->toThrow(
@@ -1472,18 +1576,27 @@ it('refuses an SVG this build cannot draw rather than writing a blank one', func
         );
 });
 
-it('refuses a drawing larger than a slide is worth, measured on the drawing', function () {
-    // `MAX_PIXELS` reaches an SVG one rendering behind everything else, because a file
-    // that sizes itself by `viewBox` says how big its coordinate system is and not how big
-    // a picture it is. The number in the failure is the raster's rather than the file's.
+it('refuses a drawing larger than a slide is worth, from its header and before drawing it', function () {
+    // The ceiling is on the canvas, and the canvas is the expensive part: a file of a couple of
+    // hundred bytes can declare a 16000-square picture, and drawing one to find out it is too
+    // big is how a deck takes gigabytes before reaching the check that refuses it in
+    // milliseconds. So the size is read from the header first, and nothing is drawn.
+    //
+    // Answered through the seam because the size now comes from there. What is under test is
+    // that `vector()` consults the measurement before it draws — not what this build's delegate
+    // makes of a large viewBox, which is the rasteriser's own test below.
     $path = imageDirectory() . '/vast.svg';
 
     file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9000 9000"/>');
 
-    $converter = new ImageConverter(new GivenSvgRasteriser(true, new ConvertedImage('x', 9000, 9000)));
+    $rasteriser = new GivenSvgRasteriser(true, new ConvertedImage('x', 9000, 9000), [9000, 9000]);
+    $converter = new ImageConverter($rasteriser);
 
     expect(fn () => $converter->png(1, 'vast.svg', $path))
-        ->toThrow(UnsupportedImageFormat::class, 'which measures 9000 x 9000 pixels');
+        ->toThrow(UnsupportedImageFormat::class, 'which measures 9000 x 9000 pixels')
+        // The raster it would have drawn is still sitting there unused, which is the claim:
+        // refusing before the draw is the difference between milliseconds and gigabytes.
+        ->and($rasteriser->drawWasAskedFor())->toBeFalse();
 });
 
 it('carries an SVG that was drawn, at the size it was drawn', function () {
@@ -1494,7 +1607,7 @@ it('carries an SVG that was drawn, at the size it was drawn', function () {
 
     file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"/>');
 
-    $converter = new ImageConverter(new GivenSvgRasteriser(true, new ConvertedImage('drawn', 40, 20)));
+    $converter = new ImageConverter(new GivenSvgRasteriser(true, new ConvertedImage('drawn', 40, 20), [40, 20]));
     $carried = $converter->png(1, 'mark.svg', $path);
 
     expect($carried->bytes)->toBe('drawn')
@@ -1511,7 +1624,7 @@ it('refuses a format nothing here can decode, and names what would work', functi
         ->toThrow(
             UnsupportedImageFormat::class,
             'Slide 1 shows "dot.ico", which is ICO — a format a .pptx carries no part for, '
-            . 'and this PHP has no decoder for it either. Convert it to GIF, JPEG, PNG or SVG first.',
+            . 'and this PHP has no decoder for it either. Convert it to GIF, JPEG or PNG first.',
         );
 });
 

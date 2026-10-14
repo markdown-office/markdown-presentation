@@ -322,10 +322,18 @@ depending on what it is next to:
 | Between | What decides it | At the library's own numbers |
 | --- | --- | --- |
 | two paragraphs | `block:` | 12px |
-| two list items | a quarter of `block:` a side | 6px |
+| two lists | a quarter of `block:` a side | 6px |
 | a paragraph and a table, a code block, a rule or a picture | 0.9 of `block:` a side | 17px |
-| a heading and the text above it | 0.7 em of the **heading's own size** | 19px at a 20pt `##` |
-| a heading and the text below it | 0.35 em of the heading's size | 9px |
+| a heading and the text above it | 0.7 em of the **heading's own size**, plus the 6px the paragraph leaves | 19px + 6px = 25px |
+| a heading and the text below it | 0.35 em of the heading's size, plus the 6px the paragraph leaves | 9px + 6px = 15px |
+
+Two of those rows are about the heading and one is about the list, and both are worth reading
+twice. A heading asks for air in proportion to its own size rather than to `block:`, so at a
+20pt `##` it asks for 19px above and 9px below — but the gap a reader sees is that **plus** what
+the paragraph beside it leaves, which is why the row says 25px and not 19px. And the 6px is the
+air between two *lists*: the items of one list are lines of one frame and are set with no gap
+between them at all, which is what makes a list read as a list rather than as a run of
+paragraphs.
 
 Two things in that table are worth reading twice. A block with an edge of its own takes more
 of the air than a paragraph, because the ink of a paragraph stops short of the bottom of its
@@ -1054,7 +1062,7 @@ try {
 ```
 
 ```text
-Slide 1 shows "diagram.png", which this PHP cannot read as an image at all — a truncated download, or something that is not one. Convert it to GIF, JPEG, PNG or SVG first.
+Slide 1 shows "diagram.png", which this PHP cannot read as an image at all — a truncated download, or something that is not one. Convert it to GIF, JPEG or PNG first.
 ```
 
 So are a format nothing here can decode — an ICO, say — and a file whose payload was cut
