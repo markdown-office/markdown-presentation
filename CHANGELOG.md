@@ -6,7 +6,84 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A fourth theme, `dense`, and a deck that exists to be looked at twice.**
+  `themes/corporate-dark` is the one that was larger than the library's own scale; nothing
+  shipped that was smaller, and a spacing model that is a fraction of a type size is only
+  demonstrable at two of them. `dense` is the whole scale down at once — a 13pt body on a 28px
+  margin — and `examples/markdown/11-type-scale.md` is built twice, once per theme, so the
+  same words at two sizes can be put side by side. The air between its blocks follows: 8px
+  after a paragraph rather than 12, and a heading's air above it follows whatever that
+  theme's `headings` scale says.
+
 ### Changed
+
+- **Public methods removed from `Render\SlideGeometry`, `Render\TextFrame` and
+  `Render\ShapeWriter`.** All of them went because the behaviour they served went:
+
+  | Removed | Replaced by |
+  | --- | --- |
+  | `SlideGeometry::paragraphSpace(): float` | the `block:` theme value, which is where the gap is decided now |
+  | `SlideGeometry::headingHeight(int $level, int $lines): int` | `headingSize()` plus the geometry that reserves the room |
+  | `TextFrame::paragraphs(): array` | `blocks()`, `leading()` and `trailing()` |
+  | `ShapeWriter::height()` and `ShapeWriter::write()` narrowing | the parameter union is now `Code\|TextFrame\|Image\|Rule\|Table` |
+
+  The last is the one that can break a caller rather than warn one: passing a `Heading` or a
+  `Quote` to either method is now a `TypeError` rather than a shape. Both are paragraphs of a
+  `TextFrame` — which is where they were being written anyway — so a caller holding one should
+  wrap it.
+
+, and a heading and a quote
+  are paragraphs of the frame around them rather than shapes of their own.**
+  `block:` was the gap between two blocks everywhere, which is one number doing the work of
+  a rhythm. It is still the gap after a paragraph, and everything else is a fraction of it or
+  a function of its own type:
+
+  | Between | What decides it | At the library's own numbers |
+  | --- | --- | --- |
+  | two paragraphs | `block:` | 12px, unchanged |
+  | two lists | a quarter of `block:` a side | 6px |
+  | a paragraph and a table, code block, rule or picture | 0.9 of `block:` a side | 17px |
+  | a heading and the text above it | 0.7 em of the heading's own size, plus the 6px the paragraph leaves | 19px + 6px = 25px |
+  | a heading and the text below it | 0.35 em of the heading's size, plus the 6px the paragraph leaves | 9px + 6px = 15px |
+
+  The 6px is between two **lists**. The items of one list are lines of one frame and are set with
+  no gap between them, and the heading rows are the heading's own air *plus* the paragraph's: at
+  a 20pt `##` the heading asks for 19px above and 9px below, and the reader sees 25px and 15px.
+
+  Two things in that table are the reason for it. A block with an edge of its own takes more
+  of the air than a paragraph, because a paragraph's ink stops short of the bottom of its box
+  — by the text inset, and by the slack in the last line's leading — while a table's border is
+  drawn exactly on the edge, so one number read as generous between two sentences and cramped
+  above a table. And a heading's air follows the heading's own size rather than a body's,
+  because a 34-point heading under the same air as a 14-point one is either crowded or
+  marooned; it is more above than below, for the same reason markdown-word writes a heading's
+  `space before` at twice its `space after`.
+
+  A heading is now a paragraph of the frame around it, carrying its own size, weight, face and
+  ink, and a quote is one carrying an indent, italic and the quiet ink — which is what each
+  already was in the file. A slide whose body is text and nothing else is now *one* box
+  rather than a box per block, so the height is measured once and `normAutofit` stands behind
+  all of it, and a deck that was a page of headings and quotes is no longer a page of boxes a
+  reader cannot move one of at a time. A rule, a table, a picture and a code block are still
+  shapes of their own: they are not type, or they are type with something painted behind them,
+  and a fill over part of a text frame is not something the format can express.
+
+  The gap between two paragraphs is written as a half at each end — `a:spcAft` under one and
+  `a:spcBef` over the other — because PowerPoint adds a paragraph's spacing before and after
+  rather than taking the larger of the two, and a gap carried entirely on one side reads as a
+  bigger gap above a paragraph than below it. The two halves add back up to what a deck got
+  before.
+
+- **A title is a box that no longer grows into the one below it.**
+  The title band asked for two lines of the role's own title size and the body started at a
+  fixed band, and nothing compared the two: at the library's own numbers the title box ended
+  ten pixels *below* the top of the body box, so a title that wrapped onto a second line put
+  its second line on the first line of the body. It is clamped to the room between the two
+  now, and `normAutofit` shrinks a long title to fit rather than the body moving down with it
+  — a slide's body is read in the same place on every slide, which is why the title gives way.
+  A one-line title is unchanged and looks identical.
 
 - **A slide is read by league/commonmark, and this library's own block parser is gone.**
   The two agreed on 2 691 of the 2 760 slide contents the differential test compared, and this
@@ -238,6 +315,108 @@ All notable changes to this project are documented here. The format follows
   on — each asserted where it is decided.
 
 ### Fixed
+
+- **A small SVG could take gigabytes to refuse.** The ceiling on a picture is on the pixels,
+  and for a vector those pixels were allocated before anything asked whether they were allowed:
+  `vector()` drew the file and measured the result. A file of **152 bytes** declaring a
+  16000-square drawing is refused now in **0.07s with a 4 MB peak**, where drawing it first
+  wanted a 1.9 GB pixel canvas — and this machine's ImageMagick allows `AREA 192 Gpixel`, so
+  the larger the host the more it takes. `SvgRasteriser::measures()` reads the header with
+  `pingImage()` and the ceiling is applied there, before anything is drawn.
+
+  The justification in the previous version — that *nothing short of rendering one knows the
+  answer* — was wrong, and so was the obvious fallback. ImageMagick's own resource limits were
+  measured against a 4000-square SVG and **did not refuse it at all**, at
+  `-limit area 1000 -limit memory 4MiB -limit map 4MiB` on the command line: the SVG coder is
+  not bounded by them. So there is no second line of defence, and a file whose header cannot be
+  read is **refused rather than drawn** rather than drawn with no ceiling on it.
+
+  A drawing is now also **drawn once per file rather than once per reference**: a deck naming
+  the same SVG on every slide paid for a render and a header read on every one of them.
+
+- **An SVG was embedded as a vector, which is a deck PowerPoint opens with the picture
+  missing.** The format does carry `image/svg+xml` and PHPPresentation declared it, so
+  nothing anywhere objected: the part was well-formed, the relationship resolved, and the
+  file passed every check that reads markup. What PowerPoint writes is two relationships —
+  a raster in `a:blip` with an `asvg:svgBlip` extension on the same element pointing at a
+  second one — and PHPPresentation writes one and points both the raster and the vector at
+  it. The shape was a picture no reader had a way to draw.
+
+  An SVG is now **drawn**, and the part in the package is a PNG — the same `ConvertedImage`
+  path a converted WebP takes, so it keeps its proportions and is fitted to its box the
+  same way. `Render\SvgRasteriser` is the new class, and it owns the whole of it.
+
+  **`ext-imagick` is optional and is now in `suggest`.** GD cannot read a vector in any
+  PHP version, so there is no imagick-free path and one was not invented. Where the
+  extension cannot draw, the deck is refused by name rather than rendered:
+
+  ```
+  Slide 3 shows "diagram.svg", which is SVG. A .pptx holds a vector only beside a raster of it, and this PHP cannot draw one: ext-imagick is not loaded, or the SVG delegate it was built with will not draw a letter. Install ext-imagick, or put a PNG of the drawing in the deck.
+  ```
+
+  What counts as "cannot draw" is not `extension_loaded()`. A build of Imagick with no SVG
+  delegate registers `SVG` anyway, hands the file to ImageMagick's own renderer, and
+  returns a picture with every `<text>` and `<path>` in it dropped — it does not fail, so
+  the capability is probed by drawing a letter. A build compiled without fontconfig fails the
+  same way and for a blunter reason: it reports zero fonts, so `RenderFreetype` raises on the
+  first `<text>` it is given and the glyph never appears. That one was blamed on a missing SVG
+  delegate for a while, which the delegate list in the same build contradicts. That is the same
+  probe and the same argument the Word half uses, and here it matters more rather than less:
+  Word keeps the vector beside the raster, so a weak delegate costs fidelity, whereas here the
+  raster is the only copy.
+
+  The loss is real and is written down: the deck carries a raster, so a diagram is a
+  picture at the size it was drawn, and what it shows is what the machine that drew it
+  shows. `MAX_PIXELS` reaches an SVG one rendering behind every other format for the same
+  reason — a file that sizes itself by `viewBox` says how big its coordinate system is, not
+  how big a picture it is — so the ceiling is measured on the raster and the number in the
+  failure is the raster's.
+
+  `examples/markdown/07-images.md` slide 3 holds an SVG and needs a build that can draw
+  one; every other example deck is unaffected.
+
+- **PowerPoint refused to open seven of the decks in this repository.** It offered to repair
+  them — "could not read some of the content … and removed it" — and opened the repaired copy,
+  so nothing looked wrong until a person opened the file. The per-block spacing above is written
+  as `a:spcAft` and `a:spcBef` in points, and a heading's trailing gap is a fraction of the
+  heading's own size: `0.35 × 22` is not `7.7` in binary floating point but `7.699999999999999`.
+  PHPPresentation writes a point measure by multiplying by a hundred without rounding
+  (`AbstractSlide::writeParagraphStyles`), which turned that into `a:spcPts val="769.9999999999999"`,
+  and `ST_TextSpacingPoint` is an integer type. LibreOffice reads the value and does not care,
+  so every render and every structural check on this machine passed.
+
+  | Was | Now |
+  | --- | --- |
+  | a spacing measure printed as the double it was | rounded to the nearest whole number, which is all the type allows |
+
+  Rounding at the writer is the only place that works: a float times a hundred is integral only
+  for the multiples of a quarter point, so a theme stating its gaps in anything finer cannot be
+  carried correctly *into* the writer, and choosing theme values that happen to be exact would
+  have traded a repair prompt for a silent constraint on the spacing model. All thirteen decks
+  now validate against the ECMA-376 schemas.
+
+- **A speaker note was written as a notes slide that nothing held up.** `::note` produced
+  `ppt/notesSlides/notesSlideN.xml` and no `ppt/notesSlides/_rels/` beside it, no
+  `ppt/notesMasters/` at all, and no `notesMasterIdLst` in `presentation.xml`. PowerPoint opens
+  a deck in that state and prints the note, so the file worked and was nevertheless not a
+  `.pptx`: a consumer resolving a part through the relationship that points at it finds
+  nothing, and the notes master a notes slide inherits its text formatting from did not exist.
+  The slide names its notes slide, so the other two links are now written from that pairing —
+  read out of the slide's own relationship rather than from the number in the file name. The
+  notes master takes its colour map from the slide master, so a note resolves its colours the
+  way the rest of the deck does. A deck with no note in it is not touched at all.
+
+  **A notes master needs a theme of its own, and the first version of this fix made every
+  deck carrying a note unopenable.** Pointing the notes master at the slide master's theme is
+  legal OPC — a part can be the target of any number of relationships — and every part still
+  validated against the ECMA-376 schemas. PowerPoint repaired those decks instead, silently,
+  so nothing here objected until a deck was actually opened in PowerPoint. The bisection that
+  found it put the fault on the `notesMasterIdLst`: declaring a valid master at all was enough,
+  and the theme was the one link left to change. `ppt/theme/theme2.xml` is now a copy of the
+  deck's own theme, so a note is still drawn in the deck's fonts; the copy is named from the
+  slide master's own relationship rather than assumed, so a package holding two themes cannot
+  have it overwrite one. An `Override` names one part, so the copy needs a content type of its
+  own even though the theme type is already declared for `theme1.xml`.
 
 - **A numbered list that begins above one counts on.** `7.` and `8.` rendered as `7.` and `7.`
   outside PowerPoint. PHPPresentation writes the start of a numbering on every paragraph of it

@@ -262,7 +262,7 @@ it('leaves a heading in the body at its own depth when the frontmatter names a t
     $geometry = new SlideGeometry();
 
     expect($pptx->fontSize('title'))->toBe((float) $geometry->headingSize(2))
-        ->and($pptx->fontSize('heading'))->toBe((float) $geometry->headingSize(1));
+        ->and($pptx->fontSize('text'))->toBe((float) $geometry->headingSize(1));
 });
 
 it('draws the heading a blank layout uses as its title at the level named', function () {
@@ -271,8 +271,8 @@ it('draws the heading a blank layout uses as its title at the level named', func
     $geometry = new SlideGeometry();
     $pptx = slideDeck("---\nlayout: blank\nlevel: 3\n---\n\n# One\n");
 
-    expect($pptx->shapeNames())->toBe(['heading'])
-        ->and($pptx->fontSize('heading'))->toBe((float) $geometry->headingSize(2));
+    expect($pptx->shapeNames())->toBe(['text'])
+        ->and($pptx->fontSize('text'))->toBe((float) $geometry->headingSize(2));
 });
 
 it('draws a title named in the frontmatter on a blank layout, which has no title box', function () {
@@ -281,7 +281,7 @@ it('draws a title named in the frontmatter on a blank layout, which has no title
     // it to say. It is drawn as the heading a blank slide's title already is.
     $pptx = slideDeck("---\nlayout: blank\ntitle: Named\n---\n\nBody.\n");
 
-    expect($pptx->shapeNames())->toBe(['heading', 'text'])
+    expect($pptx->shapeNames())->toBe(['text'])
         ->and($pptx->texts(1))->toBe(['Named', 'Body.']);
 });
 
@@ -290,7 +290,7 @@ it('draws a blank layout\'s frontmatter title at the level it names', function (
     // govern only the role that happens to have a heading in it.
     $pptx = slideDeck("---\nlayout: blank\ntitle: Named\nlevel: 3\n---\n\nBody.\n");
 
-    expect($pptx->fontSize('heading'))->toBe((float) (new SlideGeometry())->headingSize(2));
+    expect($pptx->fontSize('text'))->toBe((float) (new SlideGeometry())->headingSize(2));
 });
 
 it('draws a blank layout\'s title once, whether it came from the frontmatter or a heading', function () {
@@ -299,7 +299,7 @@ it('draws a blank layout\'s title once, whether it came from the frontmatter or 
     // every other role.
     $pptx = slideDeck("---\nlayout: blank\ntitle: Named\n---\n\n# Named\n\nBody.\n");
 
-    expect($pptx->shapeNames())->toBe(['heading', 'text'])
+    expect($pptx->shapeNames())->toBe(['text'])
         ->and($pptx->texts(1))->toBe(['Named', 'Body.']);
 });
 
@@ -342,9 +342,8 @@ it('leaves a heading in the column it was written in', function () {
 
     expect($pptx->texts(1))->toBe(['Both', 'Above', 'Left.', 'Right.'])
         ->and(array_map(static fn (array $shape): string => $shape['name'], $shapes))
-        ->toBe(['title', 'heading', 'text', 'text'])
-        ->and($shapes[1]['x'])->toBe($shapes[2]['x'])
-        ->and($shapes[2]['x'])->toBeLessThan($shapes[3]['x']);
+        ->toBe(['title', 'text', 'text'])
+        ->and($shapes[1]['x'])->toBeLessThan($shapes[2]['x']);
 });
 
 it('leaves the right column empty for a two-column slide that writes no ::column', function () {
@@ -509,8 +508,7 @@ it('splits an image-text slide at its ::column', function () {
     // the picture and the text before the marker on the left, everything after it on the right.
     $shapes = slideDeck("---\nlayout: image-text\n---\n# Both\n\nLeft.\n\n::column\n\n## Right\n\nRight side.\n")->positions();
 
-    expect($shapes[1]['x'])->toBeLessThan($shapes[2]['x'])
-        ->and($shapes[2]['x'])->toBe($shapes[3]['x']);
+    expect($shapes[1]['x'])->toBeLessThan($shapes[2]['x']);
 });
 
 it('gives an image-text layout a title box and a body placeholder for each of its columns', function () {
@@ -566,7 +564,7 @@ it('draws a title named in the frontmatter as a heading on an image slide', func
     // The same answer `blank` gives, because there is no box to draw it in either way.
     $pptx = slideDeck("---\nlayout: image-slide\ntitle: Named\n---\n\nBody.\n");
 
-    expect($pptx->shapeNames())->toBe(['heading', 'text'])
+    expect($pptx->shapeNames())->toBe(['text'])
         ->and($pptx->texts(1))->toBe(['Named', 'Body.']);
 });
 

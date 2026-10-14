@@ -10,17 +10,22 @@ use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
 
 /**
- * Writes a finished presentation out, and runs the three passes over the written package.
+ * Writes a finished presentation out, and runs the five passes over the written package.
  *
- * All three are things the file needs that PHPPresentation does not write:
+ * All five are things the file needs that PHPPresentation does not write:
  * {@see PlaceholderPass} gives every layout part real placeholders, {@see NotesColourMapPass}
- * gives every notes slide the colour map Keynote refuses to open a deck without, and
- * {@see TimingPass} gives a slide that builds up the click chain that builds it. None can be
- * done through the writer's own API, so all three are passes over the package afterwards —
- * which is what makes the file's last step one thing rather than a detail of every shape.
+ * gives every notes slide the colour map Keynote refuses to open a deck without,
+ * {@see NotesChainPass} gives every notes slide the notes master and the back-link it hangs from,
+ * {@see MeasureRoundingPass} gives every spacing measure the whole number the schema asks for and
+ * PowerPoint insists on, and {@see TimingPass} gives a slide the click chain that builds it up.
+ * None can be done through the writer's own API, so all five are passes over the package
+ * afterwards — which is what makes the file's last step one thing rather than a detail of every
+ * shape.
  *
  * @see PlaceholderPass
  * @see NotesColourMapPass
+ * @see NotesChainPass
+ * @see MeasureRoundingPass
  * @see TimingPass
  */
 final class DeckWriter
@@ -54,6 +59,8 @@ final class DeckWriter
         IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
 
         NotesColourMapPass::applyTo($path);
+        NotesChainPass::applyTo($path);
+        MeasureRoundingPass::applyTo($path);
         PlaceholderPass::applyTo($path, $geometry, $roles);
         TimingPass::applyTo($path, $builds);
 

@@ -41,8 +41,8 @@ both text, and so is snake_case_name.
 
 ## Quotes, code and rules
 
-> A quote written over two lines is one shape,
-> not two.
+> A quote written over two lines is one paragraph,
+> indented and italic and not two.
 
 ```php
 $deck = (new DeckParser())->parse($markdown);

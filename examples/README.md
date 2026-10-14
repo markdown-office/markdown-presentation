@@ -1,6 +1,6 @@
 # Examples
 
-Ten decks, each demonstrating one thing. `build.php` converts every one into a
+Eleven decks, each demonstrating one thing. `build.php` converts every one into a
 real `.pptx` under `out/` and renders **one PNG per slide** beside it, so the
 result can be checked without PowerPoint. One file per slide rather than one per
 deck: a deck's whole question is usually whether slide three overflows, which is
@@ -23,16 +23,27 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does |
 | `05-steps.md` | `05-steps.pptx` | `::click` steps as click animations on one slide, a `:::click` region that is a step of its own, a build-up across two columns, a `::column` written inside a region, a picture held back for its own click, and a `::note` |
 | `06-tables.md` | `06-tables.pptx` | Table alignment, a bold filled header, widths from content |
-| `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column, and the three layouts built around one: `image-text`, `image-title` and `image-slide` |
+| `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column, a WebP converted to PNG, an SVG drawn to PNG, and the three layouts built around one: `image-text`, `image-title` and `image-slide` |
 | `08-code.md` | `08-code.pptx` | Code blocks |
 | `09-inline-markup.md` | `09-inline-markup.pptx` | A `title:` carrying `**bold**` and `*italic*` |
 | `10-rejected.md` | **nothing** | Conditional content the way Slidev writes it |
+| `11-type-scale.md` | two files | The same slides in `default` and in `dense`, the one theme whose whole scale is smaller at once — body, title, margins, gutter, block gap and rule. The table and the code block are twelve points in both, because those two sizes are the library's, which is what leaves them to read the two pages against |
 
 ## The one that is not built
 
 `10-rejected.md` names a directive this library does not have. Converting it is
 the failure it exists to demonstrate, so `build.php` leaves it alone and says
 which file and why.
+
+## The one that needs a rasteriser
+
+`07-images.md` slide 3 holds an SVG, and a `.pptx` cannot hold a vector on its
+own — PowerPoint keeps one beside a raster of it, which is what has to be drawn
+first. That is `ext-imagick`, and it is optional, so this deck needs a build
+whose Imagick can draw one: on a build with only ImageMagick's own SVG renderer
+the diagram loses its text and its chevron, and the conversion refuses rather
+than producing that. A build without `ext-imagick` at all refuses it too, naming
+the file. Every other deck here builds either way.
 
 ## Things worth looking at in the output
 
@@ -56,11 +67,16 @@ A few of these are here because the render is the only honest evidence:
 - **`07`, the `image-text` slide.** The picture is in the *wider* column and the
   text in the narrower one, because a reader looks at the image first. It
   divides at a `::column` exactly as `two-column` does.
+- **`07`, the `two-column` slide.** The picture is an SVG, and the part in the
+  `.pptx` is a PNG of it drawn at the file's own 320 × 200 — a vector is drawn
+  rather than carried, because a relationship pointing at an `image/svg+xml` part
+  is a deck PowerPoint opens with the diagram missing. It takes the same path as
+  the WebP on slide 2, so it keeps its proportions the same way.
 - **`07`, the `image-slide` slide.** The picture is the slide: no headline, and
   no margin either — the box it is fitted to is the whole page. The logo is
   square and the page is not, so the picture keeps its own proportions inside
   that box and the air either side of it is the shape not filling it.
-- **`03`, the same slide in each of the three themes.** The difference is not
+- **`03`, the same slide in each of the three themed decks.** The difference is not
   the palette. `default` is Office's colours at the library's own scale with a
   40px margin and a 2px rule; `minimal` is a serif deck with 64px margins, a
   1px rule and headings in their own face's reading weight rather than a
@@ -70,5 +86,13 @@ A few of these are here because the render is the only honest evidence:
 - **`03-themes-corporate-dark`.** The only one of the three with a dark page,
   and the only one whose text is painted in the theme's light token rather than
   its dark one.
+- **`11`, the same slide in each of the two files.** `dense` is the one theme
+  whose numbers are all smaller than the default's at once: a 13pt body against
+  a 16pt one, a 28px margin against 40, and an 8px gap after a paragraph against
+  12 — the gap the rest of the rhythm is a fraction of, so a table above a
+  paragraph takes 12px here against 17px there. A table and a fenced block stay
+  at twelve points in both files, because those two sizes belong to the library
+  rather than to a theme, so they are the one thing on the slide that does not
+  move and the page around them is what the pair is for.
 - **`09`.** The title is `Ops **runbook**: what *changed*` and is drawn with the
   emphasis, once, and is not repeated in the body.

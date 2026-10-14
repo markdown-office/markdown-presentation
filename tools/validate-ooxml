@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+#
+# Validate the OOXML parts of one or more decks against the ECMA-376 schemas.
+#
+#   tools/validate-ooxml <deck.pptx> [<deck.pptx> …]
+#
+# PowerPoint refuses a deck whose XML is outside the schema it was written to: it opens the file
+# as `[Repaired]` and reports that it removed invalid content. The structural checks written by
+# hand here did not catch that, and the schemas did on the first run, so this is the oracle a
+# change is checked against. Deliberately not a gate: nothing in the build or in continuous
+# integration calls it.
+#
+# The exit status is the whole contract for a caller that reads nothing else:
+#
+#   0  every part of every deck given conforms
+#   1  a part does not conform
+#   2  the tool could not run, or a path given was not a deck to validate — nothing was checked
+#
+# A validator that cannot run must never report success: the schemas are fetched and checksummed
+# before anything is read, a deck with nothing to validate is reported rather than counted as
+# clean, and a deck reported as conforming says how many parts were checked for it.
+#
+# A deck PowerPoint wrote can fail here, and one does: `harbour-lights.pptx` under
+# `tests/fixtures/powerpoint/` carries `<a:buSzPct val="80000"/>`, which is outside the percent
+# pattern the schema gives that attribute in both its Strict and its Transitional form, and which
+# PowerPoint reads back without complaint. A finding on a deck this package wrote is what this is
+# for; one on a deck PowerPoint wrote is PowerPoint's.
+#
+# Needs `xmllint`, which ships with macOS as part of libxml2.
+
+set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCHEMAS="$HERE/ooxml-schemas"
+
+# The system's copies rather than whatever is first on the path, so a checkout cannot validate
+# against another build's `unzip` or a `libxml2` from somewhere else.
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+if (($# == 0)); then
+	echo "Usage: tools/validate-ooxml <deck.pptx> [...]" >&2
+	exit 2
+fi
+
+if ! command -v xmllint > /dev/null; then
+	echo "xmllint is not installed. It is part of libxml2 and comes with macOS, and there is" >&2
+	echo "nothing else here that can validate against the schemas." >&2
+	exit 2
+fi
+
+php "$HERE/install-ooxml-schemas.php" || {
+	echo "Without the schemas nothing was validated, so this run says nothing about the decks." >&2
+	exit 2
+}
+
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/validate-ooxml.XXXXXX")"
+REPORT="$WORK/report"
+
+trap 'rm -rf "$WORK"' EXIT
+
+# The vocabulary of the root element decides the schema, and it is read by the parser rather than
+# matched out of the text: the part name says where a part sits in the package, not what it is.
+# A part written in none of them needs no rule of its own — `docProps`, `[Content_Types].xml` and a
+# relationship are all outside this map, which is why none of them is named anywhere below.
+schemaFor() {
+	case "$1" in
+	http://schemas.openxmlformats.org/presentationml/2006/main) printf 'pml.xsd' ;;
+	http://schemas.openxmlformats.org/drawingml/2006/main) printf 'dml-main.xsd' ;;
+	http://schemas.openxmlformats.org/drawingml/2006/chart) printf 'dml-chart.xsd' ;;
+	*) return 1 ;;
+	esac
+}
+
+violations=0
+unvalidated=0
+
+for path in "$@"; do
+	deck="$(basename "$path")"
+
+	# The stub Office leaves beside a deck somebody has open. It is not a deck, and saying so
+	# about a file the caller expected to find beside one is noise rather than a finding.
+	[[ $deck == '~$'* ]] && continue
+
+	if [[ ! -f $path ]]; then
+		echo "  $deck: no such file" >&2
+		unvalidated=$((unvalidated + 1))
+		continue
+	fi
+
+	if ! listing="$(unzip -Z1 "$path" 2> /dev/null)"; then
+		echo "  $deck: not a zip file, so it holds no parts to validate" >&2
+		unvalidated=$((unvalidated + 1))
+		continue
+	fi
+
+	# The XML parts only. A deck carries its images and its audio as well, and unzip writes every
+	# member of an archive it is given, so asking for the name pattern the parts actually have is
+	# also what keeps a deck's media off the disk for nothing.
+	rm -rf "$WORK/deck"
+	mkdir -p "$WORK/deck"
+	unzip -q -o -d "$WORK/deck" "$path" '*.xml' 2> /dev/null
+
+	checked=0
+	offending=()
+	schemas=()
+	details=()
+
+	while IFS= read -r part; do
+		[[ $part == *.xml ]] || continue
+
+		if [[ ! -f "$WORK/deck/$part" ]]; then
+			# Named rather than passed over: a listed part that never reached the disk is one unzip
+			# refused to write, which is a package no reader should treat as sound.
+			offending+=("$part") schemas+=("") details+=("could not be taken out of the archive")
+			continue
+		fi
+
+		if ! vocabulary="$(xmllint --nonet --xpath 'string(namespace-uri(/*))' "$WORK/deck/$part" 2> /dev/null)"; then
+			# Well-formedness comes first because the vocabulary is what tells a part apart, so a
+			# part that does not parse cannot be told from one the schemas do not describe. It is
+			# reported rather than passed over: PowerPoint opens a deck holding one as `[Repaired]`
+			# whatever vocabulary it was meant to be in.
+			offending+=("$part") schemas+=("") details+=("is not well-formed XML")
+			continue
+		fi
+
+		schema="$(schemaFor "$vocabulary")" || continue
+
+		checked=$((checked + 1))
+
+		# From inside the extraction root, so what xmllint says about a part is named the way the
+		# package names it rather than by whatever scratch directory this run made.
+		if (cd "$WORK/deck" && xmllint --noout --nonet --schema "$SCHEMAS/$schema" "$part") 2> "$REPORT" > /dev/null; then
+			continue
+		fi
+
+		# xmllint's own closing line is left out: it reports that the part failed, which every line
+		# above it already says with a line number.
+		message="$(grep -v 'fails to validate$' "$REPORT")"
+
+		offending+=("$part")
+		schemas+=("$schema")
+		details+=("${message:-xmllint reported the part as invalid and said nothing else}")
+	done <<< "$listing"
+
+	if ((${#offending[@]} > 0)); then
+		echo "  $deck:"
+
+		for index in "${!offending[@]}"; do
+			echo "    ${offending[$index]}${schemas[$index]:+ [${schemas[$index]}]}"
+
+			while IFS= read -r line; do
+				echo "      $line"
+			done <<< "${details[$index]}"
+		done
+
+		violations=$((violations + ${#offending[@]}))
+	elif ((checked == 0)); then
+		echo "  $deck: no part is written in a vocabulary the schemas describe, so nothing" >&2
+		echo "  was validated for it." >&2
+		unvalidated=$((unvalidated + 1))
+	else
+		echo "  $deck: every validated part conforms ($checked parts)"
+	fi
+done
+
+if ((unvalidated > 0)); then
+	echo >&2
+	echo "$unvalidated of the paths given were not validated at all." >&2
+	exit 2
+fi
+
+if ((violations > 0)); then
+	echo
+	echo "Violating parts: $violations. PowerPoint opens a deck like that as [Repaired]."
+	exit 1
+fi
+
+exit 0

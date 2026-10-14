@@ -230,15 +230,18 @@ it('draws a heading at the depth its theme\'s scale names', function () {
     // A scale that is nearly flat makes a `##` and a `###` differ by a point and a half; a
     // stepped one separates them by four. That is the difference between two themes, not a
     // difference one theme makes with itself.
-    $flat = themedDeck(styledTheme(['headings' => [22, 20, 19, 18, 17]]))->fontSize('heading');
-    $stepped = themedDeck(styledTheme(['headings' => [26, 22, 18, 14, 10]]))->fontSize('heading');
+    $flat = themedDeck(styledTheme(['headings' => [22, 20, 19, 18, 17]]))->fontSize('text');
+    $stepped = themedDeck(styledTheme(['headings' => [26, 22, 18, 14, 10]]))->fontSize('text');
 
     expect($flat)->toBe(20.0)
         ->and($stepped)->toBe(22.0);
 });
 
 it('draws a body paragraph at the size its theme names', function () {
-    expect(themedDeck(styledTheme(['body' => 19]))->fontSize('text'))->toBe(19.0);
+    // A deck of a body paragraph and nothing else, because a heading in the same frame is
+    // written before it and `fontSize()` reports the first run of the shape.
+    expect(themedDeck(styledTheme(['body' => 19]), "---\ntheme: %s\n---\n\n# T\n\nBody.\n")->fontSize('text'))
+        ->toBe(19.0);
 });
 
 it('moves the body of a slide when the theme widens its margin', function () {
@@ -263,7 +266,9 @@ it('leaves the theme\'s own gap between two shapes of a column', function () {
         $shapes = themedDeck(styledTheme(['block' => $block]), $deck)->positions();
         $between = $shapes[2]['y'] - ($shapes[1]['y'] + $shapes[1]['height']);
 
-        expect(round($between))->toBe((float) $block, $name);
+        // A paragraph's half of `block:` and a code block's, which is more of it: the panel
+        // behind a code block is painted to the edge of its box and the text above it is not.
+        expect(round($between))->toBe(round($block * 1.4), $name);
     }
 });
 
@@ -275,11 +280,12 @@ it('leaves the theme\'s own gap between two paragraphs of one frame', function (
 
     foreach (['tight' => 8, 'loose' => 24] as $name => $block) {
         $xml = themedDeck(styledTheme(['block' => $block]), $deck)->part(SLIDE_ONE);
-        // `a:spcPts` is a measure in hundredths of a point, and a pixel is three quarters of
-        // one, so 8px of block gap is 600 there and 24px is 1800.
+        // `a:spcPts` is a measure in hundredths of a point, a pixel is three quarters of one,
+        // and the gap is spent a half at each end of it: 8px of block gap is 300 there and
+        // 24px is 900.
         preg_match_all('#<a:spcAft>\s*<a:spcPts val="(\d+)"/>#', $xml, $found);
 
-        expect(in_array((string) (int) round($block * 75), $found[1], true))->toBeTrue($name);
+        expect(in_array((string) (int) round($block * 37.5), $found[1], true))->toBeTrue($name);
     }
 });
 
@@ -373,17 +379,23 @@ function headingColourIn(string $shape): ?string
 }
 
 /**
- * The one shape on the slide named `heading`, which is the `## Sub` this deck writes.
+ * The `## Sub` on slide one, which is the first paragraph of the frame the body is drawn into.
  *
- * By name rather than by position, because the shape tree's own group carries a `<p:nvPr/>`
- * too and the first one in the file belongs to no shape.
+ * A heading is a paragraph of that frame rather than a shape of its own, so it is found by
+ * position within the shape — and it is the first paragraph because the deck wrote it before
+ * the body paragraph. The shape is found by name because the shape tree's own group carries
+ * a `<p:nvPr/>` too and the first shape in the file belongs to no shape.
  */
 function headingShape(string $slide): ?string
 {
     foreach (explode('</p:sp>', $slide) as $chunk) {
-        if (preg_match('/name="heading"/', $chunk) === 1) {
-            return $chunk;
+        if (preg_match('/name="text"/', $chunk) !== 1) {
+            continue;
         }
+
+        preg_match('#<a:p>.*?</a:p>#s', $chunk, $paragraph);
+
+        return $paragraph[0] ?? null;
     }
 
     return null;

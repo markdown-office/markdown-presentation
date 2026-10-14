@@ -1,0 +1,39 @@
+# A deck that has to hold a page rather than make a point: a reference sheet, a spec, a
+# runbook. Everything here is smaller than the default — a 13pt body, a 22pt title and a
+# heading scale that drops a point a level and ends at the body size — and every gap with it,
+# because a gap measured in pixels does not get narrower when the type inside it does. The
+# margins are the narrowest that ship and the leading the tightest; the rule is a hairline,
+# as in `minimal`, and a heading is bold in the ink the body text is rather than in the accent.
+name: Dense
+description: Small type and tight gaps, for a deck that has to hold a page.
+author: markdown-office
+colors:
+  dk1: "#22262E"
+  lt1: "#FFFFFF"
+  dk2: "#5C6470"
+  lt2: "#EDEFF3"
+  accent1: "#33658A"
+  accent2: "#A6603C"
+  accent3: "#7A8091"
+  accent4: "#B08900"
+  accent5: "#2A7F62"
+  accent6: "#7D4E9E"
+  hlink: "#33658A"
+  folHlink: "#7D4E9E"
+fonts:
+  heading: Arial Narrow
+  body: Arial
+  mono: Consolas
+style:
+  margin: 28
+  gutter: 14
+  block: 8
+  rule: 1
+  body: 13
+  title: 22
+  cover: 30
+  section: 34
+  headings: [17, 16, 15, 14, 13]
+  leading: 1.1
+  heading-weight: bold
+  heading-ink: ink

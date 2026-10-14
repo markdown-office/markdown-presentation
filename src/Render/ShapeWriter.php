@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Render;
 
+use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
 use MarkdownPresentation\Render\Block\Image;
+use MarkdownPresentation\Render\Block\ListBlock;
 use MarkdownPresentation\Render\Block\Paragraph;
 use MarkdownPresentation\Render\Block\Quote;
 use MarkdownPresentation\Render\Block\Rule;
@@ -74,33 +76,24 @@ final class ShapeWriter
      * `$box` is the column the shape is laid out in rather than the shape's own box: the
      * width text wraps in is the column's, and a shape is measured before it has a box.
      *
-     * The union rather than `Block`, because it is exhaustive: a tenth kind of shape is not
-     * something this method can guess a height for, and naming the nine is what says so at
-     * the type rather than at run time. A paragraph and a list are in it as a
-     * {@see TextFrame} rather than as themselves: they only ever reach a slide inside one, and
-     * a frame measured apart from its paragraphs is a frame whose height says nothing about
-     * the type in it.
+     * The union rather than `Block`, because it is exhaustive: another kind of shape is not
+     * something this method can guess a height for, and naming the five is what says so at
+     * the type rather than at run time. A heading, a quote, a paragraph and a list are all in
+     * it as a {@see TextFrame} rather than as themselves: they are type rather than shape,
+     * they reach a slide only inside a frame, and a frame measured apart from its paragraphs
+     * is a frame whose height says nothing about the type in it.
      */
-    public function height(Code|TextFrame|Heading|Image|Quote|Rule|Table $drawable, Box $box, int $room): int
+    public function height(Code|TextFrame|Image|Rule|Table $drawable, Box $box, int $room): int
     {
         $width = $this->textWidth($box);
 
-        return match (true) {
+        return (int) round(match (true) {
             $drawable instanceof TextFrame => $this->textHeight($drawable, $width),
-            $drawable instanceof Heading => $this->geometry->headingHeight(
-                $drawable->level,
-                $this->runLines($drawable->runs, $width, $this->geometry->headingSize($drawable->level), bold: true),
-            ),
-            $drawable instanceof Code => $this->codeHeight($drawable, $width),
             $drawable instanceof Table => $this->tableHeight($drawable, $box),
             $drawable instanceof Rule => SlideGeometry::RULE_HEIGHT,
+            $drawable instanceof Code => $this->codeHeight($drawable, $width),
             $drawable instanceof Image => $room,
-            $drawable instanceof Quote => $this->runLines(
-                $drawable->runs,
-                $width - $this->geometry->style()->gutter(),
-                SlideGeometry::QUOTE_SIZE,
-            ) * $this->geometry->lineHeight(SlideGeometry::QUOTE_SIZE),
-        };
+        });
     }
 
     /**
@@ -184,67 +177,164 @@ final class ShapeWriter
     }
 
     /**
-     * The height of a frame: its lines, and the gap after every break among them.
+     * The height of a frame: its lines at the size each is drawn at, and the air between the
+     * blocks that carry them.
      *
-     * The gap between two paragraphs of a frame is the theme's own block gap, written as
-     * their spacing after ({@see SlideGeometry::paragraphSpace()}), and PowerPoint spends it
-     * after every break the text contains — a newline inside a paragraph, or the mark between
-     * two paragraphs — rather than only between paragraphs. Measured rather than assumed, by
-     * asking PowerPoint to lay a frame out and report the height it came back with, and by
-     * reading the line positions out of the PDF it exported: a paragraph written over four
-     * source lines and wrapped to seven by its face came back with a gap after each of its
-     * three newlines and none after any of the four times it wrapped.
+     * The air between two paragraphs of a frame is the theme's own rhythm —
+     * {@see \MarkdownPresentation\Render\SlideGeometry::spaceBelow()} and
+     * {@see self::gapBetween()} above — written as those paragraphs' own spacing before and
+     * after, and PowerPoint spends it after every break the text contains, a newline inside
+     * a paragraph or the mark between two of them, rather than only between blocks. Measured
+     * rather than assumed, by asking PowerPoint to lay a frame out and report the height it
+     * came back with, and by reading the line positions out of the PDF it exported: a
+     * paragraph written over four source lines and wrapped to seven by its face came back
+     * with a gap after each of its three newlines and none after any of the four times it
+     * wrapped.
      *
      * So a break is a newline in the text or a paragraph mark, and a line the text merely
      * wrapped onto carries no gap. That is also what {@see TextMetric::lines()} counts, which
      * is what keeps the two halves of this from drifting apart: a newline is one more line
      * *and* one more gap, and counting one without the other leaves the frame a gap short of
      * the text in it.
+     *
+     * A heading and a quote are counted here for the first time. Each was a shape of its own
+     * measured against the body box, and each is now a paragraph of this frame, so a heading's
+     * lines are counted at the size of its level and a quote's at the size it is drawn in —
+     * which is why this sums a height per block rather than multiplying one line height by a
+     * total line count.
      */
-    private function textHeight(TextFrame $frame, int $width): int
+    private function textHeight(TextFrame $frame, int $width): float
     {
-        $paragraphs = $frame->paragraphs();
+        $blocks = $frame->blocks();
+        $last = count($blocks) - 1;
+        $height = 0.0;
+
+        foreach ($blocks as $at => $block) {
+            $height += $this->inFrameHeight($block, $width);
+
+            if ($at < $last) {
+                $height += $this->gapBetween($block, $blocks[$at + 1]);
+            }
+        }
+
+        return $height;
+    }
+
+    /**
+     * The height one block takes inside a frame: its lines, and the air after every break
+     * the text inside it contains.
+     *
+     * The frame's blocks rather than its paragraphs, because the air belongs to the block —
+     * see {@see TextFrame::blocks()} — and because a list is several paragraphs of one block,
+     * walked here as the items it is.
+     */
+    private function inFrameHeight(Heading|Paragraph|Quote|ListBlock $block, int $width): float
+    {
+        $size = $this->entrySize($block);
         $lines = 0;
-        $breaks = count($paragraphs) - 1;
+        $breaks = 0;
 
-        foreach ($paragraphs as $entry) {
-            $lines += $this->entryLines($entry, $width);
+        foreach ($this->frameParagraphs($block) as $entry) {
+            $runs = $this->entryRuns($entry);
+            $lines += $this->runLines(
+                $runs,
+                $this->entryWidth($block, $entry, $width),
+                $size,
+                bold: $block instanceof Heading,
+            );
 
-            foreach ($this->entryRuns($entry) as $run) {
+            foreach ($runs as $run) {
                 $breaks += substr_count($run->text, "\n");
             }
         }
 
-        return $lines * $this->geometry->lineHeight($this->bodySize())
-            + $breaks * $this->geometry->style()->blockGap();
+        return $lines * $this->geometry->lineHeight($size) + $breaks * $this->breakGap($block);
     }
 
     /**
-     * How many lines one paragraph of a frame takes.
+     * The paragraphs one block of a frame is drawn as: a list is several, the rest is one.
+     *
+     * @return list<FrameParagraph>
+     */
+    private function frameParagraphs(Heading|Paragraph|Quote|ListBlock $block): array
+    {
+        return $block instanceof ListBlock ? $block->items : [$block];
+    }
+
+    /**
+     * The size a block of a frame is drawn at, which is the body's unless it says otherwise.
+     */
+    private function entrySize(Heading|Paragraph|Quote|ListBlock $block): int
+    {
+        return match (true) {
+            $block instanceof Heading => $this->geometry->headingSize($block->level),
+            $block instanceof Quote => SlideGeometry::QUOTE_SIZE,
+            default => $this->bodySize(),
+        };
+    }
+
+    /**
+     * The width the text of one paragraph of a frame is measured in.
+     *
+     * A list item's text starts a gutter in for its marker, and one gutter more for each
+     * level, which is the width the text above it was measured in too. A quote starts a
+     * gutter in as well: as a shape of its own it was an offset and a narrower box, and as a
+     * paragraph it is an indent, which moves the text inside the box without moving the box —
+     * the same paragraph property a list level uses, and the reason the two can share a
+     * frame without either of them being a shape the reader cannot lift out on its own.
      *
      * @param FrameParagraph $entry A paragraph, or one item of a list.
      */
-    private function entryLines(Paragraph|array $entry, int $width): int
-    {
-        // A list item's text starts a gutter in for its marker, and one gutter more for each
-        // level, which is the width the text above it was measured in too.
-        return $this->runLines(
-            $this->entryRuns($entry),
-            $entry instanceof Paragraph ? $width : $width - $entry['level'] * $this->geometry->style()->gutter(),
-            $this->bodySize(),
-        );
+    private function entryWidth(
+        Heading|Paragraph|Quote|ListBlock $block,
+        Paragraph|Heading|Quote|array $entry,
+        int $width,
+    ): int {
+        $gutter = $this->geometry->style()->gutter();
+
+        return $width - $gutter * (is_array($entry) ? $entry['level'] : 0)
+            - ($block instanceof Quote ? $gutter : 0);
     }
 
     /**
-     * The runs of one paragraph of a frame, which is a paragraph or an item of a list.
+     * The runs of one paragraph of a frame, which is a paragraph, a heading, a quote, or one
+     * item of a list.
      *
      * @param FrameParagraph $entry
      *
      * @return list<Run>
      */
-    private function entryRuns(Paragraph|array $entry): array
+    private function entryRuns(Paragraph|Heading|Quote|array $entry): array
     {
-        return $entry instanceof Paragraph ? $entry->runs : $entry['runs'];
+        return is_array($entry) ? $entry['runs'] : $entry->runs;
+    }
+
+    /**
+     * The air PowerPoint spends after a break *inside* a block's own text, in pixels.
+     *
+     * Both sides of the block, where the air between two blocks is only the sides that meet
+     * at a seam — because a hard line break is not a seam, it is the paragraph's own rhythm
+     * being spent, and it is measured at the full spacing the paragraph carries rather than
+     * at the half that happens to land on one side of a seam. Splitting it halved the air
+     * under every hard line break in every deck, which is the one place a reader writing
+     * prose by hand feels the number at all.
+     *
+     * A word the face merely wrapped onto is not a break and gets none of this, which is
+     * what {@see TextMetric::lines()} is for: it counts a newline as a line and everything
+     * else as a line only.
+     */
+    private function breakGap(Block $block): float
+    {
+        return ($this->geometry->spaceBelow($block) + $this->geometry->spaceAbove($block))
+            * SlideGeometry::PIXELS_PER_POINT;
+    }
+
+    /**
+     * The air between two blocks of a frame, in pixels.
+     */
+    private function gapBetween(Block $above, Block $below): float
+    {
+        return $this->geometry->gapBetween($above, $below);
     }
 
     private function tableHeight(Table $block, Box $box): int
@@ -350,16 +440,14 @@ final class ShapeWriter
      * @param Box $box    Where it starts and how much of its box it has left.
      * @param int $height The height {@see self::height()} gave it.
      */
-    public function write(Slide $slide, Code|TextFrame|Heading|Image|Quote|Rule|Table $drawable, Box $box, int $height): AbstractShape
+    public function write(Slide $slide, Code|TextFrame|Image|Rule|Table $drawable, Box $box, int $height): AbstractShape
     {
         $shape = match (true) {
             $drawable instanceof Code => $this->code($slide, $drawable, $box, $height),
             $drawable instanceof Table => $this->table($slide, $drawable, $box, $height),
             $drawable instanceof Image => $this->image($slide, $drawable, $box, $height),
             $drawable instanceof Rule => $this->rule($slide, $box),
-            $drawable instanceof Heading => $this->heading($slide, $drawable, $box, $height),
             $drawable instanceof TextFrame => $this->textFrame($slide, $drawable, $box, $height),
-            $drawable instanceof Quote => $this->quote($slide, $drawable, $box, $height),
         };
 
         $shape->setName($drawable->name());
@@ -368,78 +456,105 @@ final class ShapeWriter
     }
 
     /**
-     * A run of paragraphs and lists, as one shape holding one paragraph each.
+     * A run of type, as one shape holding one paragraph each.
      *
      * The frame is the unit a reader edits: it is drawn once, placed once, and PowerPoint
-     * flows its paragraphs inside it.
+     * flows its paragraphs inside it — which is why a heading and a quote are paragraphs here
+     * rather than boxes of their own. Both carry their own runs, so the paragraph they are
+     * written as says what the shape used to: the heading's size, weight, face and ink, the
+     * quote's indent, italic and quiet ink.
      */
     private function textFrame(Slide $slide, TextFrame $frame, Box $box, int $height): RichText
     {
         $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
 
-        $paragraphs = $frame->paragraphs();
-        $last = count($paragraphs) - 1;
+        $blocks = $frame->blocks();
+        $last = count($blocks) - 1;
         $first = true;
 
-        foreach ($paragraphs as $at => $entry) {
-            // A fresh shape already carries one paragraph, and creating another for the first
-            // would leave that empty one in the file as a blank line.
-            $paragraph = $first ? $shape->getActiveParagraph() : $shape->createParagraph();
-            $first = false;
+        foreach ($blocks as $at => $block) {
+            $entries = $this->frameParagraphs($block);
+            $tail = count($entries) - 1;
 
-            if ($entry instanceof Paragraph) {
-                $this->runs($paragraph, $entry->runs, $this->bodySize());
-            } else {
-                $this->item($paragraph, $entry);
-            }
+            foreach ($entries as $index => $entry) {
+                // A fresh shape already carries one paragraph, and creating another for the
+                // first would leave that empty one in the file as a blank line.
+                $paragraph = $first ? $shape->getActiveParagraph() : $shape->createParagraph();
+                $first = false;
+                $this->paragraph($paragraph, $entry);
 
-            // `runs()` zeroes the spacing on every paragraph it fills, which is right for a
-            // shape of one paragraph and wrong for a frame of several. The gap between two of
-            // them is written here instead, on every paragraph that has another one under
-            // it; a trailing one would be space the frame was never measured for.
-            if ($at < $last) {
-                $paragraph->setSpacingAfter($this->geometry->paragraphSpace());
+                // `runs()` zeroes the spacing on every paragraph it fills, which is right for
+                // a shape of one paragraph and wrong for a frame of several. The air goes back
+                // on here: the two halves of it on the paragraph at the seam between two
+                // blocks, which is where {@see self::textHeight()} counted them, and neither
+                // on the first block's first paragraph nor the last block's last — a leading
+                // gap pushes the frame's text down inside a box measured without it, and a
+                // trailing one is space nothing was measured for.
+                if ($index === 0 && $at > 0) {
+                    $paragraph->setSpacingBefore($this->geometry->spaceAbove($block));
+                }
+
+                if ($index === $tail && $at < $last) {
+                    $paragraph->setSpacingAfter($this->geometry->spaceBelow($block));
+                }
             }
         }
 
         return $shape;
     }
 
-    private function quote(Slide $slide, Quote $block, Box $box, int $height): RichText
+    /**
+     * The runs of one paragraph of a frame, filled in at the size and in the ink that
+     * paragraph's own kind calls for.
+     *
+     * Four arms rather than one, because four kinds of paragraph is what a frame holds and a
+     * heading is not a paragraph in a larger size: it is a different weight, a different face
+     * and, under a theme that asks for it, a different colour. {@see self::entrySize()} is
+     * where the measure half reads the same answer from, so the two cannot disagree about how
+     * big this is.
+     *
+     * @param FrameParagraph $entry A paragraph, a heading, a quote, or one item of a list.
+     */
+    private function paragraph(TextParagraph $paragraph, Paragraph|Heading|Quote|array $entry): void
     {
-        $shape = $this->textBox($slide);
-        $this->place($shape, $box, $height);
-        $shape->setOffsetX($box->x + $this->geometry->style()->gutter());
-        $shape->setWidth($box->width - $this->geometry->style()->gutter());
+        match (true) {
+            $entry instanceof Heading => $this->runs(
+                $paragraph,
+                $entry->runs,
+                $this->geometry->headingSize($entry->level),
+                bold: $this->geometry->style()->headingIsBold(),
+                font: $this->headingInk(),
+                face: $this->font('heading'),
+            ),
+            $entry instanceof Quote => $this->quote($paragraph, $entry),
+            $entry instanceof Paragraph => $this->runs($paragraph, $entry->runs, $this->bodySize()),
+            default => $this->item($paragraph, $entry),
+        };
+    }
+
+    /**
+     * A quote, which as a paragraph is an indent rather than a shape.
+     *
+     * It was a shape of its own once, offset by a gutter and drawn in a box a gutter narrower,
+     * which put it outside the run of type around it and meant the air above and below it was
+     * the column's arithmetic rather than the theme's. As a paragraph the indent moves the
+     * text inside the frame without moving the frame, and the air is written like anyone
+     * else's.
+     */
+    private function quote(TextParagraph $paragraph, Quote $block): void
+    {
+        $paragraph->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+            ->setMarginLeft($this->geometry->style()->gutter());
 
         $this->runs(
-            $shape->getActiveParagraph(),
+            $paragraph,
             $block->runs,
             SlideGeometry::QUOTE_SIZE,
             italic: true,
             font: $this->subtleInk(),
         );
-
-        return $shape;
-    }
-
-    private function heading(Slide $slide, Heading $block, Box $box, int $height): RichText
-    {
-        $shape = $this->textBox($slide);
-        $this->place($shape, $box, $height);
-
-        $size = $this->geometry->headingSize($block->level);
-        $this->runs(
-            $shape->getActiveParagraph(),
-            $block->runs,
-            $size,
-            bold: $this->geometry->style()->headingIsBold(),
-            font: $this->headingInk(),
-            face: $this->font('heading'),
-        );
-
-        return $shape;
     }
 
     /**
@@ -710,8 +825,9 @@ final class ShapeWriter
      * Spacing is zeroed here rather than left at PowerPoint's default because
      * {@see self::height()} decides where the next shape starts, and a leading gap the
      * heights do not know about is what puts one shape on top of the one before it. A
-     * {@see TextFrame} puts the gap between its own paragraphs back on top of it, on every
-     * paragraph that has another one under it.
+     * A {@see TextFrame} puts its own air back on top of that at its first block and its last,
+     * and leaves the blocks between them at zero: they are paragraphs of one thing, so the gap
+     * the frame asks for is the gap around it rather than a gap inside it.
      *
      * @param list<Run> $runs
     */

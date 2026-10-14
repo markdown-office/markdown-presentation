@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Render;
 
+use MarkdownPresentation\Render\Block\Block;
+use MarkdownPresentation\Render\Block\Code;
+use MarkdownPresentation\Render\Block\Heading;
+use MarkdownPresentation\Render\Block\Image;
+use MarkdownPresentation\Render\Block\ListBlock;
+use MarkdownPresentation\Render\Block\Quote;
+use MarkdownPresentation\Render\Block\Rule;
+use MarkdownPresentation\Render\Block\Table;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\Style;
 
@@ -120,7 +128,12 @@ final class SlideGeometry
     public const RULE_HEIGHT = 16;
 
     /**
-     * The gap left between two blocks in a column, by default.
+     * The gap left between two blocks in a column, by default: the gap after a paragraph.
+     *
+     * This is the one number a theme sets for the rhythm of a slide, and it is
+     * {@see Style::blockGap()} rather than anything here — every other gap is a multiple of
+     * it, so a theme that widens the rhythm widens all of it at once. What the multiples are
+     * is {@see self::spaceBelow()} and {@see self::spaceAbove()}.
      *
      * In the layout rather than in the shapes: a paragraph is written with
      * `setSpacingBefore(0)` and the last paragraph of a frame with `setSpacingAfter(0)`,
@@ -129,13 +142,76 @@ final class SlideGeometry
      *
      * One gap spent once: between two shapes of a column it is added to the cursor as they
      * are laid out, and between two paragraphs of one frame it is written as the paragraph's
-     * own spacing after — {@see self::paragraphSpace()}. A frame measured with the gap *and*
-     * written with it is a gap taller than the text it separates.
+     * own spacing after. A frame measured with the gap *and* written with it is a gap taller
+     * than the text it separates.
      */
     public const BLOCK_GAP = 12;
 
-    /** A point is 4/3 of a pixel at the 96 dpi {@see Box} counts in. */
-    private const PIXELS_PER_POINT = 4 / 3;
+    /**
+     * The half-gap a paragraph leaves on either side of itself, as a fraction of the theme's
+     * own.
+     *
+     * Halves rather than the whole gap on one side, because the air between two blocks is
+     * {@see self::spaceBelow()} of the one above added to {@see self::spaceAbove()} of the one
+     * below — PowerPoint adds a paragraph's spacing before and after rather than taking the
+     * larger of the two, so a gap carried entirely on one side reads as a bigger gap above a
+     * paragraph than below it, and a column stacked from those is a column whose rhythm
+     * alternates. Two halves add back to the number the theme set, so a deck that says
+     * nothing about its own rhythm is laid out exactly as it was.
+     */
+    private const PARAGRAPH_GAP = 0.5;
+
+    /**
+     * How much of the paragraph gap a list leaves on either side of itself.
+     *
+     * Less than a paragraph's, because a list is one block to the deck and several lines of
+     * type to the reader, and the air around it is what keeps it reading as one thing rather
+     * than as a run of paragraphs.
+     *
+     * Between two *lists*, not between the items of one. A list's items are paragraphs of a
+     * single frame and are set with no gap between them — that is what makes them read as a
+     * list — so this is the air a reader sees between a list and whatever is beside it. Naming
+     * it after the item is what a reader takes from the name, and the two are not the same
+     * number: measured on a built deck, the items of one list are set at `spcAft=0`.
+     */
+    private const LIST_GAP = 0.25;
+
+    /**
+     * How much of the paragraph gap a block with an edge of its own leaves on either side.
+     *
+     * More, and this is the gap that used to read as cramped: the ink of a paragraph stops
+     * short of the bottom of its box, by the text inset and by the slack in the last line's
+     * leading, while a table's border, a filled code block's panel and a rule's bar are drawn
+     * exactly on the edge. Two blocks separated by the same number therefore read as further
+     * apart when one of them is a paragraph than when one of them is a table, and the number
+     * that suits a paragraph is short for a table.
+     */
+    private const SOLID_GAP = 0.9;
+
+    /**
+     * The air above and below a heading, in ems of the heading's own size.
+     *
+     * The one gap that is not a fraction of {@see Style::blockGap()}, because a heading is
+     * not a bigger paragraph: the air it wants is a function of how big the type is, and a
+     * 34-point heading under the same air as a 14-point one is either crowded or marooned.
+     * More above than below, because a heading belongs to the text that follows it — which is
+     * the same reason markdown-word writes a heading's `space before` at twice its
+     * `space after` and `keepNext` on top of that.
+     *
+     * The two are not halves of one gap but two different ones, so that a reader sees a
+     * heading sit closer to the text it introduces than to the text it replaced.
+     */
+    private const HEADING_ABOVE = 0.7;
+    private const HEADING_BELOW = 0.35;
+
+    /**
+     * A point is 4/3 of a pixel at the 96 dpi {@see Box} counts in.
+     *
+     * Public because the gaps are stated in points — `a:spcPts` is a point measure — and both the
+     * frame that writes them and the column that spends them as a cursor have to convert, and a
+     * conversion one of them rederived is a conversion the two can disagree about.
+     */
+    public const PIXELS_PER_POINT = 4 / 3;
 
     /**
      * The boxes a template's own layouts gave the roles, on top of the ones below.
@@ -236,7 +312,10 @@ final class SlideGeometry
                 'alignment' => 'l',
             ],
             LayoutRole::Content, LayoutRole::TwoColumn, LayoutRole::ImageText => [
-                'box' => new Box($margin, $this->band(0.6), $width, $this->headingBand($this->style->title(), 2)),
+                'box' => new Box($margin, $this->band(0.6), $width, min(
+                    $this->headingBand($this->style->title(), 2),
+                    $this->titleRoom(),
+                )),
                 'size' => $this->style->title(),
                 'alignment' => 'l',
             ],
@@ -275,8 +354,33 @@ final class SlideGeometry
      * into it.
      */
     private function bodyTop(): int
-    {
-        return $this->band(2.6);
+{
+    return $this->band(2.6);
+    }
+
+    /**
+     * The room a title has above the body, in pixels: the band {@see self::bodyTop()} leaves,
+     * less the air the title itself is drawn with.
+     *
+     * A clamp rather than the flow markdown-word does, because a slide's body is read in the
+     * same place on every slide and a body that moves with the length of the title above it
+     * makes a deck jump as it advances. Two boxes is the model; this is what keeps the one
+     * above from growing into the one below.
+     *
+     * It was needed because the two numbers were computed without reference to each other.
+     * {@see self::headingBand()} asks for two lines of the role's own title size, which at the
+     * library's numbers is 90 pixels, and the band a content slide leaves for it is 80 — so the
+     * title box ended ten pixels below the top of the body box before this existed, and a title
+     * that wrapped put its second line on the body's first. `normAutofit` cannot repair that:
+     * both boxes were written at a size the layout had chosen, and the size was the wrong one.
+     *
+     * {@see self::headingBand()}'s margin-derived floor is not consulted on the way, or a theme
+     * with a wide margin would carry the overlap straight through the clamp: the floor is what
+     * the band is when the title is small, not a minimum the title may not go below.
+     */
+    private function titleRoom(): int
+{
+    return max(1, $this->bodyTop() - $this->band(0.6) - $this->style->blockGap());
     }
 
     /**
@@ -402,29 +506,89 @@ final class SlideGeometry
     }
 
     /**
-     * The gap written between two paragraphs of one text frame, in points.
+     * The air left above a block, in points.
      *
-     * The theme's own block gap, because the air between two paragraphs is the same air as
-     * between two shapes of a column and `block:` should decide both — a theme that widens one
-     * widens the other. In points rather than pixels because `a:spcPts` is a point measure the
-     * writer stores in hundredths, where {@see Box} is the 96 dpi pixel
-     * {@see self::PIXELS_PER_POINT} converts.
+     * Points rather than pixels because this is also what `a:spcBef` is written in, and the gap
+     * between two paragraphs of one frame and the gap between two shapes of a column are one
+     * number spent in two places — spent by PowerPoint inside a frame and by the cursor outside
+     * one. {@see ShapeWriter} measures with this and writes with this, which is what keeps the
+     * two from disagreeing by the gap.
      *
-     * Rounded to a hundredth of a point, which is all {@see Box} can be half of anyway and is
-     * what the writer's hundredths need: `12 / (4 / 3)` is `9.000000000000002` in binary
-     * floating point, and that is written into an attribute the format defines as a whole
-     * number.
+     * A frame takes the air of the block at whichever end is facing the gap: the paragraph above
+     * a frame that opens with a heading has to clear the heading, and the paragraph below one
+     * that closes with a list has to clear the list.
+     *
+     * {@see \MarkdownPresentation\Render\Block\Block} rather than one type per block, because
+     * the answer is a property of the kind of thing and the kinds are the ones that already
+     * exist — a tenth kind of block is not a new arm here but a new match in the geometry.
      */
-    public function paragraphSpace(): float
-    {
-        return round($this->style->blockGap() / self::PIXELS_PER_POINT, 2);
+    public function spaceAbove(Block|TextFrame $block): float
+{
+    return match (true) {
+        $block instanceof TextFrame => $this->spaceAbove($block->leading()),
+        $block instanceof Heading => self::HEADING_ABOVE * $this->headingSize($block->level),
+        $block instanceof ListBlock => $this->fraction(self::LIST_GAP),
+        $block instanceof Quote => $this->fraction(self::PARAGRAPH_GAP),
+        $block instanceof Table, $block instanceof Code,
+        $block instanceof Rule, $block instanceof Image => $this->fraction(self::SOLID_GAP),
+        default => $this->fraction(self::PARAGRAPH_GAP),
+    };
     }
 
     /**
-     * The height a heading of this size takes for this many lines, in pixels.
+     * The air left below a block, in points. The same answer as {@see self::spaceBelow()} read
+     * the other way round the pair: what is written as this paragraph's `a:spcAft` inside a
+     * frame, and what the cursor adds after the shape outside one.
      */
-    public function headingHeight(int $level, int $lines): int
-    {
-        return $lines * $this->lineHeight($this->headingSize($level));
+    public function spaceBelow(Block|TextFrame $block): float
+{
+    return match (true) {
+        $block instanceof TextFrame => $this->spaceBelow($block->trailing()),
+        $block instanceof Heading => self::HEADING_BELOW * $this->headingSize($block->level),
+        $block instanceof ListBlock => $this->fraction(self::LIST_GAP),
+        $block instanceof Quote => $this->fraction(self::PARAGRAPH_GAP),
+        $block instanceof Table, $block instanceof Code,
+        $block instanceof Rule, $block instanceof Image => $this->fraction(self::SOLID_GAP),
+        default => $this->fraction(self::PARAGRAPH_GAP),
+    };
     }
+
+    /**
+     * The gap after a paragraph, in points, which is the one the theme sets.
+     */
+    private function block(): float
+{
+    return $this->style->blockGap() / self::PIXELS_PER_POINT;
+    }
+
+    /**
+     * The air between two blocks, in pixels.
+     *
+     * {@see self::spaceBelow()} and {@see self::spaceAbove()} added and converted, so that the
+     * gap between two shapes of a column and the gap between two paragraphs of a frame are one
+     * number rather than two that agree today: the frame writes the two halves as `a:spcAft` and
+     * `a:spcBef` and the column spends this on the cursor, and a gap measured as one and drawn
+     * as the other is a gap of the wrong size in whichever of the two is not derived from here.
+     *
+     * A float rather than an int because the halves are points — `a:spcPts` is a point measure —
+     * and a theme's block gap divided by four thirds is not a whole number of pixels.
+     */
+    public function gapBetween(Block|TextFrame $above, Block|TextFrame $below): float
+{
+    return ($this->spaceBelow($above) + $this->spaceAbove($below)) * self::PIXELS_PER_POINT;
+    }
+
+    /**
+     * A fraction of the theme's block gap, in points.
+     *
+     * One method rather than one per gap, because every gap but a heading's is a fraction of
+     * `block:` and the gap beside a list, the gap beside a table and the gap beside a
+     * paragraph are that one multiplication with three different numbers — which is what makes
+     * the model tunable from the theme rather than from here.
+     */
+    private function fraction(float $part): float
+    {
+        return $this->block() * $part;
+    }
+
 }

@@ -15,8 +15,10 @@ use MarkdownPresentation\Render\SlideGeometry;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Render\ConvertedImage;
 use MarkdownPresentation\Render\ImageConverter;
 use MarkdownPresentation\Render\PresentationRenderer;
+use MarkdownPresentation\Render\SvgRasteriser;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 
@@ -90,6 +92,82 @@ const BOLD_RUN = 'b="1"';
 
 /** Why a build with no WebP encoder skips, said the same way each time. */
 const NO_WEBP = 'This GD build cannot write a WebP.';
+
+/**
+ * Why a build that cannot draw an SVG skips.
+ *
+ * Two builds reach it — no `ext-imagick` at all, and Imagick whose delegate drops every
+ * `<text>` — and neither is what the tests that skip on this are about, which is what a
+ * deck writes once something *can* draw one.
+ */
+const NO_RASTERISER = 'This build cannot rasterise an SVG, so there is nothing to embed.';
+
+/**
+ * A rasteriser with its answers given rather than drawn.
+ *
+ * The seam {@see SvgRasteriser} is not `final` for. It stands in for the build this
+ * machine is not, so that the refusals are asked on a machine with a rasteriser as well
+ * as without one — and says nothing at all about whether a real rasteriser works, which
+ * is what the tests that use the real class are for.
+ */
+final class GivenSvgRasteriser extends SvgRasteriser
+{
+    /** `$drawing` is null for a build that will not read the file it was asked about. */
+    public function __construct(
+        private readonly bool $draws,
+        private readonly ?ConvertedImage $drawing,
+        /** What a header read answers, or null for a file that has no readable header. */
+        private readonly ?array $measures = null,
+    ) {
+    }
+
+    public function available(): bool
+    {
+        return $this->draws;
+    }
+
+    /** @return array{int, int}|null */
+    public function measures(string $path): ?array
+    {
+        return $this->measures;
+    }
+
+    /** Whether a draw was actually asked for, which a refusal before the draw must not change. */
+    public function drawWasAskedFor(): bool
+    {
+        return $this->asked > 0;
+    }
+
+    public function png(string $path): ?ConvertedImage
+    {
+        $this->asked++;
+
+        return $this->drawing;
+    }
+
+    private int $asked = 0;
+}
+
+/**
+ * The real rasteriser with its two protected questions opened up.
+ *
+ * {@see SvgRasteriser} asks two questions — whether the drawing put ink on the page, and
+ * whether this drawing can be read at all — and on a machine whose delegate cannot draw an SVG
+ * both have one answer, so neither outcome can be reached through the public class here. This
+ * is not a stand-in for the class: it is the class, asked directly.
+ */
+final class AskableSvgRasteriser extends SvgRasteriser
+{
+    public function asksDrewAnything(Imagick $image): bool
+    {
+        return $this->drewAnything($image);
+    }
+
+    public function asksDrawsAGlyph(?string $drawing = null): bool
+    {
+        return $this->drawsAGlyph($drawing);
+    }
+}
 
 /**
  * Render a deck and open what came out, in one step — every test below needs both and
@@ -370,7 +448,7 @@ it('keeps a heading that only repeats the title, because it is not the one that 
     // author wrote and dropping every heading that reads like the title would take it out.
     $pptx = renderDeck("---\ntitle: One\n---\n\n# One\n\n## One\n");
 
-    expect($pptx->shapeNames())->toBe(['title', 'heading'])
+    expect($pptx->shapeNames())->toBe(['title', 'text'])
         ->and($pptx->texts(1))->toBe(['One', 'One']);
 });
 
@@ -396,7 +474,7 @@ it('writes the deck title into the document properties as text, without its mark
 it('draws a heading that is not the title in the body', function () {
     $pptx = renderDeck("# Title\n\n## A section\n");
 
-    expect($pptx->shapeNames())->toBe(['title', 'heading']);
+    expect($pptx->shapeNames())->toBe(['title', 'text']);
 });
 
 it('leaves a heading that became the title out of the body', function () {
@@ -406,7 +484,7 @@ it('leaves a heading that became the title out of the body', function () {
 it('draws a heading that is not the first heading of the slide', function () {
     $pptx = renderDeck("# One\n\n## Two\n\n## Three\n");
 
-    expect($pptx->shapeNames())->toBe(['title', 'heading', 'heading']);
+    expect($pptx->shapeNames())->toBe(['title', 'text']);
 });
 
 it('keeps a title written in the frontmatter even when the content has no heading', function () {
@@ -660,12 +738,15 @@ it('starts the block after a table below the rows the table writes', function ()
     // written at 38, so four rows declared 104px and the next block landed on the last one.
     $pptx = renderDeck("| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |\n| 7 | 8 |\n\nAfter.\n");
 
+    // 17 and not 12: the air is the table's own and the paragraph's, and a table has an edge
+    // of its own and takes more of it than a paragraph does — which is the whole of what
+    // {@see SlideGeometry::spaceBelow()} and {@see SlideGeometry::spaceAbove()} are for.
     expect($pptx->positionOf('table')['height'])->toBe(5.0 * 38.0)
-        ->and($pptx->positionOf('text')['y'])->toBe(104.0 + 5 * 38.0 + 12.0);
+        ->and($pptx->positionOf('text')['y'])->toBe(104.0 + 5 * 38.0 + 17.0);
 });
 
-it('renders a block quote as a quote shape', function () {
-    expect(renderDeck("> quoted\n")->shapeNames())->toBe(['quote']);
+it('renders a block quote as a paragraph of the frame, not a shape of its own', function () {
+    expect(renderDeck("> quoted\n")->shapeNames())->toBe(['text']);
 });
 
 it('draws a quote written across two lines as one shape', function () {
@@ -673,15 +754,16 @@ it('draws a quote written across two lines as one shape', function () {
     // Markdown meant by writing it over two lines.
     $pptx = renderDeck("> line one\n> line two\n");
 
-    expect($pptx->shapeNames())->toBe(['quote'])
+    expect($pptx->shapeNames())->toBe(['text'])
         ->and($pptx->texts(1))->toBe(["line one\nline two"]);
 });
 
 it('indents a block quote from the margin', function () {
-    // The number rather than "greater than 40": the shape is 860 of the 880 the body box is,
-    // which is what "indented by a gutter" has to mean if the block below it is to keep its
-    // full width.
-    expect(renderDeck("> quoted\n")->positionOf('quote')['x'])->toBe(60.0);
+    // The paragraph margin rather than the shape's offset: a quote that moved the frame as
+    // well as the text would push everything below it a gutter to the left, and the gutter
+    // is there to indent the text inside the frame rather than to move the frame.
+    expect(renderDeck("> quoted\n")->positionOf('text')['x'])->toBe(40.0)
+        ->and(renderDeck("> quoted\n")->part(SLIDE_ONE))->toContain('marL="190500"');
 });
 
 it('renders a thematic break as a rule rather than dropping it', function () {
@@ -759,21 +841,28 @@ it('leaves a gap between two shapes of a column', function () {
     // Every shape is written with `setSpacingBefore(0)`, so without a gap in the layout two
     // shapes drawn one after the other abut with nothing between them: the last line of one
     // against the first line of the next.
+    //
+    // 17 and not 12: the air is the paragraph's half and the code block's, and a code block
+    // has a panel painted to the edge of its box and takes more of it than a paragraph does.
     $shapes = renderDeck("First.\n\n```\nx\n```\n")->positions();
+    $between = $shapes[1]['y'] - ($shapes[0]['y'] + $shapes[0]['height']);
 
-    expect($shapes[1]['y'] - ($shapes[0]['y'] + $shapes[0]['height']))->toBe(12.0);
+    expect($between)->toBe(17.0)
+        ->and($between)->toBeGreaterThan(12.0);
 });
 
 it('leaves the theme\'s own gap between two paragraphs of one frame', function () {
-    // The gap a reader sees between two paragraphs is now written into the frame rather than
-    // taken out of the column between two boxes, and it is the same number either way:
-    // `a:spcAft` in hundredths of a point, on every paragraph that has another under it.
+    // The gap a reader sees between two paragraphs is written into the frame rather than
+    // taken out of the column between two boxes, and it is the same number either way — in
+    // two halves, because PowerPoint adds a paragraph's spacing before and after rather than
+    // taking the larger of the two, and a gap carried entirely on one side reads as a bigger
+    // gap above a paragraph than below it.
     $xml = renderDeck("First.\n\nSecond.\n")->part(SLIDE_ONE);
 
-    // 12px of block gap is 9pt at 96 dpi, and the two paragraphs of the frame carry one gap
-    // between them: the first, and not the second.
-    expect(preg_match_all('#<a:spcAft>\s*<a:spcPts val="900"/>#', $xml))->toBe(1)
-        ->and(preg_match_all('#<a:spcAft>#', $xml))->toBe(2);
+    // 12px of block gap is 9pt at 96 dpi, half of that on each side, and `a:spcPts` is in
+    // hundredths of a point: 450 written under the first paragraph and 450 over the second.
+    expect(preg_match_all('#<a:spcAft>\s*<a:spcPts val="450"/>#', $xml))->toBe(1)
+        ->and(preg_match_all('#<a:spcBef>\s*<a:spcPts val="450"/>#', $xml))->toBe(1);
 });
 
 it('measures a frame the way PowerPoint lays it out, which is a gap after every break', function () {
@@ -1237,11 +1326,72 @@ it('leaves an image the package already carries exactly as it was', function () 
         ->toBe((string) file_get_contents($png));
 });
 
-it('still embeds an SVG as an SVG', function () {
+it('answers the same thing every time it is asked whether this build can draw an SVG', function () {
+    // Asked of a real rasteriser rather than of the seam, because what is being asserted is
+    // the answer itself: a boolean either way on any build, and the same boolean the second
+    // time. What a build can draw is a property of the process, so the probe is kept rather
+    // than repeated for every diagram in a deck — and a probe repeated per picture would be a
+    // test that could not tell a kept answer from an accidental one.
+    $rasteriser = new SvgRasteriser();
+    $first = $rasteriser->available();
+
+    expect($first)->toBeBool()
+        ->and($rasteriser->available())->toBe($first)
+        // A fresh instance is a fresh question, so this cannot pass by both calls sharing one
+        // memoised answer on the same object.
+        ->and((new SvgRasteriser())->available())->toBe($first);
+});
+
+it('tells ink on the page from a page with none on it', function () {
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    // The two answers the probe exists to distinguish, asked directly because a build that
+    // cannot draw an SVG only ever produces one of them. Made rather than drawn: an opaque
+    // rectangle is not a glyph, but `drewAnything()` asks about alpha and not about what put
+    // it there, so the two are the same question and this is the cheaper way to ask it.
+    $rasteriser = new AskableSvgRasteriser();
+    $inked = new Imagick();
+    $inked->newImage(4, 4, new ImagickPixel('black'));
+
+    $blank = new Imagick();
+    $blank->newImage(4, 4, new ImagickPixel('transparent'));
+
+    expect($rasteriser->asksDrewAnything($inked))->toBeTrue()
+        ->and($rasteriser->asksDrewAnything($blank))->toBeFalse();
+
+    $inked->clear();
+    $blank->clear();
+});
+
+it('says a build cannot draw when the drawing itself cannot be read', function () {
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    // The failure the probe has to survive: `readImageBlob()` raises before any histogram
+    // exists, so a delegate that rejects the file answers false rather than crashing the
+    // render. Bytes that are not an SVG at all, which is what a truncated or an
+    // already-corrupted file is.
+    expect((new AskableSvgRasteriser())->asksDrawsAGlyph('not a drawing at all'))->toBeFalse();
+});
+
+it('embeds an SVG as a PNG rather than as a vector no reader can draw', function () {
     // A viewBox and no `width`/`height`, which is an ordinary SVG and one that no
-    // `getimagesize()` can measure on any build — so the extension is all there is to go on.
-    // Treating "would not measure" as "not an image" would have refused it, and with it
-    // every SVG that sizes itself by viewBox.
+    // `getimagesize()` can measure on any build — so the extension is all there is to go
+    // on. Treating "would not measure" as "not an image" would have refused it, and with
+    // it every SVG that sizes itself by viewBox.
+    //
+    // The relationship is the assertion rather than the file name, because the file name
+    // is PHPPresentation's own numbering and the relationship is what PowerPoint follows.
+    // It used to point at an `image/svg+xml` part, one relationship shared by the raster
+    // and the vector where a PowerPoint file has two — well-formed, schema-clean markup,
+    // and a deck that opens with the diagram missing.
+    if (!(new SvgRasteriser())->available()) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
     file_put_contents(
         imageDirectory() . '/mark.svg',
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20">'
@@ -1249,9 +1399,219 @@ it('still embeds an SVG as an SVG', function () {
     );
 
     $pptx = renderDeck("![a mark](mark.svg)\n");
+    $media = array_values(preg_grep(MEDIA_PART, $pptx->parts()));
 
-    expect(array_values(preg_grep(MEDIA_PART, $pptx->parts()))[0])->toEndWith('.svg')
-        ->and($pptx->part(CONTENT_TYPES))->toContain('ContentType="image/svg+xml"');
+    expect($media[0])->toEndWith('.png')
+        ->and($pptx->part(CONTENT_TYPES))->toContain('ContentType="image/png"')
+        // No vector part anywhere in the package, which is what "as a PNG rather than as a
+        // vector" comes to. Not "no `image/svg+xml` in the content types": PHPPresentation
+        // writes that Default into every deck it produces, SVG or not, and an OPC Default for
+        // an extension no part uses is legal and harmless. Asserting on it would be a claim
+        // about the vendor writer rather than about this deck — and it would pass on the
+        // broken version too, which is the worst property an assertion here can have.
+        ->and(array_filter(
+            $pptx->parts(),
+            static fn (string $part): bool => str_ends_with($part, '.svg'),
+        ))->toBe([])
+        ->and($pptx->part('ppt/slides/_rels/slide1.xml.rels'))->toContain('/' . basename($media[0]))
+        ->and($pptx->shapeNames())->toBe(['image']);
+});
+
+it('measures a drawing from its header without drawing it', function () {
+    // What `vector()` asks before it draws anything. A header read is milliseconds and
+    // allocates nothing; the draw it replaces is where the memory goes, so the two have to be
+    // asked apart rather than measured the same way.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    $path = imageDirectory() . '/measured.svg';
+
+    file_put_contents(
+        $path,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" viewBox="0 0 120 60">'
+        . '<rect width="120" height="60" fill="#0ac81e"/></svg>',
+    );
+
+    expect((new SvgRasteriser())->measures($path))->toBe([120, 60]);
+});
+
+it('answers null for a size it cannot read rather than guessing one', function () {
+    // A guess is what the ceiling is standing in front of. There is no drawing here to measure,
+    // so the answer is that there is no measurement — and the draw that follows is bounded by
+    // the area limit instead, which is the case this exists to keep reachable.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    expect((new SvgRasteriser())->measures(imageDirectory() . '/never-written.svg'))->toBeNull();
+});
+
+it('refuses a drawing whose size it cannot read rather than drawing it unbounded', function () {
+    // The short end of the line the ceiling stands on. Both ways of not being able to draw a
+    // file are the same fact about the same file, so both are refused the same way — and the
+    // refusal here is the strict one, because a draw with nothing on it is the case the header
+    // read exists to prevent.
+    $path = imageDirectory() . '/headerless.svg';
+    file_put_contents($path, 'this is not a drawing whatever it is called');
+
+    $rasteriser = new GivenSvgRasteriser(true, new ConvertedImage('x', 10, 10), null);
+    $converter = new ImageConverter($rasteriser);
+
+    expect(fn () => $converter->png(4, 'headerless.svg', $path))
+        ->toThrow(UnsupportedImageFormat::class, 'which this build\'s SVG delegate would not draw')
+        ->and($rasteriser->drawWasAskedFor())->toBeFalse();
+});
+
+it('draws the same file once however many times a deck names it', function () {
+    // A deck may put the same drawing on every slide. Without this the delegate is asked once
+    // per reference, so a repeated picture costs a repeated render — and the header read that
+    // refuses an oversized one would be paid for once per reference too.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    $path = imageDirectory() . '/once.svg';
+
+    file_put_contents(
+        $path,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20" viewBox="0 0 40 20">'
+        . '<rect width="40" height="20" fill="#0ac81e"/></svg>',
+    );
+
+    $rasteriser = new SvgRasteriser();
+    $first = $rasteriser->png($path);
+
+    unlink($path);
+
+    // The file is gone, so a second draw has nothing to read: what comes back is the answer
+    // kept, and identity rather than equality is what says it was not drawn again.
+    expect($first)->not->toBeNull()
+        ->and($rasteriser->png($path))->toBe($first);
+});
+
+it('draws an SVG as a PNG of what this build actually renders', function () {
+    // Asked of the rasteriser rather than through a deck, because the deck refuses on a
+    // build whose delegate drops text — and a rendering claim is not established by
+    // reading the SVG, so what is below is the render itself: a PNG signature and its
+    // size would pass for a blank canvas, and the colour is the part that says a shape
+    // was drawn.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    $path = imageDirectory() . '/solid.svg';
+
+    file_put_contents(
+        $path,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20" viewBox="0 0 40 20">'
+        . '<rect width="40" height="20" fill="#0ac81e"/></svg>',
+    );
+
+    $raster = (new SvgRasteriser())->png($path);
+
+    expect($raster)->not->toBeNull()
+        ->and($raster->bytes)->toStartWith("\x89PNG\r\n\x1a\n")
+        ->and([$raster->width, $raster->height])->toBe([40, 20]);
+
+    $drawn = imagecreatefromstring($raster->bytes);
+    $centre = imagecolorsforindex($drawn, imagecolorat($drawn, 20, 10));
+
+    expect($centre['red'])->toBe(10)
+        ->and($centre['green'])->toBe(200)
+        ->and($centre['blue'])->toBe(30);
+});
+
+it('answers null for a file the delegate will not read rather than an empty picture', function () {
+    // A file that is called an SVG and is not one. Carrying whatever came back would put a
+    // picture-sized hole in the deck, and the deck would open with it blank.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    $path = imageDirectory() . '/lies.svg';
+    file_put_contents($path, 'this is not a drawing whatever it is called');
+
+    expect((new SvgRasteriser())->png($path))->toBeNull();
+});
+
+it('refuses an SVG on a PHP with no rasteriser, and names what would fix it', function () {
+    // The branch a build without `ext-imagick` takes, answered through the seam rather than
+    // by unloading the extension, so both branches of the decision run on one build. What
+    // is being checked is the refusal and what it says, and that is the same sentence
+    // whether this machine is short of Imagick or short of a delegate that draws a letter.
+    $path = imageDirectory() . '/diagram.svg';
+
+    file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"/>');
+
+    $converter = new ImageConverter(new GivenSvgRasteriser(false, null));
+
+    expect(fn () => $converter->png(3, 'assets/diagram.svg', $path))
+        ->toThrow(
+            UnsupportedImageFormat::class,
+            'Slide 3 shows "assets/diagram.svg", which is SVG. A .pptx holds a vector only beside a raster of it, '
+            . 'and this PHP cannot draw one: ext-imagick is not loaded, or the SVG delegate it was built with '
+            . 'will not draw a letter. Install ext-imagick, or put a PNG of the drawing in the deck.',
+        );
+});
+
+it('refuses an SVG this build cannot draw rather than writing a blank one', function () {
+    // The other half, and the one that is easy to get wrong the other way: a build that
+    // *has* a rasteriser and will not read this file still gets a refusal, and gets the one
+    // that says so rather than the one about an extension it has already installed.
+    $path = imageDirectory() . '/diagram.svg';
+
+    file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"/>');
+
+    // A size is given so this reaches the draw and fails there rather than at the header read:
+    // the file is read well enough to be measured and then not drawn, which is a different
+    // failure from not being measured at all and is refused the same way.
+    $converter = new ImageConverter(new GivenSvgRasteriser(true, null, [40, 20]));
+
+    expect(fn () => $converter->png(2, 'diagram.svg', $path))
+        ->toThrow(
+            UnsupportedImageFormat::class,
+            'Slide 2 shows "diagram.svg", which this build\'s SVG delegate would not draw. '
+            . 'Convert it to PNG and put that in the deck instead.',
+        );
+});
+
+it('refuses a drawing larger than a slide is worth, from its header and before drawing it', function () {
+    // The ceiling is on the canvas, and the canvas is the expensive part: a file of a couple of
+    // hundred bytes can declare a 16000-square picture, and drawing one to find out it is too
+    // big is how a deck takes gigabytes before reaching the check that refuses it in
+    // milliseconds. So the size is read from the header first, and nothing is drawn.
+    //
+    // Answered through the seam because the size now comes from there. What is under test is
+    // that `vector()` consults the measurement before it draws — not what this build's delegate
+    // makes of a large viewBox, which is the rasteriser's own test below.
+    $path = imageDirectory() . '/vast.svg';
+
+    file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9000 9000"/>');
+
+    $rasteriser = new GivenSvgRasteriser(true, new ConvertedImage('x', 9000, 9000), [9000, 9000]);
+    $converter = new ImageConverter($rasteriser);
+
+    expect(fn () => $converter->png(1, 'vast.svg', $path))
+        ->toThrow(UnsupportedImageFormat::class, 'which measures 9000 x 9000 pixels')
+        // The raster it would have drawn is still sitting there unused, which is the claim:
+        // refusing before the draw is the difference between milliseconds and gigabytes.
+        ->and($rasteriser->drawWasAskedFor())->toBeFalse();
+});
+
+it('carries an SVG that was drawn, at the size it was drawn', function () {
+    // The positive of the two refusals above, and what says the seam is wired: a raster
+    // that comes back is handed on rather than refused, and being under the ceiling
+    // reaches the deck as nothing but a picture.
+    $path = imageDirectory() . '/mark.svg';
+
+    file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"/>');
+
+    $converter = new ImageConverter(new GivenSvgRasteriser(true, new ConvertedImage('drawn', 40, 20), [40, 20]));
+    $carried = $converter->png(1, 'mark.svg', $path);
+
+    expect($carried->bytes)->toBe('drawn')
+        ->and([$carried->width, $carried->height])->toBe([40, 20]);
 });
 
 it('refuses a format nothing here can decode, and names what would work', function () {
@@ -1264,14 +1624,14 @@ it('refuses a format nothing here can decode, and names what would work', functi
         ->toThrow(
             UnsupportedImageFormat::class,
             'Slide 1 shows "dot.ico", which is ICO — a format a .pptx carries no part for, '
-            . 'and this PHP has no decoder for it either. Convert it to GIF, JPEG, PNG or SVG first.',
+            . 'and this PHP has no decoder for it either. Convert it to GIF, JPEG or PNG first.',
         );
 });
 
 it('refuses a file that is not an image at all', function () {
     // A truncated download or a PDF named as a picture. `getimagesize()` answers false for
-    // it, and every carried format but one is a raster, so a name like this saying nothing
-    // is a file that is not the image it claims to be.
+    // it, and every carried format is a raster, so a name like this saying nothing is a
+    // file that is not the image it claims to be.
     file_put_contents(imageDirectory() . '/diagram.png', 'not an image, whatever it is called');
 
     expect(fn () => renderDeck("![a diagram](diagram.png)\n"))

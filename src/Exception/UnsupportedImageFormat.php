@@ -25,7 +25,7 @@ final class UnsupportedImageFormat extends InvalidInput
     {
         return new self(sprintf(
             'Slide %d shows "%s", which is %s — a format a .pptx carries no part for, and this '
-            . 'PHP has no decoder for it either. Convert it to GIF, JPEG, PNG or SVG first.',
+            . 'PHP has no decoder for it either. Convert it to GIF, JPEG or PNG first.',
             $slide,
             $written,
             strtoupper($format),
@@ -55,7 +55,7 @@ final class UnsupportedImageFormat extends InvalidInput
     {
         return new self(sprintf(
             'Slide %d shows "%s", which this PHP cannot read as an image at all — a truncated '
-            . 'download, or something that is not one. Convert it to GIF, JPEG, PNG or SVG first.',
+            . 'download, or something that is not one. Convert it to GIF, JPEG or PNG first.',
             $slide,
             $written,
         ));

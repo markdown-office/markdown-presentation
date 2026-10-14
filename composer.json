@@ -34,6 +34,9 @@
         "ext-simplexml": "*",
         "pestphp/pest": "^3.0 || ^4.0 || ^5.0"
     },
+    "suggest": {
+        "ext-imagick": "Embeds SVG. PowerPoint holds a vector only beside a raster of it, so something has to draw the raster; without this an SVG raises rather than going in as a picture no reader can show."
+    },
     "autoload": {
         "psr-4": {
             "MarkdownPresentation\\": "src/"

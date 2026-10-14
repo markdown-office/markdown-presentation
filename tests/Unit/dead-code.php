@@ -248,6 +248,15 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a deck of markers asks for more written slides than it has' => 'asks for 800 written slides',
     'a build-up is measured once per step' => 'each revealing everything the one before it had',
     'the two passes over the written package' => 'runs the two passes over it',
+    'the air between two items of one list is a quarter of block: a side' => 'two list items | a quarter of',
+    'a list leaves less air between its items than a paragraph leaves between two of them' => 'less air between its items than a paragraph',
+    'a heading and the text above it are 19px apart' => '| a heading and the text above it | 0.7 em of the **heading\'s own size** | 19px |',
+    'the shape union names seven members' => 'naming the seven is what says so',
+    'the shape union has a tenth kind' => 'a tenth kind of shape',
+    'three passes make the same refusal' => 'one type for the three passes',
+    'a note has no name()' => 'and Quote::name()',
+    'a frame spaces every paragraph but the last' => 'on every paragraph but the last',
+
     // Columns divided at a `##` until `::column` said otherwise. The phrase is the sentence
     // the README, the gallery and the renderer's own docblock all gave as the reason, and
     // none of them can now: a heading is an ordinary heading. `CHANGELOG.md` has to be able
@@ -280,6 +289,14 @@ it('does not claim again what the code does not do', function (string $claim) {
     // finding on new code rather than one still waiting for the next method. The claim was
     // about the block parser of the time, which `BlockTranslator` has now replaced.
     'one more method and the parser is over the ceiling' => 'the next method still breaks that gate',
+    // An SVG was carried into the package as an `image/svg+xml` part, on the strength of
+    // the format declaring one — a deck that opened with the diagram missing, and nothing
+    // in the repository said so. It is drawn now, so a page may not say the file rides
+    // along or that it is the one image nothing is done to. The phrase is the reasoning
+    // rather than the spelling so `CHANGELOG.md`, which has to be able to name what an
+    // SVG used to be written as, is not guarded instead of the live claims.
+    'an svg is carried into the package as the file itself' => 'the only one of these three that is not re-encoded',
+    'an svg is put in the deck unexamined' => 'written into the package byte for byte',
 ]);
 
 it('has no decorative dividers in it', function () {

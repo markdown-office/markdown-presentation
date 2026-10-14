@@ -243,9 +243,12 @@ it('writes each notes slide once, however many slides carry one', function () {
     @unlink($path);
 
     $twice = array_filter($seen, static fn (int $count): bool => $count > 1);
+    // The notes slides themselves rather than everything under their directory: a deck with a
+    // speaker note in it also carries `ppt/notesSlides/_rels/`, and a relationship part is not
+    // a second copy of a notes slide. `$twice` above still covers every part in the package.
     $notes = array_filter(
         array_keys($seen),
-        static fn (string $name): bool => str_starts_with($name, NOTES_SLIDES),
+        static fn (string $name): bool => preg_match('~^' . preg_quote(NOTES_SLIDES, '~') . 'notesSlide\d+\.xml$~', $name) === 1,
     );
 
     expect($twice)->toBe([])->and($notes)->toHaveCount(3);

@@ -18,23 +18,36 @@ use MarkdownPresentation\Exception\UnsupportedImageFormat;
  * without complaint and opens with the picture missing, which is the one outcome this
  * library refuses to produce anywhere else.
  *
- * So a format is checked here, before anything is built, and the two ways of failing
- * are kept apart: a format GD can decode is converted and the deck is written with the
+ * So a format is checked here, before anything is built, and the ways of failing are
+ * kept apart: a format GD can decode is converted and the deck is written with the
  * picture in it, and a format nothing here can decode is refused. The conversion is
  * visible in the file rather than silent — the part is a PNG, so a deck full of
  * converted photographs is several times the size it was written from.
+ *
+ * SVG is a third case and not a fourth one. The format declares a part for it, and
+ * writing that part is the silent failure this class exists to prevent wearing a
+ * different hat: PHPPresentation points one relationship at both the raster and the
+ * vector where PowerPoint's own file has two, so the shape is a picture no reader can
+ * draw. The file is therefore drawn — {@see SvgRasteriser} — and the part in the package
+ * is a PNG, which means the vector is lost rather than carried.
  */
 final class ImageConverter
 {
+    public function __construct(private readonly SvgRasteriser $svg = new SvgRasteriser())
+    {
+    }
+
     /**
      * The formats a package may carry, as extensions.
      *
      * Mirrors what `ContentTypes` declares for every package plus what `Drawing\Base64`
-     * will accept, minus the two metafile types: those need `phpoffice/wmf`, which is a
-     * suggestion rather than a requirement, so a build without it cannot embed them and
-     * treating them as carryable would put that back into the same silent failure.
+     * will accept, minus SVG and the two metafile types. SVG is not missing by accident:
+     * the format has a part for it, and writing that part is a deck whose picture does
+     * not appear. The metafiles need `phpoffice/wmf`, which is a suggestion rather than a
+     * requirement, so a build without it cannot embed them and treating them as carryable
+     * would put that back into the same silent failure.
      */
-    private const CARRIED = ['gif', 'jpg', 'png', 'svg'];
+    private const CARRIED = ['gif', 'jpg', 'png'];
 
     /**
      * The most pixels this render will open, and why the number is that one.
@@ -82,11 +95,79 @@ final class ImageConverter
             throw UnsupportedImageFormat::notAnImage($slide, $written);
         }
 
+        if ($format === 'svg') {
+            return $this->vector($slide, $written, $path);
+        }
+
         if (in_array($format, self::CARRIED, true)) {
             return null;
         }
 
         return $this->convert($slide, $written, $path, $format);
+    }
+
+    /**
+     * The PNG an SVG is drawn as, or the refusal for a build that cannot draw it.
+     *
+     * The ceiling is {@see self::MAX_PIXELS}, and it is enforced on the *header* rather than on
+     * the file's size, because a vector says how big a picture it is by describing one and the
+     * picture is what takes the memory. Reading the size is what keeps the ceiling a ceiling:
+     * measured after the drawing, a file of a couple of hundred bytes declaring a 16000-square
+     * picture has already had its canvas before anything asks whether it may have one.
+     *
+     * A file whose size cannot be read is refused rather than drawn. That is the strict end of
+     * a short line — the same reader that cannot find the header will not find the drawing — and
+     * it is taken because the alternative is a draw with no ceiling on it, which is the whole
+     * thing this is here to prevent.
+     *
+     * @throws UnsupportedImageFormat
+     */
+    private function vector(int $slide, string $written, string $path): ConvertedImage
+    {
+        if (!$this->svg->available()) {
+            throw new UnsupportedImageFormat(sprintf(
+                'Slide %d shows "%s", which is SVG. A .pptx holds a vector only beside a raster of it, and this '
+                . 'PHP cannot draw one: ext-imagick is not loaded, or the SVG delegate it was built with will not '
+                . 'draw a letter. Install ext-imagick, or put a PNG of the drawing in the deck.',
+                $slide,
+                $written,
+            ));
+        }
+
+        $measured = $this->svg->measures($path);
+
+        if ($measured === null) {
+            throw self::undecodable($slide, $written);
+        }
+
+        if ($measured[0] * $measured[1] > self::MAX_PIXELS) {
+            throw UnsupportedImageFormat::tooLarge($slide, $written, $measured[0], $measured[1], self::MAX_PIXELS);
+        }
+
+        $raster = $this->svg->png($path);
+
+        if ($raster === null) {
+            throw self::undecodable($slide, $written);
+        }
+
+        return $raster;
+    }
+
+    /**
+     * A refusal for a file this build will not draw, said once for the two ways of finding out.
+     *
+     * They are the same fact about the same file — the delegate cannot read it — reached either
+     * from its header or from the draw itself, and a reader told "it would not draw" is not
+     * misled by being told it after a measurement rather than after a picture.
+     */
+    private static function undecodable(int $slide, string $written): UnsupportedImageFormat
+    {
+        return new UnsupportedImageFormat(sprintf(
+            'Slide %d shows "%s", which this build\'s SVG delegate would not draw. Convert it to PNG and '
+            . 'put that in the deck instead.',
+            $slide,
+            $written,
+        ));
     }
 
     /**
@@ -97,11 +178,8 @@ final class ImageConverter
      * learned to read the ones that do give a `width` and a `height` in PHP 8.5, so on
      * the older builds this package supports a perfectly good SVG answers false. Refusing
      * one as a file that is not an image is the failure the extension is here to avoid.
-     *
-     * The other half of that is that {@see self::MAX_PIXELS} does not apply to an SVG:
-     * nothing here opens one, and nothing here could refuse one by size even if it did.
-     * What is in the package is the file, byte for byte — see the README for what that
-     * means to whoever opens the deck.
+     * What it does not know is the size of the raster, which is where {@see self::MAX_PIXELS}
+     * reaches it instead — see {@see self::vector()}.
      *
      * Every other carried format *is* a raster, so one of those names that will not
      * measure is a file that is not the image it claims to be — a PDF, a download that

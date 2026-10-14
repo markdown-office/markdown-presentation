@@ -76,8 +76,8 @@ final class TimingPass
      *
      * @throws UnreadablePackage When the presentation cannot be opened for writing, or a slide
      *         cannot be read out of it. The same refusals {@see PlaceholderPass::applyTo()}
-     *         makes on the same file, so a caller catches one type for the three passes rather
-     *         than one for each.
+     *         makes on the same file, so a caller catches one type for every pass rather than
+     *         one for each.
      */
     public static function applyTo(string $path, array $builds, ?ZipArchive $archive = null): int
     {
