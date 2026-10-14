@@ -10,19 +10,23 @@ use MarkdownPresentation\Render\Box;
 use MarkdownPresentation\Render\SlideGeometry;
 
 /**
- * Where a free-placement directive puts its shape, as a box on the slide and a layer to write
- * it in.
+ * Where a free-placement directive puts its shape, as a box on the slide, a layer to write it
+ * in and a rotation to turn it by.
  *
- * Four measurements and two words, and the words are what make the measurements usable: an
- * `anchor` says which corner of the box `left` and `top` name, so `left=50%` can be the middle
- * of the slide rather than the left of it, and `layer` says whether the shape is written
- * before the layout's own shapes or after them.
+ * Four measurements and three words, and the words are what make the measurements usable: an
+ * `anchor` says which corner of the box `left` and `top` name, `layer` says whether the shape
+ * is written before the layout's own shapes or after them, and `rotate` turns it about its own
+ * middle without moving the box.
  *
  * The box lies within the slide, and one that does not is refused with the numbers rather than
  * clamped. Clamping is the failure {@see SlideGeometry::MIN_SIZE} exists to prevent: a shape
  * quietly drawn somewhere other than where it was asked for is a deck that renders, showing
  * something the author did not write, and nothing in the file says so. Full bleed is still
  * reachable, because `left=0 width=100%` is exactly the edge.
+ *
+ * That is a claim about the **box**, and a rotation is what makes it worth saying so: a square
+ * turned forty-five degrees keeps its hundred-pixel box and reaches past the edge of it. What
+ * is checked is what the deck placed, which is the box; the tilt is the author's.
  */
 final class Placement
 {
@@ -48,6 +52,16 @@ final class Placement
         'center' => ['centre', 'centre'],
     ];
 
+    /**
+     * A rotation as it is written: a whole number of degrees, with `deg` optional.
+     *
+     * Whole degrees because that is what the format takes: `a:xfrm rot` is in sixtieths of a
+     * degree and {@see \PhpOffice\PhpPresentation\AbstractShape::setRotation()} is an `int`,
+     * so a fraction is a `TypeError` rather than a rounded angle. Refused here, with the
+     * spelling that would have worked.
+     */
+    private const ROTATION = '/\A([+-]?\d+)(?:deg)?\z/i';
+
     /** The layer a shape written after the layout's own shapes is in, which is the default. */
     public const FRONT = 'front';
 
@@ -57,9 +71,13 @@ final class Placement
     /** @var list<string> */
     private const LAYERS = [self::BACK, self::FRONT];
 
+    /**
+     * @param int $rotate Degrees clockwise, already wrapped — see {@see self::rotation()}.
+     */
     private function __construct(
         public readonly Box $box,
         public readonly string $layer,
+        public readonly int $rotate,
     ) {
     }
 
@@ -103,7 +121,45 @@ final class Placement
         return new self(
             new Box($x, $y, $width, $height),
             self::layer($slide, $name, $attributes),
+            self::rotation($slide, $name, $attributes),
         );
+    }
+
+    /**
+     * How far the shape is turned clockwise, in degrees, wrapped to a single turn.
+     *
+     * Wrapped rather than refused or bounded, and each of the three was a reason. Refusing a
+     * negative loses `rotate=-30`, which is a counter-clockwise tilt and the spelling a model
+     * reaches for; refusing past a turn loses nothing anyone writes. Wrapping makes both the
+     * same shape as the positive spelling, which is what PowerPoint does when it reads one, and
+     * it bounds the number: `AbstractShape::setRotation()` is multiplied by sixty thousand and
+     * returned as an `int`, so a degree count large enough to overflow that is a `TypeError`
+     * rather than a failure a deck author can act on.
+     *
+     * @throws MalformedShape
+     */
+    private static function rotation(int $slide, string $name, DirectiveAttributes $attributes): int
+    {
+        $written = strtolower(Length::written($slide, $name, 'rotate', $attributes, '0'));
+
+        if (preg_match(self::ROTATION, $written, $match) !== 1) {
+            throw MalformedShape::attributeValue(
+                $slide,
+                $name,
+                'rotate',
+                $written,
+                'A rotation is a whole number of degrees, and turns the shape about the middle of its box: '
+                . 'rotate=45, rotate=-30, rotate=45deg.',
+            );
+        }
+
+        $degrees = (int) $match[1];
+
+        // PHP's `%` keeps the sign of the dividend, so `-45 % 360` is `-45` rather than the
+        // 315 it names. Two additions rather than one: a full turn is zero rather than 360, and
+        // `rot="0"` is an attribute the writer leaves off entirely, so a deck that asked for
+        // `rotate=360` would otherwise come back rotated when it asked for none.
+        return (($degrees % 360) + 360) % 360;
     }
 
     /**

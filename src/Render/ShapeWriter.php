@@ -529,6 +529,7 @@ final class ShapeWriter
 
         $box = $shape->placement->box;
         $this->place($written, $box, $box->height);
+        $written->setRotation($shape->placement->rotate);
 
         return $written;
     }
@@ -596,6 +597,7 @@ final class ShapeWriter
         if ($shape->fit === Pictures::STRETCH) {
             $written->setResizeProportional(false);
             $this->place($written, $box, $box->height);
+            $written->setRotation($shape->placement->rotate);
 
             return $written;
         }
@@ -604,6 +606,7 @@ final class ShapeWriter
         // {@see self::fitted()} on why `place()` is not enough on its own.
         $this->place($written, $box, $box->height);
         $this->fitted($written, $box, $box->height);
+        $written->setRotation($shape->placement->rotate);
 
         return $written;
     }
@@ -644,6 +647,7 @@ final class ShapeWriter
         }
 
         $this->restyled($written, $style);
+        $written->setRotation($shape->placement->rotate);
 
         return $written;
     }

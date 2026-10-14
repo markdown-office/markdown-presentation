@@ -28,7 +28,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `09-inline-markup.md` | `09-inline-markup.pptx` | A `title:` carrying `**bold**` and `*italic*` |
 | `10-rejected.md` | **nothing** | Conditional content the way Slidev writes it |
 | `11-type-scale.md` | two files | The same slides in `default` and in `dense`, the one theme whose whole scale is smaller at once — body, title, margins, gutter, block gap and rule. The table and the code block are twelve points in both, because those two sizes are the library's, which is what leaves them to read the two pages against |
-| `12-free-shapes.md` | `12-free-shapes.pptx` | Shapes placed by the deck rather than by the layout: a panel behind the text, a badge and a chevron, text blocks in boxes of their own, a circle and an ellipse sharing a centre, and all ten ink shapes with a picture on one slide |
+| `12-free-shapes.md` | `12-free-shapes.pptx` | Shapes placed by the deck rather than by the layout: a panel behind the text, a badge and a chevron, tilted arrows whose labels turn with them, text blocks in boxes of their own, a circle and an ellipse sharing a centre, and all ten ink shapes with a picture on one page |
 
 ## The one that is not built
 
@@ -87,7 +87,12 @@ A few of these are here because the render is the only honest evidence:
   both axes while the ellipse is 20% of its width, so they are the same height and not the
   same width. That is what resolving a circle's percentages against the height buys: the
   spelling that reads as "a circle inside an ellipse" draws one.
-- **`12`, the fourth slide.** Ten ink shapes on one slide, each its own
+- **`12`, the fourth slide.** Three arrows, two of them tilted, and a `:::content`
+  label given the *same* `rotate` as the arrow it sits on — which is how a label
+  is turned with its shape rather than laid straight across it. A shape with text
+  in it is not offered: `:::content` over the shape can be styled and rotated,
+  and the shape's own text cannot.
+- **`12`, the fifth slide.** Ten ink shapes on one slide, each its own
   `<p:sp>`. The rule is a rectangle a pixel tall rather than a connector,
   which is what a `---` has always been.
 - **`03`, the same slide in each of the three themed decks.** The difference is not

@@ -40,8 +40,8 @@ enum ShapeKind: string
     case Image = 'image';
     case Content = 'content';
 
-    /** Where a shape sits and when it is drawn: on its own, before or after the layout's. */
-    private const PLACEMENT = ['left', 'top', 'width', 'height', 'anchor', 'layer'];
+    /** Where a shape sits, how it is turned and when it is drawn, beside the layout's. */
+    private const PLACEMENT = ['left', 'top', 'width', 'height', 'anchor', 'layer', 'rotate'];
 
     /** What a shape is painted with. */
     private const PAINT = ['fill', 'alpha', 'stroke', 'stroke-width'];

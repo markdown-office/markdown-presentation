@@ -67,6 +67,28 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`rotate` turns a free shape about the middle of its own box**, on all twelve — the box
+  does not move and does not resize, so a rotated shape is still the box that was placed. A
+  `:::content` box is a shape, so it turns too, which is how a label is turned *with* the arrow
+  it sits on. Whole degrees only, because `a:xfrm rot` is in sixtieths of a degree and the
+  setter is an `int` and a fraction would be a `TypeError` rather than a rounded angle. Negative
+  and past a turn are wrapped to a single turn rather than refused: `rotate=-12` is a
+  counter-clockwise tilt, and wrapping is what bounds the number, since an unbounded one
+  overflows the multiplication into a `TypeError` on a deck nobody can act on. A full turn
+  writes no `rot` at all rather than `rot="0"`.
+
+  This is also what narrows one of the promises above: a free shape lies within the slide, but
+  that is a claim about its **box**, and a square turned forty-five degrees reaches past the
+  edge of the slide while its box stays inside it. What is checked is what the deck placed.
+
+- **There is no `text` attribute on a free shape, and a `:::content` box over it is the
+  answer.** Draw the shape, then put a text block over it and give both the same `rotate`.
+  PHPPresentation will put a string inside an autoshape, and writes one plain run with no
+  `a:rPr` — no size, no face, no colour — with `algn="ctr"` and `anchor="ctr"` written into
+  the element rather than read from anything. So a `text` attribute would be a second way to
+  put words on a slide that is worse in every respect except that it is one line shorter: no
+  Markdown, no runs, no link, and type the deck cannot ask for.
+
 - **A placed picture is fitted to its box by the same call a picture in a column uses.**
   `AbstractGraphic::setWidth()` re-derives the height from the picture's ratio and
   `setHeight()` then re-derives the width from *that*, so placing with two calls compounds

@@ -319,6 +319,20 @@ it('does not claim again what the code does not do', function (string $claim) {
     // the file PHPPresentation writes, so a dash is not something this library can draw and is
     // refused by name rather than dropped — and a page may not claim one is offered.
     'a free shape can be given a dashed outline' => 'a dashed outline on a free shape',
+    // A free shape lying within the slide is a claim about its *box*, and `rotate` is what
+    // makes the difference matter: a square turned forty-five degrees reaches past the edge
+    // while its box stays inside it. What is refused is the box. A page may not say the turned
+    // shape is the thing that is checked — and, because the same reasoning applies the other
+    // way, that a box which *does* fit is a promise about the ink on the slide.
+    'a free shape is checked against the slide edge once it is turned' => 'the turned shape is checked against the edge',
+    'a free shape inside the slide means its turned corners are too' => 'its corners stay inside the slide',
+    // There is no `text` attribute on a free shape, and the reason is that `:::content` over
+    // the shape can be styled and this could not. There is no guard for it, and the reason is
+    // the one above: the README has to be able to name `::arrow{text="…"}` in the sentence
+    // that says the attribute does not exist, and a phrase guard cannot tell that from a page
+    // offering it. The decision is pinned by the XML the README quotes instead — one run, no
+    // `a:rPr`, `algn` and `anchor` written into the element — which cannot be edited into
+    // meaning the opposite without also being visibly wrong.
 ]);
 
 it('has no decorative dividers in it', function () {

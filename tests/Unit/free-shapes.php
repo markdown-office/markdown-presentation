@@ -353,7 +353,7 @@ it('refuses an attribute the directive does not read, and names the ones it does
     // The one mistake in this vocabulary that would otherwise leave no trace: a shape drawn
     // without the fill that was asked for, on a deck that looks rendered.
     expect(fn () => placedShapes("::image{src=\"logo.png\" padding=8}\n"))
-        ->toThrow(MalformedShape::class, 'The attributes are: alt, anchor, fit, height, layer, left, src, top, width.');
+        ->toThrow(MalformedShape::class, 'The attributes are: alt, anchor, fit, height, layer, left, rotate, src, top, width.');
 });
 
 it('gives each directive its own attribute vocabulary', function (ShapeKind $kind, string $last) {
@@ -948,4 +948,90 @@ it('measures a placed text block at the size it named, not at the theme\'s body 
         ->and($overflows[0]['wanted'])->toBe(38)
         ->and($overflows[0]['available'])->toBe(32)
         ->and($overflows[0]['column'])->toBeNull();
+});
+
+it('turns a shape by the angle it was given, in every kind of shape', function (string $markdown, string $name) {
+    // `rot` is written on the `a:xfrm` of a text box, an autoshape and a picture, and the
+    // only thing this has to do is hand the angle to all three: 45 degrees is 2,700,000
+    // sixtieths of a degree, which is what `a:xfrm rot` counts in.
+    $markdown = $markdown === 'PLACEHOLDER'
+        ? sprintf('::image{src="%s" rotate=45}', basename(freeShapePicture()))
+        : $markdown;
+
+    $deck = freeShapeDeckFile(sprintf("---\nlayout: blank\n---\n\n%s\n", $markdown));
+
+    expect($deck->part(SLIDE_ONE))->toContain('<a:xfrm rot="2700000"')
+        ->and($deck->shapeNames())->toContain($name);
+})->with([
+    'an ink shape'   => ['::arrow{width=200 height=80 rotate=45}', 'arrow'],
+    'a text block'   => [":::content{width=300 height=120 rotate=45}\nWords.\n:::", 'content'],
+    'a picture'      => ['PLACEHOLDER', 'image'],
+]);
+
+it('writes no rotation at all where the deck named none', function () {
+    // `a:xfrm rot` is written only for a non-zero angle, so an unrotated shape carries no
+    // attribute at all rather than `rot="0"`.
+    $deck = freeShapeDeckFile("---\nlayout: blank\n---\n\n::rectangle{}\n");
+
+    expect($deck->part(SLIDE_ONE))->not->toContain('rot=');
+});
+
+it('turns a shape the same way whichever way round the angle is written', function (string $written, int $degrees) {
+    // Negative and past a turn are both things a model writes, and both mean an angle rather
+    // than a refusal. Wrapping also bounds the number: `setRotation()` is multiplied by sixty
+    // thousand and returned as an `int`, so an unbounded angle is a `TypeError` on a deck
+    // rather than a failure anybody can act on.
+    $deck = freeShapeDeckFile(sprintf(
+        "---\nlayout: blank\n---\n\n::rectangle{width=100 height=100 rotate=%s}\n",
+        $written,
+    ));
+
+    expect($deck->part(SLIDE_ONE))->toContain(sprintf('<a:xfrm rot="%d"', $degrees * 60000));
+})->with([
+    ['45', 45],
+    ['-45', 315],
+    ['315', 315],
+    ['-12', 348],
+    ['400', 40],
+    ['-400', 320],
+    ['45deg', 45],
+    ['99999999999', 279],
+]);
+
+it('writes no rotation for a whole turn or for none at all', function (string $written) {
+    // A full turn is no rotation, and `a:xfrm rot` is written only for a non-zero angle — so
+    // `rotate=360` comes back as a shape with no `rot` on it rather than as `rot="0"`. Which is
+    // the other half of the wrap: a `%` that left a negative alone would write a negative
+    // angle, and one that mapped a turn to 360 would write a rotation the author did not ask
+    // for.
+    $deck = freeShapeDeckFile(sprintf(
+        "---\nlayout: blank\n---\n\n::rectangle{width=100 height=100 rotate=%s}\n",
+        $written,
+    ));
+
+    expect($deck->part(SLIDE_ONE))->not->toContain('rot=');
+})->with(['0', '360', '-360', '720']);
+
+it('refuses a rotation that is not a whole number of degrees', function (string $written) {
+    // `a:xfrm rot` is in sixtieths of a degree and `setRotation()` is an `int`, so a fraction
+    // is a `TypeError` rather than a rounded angle. Refused with the spelling that works.
+    // `rotate=45 turns` is not here: the space splits it into a rotation and an attribute
+    // called `turns`, which the attribute vocabulary refuses first and for a different reason.
+    expect(fn () => placedShapes(sprintf("::rectangle{rotate=%s}\n", $written)))
+        ->toThrow(MalformedShape::class, 'A rotation is a whole number of degrees');
+})->with(['22.5', '45.5', 'quarter', '45deg2', '%', '1e3', '']);
+
+it('turns a text block with its shape, which is what a label on a tilted arrow is', function () {
+    // The composable answer to putting text in a shape, and the reason the vocabulary has no
+    // `text` attribute: a `:::content` box is a shape, so it carries `rotate` too, and a box
+    // given the same angle as the arrow under it turns with it.
+    $deck = freeShapeDeckFile(
+        "---\nlayout: blank\n---\n\n::arrow{left=5% top=34% width=32% height=15% fill=accent1 rotate=-12}\n\n"
+        . ":::content{left=5% top=38% width=32% height=7% rotate=-12 align=center font-size=16}\n**Retention**\n:::\n",
+    );
+
+    // One turn on each shape, and the two are at the same angle — which is the whole claim.
+    // `-12` is written as 348 because the reader wraps, and 348 is the same angle.
+    expect(substr_count($deck->part(SLIDE_ONE), 'rot="20880000"'))->toBe(2)
+        ->and($deck->shapeNames())->toBe(['arrow', 'content']);
 });

@@ -875,6 +875,7 @@ Six attributes, on every name:
 | `width`, `height` | `100%` | its size, so a shape with no attributes is full bleed |
 | `anchor` | `nw` | which corner `left` and `top` name: `nw` `n` `ne` `e` `se` `s` `sw` `w` `center` |
 | `layer` | `front` | `back` writes the shape before the layout's own, `front` after |
+| `rotate` | `0` | degrees clockwise, about the middle of the box: `45`, `-30`, `45deg` |
 
 `anchor` is what makes a percentage usable for centring, which is the thing a model reaches for
 most often. `left=50% top=50% anchor=center` puts the box's **middle** at the middle of the
@@ -908,6 +909,40 @@ A box lies **within** the slide. One that does not is refused with the numbers r
 clamped, because a shape quietly drawn somewhere other than where it was asked for is a deck
 that renders and shows something the author did not write — and nothing in the file says so.
 Full bleed is still reachable, because `left=0 width=100%` is exactly the edge.
+
+That is a claim about the **box**, and `rotate` is what makes it worth saying so: a square
+turned forty-five degrees keeps its hundred-pixel box and reaches past the edge of it. What
+is checked is what the deck placed; the tilt is the author's.
+
+### Turning a shape
+
+`rotate` turns a shape about the **middle of its own box**. The box does not move and does not
+resize, so a rotated shape is still the box you placed — which is also how a label is turned
+*with* the arrow it sits on:
+
+```markdown
+::arrow{left=5% top=34% width=32% height=15% fill=accent1 rotate=-12}
+
+:::content{left=5% top=38% width=32% height=7% rotate=-12 align=center vertical-align=middle font-size=16}
+**Retention** 94%
+:::
+```
+
+A `:::content` box is a shape, so it carries `rotate` like the other eleven. That is the whole
+of how to put text inside a rotated shape, and it is discussed under
+[A placed text block](#a-placed-text-block) — there is no `text` attribute, and the reason is
+there too.
+
+Three rules, each for a reason:
+
+| | |
+| --- | --- |
+| **Whole degrees only** | `a:xfrm rot` is in sixtieths of a degree and the setter is an `int`, so `22.5` is a `TypeError` rather than a rounded angle. It is refused with the spelling that works. |
+| **Negative and past a turn are fine** | `rotate=-12` is a counter-clockwise tilt and `rotate=400` is a turn and a bit. Both are wrapped to a single turn rather than refused, which is what PowerPoint does when it reads one. |
+| **A full turn is no turn** | `rotate=360` and `rotate=0` write no `rot` at all, rather than `rot="0"` or `rot="21600000"`. |
+
+Rotation is invisible on `::circle` and `::ellipse` — an ellipse turned ninety degrees looks
+exactly like an ellipse. It shows where a shape has a corner to be different at.
 
 #### Measurements
 
@@ -1031,6 +1066,52 @@ Text that does not fit is clamped to the box and reported by
 `overflows()` like any other block, with no column behind the entry — there is no column, and
 putting `0` there would be a number in front of nothing.
 
+**There is no `text` attribute on a shape, and `:::content` is why.** A shape with text in it
+is expressible today, and it is the composable version: draw the shape, then put a
+`:::content` box over it and give both the same `rotate`. What a `text` attribute would add is
+a *second* way to put words on a slide, and it would be the worse one — see
+[Text inside a shape](#text-inside-a-shape).
+
+#### Text inside a shape
+
+The question this section answers is the obvious one: how do you get a label onto an arrow, a
+badge or a panel, the way a diagram has them?
+
+```markdown
+::arrow{left=5% top=34% width=32% height=15% fill=accent1 rotate=-12}
+
+:::content{left=5% top=38% width=32% height=7% rotate=-12 align=center vertical-align=middle font-size=16}
+**Retention** 94%
+:::
+```
+
+Two shapes, not one shape with words in it. That is the answer, and it is worth having on its
+own terms:
+
+- **Everything a text block can do, and the shape's own text cannot.** `**bold**`, `*italic*`,
+  a [link](#links), a bullet list. A shape's own text is one plain string with no markup in it.
+- **Type you control.** `color`, `font-size`, `font-family`, `align`, `vertical-align`,
+  `padding` — and `rotate`, so the label turns with the shape it labels.
+- **One shape each, and therefore two in the file.** A shape with text in it and the same shape
+  without are different objects to every reader, and PowerPoint edits them as one.
+
+The alternative is available underneath and is deliberately not exposed. PHPPresentation will
+put a string inside an autoshape, and it writes exactly this:
+
+```xml
+<a:p><a:pPr algn="ctr"/><a:r><a:t>Retention</a:t></a:r></a:p>
+```
+
+No `a:rPr` — no size, no face, no colour, so the run takes whatever the shape's style says,
+which on a blank layout is the theme's body text. `algn="ctr"` and `anchor="ctr"` are written
+into the element rather than read from anything, so there is no alignment to ask for. And it is
+one string: no Markdown, no runs, no link. Exposing that as `::arrow{text="…"}` would be a
+second way to put words on a slide that is worse in every respect except that it is one line
+shorter.
+
+So the vocabulary has one way to put text on a slide, it is the one that can be styled, and it
+composes with `rotate`.
+
 #### What is refused, and how it reads
 
 An attribute a directive does not read is refused rather than ignored, and that is the whole of
@@ -1046,6 +1127,7 @@ $decks = [
     "::rectangle{left=900 width=120}\n",
     "::circle{width=120 height=80}\n",
     "::rectangle{fill=chartreuse}\n",
+    "::rectangle{rotate=22.5}\n",
     "::image{src=\"chart.png\" fill=accent1}\n",
 ];
 
@@ -1070,7 +1152,9 @@ Slide 1 gives a "::circle" a width of 120 and a height of 80. A circle is as wid
 
 Slide 1 gives "rectangle" a fill of "chartreuse". A colour is none, page, ink, subtle, panel, a theme slot (dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), or a hex value such as #4C1D95.
 
-Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, src, top, width.
+Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
+
+Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, rotate, src, top, width.
 ```
 
 Two things are **not** offered and are refused rather than approximated: a dashed outline,
