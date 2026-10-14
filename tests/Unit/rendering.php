@@ -1375,7 +1375,16 @@ it('embeds an SVG as a PNG rather than as a vector no reader can draw', function
 
     expect($media[0])->toEndWith('.png')
         ->and($pptx->part(CONTENT_TYPES))->toContain('ContentType="image/png"')
-        ->and($pptx->part(CONTENT_TYPES))->not->toContain('image/svg+xml')
+        // No vector part anywhere in the package, which is what "as a PNG rather than as a
+        // vector" comes to. Not "no `image/svg+xml` in the content types": PHPPresentation
+        // writes that Default into every deck it produces, SVG or not, and an OPC Default for
+        // an extension no part uses is legal and harmless. Asserting on it would be a claim
+        // about the vendor writer rather than about this deck — and it would pass on the
+        // broken version too, which is the worst property an assertion here can have.
+        ->and(array_filter(
+            array_keys($pptx->parts()),
+            static fn (string $part): bool => str_ends_with($part, '.svg'),
+        ))->toBe([])
         ->and($pptx->part('ppt/slides/_rels/slide1.xml.rels'))->toContain('/' . basename($media[0]))
         ->and($pptx->shapeNames())->toBe(['image']);
 });
