@@ -67,6 +67,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **A placed picture is fitted to its box by the same call a picture in a column uses.**
+  `AbstractGraphic::setWidth()` re-derives the height from the picture's ratio and
+  `setHeight()` then re-derives the width from *that*, so placing with two calls compounds
+  the ratio: a 2:1 picture in a square box came back at twice the width. It is invisible for a
+  picture whose ratio happens to match its box, which is why only some pictures came out wrong
+  and a test on the rest would have passed. `fit=stretch` was never affected — it turns the
+  ratio off first — and `contain`, the default, was.
+
 - **`UnknownDirective::container()` and `::leaf()` now name the free shapes**, because
   `::content` and `::rectangle` are the two names an author who has met this library is most
   likely to reach for, and a refusal that does not mention them reads as a refusal of the

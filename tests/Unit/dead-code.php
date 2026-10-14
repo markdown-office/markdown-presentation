@@ -310,6 +310,11 @@ it('does not claim again what the code does not do', function (string $claim) {
     // A deck asking for it must be told, not given something else — so a page may not claim a
     // free picture fills its box and loses its edges.
     'a free picture fills its box and loses its edges' => 'fills the box and crops',
+    // A free picture was placed with `setWidth()` and `setHeight()`, which each re-derive the
+    // other from the ratio, so a 2:1 picture in a square box came back at twice the width. It
+    // is right for a picture whose ratio matches its box, so a page may not claim the box is
+    // kept exactly — the box is what the picture is fitted *into*, not what it fills.
+    'a free picture takes its box exactly' => 'takes the box exactly and ignores it',
     // A dashed outline on a free shape. An autoshape's stroke is one colour and one width in
     // the file PHPPresentation writes, so a dash is not something this library can draw and is
     // refused by name rather than dropped — and a page may not claim one is offered.
@@ -356,7 +361,12 @@ it('says in the code why ShapeWriter is not split', function () {
     // And the argument has to be the crossings rather than a count, because a count is wrong
     // the moment one method moves and a name is not. Each of these is read by the measure
     // half of the class and by the draw half.
-    foreach (['columns()', 'rowHeights()', 'HEADER_ROW', 'bodySize()'] as $crossing) {
+    //
+    // The last three arrived with free placement, and they are here for the reason the first
+    // four are: a reason for a red finding that does not name what was added to the class
+    // stops describing it, and the next person to read it either splits the class on the
+    // strength of an argument that no longer holds or silences the finding.
+    foreach (['columns()', 'rowHeights()', 'HEADER_ROW', 'bodySize()', 'filled()', 'runs()', 'textHeight()'] as $crossing) {
         expect($doc)->toContain($crossing);
     }
 });

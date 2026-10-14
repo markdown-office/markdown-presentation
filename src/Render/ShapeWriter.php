@@ -23,6 +23,7 @@ use MarkdownPresentation\Render\Free\TextStyle;
 use MarkdownPresentation\Theme\Theme;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Shape\AutoShape;
+use PhpOffice\PhpPresentation\Shape\AbstractGraphic;
 use PhpOffice\PhpPresentation\Shape\Drawing\AbstractDrawingAdapter;
 use PhpOffice\PhpPresentation\Shape\Drawing\Base64;
 use PhpOffice\PhpPresentation\Shape\Drawing\File;
@@ -56,6 +57,17 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
  * paragraph and the runs both of them draw all read it. Those are the places a split would
  * have to cut, and each is a place where the seam runs through a fact two methods must agree
  * on.
+ *
+ * The placed shapes this class also draws cross three more, and they are the reason it was
+ * not the obvious place to put them instead. `filled()` is the one place a fill becomes
+ * `FILL_SOLID` or `FILL_NONE`, read by an autoshape and by a placed text box alike, because
+ * `Fill::FILL_UNSET` means *inherit* and a shape on a blank layout has nothing to inherit
+ * from. `runs()` writes every run's size, face and colour and `restyled()` then overrides
+ * all three in place, so the two have to agree on where a run's type lives. `textHeight()`
+ * measures a frame once for a column and again through `sized()` for a text block the deck
+ * sized itself, and `freeText()` draws what the second measured. Those are the places a split
+ * would have to cut, and each is a place where the seam runs through a fact two methods must
+ * agree on.
  *
  * Every shape is named after the kind of thing it was drawn from, so the whole mapping can be
  * read off `ppt/slides/slideN.xml` without opening the library. A {@see TextFrame} is the one
@@ -577,12 +589,21 @@ final class ShapeWriter
         // the longer version of why nothing in the file records where the deck found it.
         $written->setDescription($shape->image->alt === '' ? $shape->image->written : $shape->image->alt);
 
+        $box = $shape->placement->box;
+
+        // `stretch` turns the ratio off, and then {@see self::place()} is the whole of it —
+        // both dimensions stick, because there is no ratio left for either to re-derive from.
         if ($shape->fit === Pictures::STRETCH) {
             $written->setResizeProportional(false);
+            $this->place($written, $box, $box->height);
+
+            return $written;
         }
 
-        $box = $shape->placement->box;
+        // `contain` is the default and needs the fit the column path uses: see
+        // {@see self::fitted()} on why `place()` is not enough on its own.
         $this->place($written, $box, $box->height);
+        $this->fitted($written, $box, $box->height);
 
         return $written;
     }
@@ -919,21 +940,40 @@ final class ShapeWriter
 
         $this->place($shape, $box, $height);
 
+        $this->fitted($shape, $box, $height);
+
+        return $shape;
+    }
+
+    /**
+     * A picture fitted to the room it was given, and centred in what is left of it.
+     *
+     * {@see AbstractGraphic::setWidthAndHeight()} **once**, and never {@see self::place()}'s
+     * separate width and height calls for a picture that keeps its ratio: with proportional
+     * resize on, `setWidth()` re-derives the height from the ratio and `setHeight()` then
+     * re-derives the width from *that*, so a 2:1 picture in a square box comes back twice as
+     * wide as the box. The compounding is invisible for a picture whose ratio happens to match
+     * its box and wrong by a factor of the ratio for every other one.
+     *
+     * Centred on both axes, because the slack is only ever on one of them: a picture that fills
+     * the box's width has a gap above and below and none at the sides. The offsets are floored
+     * at the box because `setWidthAndHeight()` rounds the losing dimension *up*, and centring
+     * that would push the picture past the block below it.
+     *
+     * @param int $room How tall the picture may be, which is the box unless it was clamped.
+     */
+    private function fitted(AbstractGraphic $shape, Box $box, int $room): void
+    {
         // The room the block was given may have run out, so the box it is fitted to is
         // clamped before the ratio is read off it: a zero dimension disables the
         // proportional fit and hands the picture the negative room unchanged.
         $width = max($box->width, SlideGeometry::MIN_SIZE);
-        $tall = max($height, SlideGeometry::MIN_SIZE);
+        $tall = max($room, SlideGeometry::MIN_SIZE);
+
         $shape->setWidthAndHeight($width, $tall);
 
-        // Centred on both axes, because the slack is only ever on one of them: an image that
-        // fills the box's width has a gap above and below and none at the sides. The offsets
-        // are floored at the box because `setWidthAndHeight()` rounds the losing dimension
-        // *up*, and centring that would push the picture past the block below it.
         $shape->setOffsetX($box->x + max(0, intdiv($width - $shape->getWidth(), 2)))
             ->setOffsetY($box->y + max(0, intdiv($tall - $shape->getHeight(), 2)));
-
-        return $shape;
     }
 
     /**

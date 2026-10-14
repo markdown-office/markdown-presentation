@@ -459,10 +459,13 @@ $renderer->render(
 
 foreach ($renderer->overflows() as $overflow) {
     printf(
-        "slide %d step %d column %d: %s wants %dpx, %dpx left\n",
+        "slide %d step %d %s: %s wants %dpx, %dpx left\n",
         $overflow['slide'],
         $overflow['step'],
-        $overflow['column'] + 1,
+        // A shape the deck placed itself is in no column, and `null + 1` would say column 1.
+        $overflow['column'] === null
+            ? sprintf('placed "%s"', $overflow['block'])
+            : sprintf('column %d', $overflow['column'] + 1),
         $overflow['block'],
         $overflow['wanted'],
         $overflow['available'],
@@ -476,9 +479,10 @@ slide 1 step 1 column 1: code wants 1150px, 396px left
 
 One entry per shape that had to be clamped, so a slide whose contents are taller than its
 box reports every shape below the point it ran out. A run of paragraphs and lists is one
-shape, so it is one entry where there used to be one per block. The list is emptied by each
-`render()`: a layout belongs to one deck, so a caller converting several in a loop reads the
-last one's.
+shape, so it is one entry where there used to be one per block. A [free shape](#free-shapes)
+is in no column at all, so its entry carries `null` rather than a number in front of nothing.
+The list is emptied by each `render()`: a layout belongs to one deck, so a caller converting
+several in a loop reads the last one's.
 
 A caller that would rather have no file than a file with a slide on it that is missing
 something asks for the strict renderer, and gets `ContentOverflow` naming the slide, the

@@ -824,6 +824,38 @@ it('writes a placed picture it had to convert, at the size of the conversion', f
     expect($deck->positionOf('image'))->toMatchArray(['width' => 240.0, 'height' => 120.0]);
 });
 
+it('fits a placed picture inside its box, whatever its ratio', function (int $wide, int $tall, int $side) {
+    // The regression this guards is a picture drawn *wider than the box it was given*:
+    // `AbstractGraphic::setWidth()` re-derives the height from the ratio and `setHeight()`
+    // then re-derives the width from that, so placing with two calls compounds the ratio and a
+    // 2:1 picture in a square box comes back at 2x the width. It is invisible for a picture
+    // whose ratio matches its box, which is why the square box is here and not a matched one.
+    $png = Scratch::file('ratio.png', '');
+    // The picture has the ratio the case is about, which a fixed one cannot.
+    imagepng(imagecreatetruecolor($wide, $tall), $png);
+
+    $path = Scratch::file('deck.pptx', '');
+    (new PresentationRenderer(directory: Scratch::directory()))->render(
+        (new DeckParser())->parse(sprintf(
+            "::image{src=\"%s\" left=10 top=10 width=%d height=%d}\n",
+            basename($png),
+            $side,
+            $side,
+        )),
+        $path,
+    );
+    $drawn = Pptx::open($path)->positionOf('image');
+
+    expect($drawn['width'])->toBeLessThanOrEqual((float) $side)
+        ->and($drawn['height'])->toBeLessThanOrEqual((float) $side);
+})->with([
+    'a square picture in a square box' => [30, 30, 300],
+    'a landscape picture in a square box' => [40, 20, 300],
+    'a portrait picture in a square box' => [20, 40, 300],
+    'a landscape picture in a wide box' => [40, 20, 400],
+    'a portrait picture in a wide box' => [20, 40, 400],
+]);
+
 it('leaves a placed picture it did not convert alone, and stretches one that asked for it', function () {
     // The other arm of the same fork: a PNG goes in as a path and PHPPresentation measures it.
     // `stretch` is the one flag that differs — contain keeps the ratio and fits inside, and
@@ -898,17 +930,22 @@ it('leaves the type of a placed text block in the theme\'s own where it named no
 });
 
 it('measures a placed text block at the size it named, not at the theme\'s body size', function () {
-    // The bug this guards against is a clamp, not a crash: a 24pt paragraph measured at the
-    // theme's 16pt is shorter than it is, so the block is cut to room it did not need and its
-    // last paragraph is reported as lost when it was not.
-    $fits = "# One\n\n:::content{left=0 top=0 width=400 height=140 font-size=24}\nOne line.\n:::\n";
+    // The bug this guards is a clamp, not a crash, and it only shows where the box sits
+    // *between* the two heights. A box taller than both fits either way, and a box shorter
+    // than both overflows either way — measuring 24pt of text at the theme's 16pt makes it
+    // look shorter than it is, so the shape is cut to room it did not need and the block is
+    // reported as lost when it was not. 38px of 24pt against 26px of 16pt, in a 32px box, is
+    // that case exactly: right, it overflows; measured at the body size, it does not.
+    $tight = "# One\n\n:::content{left=0 top=0 width=400 height=32 font-size=24}\nOne line.\n:::\n";
     $renderer = new PresentationRenderer(directory: Scratch::directory());
 
-    expect(freeShapeDeckFile($fits)->part(SLIDE_ONE))->toContain('sz="2400"')
-        ->and(fn () => $renderer->render(
-            (new DeckParser())->parse($fits),
-            Scratch::file('deck.pptx', ''),
-        ))->not->toThrow(MarkdownException::class);
+    $renderer->render((new DeckParser())->parse($tight), Scratch::file('tight.pptx', ''));
+    $overflows = $renderer->overflows();
 
-    expect($renderer->overflows())->toBe([]);
+    expect(freeShapeDeckFile($tight)->part(SLIDE_ONE))->toContain('sz="2400"')
+        ->and($overflows)->toHaveCount(1)
+        ->and($overflows[0]['block'])->toBe('content')
+        ->and($overflows[0]['wanted'])->toBe(38)
+        ->and($overflows[0]['available'])->toBe(32)
+        ->and($overflows[0]['column'])->toBeNull();
 });
