@@ -15,8 +15,10 @@ use MarkdownPresentation\Render\SlideGeometry;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Render\ConvertedImage;
 use MarkdownPresentation\Render\ImageConverter;
 use MarkdownPresentation\Render\PresentationRenderer;
+use MarkdownPresentation\Render\SvgRasteriser;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 
@@ -90,6 +92,62 @@ const BOLD_RUN = 'b="1"';
 
 /** Why a build with no WebP encoder skips, said the same way each time. */
 const NO_WEBP = 'This GD build cannot write a WebP.';
+
+/**
+ * Why a build that cannot draw an SVG skips.
+ *
+ * Two builds reach it — no `ext-imagick` at all, and Imagick whose delegate drops every
+ * `<text>` — and neither is what the tests that skip on this are about, which is what a
+ * deck writes once something *can* draw one.
+ */
+const NO_RASTERISER = 'This build cannot rasterise an SVG, so there is nothing to embed.';
+
+/**
+ * A rasteriser with its answers given rather than drawn.
+ *
+ * The seam {@see SvgRasteriser} is not `final` for. It stands in for the build this
+ * machine is not, so that the refusals are asked on a machine with a rasteriser as well
+ * as without one — and says nothing at all about whether a real rasteriser works, which
+ * is what the tests that use the real class are for.
+ */
+final class GivenSvgRasteriser extends SvgRasteriser
+{
+    /** `$drawing` is null for a build that will not read the file it was asked about. */
+    public function __construct(private readonly bool $draws, private readonly ?ConvertedImage $drawing)
+    {
+    }
+
+    public function available(): bool
+    {
+        return $this->draws;
+    }
+
+    public function png(string $path): ?ConvertedImage
+    {
+        return $this->drawing;
+    }
+}
+
+/**
+ * The real rasteriser with its two protected questions opened up.
+ *
+ * {@see SvgRasteriser} asks two questions — whether the drawing put ink on the page, and
+ * whether this drawing can be read at all — and on a machine whose delegate cannot draw an SVG
+ * both have one answer, so neither outcome can be reached through the public class here. This
+ * is not a stand-in for the class: it is the class, asked directly.
+ */
+final class AskableSvgRasteriser extends SvgRasteriser
+{
+    public function asksDrewAnything(Imagick $image): bool
+    {
+        return $this->drewAnything($image);
+    }
+
+    public function asksDrawsAGlyph(?string $drawing = null): bool
+    {
+        return $this->drawsAGlyph($drawing);
+    }
+}
 
 /**
  * Render a deck and open what came out, in one step — every test below needs both and
@@ -1248,11 +1306,64 @@ it('leaves an image the package already carries exactly as it was', function () 
         ->toBe((string) file_get_contents($png));
 });
 
-it('still embeds an SVG as an SVG', function () {
+it('answers the same thing every time it is asked whether this build can draw an SVG', function () {
+    // Asked of a real rasteriser rather than of the seam, because what is being asserted is
+    // the answer itself: a boolean either way on any build, and the same boolean the second
+    // time. What a build can draw is a property of the process, so the probe is kept rather
+    // than repeated for every diagram in a deck — and a probe repeated per picture would be a
+    // test that could not tell a kept answer from an accidental one.
+    $rasteriser = new SvgRasteriser();
+    $first = $rasteriser->available();
+
+    expect($first)->toBeBool()
+        ->and($rasteriser->available())->toBe($first)
+        // A fresh instance is a fresh question, so this cannot pass by both calls sharing one
+        // memoised answer on the same object.
+        ->and((new SvgRasteriser())->available())->toBe($first);
+});
+
+it('tells ink on the page from a page with none on it', function () {
+    // The two answers the probe exists to distinguish, asked directly because a build that
+    // cannot draw an SVG only ever produces one of them. Made rather than drawn: an opaque
+    // rectangle is not a glyph, but `drewAnything()` asks about alpha and not about what put
+    // it there, so the two are the same question and this is the cheaper way to ask it.
+    $rasteriser = new AskableSvgRasteriser();
+    $inked = new Imagick();
+    $inked->newImage(4, 4, new ImagickPixel('black'));
+
+    $blank = new Imagick();
+    $blank->newImage(4, 4, new ImagickPixel('transparent'));
+
+    expect($rasteriser->asksDrewAnything($inked))->toBeTrue()
+        ->and($rasteriser->asksDrewAnything($blank))->toBeFalse();
+
+    $inked->clear();
+    $blank->clear();
+});
+
+it('says a build cannot draw when the drawing itself cannot be read', function () {
+    // The failure the probe has to survive: `readImageBlob()` raises before any histogram
+    // exists, so a delegate that rejects the file answers false rather than crashing the
+    // render. Bytes that are not an SVG at all, which is what a truncated or an
+    // already-corrupted file is.
+    expect((new AskableSvgRasteriser())->asksDrawsAGlyph('not a drawing at all'))->toBeFalse();
+});
+
+it('embeds an SVG as a PNG rather than as a vector no reader can draw', function () {
     // A viewBox and no `width`/`height`, which is an ordinary SVG and one that no
-    // `getimagesize()` can measure on any build — so the extension is all there is to go on.
-    // Treating "would not measure" as "not an image" would have refused it, and with it
-    // every SVG that sizes itself by viewBox.
+    // `getimagesize()` can measure on any build — so the extension is all there is to go
+    // on. Treating "would not measure" as "not an image" would have refused it, and with
+    // it every SVG that sizes itself by viewBox.
+    //
+    // The relationship is the assertion rather than the file name, because the file name
+    // is PHPPresentation's own numbering and the relationship is what PowerPoint follows.
+    // It used to point at an `image/svg+xml` part, one relationship shared by the raster
+    // and the vector where a PowerPoint file has two — well-formed, schema-clean markup,
+    // and a deck that opens with the diagram missing.
+    if (!(new SvgRasteriser())->available()) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
     file_put_contents(
         imageDirectory() . '/mark.svg',
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20">'
@@ -1260,9 +1371,125 @@ it('still embeds an SVG as an SVG', function () {
     );
 
     $pptx = renderDeck("![a mark](mark.svg)\n");
+    $media = array_values(preg_grep(MEDIA_PART, $pptx->parts()));
 
-    expect(array_values(preg_grep(MEDIA_PART, $pptx->parts()))[0])->toEndWith('.svg')
-        ->and($pptx->part(CONTENT_TYPES))->toContain('ContentType="image/svg+xml"');
+    expect($media[0])->toEndWith('.png')
+        ->and($pptx->part(CONTENT_TYPES))->toContain('ContentType="image/png"')
+        ->and($pptx->part(CONTENT_TYPES))->not->toContain('image/svg+xml')
+        ->and($pptx->part('ppt/slides/_rels/slide1.xml.rels'))->toContain('/' . basename($media[0]))
+        ->and($pptx->shapeNames())->toBe(['image']);
+});
+
+it('draws an SVG as a PNG of what this build actually renders', function () {
+    // Asked of the rasteriser rather than through a deck, because the deck refuses on a
+    // build whose delegate drops text — and a rendering claim is not established by
+    // reading the SVG, so what is below is the render itself: a PNG signature and its
+    // size would pass for a blank canvas, and the colour is the part that says a shape
+    // was drawn.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    $path = imageDirectory() . '/solid.svg';
+
+    file_put_contents(
+        $path,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20" viewBox="0 0 40 20">'
+        . '<rect width="40" height="20" fill="#0ac81e"/></svg>',
+    );
+
+    $raster = (new SvgRasteriser())->png($path);
+
+    expect($raster)->not->toBeNull()
+        ->and($raster->bytes)->toStartWith("\x89PNG\r\n\x1a\n")
+        ->and([$raster->width, $raster->height])->toBe([40, 20]);
+
+    $drawn = imagecreatefromstring($raster->bytes);
+    $centre = imagecolorsforindex($drawn, imagecolorat($drawn, 20, 10));
+
+    expect($centre['red'])->toBe(10)
+        ->and($centre['green'])->toBe(200)
+        ->and($centre['blue'])->toBe(30);
+});
+
+it('answers null for a file the delegate will not read rather than an empty picture', function () {
+    // A file that is called an SVG and is not one. Carrying whatever came back would put a
+    // picture-sized hole in the deck, and the deck would open with it blank.
+    if (!extension_loaded('imagick')) {
+        $this->markTestSkipped(NO_RASTERISER);
+    }
+
+    $path = imageDirectory() . '/lies.svg';
+    file_put_contents($path, 'this is not a drawing whatever it is called');
+
+    expect((new SvgRasteriser())->png($path))->toBeNull();
+});
+
+it('refuses an SVG on a PHP with no rasteriser, and names what would fix it', function () {
+    // The branch a build without `ext-imagick` takes, answered through the seam rather than
+    // by unloading the extension, so both branches of the decision run on one build. What
+    // is being checked is the refusal and what it says, and that is the same sentence
+    // whether this machine is short of Imagick or short of a delegate that draws a letter.
+    $path = imageDirectory() . '/diagram.svg';
+
+    file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"/>');
+
+    $converter = new ImageConverter(new GivenSvgRasteriser(false, null));
+
+    expect(fn () => $converter->png(3, 'assets/diagram.svg', $path))
+        ->toThrow(
+            UnsupportedImageFormat::class,
+            'Slide 3 shows "assets/diagram.svg", which is SVG. A .pptx holds a vector only beside a raster of it, '
+            . 'and this PHP cannot draw one: ext-imagick is not loaded, or the SVG delegate it was built with '
+            . 'will not draw a letter. Install ext-imagick, or put a PNG of the drawing in the deck.',
+        );
+});
+
+it('refuses an SVG this build cannot draw rather than writing a blank one', function () {
+    // The other half, and the one that is easy to get wrong the other way: a build that
+    // *has* a rasteriser and will not read this file still gets a refusal, and gets the one
+    // that says so rather than the one about an extension it has already installed.
+    $path = imageDirectory() . '/diagram.svg';
+
+    file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"/>');
+
+    $converter = new ImageConverter(new GivenSvgRasteriser(true, null));
+
+    expect(fn () => $converter->png(2, 'diagram.svg', $path))
+        ->toThrow(
+            UnsupportedImageFormat::class,
+            'Slide 2 shows "diagram.svg", which this build\'s SVG delegate would not draw. '
+            . 'Convert it to PNG and put that in the deck instead.',
+        );
+});
+
+it('refuses a drawing larger than a slide is worth, measured on the drawing', function () {
+    // `MAX_PIXELS` reaches an SVG one rendering behind everything else, because a file
+    // that sizes itself by `viewBox` says how big its coordinate system is and not how big
+    // a picture it is. The number in the failure is the raster's rather than the file's.
+    $path = imageDirectory() . '/vast.svg';
+
+    file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9000 9000"/>');
+
+    $converter = new ImageConverter(new GivenSvgRasteriser(true, new ConvertedImage('x', 9000, 9000)));
+
+    expect(fn () => $converter->png(1, 'vast.svg', $path))
+        ->toThrow(UnsupportedImageFormat::class, 'which measures 9000 x 9000 pixels');
+});
+
+it('carries an SVG that was drawn, at the size it was drawn', function () {
+    // The positive of the two refusals above, and what says the seam is wired: a raster
+    // that comes back is handed on rather than refused, and being under the ceiling
+    // reaches the deck as nothing but a picture.
+    $path = imageDirectory() . '/mark.svg';
+
+    file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"/>');
+
+    $converter = new ImageConverter(new GivenSvgRasteriser(true, new ConvertedImage('drawn', 40, 20)));
+    $carried = $converter->png(1, 'mark.svg', $path);
+
+    expect($carried->bytes)->toBe('drawn')
+        ->and([$carried->width, $carried->height])->toBe([40, 20]);
 });
 
 it('refuses a format nothing here can decode, and names what would work', function () {
@@ -1281,8 +1508,8 @@ it('refuses a format nothing here can decode, and names what would work', functi
 
 it('refuses a file that is not an image at all', function () {
     // A truncated download or a PDF named as a picture. `getimagesize()` answers false for
-    // it, and every carried format but one is a raster, so a name like this saying nothing
-    // is a file that is not the image it claims to be.
+    // it, and every carried format is a raster, so a name like this saying nothing is a
+    // file that is not the image it claims to be.
     file_put_contents(imageDirectory() . '/diagram.png', 'not an image, whatever it is called');
 
     expect(fn () => renderDeck("![a diagram](diagram.png)\n"))

@@ -280,6 +280,14 @@ it('does not claim again what the code does not do', function (string $claim) {
     // finding on new code rather than one still waiting for the next method. The claim was
     // about the block parser of the time, which `BlockTranslator` has now replaced.
     'one more method and the parser is over the ceiling' => 'the next method still breaks that gate',
+    // An SVG was carried into the package as an `image/svg+xml` part, on the strength of
+    // the format declaring one — a deck that opened with the diagram missing, and nothing
+    // in the repository said so. It is drawn now, so a page may not say the file rides
+    // along or that it is the one image nothing is done to. The phrase is the reasoning
+    // rather than the spelling so `CHANGELOG.md`, which has to be able to name what an
+    // SVG used to be written as, is not guarded instead of the live claims.
+    'an svg is carried into the package as the file itself' => 'the only one of these three that is not re-encoded',
+    'an svg is put in the deck unexamined' => 'written into the package byte for byte',
 ]);
 
 it('has no decorative dividers in it', function () {

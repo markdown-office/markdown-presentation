@@ -89,6 +89,8 @@ foreach (glob(SOURCES . '/*.md') ?: [] as $path) {
 
 ksort($markdown);
 
+$refused = [];
+
 foreach ($markdown as $name => $source) {
     if (isset(NOT_BUILT[$name])) {
         $skipped[] = [$name, NOT_BUILT[$name]];
@@ -96,15 +98,23 @@ foreach ($markdown as $name => $source) {
         continue;
     }
 
-    if (!isset(VARIANTS[$name])) {
-        $built[] = build($parser, $name, $source, $name);
+    // A deck this build cannot convert is not a reason to stop: the other twelve are still
+    // worth having, and the one that could not be built is named below with the reason rather
+    // than left as a file from a previous run that looks like it was built just now.
+    try {
+        if (!isset(VARIANTS[$name])) {
+            $built[] = build($parser, $name, $source, $name);
 
-        continue;
-    }
+            continue;
+        }
 
-    foreach (VARIANTS[$name]['theme'] as $theme) {
-        $stem = sprintf('%s-%s', $name, $theme);
-        $built[] = build($parser, $stem, withTheme($source, $theme), $stem);
+        foreach (VARIANTS[$name]['theme'] as $theme) {
+            $stem = sprintf('%s-%s', $name, $theme);
+            $built[] = build($parser, $stem, withTheme($source, $theme), $stem);
+        }
+    } catch (Throwable $e) {
+        $refused[] = [$name, $e->getMessage()];
+        @unlink(OUT . '/' . $name . DECK);
     }
 }
 
@@ -122,9 +132,26 @@ if ($skipped !== []) {
     }
 }
 
+if ($refused !== []) {
+    echo "\nThis build could not convert:\n\n";
+
+    foreach ($refused as [$name, $why]) {
+        printf("  %-30s %s\n", $name . '.md', $why);
+    }
+
+    echo "\n  A gallery missing a deck is not a finished gallery, and one that kept a deck\n";
+    echo "  from a previous run would look finished. This exits non-zero.\n";
+}
+
 echo "\n";
 
 renderPreviews($built);
+
+// After the previews, so a person watching the run sees what was built before being told what
+// was not.
+if ($refused !== []) {
+    exit(1);
+}
 
 /**
  * Convert one source and say what did not fit.

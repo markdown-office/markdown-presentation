@@ -23,6 +23,9 @@
 /.phpunit.cache/
 /.phpunit.result.cache
 
+# The OOXML schemas `tools/install-ooxml-schemas.php` fetches and checksums.
+/tools/ooxml-schemas/
+
 # A local override; the committed configuration is phpunit.xml.dist.
 /phpunit.xml
 

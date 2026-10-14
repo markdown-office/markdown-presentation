@@ -35,6 +35,10 @@ the machines that write them than for the people that do. The renderer is pinned
 commit of the PHPPresentation `master` branch rather than to a tag — see
 [Conformance](#conformance).
 
+`ext-imagick` is optional and enables [SVG](#what-an-svg-costs-you). PowerPoint holds a
+vector only beside a raster of it, so something has to draw the raster; without the
+extension an SVG raises rather than going in as a picture no reader can show.
+
 ## Splitting a deck
 
 A deck is Markdown. Slides are separated by a line of three dashes, and each slide
@@ -934,10 +938,10 @@ tested:
 | `![](../secrets/creds.svg)` | the same, one directory up | the same failure |
 | `![](assets/link.svg)` where `link.svg` is a symlink to `/home/me/.ssh/id_rsa` | the target, verbatim | the same failure |
 
-An `.svg` is the sharp case, because SVG is text and is embedded byte for byte (see
-[Image formats](#image-formats)): reading somebody's `~/.aws/credentials` into a deck is one
-`![a](…)` away. The deck did not have to be trying — a deck written by a model, from a file
-it was given, is enough.
+An `.svg` is the sharp case, because it is a document rather than a picture: reading
+somebody's `~/.aws/credentials` is one `![a](…)` away whether what reaches the deck is its
+bytes or only what was drawn out of them (see [Image formats](#image-formats)). The deck did
+not have to be trying — a deck written by a model, from a file it was given, is enough.
 
 A library of images a deck draws from by name rather than shipping is a real case, so the
 roots are a constructor argument. It is the program's decision, made before a deck is read:
@@ -1020,6 +1024,10 @@ writes whatever media type it finds, so a WebP went into the package as `image/w
 the deck rendered without complaint and opened with the picture missing. The format is
 checked before anything is built instead.
 
+This library carries **GIF, JPEG and PNG** and draws an **SVG** — see
+[What an SVG costs you](#what-an-svg-costs-you) for why the fourth one is not carried and
+what carrying it would have produced.
+
 A format GD can decode — a WebP or a BMP, the two a deck is most likely to name — is
 converted to PNG and the picture is in the deck. The part *is* a PNG, so the conversion is
 visible in the size of the file rather than done quietly. The format is read from the
@@ -1052,10 +1060,11 @@ Slide 1 shows "diagram.png", which this PHP cannot read as an image at all — a
 So are a format nothing here can decode — an ICO, say — and a file whose payload was cut
 short, which measures perfectly and is still not an image anybody can draw.
 
-An SVG is taken on its extension and never measured: `getimagesize()` cannot read one that
-sizes itself by `viewBox`, and before PHP 8.5 it could not read one at all. Every other
+An SVG is taken on its extension and never measured by `getimagesize()`: it cannot read one
+that sizes itself by `viewBox`, and before PHP 8.5 it could not read one at all. Every other
 carried format is a raster, so it is measured, and a picture that claims more than
-**4096 × 4096 pixels** is refused before anything opens it:
+**4096 × 4096 pixels** is refused before anything opens it — which is where the ceiling does
+reach an SVG too, one rendering later:
 
 ```
 Slide 1 shows "bomb.png", which measures 50000 x 50000 pixels. Decoding it is about 9.3 GB of memory, and this render opens no picture over 16777216 pixels: scale it down before putting it in a deck.
@@ -1067,25 +1076,49 @@ than out of a second look at the file.
 
 ### What an SVG costs you
 
-**An SVG is written into the package byte for byte, unexamined.** Nothing here parses one,
-filters one, or measures one, and that is not an oversight that could be fixed here: an SVG
-is arbitrary XML with scripts, external references and embedded HTML in it, and a correct
-sanitiser is a parser and a policy about what to drop. This library has no claim to either,
-so it does not pretend to.
+**An SVG is drawn, and the drawing is what goes in.** The format does have a part for a
+vector and `ContentTypes` declares it, and writing that part is what produced a deck
+PowerPoint cannot show. Its own anatomy is a raster in `a:blip` with an `asvg:svgBlip`
+extension on the same element pointing at a second relationship; PHPPresentation writes one
+relationship and points both the raster and the vector at it. No schema check sees that —
+the part and the relationship are well-formed, and only opening the deck shows the gap — so
+the file is drawn here instead and the part in the package is a PNG.
 
-What that means in practice:
+That is a loss, and it is the price:
 
-- the file is in the deck whatever it contains — `<script>`, `<foreignObject>`, or
-  `<image href="https://tracker.example/pixel">`;
-- what any reader does with that is the reader's business. PowerPoint does not run a script
-  out of an SVG; a browser, a preview service and a converter to HTML or PDF all might;
-- the `MAX_PIXELS` bound above does not apply to an SVG, because nothing here opens one.
+- the deck carries a raster, so a diagram is a picture at the size it was drawn and nothing
+  more. Zoom in far enough and it is pixels.
+- what the raster shows is what *this machine's* rasteriser shows. `ext-imagick` is the
+  rasteriser, and a build of it with no SVG delegate — ImageMagick's own renderer rather
+  than librsvg — does not draw `<text>` or `<path>` at all. Measured on this repository's
+  own `diagram.svg`: the background, the circle and the panel came through, and the
+  chevron and the words were not in the raster.
 
-So an SVG is the one image this library will not tell you anything about. If a deck can come
-from somebody you would not hand a file to, treat the output as untrusted: render it, then
-open it somewhere isolated, and prefer a raster. The containment rule above still applies —
-an SVG is read from a directory the caller allowed, like any other picture — but what is
-inside it is nobody's decision but yours.
+So the extension is asked whether it can draw a letter rather than whether the `SVG` format
+is registered, because a build that answers yes to the second question and no to the first
+returns a picture with its words missing and says nothing. A deck naming an SVG on such a
+build is refused rather than rendered:
+
+```
+Slide 3 shows "diagram.svg", which is SVG. A .pptx holds a vector only beside a raster of it, and this PHP cannot draw one: ext-imagick is not loaded, or the SVG delegate it was built with will not draw a letter. Install ext-imagick, or put a PNG of the drawing in the deck.
+```
+
+A file this build's delegate will not read at all is refused the same way, with a message
+that says the file rather than the extension — an SVG that is not one, or markup the
+delegate cannot draw.
+
+**`ext-imagick` is optional**, and the `suggest` in `composer.json` says what it buys. GD
+has no way to read a vector in any PHP version, so there is nothing else to fall back to and
+nothing to fall back *to* silently.
+
+The `MAX_PIXELS` bound above reaches an SVG one rendering behind every other format. A file
+that sizes itself by `viewBox` says how big its coordinate system is, not how big a picture
+it is, so the ceiling is measured on the raster and the number in the failure is the
+raster's.
+
+The containment rule further up still applies: an SVG is read from a directory the caller
+allowed, like any other picture, and what is inside it is parsed by a rasteriser rather than
+by PowerPoint.
 
 ### What the theme reaches
 

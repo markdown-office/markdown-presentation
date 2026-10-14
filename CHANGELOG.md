@@ -297,6 +297,76 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **An SVG was embedded as a vector, which is a deck PowerPoint opens with the picture
+  missing.** The format does carry `image/svg+xml` and PHPPresentation declared it, so
+  nothing anywhere objected: the part was well-formed, the relationship resolved, and the
+  file passed every check that reads markup. What PowerPoint writes is two relationships —
+  a raster in `a:blip` with an `asvg:svgBlip` extension on the same element pointing at a
+  second one — and PHPPresentation writes one and points both the raster and the vector at
+  it. The shape was a picture no reader had a way to draw.
+
+  An SVG is now **drawn**, and the part in the package is a PNG — the same `ConvertedImage`
+  path a converted WebP takes, so it keeps its proportions and is fitted to its box the
+  same way. `Render\SvgRasteriser` is the new class, and it owns the whole of it.
+
+  **`ext-imagick` is optional and is now in `suggest`.** GD cannot read a vector in any
+  PHP version, so there is no imagick-free path and one was not invented. Where the
+  extension cannot draw, the deck is refused by name rather than rendered:
+
+  ```
+  Slide 3 shows "diagram.svg", which is SVG. A .pptx holds a vector only beside a raster of it, and this PHP cannot draw one: ext-imagick is not loaded, or the SVG delegate it was built with will not draw a letter. Install ext-imagick, or put a PNG of the drawing in the deck.
+  ```
+
+  What counts as "cannot draw" is not `extension_loaded()`. A build of Imagick with no SVG
+  delegate registers `SVG` anyway, hands the file to ImageMagick's own renderer, and
+  returns a picture with every `<text>` and `<path>` in it dropped — it does not fail, so
+  the capability is probed by drawing a letter. That is the same probe and the same
+  argument the Word half uses, and here it matters more rather than less: Word keeps the
+  vector beside the raster, so a weak delegate costs fidelity, whereas here the raster is
+  the only copy.
+
+  The loss is real and is written down: the deck carries a raster, so a diagram is a
+  picture at the size it was drawn, and what it shows is what the machine that drew it
+  shows. `MAX_PIXELS` reaches an SVG one rendering behind every other format for the same
+  reason — a file that sizes itself by `viewBox` says how big its coordinate system is, not
+  how big a picture it is — so the ceiling is measured on the raster and the number in the
+  failure is the raster's.
+
+  `examples/markdown/07-images.md` slide 3 holds an SVG and needs a build that can draw
+  one; every other example deck is unaffected.
+
+- **PowerPoint refused to open seven of the decks in this repository.** It offered to repair
+  them — "could not read some of the content … and removed it" — and opened the repaired copy,
+  so nothing looked wrong until a person opened the file. The per-block spacing above is written
+  as `a:spcAft` and `a:spcBef` in points, and a heading's trailing gap is a fraction of the
+  heading's own size: `0.35 × 22` is not `7.7` in binary floating point but `7.699999999999999`.
+  PHPPresentation writes a point measure by multiplying by a hundred without rounding
+  (`AbstractSlide::writeParagraphStyles`), which turned that into `a:spcPts val="769.9999999999999"`,
+  and `ST_TextSpacingPoint` is an integer type. LibreOffice reads the value and does not care,
+  so every render and every structural check on this machine passed.
+
+  | Was | Now |
+  | --- | --- |
+  | a spacing measure printed as the double it was | rounded to the nearest whole number, which is all the type allows |
+
+  Rounding at the writer is the only place that works: a float times a hundred is integral only
+  for the multiples of a quarter point, so a theme stating its gaps in anything finer cannot be
+  carried correctly *into* the writer, and choosing theme values that happen to be exact would
+  have traded a repair prompt for a silent constraint on the spacing model. All thirteen decks
+  now validate against the ECMA-376 schemas.
+
+- **A speaker note was written as a notes slide that nothing held up.** `::note` produced
+  `ppt/notesSlides/notesSlideN.xml` and no `ppt/notesSlides/_rels/` beside it, no
+  `ppt/notesMasters/` at all, and no `notesMasterIdLst` in `presentation.xml`. PowerPoint opens
+  a deck in that state and prints the note, so the file worked and was nevertheless not a
+  `.pptx`: a consumer resolving a part through the relationship that points at it finds
+  nothing, and the notes master a notes slide inherits its text formatting from did not exist.
+  The slide names its notes slide, so the other two links are now written from that pairing —
+  read out of the slide's own relationship rather than from the number in the file name. The
+  notes master takes its colour map from the slide master and its theme relationship points at
+  the presentation's existing theme part, so a note is drawn in the deck's own fonts rather than
+  a second set of defaults nobody chose. A deck with no note in it is not touched at all.
+
 - **A numbered list that begins above one counts on.** `7.` and `8.` rendered as `7.` and `7.`
   outside PowerPoint. PHPPresentation writes the start of a numbering on every paragraph of it
   and leaves the reader to count on, which PowerPoint does and LibreOffice does not — it restarts

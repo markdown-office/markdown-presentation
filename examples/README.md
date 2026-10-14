@@ -23,7 +23,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does |
 | `05-steps.md` | `05-steps.pptx` | `::click` steps as click animations on one slide, a `:::click` region that is a step of its own, a build-up across two columns, a `::column` written inside a region, a picture held back for its own click, and a `::note` |
 | `06-tables.md` | `06-tables.pptx` | Table alignment, a bold filled header, widths from content |
-| `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column, and the three layouts built around one: `image-text`, `image-title` and `image-slide` |
+| `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column, a WebP converted to PNG, an SVG drawn to PNG, and the three layouts built around one: `image-text`, `image-title` and `image-slide` |
 | `08-code.md` | `08-code.pptx` | Code blocks |
 | `09-inline-markup.md` | `09-inline-markup.pptx` | A `title:` carrying `**bold**` and `*italic*` |
 | `10-rejected.md` | **nothing** | Conditional content the way Slidev writes it |
@@ -34,6 +34,16 @@ quietly. The profile and the scratch script go to the temporary directory, so
 `10-rejected.md` names a directive this library does not have. Converting it is
 the failure it exists to demonstrate, so `build.php` leaves it alone and says
 which file and why.
+
+## The one that needs a rasteriser
+
+`07-images.md` slide 3 holds an SVG, and a `.pptx` cannot hold a vector on its
+own — PowerPoint keeps one beside a raster of it, which is what has to be drawn
+first. That is `ext-imagick`, and it is optional, so this deck needs a build
+whose Imagick can draw one: on a build with only ImageMagick's own SVG renderer
+the diagram loses its text and its chevron, and the conversion refuses rather
+than producing that. A build without `ext-imagick` at all refuses it too, naming
+the file. Every other deck here builds either way.
 
 ## Things worth looking at in the output
 
@@ -57,6 +67,11 @@ A few of these are here because the render is the only honest evidence:
 - **`07`, the `image-text` slide.** The picture is in the *wider* column and the
   text in the narrower one, because a reader looks at the image first. It
   divides at a `::column` exactly as `two-column` does.
+- **`07`, the `two-column` slide.** The picture is an SVG, and the part in the
+  `.pptx` is a PNG of it drawn at the file's own 320 × 200 — a vector is drawn
+  rather than carried, because a relationship pointing at an `image/svg+xml` part
+  is a deck PowerPoint opens with the diagram missing. It takes the same path as
+  the WebP on slide 2, so it keeps its proportions the same way.
 - **`07`, the `image-slide` slide.** The picture is the slide: no headline, and
   no margin either — the box it is fitted to is the whole page. The logo is
   square and the page is not, so the picture keeps its own proportions inside
