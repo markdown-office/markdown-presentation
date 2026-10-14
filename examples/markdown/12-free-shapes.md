@@ -1,15 +1,31 @@
 ---
+title: Free shapes
 theme: default
+description: Shapes a deck places itself, beside the ones a layout places.
 ---
+
+# Free shapes
+
+Twelve directives in the body of a slide put a shape where the deck wants it rather than where
+the layout would. They are written in the two-colon syntax the step markers use, measured in
+fractions of the slide, and coloured in theme slots so they follow the theme.
+
+The three slides after this one are all `layout: blank`, which is what most of them want: a
+slide whose whole content is free shapes has no title to place them around.
+
+- `left` `top` `width` `height` — where the box is
+- `anchor` — which corner those two name
+- `layer` — before the layout's own shapes or after them
+- `fill` `stroke` `alpha` `stroke-width` — what it is painted with
+- `:::content` — Markdown, in a box the deck sized
 
 ---
 layout: blank
 ---
 
-# Free shapes
+# A panel, a badge and a chevron
 
-Every shape on this slide is placed by the deck rather than by the layout. They are written in
-fractions of the slide, coloured in theme slots, and one of them is behind the text.
+One of these shapes is behind the text and two are over it, and none of them is in a column.
 
 ::rectangle{left=4% top=30% width=92% height=64% fill=panel layer=back}
 
@@ -46,13 +62,14 @@ is the only way a percentage is any use for centring.
 
 ::circle{left=30% top=42% width=14% height=14% fill=accent3 anchor=center}
 
-::ellipse{left=30% top=42% width=20% height=14% fill=none stroke=accent1 stroke-width=2}
+::ellipse{left=30% top=42% width=20% height=14% fill=none stroke=accent1 stroke-width=2 anchor=center}
 
 ::image{src="assets/logo.png" left=58% top=40% width=30% height=20% fit=contain alt="The logo"}
 
-:::content{left=6% top=74% width=88% height=16% font-size=14 align=center}
-The ellipse is 20% of the slide wide and 14% of it tall; the circle is 14% of the height on
-both axes, which is what a circle's percentages resolve against.
+:::content{left=6% top=72% width=88% height=20% font-size=14 align=center}
+Both shapes are `anchor=center` on the same two numbers, so they share a centre. The ellipse is
+20% of the slide wide and 14% of it tall; the circle is 14% of the height on both axes, which is
+what a circle's percentages resolve against.
 :::
 
 ---
@@ -61,7 +78,7 @@ layout: blank
 
 # What the shapes draw
 
-Nine ink shapes and a picture. Each is one shape, and a rule is a rectangle a pixel tall
+Ten ink shapes and a picture. Each is one shape, and a rule is a rectangle a pixel tall
 rather than a connector — which is what a `---` has always been.
 
 ::rectangle{left=6% top=34% width=11% height=12% fill=accent1}
