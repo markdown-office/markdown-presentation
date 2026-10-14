@@ -38,6 +38,7 @@ use MarkdownPresentation\Render\Run;
 use MarkdownPresentation\Render\SlideBlocks;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
+use MarkdownPresentation\Theme\Theme;
 
  /**
   * How a slide's text is read: the inline markup of a run, and the blocks a slide is made of.
@@ -49,10 +50,19 @@ use MarkdownPresentation\Tests\Support\Scratch;
 
 /**
  * A slide's content as the parser read it: its blocks and the column each was written for.
+ *
+ * The theme is the library's own, because a free shape may be written in its colours and
+ * resolving one needs the theme a deck named.
  */
 function slideContentOf(string $markdown): SlideBlocks
 {
-    return (new BlockTranslator())->parse($markdown, 1, Scratch::directory(), deckScope(Scratch::directory()));
+    return (new BlockTranslator())->parse(
+        $markdown,
+        1,
+        Scratch::directory(),
+        deckScope(Scratch::directory()),
+        Theme::defaults(),
+    );
 }
 
 /**
@@ -551,7 +561,8 @@ it('refuses a ::: container, naming the alternatives', function () {
         ->toThrow(
             UnknownDirective::class,
             'Slide 1 opens the container "::: note", which is not something a slide draws. Three colons '
-            . 'open a step region as ":::click" and close it as ":::"; divide a deck with a "---" line, '
+            . 'open a step region as ":::click" and close it as ":::"; a placed text block is '
+            . '":::content" with its Markdown between the fences; divide a deck with a "---" line, '
             . 'write a section as a heading, and write a note as a quote: "> ".',
         );
 });
@@ -586,9 +597,11 @@ it('refuses a leaf directive under a name this format does not draw', function (
     expect(fn () => blocksOf("# One\n\n::bogus\n"))
         ->toThrow(
             UnknownDirective::class,
-            'Slide 1 opens the directive "::bogus", which is not something a slide draws. Two colons '
-            . 'mark a step as "::click" or a column as "::column"; three open a step region as '
-            . '":::click" and close it as ":::"; write a note as "::note", its text, and a closing "::".',
+            'Slide 1 opens the directive "::bogus", which is not something a slide draws. The free shapes '
+            . 'are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, line, rectangle, '
+            . 'roundrect, triangle. Two colons mark a step as "::click" or a column as "::column" and '
+            . 'three open a step region as ":::click"; a placed text block is ":::content" with its '
+            . 'Markdown between the fences.',
         );
 });
 
@@ -872,7 +885,7 @@ it('has no lines for a node the parser built for itself', function () {
     // league counts lines for the blocks it read out of the deck and not for the nodes it
     // assembled around them, and reading a line that is not there has to be an empty answer
     // rather than a warning: a table's rows carry their text and no line of the deck.
-    $state = new SlideState(1, __DIR__, deckScope(__DIR__), ['# One']);
+    $state = new SlideState(1, __DIR__, deckScope(__DIR__), ['# One'], Theme::defaults());
     $built = new LeagueParagraph();
 
     expect($state->lines($built))->toBe([])

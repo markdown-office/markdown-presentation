@@ -297,6 +297,23 @@ it('does not claim again what the code does not do', function (string $claim) {
     // SVG used to be written as, is not guarded instead of the live claims.
     'an svg is carried into the package as the file itself' => 'the only one of these three that is not re-encoded',
     'an svg is put in the deck unexamined' => 'written into the package byte for byte',
+
+    // A free shape past the edge of the slide was clamped to it, which is the one outcome this
+    // library will not have: a deck that renders, showing a shape somewhere the author did not
+    // put it, and nothing in the file to say so. It is refused with the numbers now, so no page
+    // or comment may argue that a shape off the slide is pulled back onto it. `CHANGELOG.md`
+    // has to be able to name what it used to do, so the phrase is the reasoning rather than the
+    // spelling.
+    'a free shape past the edge is pulled back onto it' => 'is moved to fit inside the slide',
+    // `fit=cover` is refused rather than drawn as `contain`: it is a crop, and PHPPresentation
+    // writes a picture either proportional or stretched with nowhere to put the crop rectangle.
+    // A deck asking for it must be told, not given something else — so a page may not claim a
+    // free picture fills its box and loses its edges.
+    'a free picture fills its box and loses its edges' => 'fills the box and crops',
+    // A dashed outline on a free shape. An autoshape's stroke is one colour and one width in
+    // the file PHPPresentation writes, so a dash is not something this library can draw and is
+    // refused by name rather than dropped — and a page may not claim one is offered.
+    'a free shape can be given a dashed outline' => 'a dashed outline on a free shape',
 ]);
 
 it('has no decorative dividers in it', function () {

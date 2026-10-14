@@ -7,16 +7,22 @@ namespace MarkdownPresentation\Render\CommonMark;
 use League\CommonMark\Node\Block\AbstractBlock;
 use League\CommonMark\Node\Node;
 use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Render\Free\FreeShape;
+use MarkdownPresentation\Theme\Theme;
 
 /**
  * Where the walk has got to on one slide, and what it is walking.
  *
  * A block carries the step it appears on, and a column is where a block is drawn rather than
  * anything about the block, so the walk holds both as it goes and hands each block the pair
- * as it writes it. They are held on one object rather than passed along as arguments
- * because a region's opener writes the step for everything inside it and its closer writes
- * the column for everything after it, and a walk that carried them as values would have to
- * return the one it moved and take the other by reference.
+ * as it writes it. A free shape carries a step and no column, for the same reason, and goes on
+ * the state beside them: it is placed rather than laid out, so nothing about where the layout
+ * would have put it applies to it and a column would only be a thing to keep it out of.
+ *
+ * The theme is here for the same reason the directory and the file scope are: resolving
+ * `fill=panel` needs the theme the deck named, and a directive naming an attribute nothing
+ * reads has to be refused before anything is built rather than after a shape exists to refuse
+ * it on.
  *
  * The lines the deck was written as are held too. CommonMark normalises the text it parses —
  * a code block loses the indentation of its fence, a paragraph loses the trailing space of
@@ -31,10 +37,17 @@ final class SlideState
     /** The column a slide with no marker in it is written for, which is the first of them. */
     public int $column = 0;
 
-    /** How many `::column` markers the slide has written, whether or not a block follows. */
+    /** How many `::column` markers the slide has written, whether or not a block follows it. */
     public int $markers = 0;
 
     /**
+     * The shapes the slide placed itself, in the order the deck wrote them.
+     *
+     * @var list<FreeShape>
+     */
+    private array $shapes = [];
+
+        /**
      * @param list<string> $lines The slide's content, one entry per line.
      */
     public function __construct(
@@ -42,7 +55,30 @@ final class SlideState
         public readonly string $directory,
         public readonly PathScope $files,
         private readonly array $lines,
+        public readonly Theme $theme,
     ) {
+    }
+
+    /**
+     * A shape the deck placed itself, which the layout has nothing to do with.
+     *
+     * Here rather than handed back up the walk because it is not a block: {@see
+     * \MarkdownPresentation\Render\SlideBlocks} carries it in a list of its own and {@see
+     * \MarkdownPresentation\Render\PresentationRenderer} writes it beside the layout's shapes,
+     * and neither of those is a decision the walk can make — a walk that returned shapes would
+     * have to return them as something, and there is no block here.
+     */
+    public function place(FreeShape $shape): void
+    {
+        $this->shapes[] = $shape;
+    }
+
+    /**
+     * @return list<FreeShape>
+     */
+    public function shapes(): array
+    {
+        return $this->shapes;
     }
 
     /**
@@ -71,8 +107,8 @@ final class SlideState
     /**
      * The line a node starts on, which is what a refusal about it quotes.
      *
-     * `array_slice()` rather than an index, because a node the parser built for itself has
-     * no lines and an index that is not there is a warning rather than a sentence.
+     * `array_slice()` rather than an index, because a node the parser built for itself has no
+     * lines and an index that is not there is a warning rather than a sentence.
      */
     public function written(Node $node): string
     {

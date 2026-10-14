@@ -8,6 +8,54 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Twelve directives that place a shape themselves, so one slide can be styled freely.**
+  `::rectangle`, `::roundrect`, `::ellipse`, `::circle`, `::triangle`, `::diamond`,
+  `::chevron`, `::hexagon`, `::arrow`, `::line`, `::image` and `:::content` … `:::` are
+  written in the body of a slide, in the same two-colon syntax the step markers use:
+
+  ```markdown
+  ::rectangle{left=0 top=30% width=100% height=64% fill=panel layer=back}
+
+  :::content{left=8% top=47% width=52% height=42% font-size=15}
+  ## Fill, stroke, alpha
+  :::
+  ```
+
+  Everything above this is laid out for you. A free shape is placed by the deck, in pixels or
+  in fractions of the slide, and coloured in the theme's own slots so it survives a theme
+  swap. Three decisions are worth knowing:
+
+  - **A box lies within the slide, and one that does not is refused with the numbers.**
+    Clamping it would be a shape quietly drawn somewhere the author did not ask for, and
+    nothing in the file would say so. `left=0 width=100%` is exactly the edge, so full bleed
+    is still one spelling.
+  - **An attribute a directive does not read is refused rather than ignored**, and the failure
+    names the attributes that one does. An ignored attribute is the one mistake in a
+    vocabulary like this that leaves no trace at all: a shape drawn without the fill that was
+    asked for, on a deck that looks rendered.
+  - **A placed text block is one shape.** It holds the blocks a text frame holds anywhere
+    else — paragraphs, headings, lists, quotes — and a table, a code block, a picture or a
+    rule inside one is refused by name. A shape's id in the file is its position in the
+    slide's shape collection, and the renderer counts them rather than looking them up, so a
+    body that could produce two shapes would put the click chain and the file out of step.
+
+  `layer=back` writes a shape before the layout's own and `layer=front` after, so a panel
+  behind a slide's text and a badge over it are the same attribute with two values. A free
+  shape sits on the step it was written on, so a `::click` above one reveals it like any
+  other. Text that does not fit is clamped and reported by `overflows()`, with no column
+  behind the entry — there is no column, and putting `0` there would be a number in front of
+  nothing.
+
+  Two things are **not** offered and are refused by name rather than approximated: `fit=cover`,
+  which is a crop rather than a fit and has nowhere to go in the shape PHPPresentation
+  writes; and a dashed outline, because an autoshape's stroke is one colour and one width.
+  A label in brackets is refused too — a free shape has nowhere to put one.
+
+  `MarkerStartParser` now stands aside for a `:::` container whose name it draws, which is
+  what lets the generic directives extension parse `:::content` as a container with a body
+  rather than have the marker parser take every three-colon line. Everything a `:::click`
+  region does is unchanged.
+
 - **A fourth theme, `dense`, and a deck that exists to be looked at twice.**
   `themes/corporate-dark` is the one that was larger than the library's own scale; nothing
   shipped that was smaller, and a spacing model that is a fraction of a type size is only
@@ -18,6 +66,25 @@ All notable changes to this project are documented here. The format follows
   theme's `headings` scale says.
 
 ### Changed
+
+- **`UnknownDirective::container()` and `::leaf()` now name the free shapes**, because
+  `::content` and `::rectangle` are the two names an author who has met this library is most
+  likely to reach for, and a refusal that does not mention them reads as a refusal of the
+  whole idea rather than of the spelling. Both messages also say what a placed text block
+  looks like, which is the one thing a `:::` line can be that is not a step region.
+
+- **`BlockTranslator::parse()` takes the theme**, and `SlideState` carries it. A free shape may
+  be written in the theme's colours, so `fill=panel` is a reference that needs the theme a deck
+  named — and an attribute nobody reads has to be refused before anything is built, which is
+  before there is a shape to hand a colour to.
+
+- **`SlideBlocks` carries a fourth list, the shapes the deck placed itself**, beside the
+  blocks and the columns. They are not blocks: a free shape is placed rather than laid out,
+  takes no column, and is not measured against the layout's box.
+
+- **`PresentationRenderer::overflows()` reports a `null` column** for a block that is in no
+  column, which today means a free text block. Saying `column 0` about one would be a number
+  in front of nothing.
 
 - **Public methods removed from `Render\SlideGeometry`, `Render\TextFrame` and
   `Render\ShapeWriter`.** All of them went because the behaviour they served went:

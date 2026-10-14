@@ -15,18 +15,23 @@ use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
 
 /**
- * One slide's blocks, the column each of them was written for, and how many `::column`
- * markers the deck wrote.
+ * One slide's blocks, the column each of them was written for, how many `::column` markers the
+ * deck wrote, and the shapes the deck placed itself.
  *
- * A parallel list rather than a property on the blocks because nothing about a block depends
- * on where it is drawn: the same paragraph is the same paragraph in either column, so the
+ * A parallel list rather than a property on the blocks because nothing about a block depends on
+ * where it is drawn: the same paragraph is the same paragraph in either column, so the
  * number would be carried by eight classes, a text frame, two synthetic headings and every
  * construction site of all of them, for one reader. The lists are checked against each other
  * here instead, once, rather than at every `visible()`.
  *
+ * The shapes are here for the same reason and not as a block: one is placed rather than laid
+ * out, takes no column, and is not measured against the layout's box — {@see
+ * \MarkdownPresentation\Render\Free\FreeShape} says so at the type, and putting one in the
+ * block list would put it back into a column.
+ *
  * The columns are zero-based and are not necessarily contiguous: a slide that opens on
- * `::column` has no block in column zero, and the renderer draws that column empty rather
- * than moving a block back into it.
+ * `::column` has no block in column zero, and the renderer draws that column empty rather than
+ * moving a block back into it.
  *
  * The marker count is beside the columns because a marker with nothing after it leaves no
  * block to show for it, and the renderer has to refuse it all the same: a rule that depended
@@ -42,6 +47,7 @@ final class SlideBlocks
      * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks In reading order.
      * @param list<int>                                                      $columns The column each block was written for, index by index.
      * @param int                                                            $columnMarkers How many `::column` markers the deck wrote, whether or not a block follows each one.
+     * @param list<\MarkdownPresentation\Render\Free\FreeShape>             $shapes The shapes the deck placed itself, in the order it wrote them.
      *
      * @throws Exception When the two lists are not the same length, or when the marker count
      *                   is below the column a block was written for.
@@ -59,6 +65,7 @@ final class SlideBlocks
         private readonly array $blocks,
         private readonly array $columns,
         private readonly int $columnMarkers,
+        private readonly array $shapes = [],
     ) {
         if (count($blocks) !== count($columns)) {
             throw new Exception(sprintf(
@@ -112,5 +119,15 @@ final class SlideBlocks
     public function columnMarkers(): int
     {
         return $this->columnMarkers;
+    }
+
+    /**
+     * The shapes the deck placed itself, in the order it wrote them.
+     *
+     * @return list<\MarkdownPresentation\Render\Free\FreeShape>
+     */
+    public function shapes(): array
+    {
+        return $this->shapes;
     }
 }

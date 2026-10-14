@@ -174,12 +174,16 @@ function build(DeckParser $parser, string $name, string $source, string $stem): 
     $renderer->render($parser->parse($source), $path);
 
     foreach ($renderer->overflows() as $overflow) {
+        // No column for a shape the deck placed itself, and saying `column 1` about one would
+        // be a number in front of nothing.
         printf(
-            "  %-24s clamped: slide %d step %d column %d: %s wanted %dpx, %dpx left\n",
+            "  %-24s clamped: slide %d step %d %s: %s wanted %dpx, %dpx left\n",
             $stem . DECK,
             $overflow['slide'],
             $overflow['step'],
-            $overflow['column'] + 1,
+            $overflow['column'] === null
+                ? sprintf('placed "%s"', $overflow['block'])
+                : sprintf('column %d', $overflow['column'] + 1),
             $overflow['block'],
             $overflow['wanted'],
             $overflow['available'],

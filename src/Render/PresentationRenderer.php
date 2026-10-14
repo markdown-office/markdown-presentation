@@ -29,8 +29,11 @@ use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
 use MarkdownPresentation\Render\CommonMark\BlockTranslator;
 use MarkdownPresentation\Render\CommonMark\InlineTranslator;
+use MarkdownPresentation\Render\Free\FreeShape;
+use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
+use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeResolver;
 use PhpOffice\PhpPresentation\PhpPresentation;
 use PhpOffice\PhpPresentation\Slide as WrittenSlide;
@@ -63,6 +66,11 @@ use PhpOffice\PhpPresentation\Slide\SlideLayout;
  * the directive's own text. That last one is the case this library exists for: a deck
  * written by a model, a directive it does not know, and a slide with the directive printed
  * on it reads as a rendered deck.
+ *
+ * A **free shape** is the other half of what a slide's body can carry, and this renderer is
+ * where it is drawn: {@see \MarkdownPresentation\Render\Free\FreeShape} is placed rather than
+ * laid out, so it takes no column and is not measured against the layout's box — see
+ * {@see self::placed()}, which is the write order a `layer` decides.
  *
  * Two things it does not do are somebody else's job, and both classes that do them sit in
  * this directory rather than being reached through a caller: {@see MasterLayouts} writes the
@@ -120,7 +128,7 @@ final class PresentationRenderer
      * Every block that did not fit its slide during the last render, in the order they were
      * laid out.
      *
-     * @var list<array{slide: int, step: int, column: int, block: string, wanted: int, available: int}>
+     * @var list<array{slide: int, step: int, column: ?int, block: string, wanted: int, available: int}>
      */
     private array $overflows = [];
 
@@ -171,7 +179,7 @@ final class PresentationRenderer
      * one deck: a caller converting several in a loop wants the last one's overflows, not
      * all of them.
      *
-     * @return list<array{slide: int, step: int, column: int, block: string, wanted: int, available: int}>
+     * @return list<array{slide: int, step: int, column: ?int, block: string, wanted: int, available: int}>
      */
     public function overflows(): array
     {
@@ -185,6 +193,9 @@ final class PresentationRenderer
      * @throws MalformedTemplate When the theme's `template.pptx` cannot be read.
      * @throws TooManySlides    When the deck asks for more slides than {@see self::MAX_SLIDES}.
      * @throws \MarkdownPresentation\Exception\Exception When the file cannot be written.
+     *
+     * @throws \MarkdownPresentation\Exception\MalformedShape When a free-placement directive
+     *     names an attribute it does not read, or gives one a value it cannot be.
      *
      * @return string The path written.
      */
@@ -220,7 +231,7 @@ final class PresentationRenderer
         $layouts = MasterLayouts::build($presentation, $deck, $theme, $used, $this->blocks->inline());
 
         $writer = new ShapeWriter($theme->theme(), $geometry);
-        $blocks = $this->blocks($deck);
+        $blocks = $this->blocks($deck, $theme->theme());
         $builds = [];
 
         foreach ($deck->slides() as $slide) {
@@ -293,14 +304,19 @@ final class PresentationRenderer
      * all — an image that does not resolve, a marker that goes backwards — is a failure with
      * no file written behind it, rather than one found after the first few slides are built.
      *
+     * The theme comes with the deck because a free shape may be written in its colours, and
+     * resolving `fill=panel` needs the theme the deck named. Refusing `fill=chartreuse` once a
+     * shape exists would be too late to have written no file.
+     *
      * @return array<int, SlideBlocks>
      *
      * @throws ImageNotFound
+     * @throws \MarkdownPresentation\Exception\MalformedShape
      * @throws UnknownDirective
      * @throws UnknownMarker
      * @throws UnsupportedImageFormat
      */
-    private function blocks(Deck $deck): array
+    private function blocks(Deck $deck, Theme $theme): array
     {
         $blocks = [];
 
@@ -310,6 +326,7 @@ final class PresentationRenderer
                 $source->index() + 1,
                 $this->directory,
                 $this->files,
+                $theme,
             );
         }
 
@@ -526,7 +543,96 @@ final class PresentationRenderer
             $next++;
         }
 
-        return $this->stack($slide, $content, $role, $writer, $source->index() + 1, $geometry, $next);
+        return $this->placed($slide, $content, $role, $writer, $source->index() + 1, $geometry, $next);
+    }
+
+    /**
+     * Every shape on a slide, in the order they are written, and the step each appears on.
+     *
+     * Three passes, and the order is the whole of what `layer` means: a later shape in
+     * `p:spTree` is drawn over an earlier one, so a panel behind a slide's text has to be
+     * written before the text and nothing else will put it there. A shape with no `layer` is
+     * written last — on top of the layout's own shapes, which is the only thing that lets a
+     * badge sit over a title.
+     *
+     * A placed text block is measured against the box the deck gave it and clamped to it, and
+     * reported through {@see self::overflow()} when it did not fit: the same clamp-then-say
+     * rule every other block in this renderer follows, because a text block that quietly lost
+     * its last paragraph is the failure this library exists to avoid.
+     *
+     * The ids are counted rather than looked up because a shape's id is its position in the
+     * slide's shape collection — the tree's own group is 1, and PHPPresentation's
+     * `writeShapeCollection()` increments before it uses the number — and both
+     * {@see ShapeWriter::free()} and {@see ShapeWriter::write()} add exactly one shape per
+     * call, which is what makes counting them the same as asking the file.
+     *
+     * @param SlideBlocks $content The slide's blocks, its columns and the shapes it placed itself.
+     *
+     * @return array<int, int> Shape id to the step it appears on, in write order.
+     *
+     * @throws UnsupportedColumn
+     */
+    private function placed(
+        WrittenSlide $slide,
+        SlideBlocks $content,
+        LayoutRole $role,
+        ShapeWriter $writer,
+        int $number,
+        SlideGeometry $geometry,
+        int $first,
+    ): array {
+        $steps = [];
+        $next = $first;
+
+        foreach ($content->shapes() as $shape) {
+            if (!$shape->isBack()) {
+                continue;
+            }
+
+            $steps[$next] = $this->shape($slide, $shape, $writer, $number);
+            $next++;
+        }
+
+        foreach ($this->stack($slide, $content, $role, $writer, $number, $geometry, $next) as $id => $step) {
+            $steps[$id] = $step;
+        }
+
+        foreach ($content->shapes() as $shape) {
+            if ($shape->isBack()) {
+                continue;
+            }
+
+            $steps[$next] = $this->shape($slide, $shape, $writer, $number);
+            $next++;
+        }
+
+        return $steps;
+    }
+
+    /**
+     * One placed shape, drawn at the height it asked for or as small as its box allows.
+     *
+     * Only a text block is measured: the other two are exactly the box the deck gave them, and
+     * a picture's own ratio is what {@see \MarkdownPresentation\Render\ShapeWriter} fits it to.
+     */
+    private function shape(WrittenSlide $slide, FreeShape $shape, ShapeWriter $writer, int $number): int
+    {
+        $box = $shape->placement->box;
+        $height = $box->height;
+
+        if ($shape instanceof FreeText) {
+            $wanted = $writer->sized($shape->frame, $box, $box->height, $shape->style->size);
+
+            if ($wanted > $height) {
+                $this->overflow($number, $shape->step, null, $shape->name(), $wanted, $height);
+            }
+
+            $height = max(min($wanted, $height), SlideGeometry::MIN_SIZE);
+        }
+
+        $writer->free($slide, $shape, $box, $height);
+
+        return $shape->step;
     }
 
     /**
@@ -615,6 +721,7 @@ final class PresentationRenderer
         $blocks = $content->blocks();
         $columns = $content->columns();
         $markers = $content->columnMarkers();
+        $shapes = $content->shapes();
         $heading = null;
         $at = 0;
 
@@ -638,7 +745,7 @@ final class PresentationRenderer
             // blank slide's title already is.
             return $hasTitleBox
                 ? $content
-                : new SlideBlocks([$this->titleHeading($title, $depth), ...$blocks], [0, ...$columns], $markers);
+                : new SlideBlocks([$this->titleHeading($title, $depth), ...$blocks], [0, ...$columns], $markers, $shapes);
         }
 
         $drawn = $heading;
@@ -661,8 +768,9 @@ final class PresentationRenderer
                 array_merge(array_slice($kept, 0, $at), array_slice($kept, $at + 1)),
                 array_merge(array_slice($columns, 0, $at), array_slice($columns, $at + 1)),
                 $markers,
+                $shapes,
             )
-            : new SlideBlocks($kept, $columns, $markers);
+            : new SlideBlocks($kept, $columns, $markers, $shapes);
     }
 
     private function note(WrittenSlide $slide, string $text): void
@@ -762,12 +870,12 @@ final class PresentationRenderer
      * can tell what is missing. Strict mode raises instead, for a caller that would rather
      * have no file.
      *
-     * @param int $step The step of the block that did not fit, which is the click the reader
-     *                  would have reached it on.
+     * `$column` is null for a shape the deck placed itself, which is in no column at all, and
+     * saying `column 0` would put a number where there is nothing behind it.
      *
      * @throws ContentOverflow
      */
-    private function overflow(int $slide, int $step, int $column, string $block, int $wanted, int $available): void
+    private function overflow(int $slide, int $step, ?int $column, string $block, int $wanted, int $available): void
     {
         if ($this->strict) {
             throw ContentOverflow::on($slide, $step, $column, $block, $wanted, $available);
