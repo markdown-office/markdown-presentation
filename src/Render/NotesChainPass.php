@@ -20,12 +20,15 @@ use ZipArchive;
  * PowerPoint opens a deck in that state and prints the note, which is why the omission survived
  * as long as it did: the file works and is nevertheless not the `.pptx` it claims to be, and a
  * consumer that resolves a part through the relationship that points at it finds nothing. This
- * pass writes the three things that close the chain.
+ * pass writes the links that close it: a notes slide back to its own slide and on to a notes
+ * master, a notes master in its own right with a theme of its own, and the presentation's list
+ * naming it.
  *
  * The notes master takes its colour map from the slide master rather than carrying a second
- * copy, and its theme relationship points at the presentation's existing theme part. A part can
- * be the target of more than one relationship, so both are legal, and sharing them means the
- * notes are drawn in the deck's own fonts instead of a second set of defaults nobody chose.
+ * copy, so a note resolves its colours the way the rest of the deck does. Its theme is a *copy*
+ * of that theme rather than the same part: one part serving two masters is legal OPC, and
+ * PowerPoint repairs every deck that does it — see {@see self::notesTheme()} for why that is
+ * written at the length it is.
  */
 final class NotesChainPass
 {
@@ -37,10 +40,23 @@ final class NotesChainPass
 
     private const NOTES_MASTER_TYPE = 'application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml';
 
+    private const THEME_TYPE = 'application/vnd.openxmlformats-officedocument.theme+xml';
+
     /**
      * `CT_NotesMaster` orders its children `cSld`, `clrMap`, `notesStyle`, and the last two are
      * both required — the colour map is what resolves a note's `schemeClr`, and the style is
      * what it falls back to. `notesStyle` may be empty: every one of its children is optional.
+     *
+     * The two placeholders are not decoration. A notes slide names its shapes by placeholder
+     * type and takes their position and size from the master's shape of that type, so a master
+     * with an empty `spTree` is a master that has nothing to give: PowerPoint opens such a deck
+     * by repairing it, and reports nothing until it does. Schema validation does not see this —
+     * an empty shape tree is a valid `spTree` — which is why it has to be probed in PowerPoint
+     * rather than argued about from the XSD.
+     *
+     * The geometry is the one PowerPoint itself writes for a `notesSz` of 6858000 by 9144000
+     * EMU, which is the `p:notesSz` PHPPresentation emits: the slide image above, the note
+     * below it, both inset by 685800 from either side.
      */
     private const NOTES_MASTER_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<p:notesMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
@@ -48,7 +64,19 @@ final class NotesChainPass
         . ' xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
         . '<p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>'
         . '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/>'
-        . '<a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld>%s<p:notesStyle/>'
+        . '<a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>'
+        . '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Slide Image Placeholder 1"/>'
+        . '<p:cNvSpPr><a:spLocks noGrp="1" noRot="1" noChangeAspect="1"/></p:cNvSpPr>'
+        . '<p:nvPr><p:ph type="sldImg"/></p:nvPr></p:nvSpPr>'
+        . '<p:spPr><a:xfrm><a:off x="685800" y="457200"/><a:ext cx="5486400" cy="3086100"/></a:xfrm>'
+        . '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:sp>'
+        . '<p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes Placeholder 2"/>'
+        . '<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>'
+        . '<p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>'
+        . '<p:spPr><a:xfrm><a:off x="685800" y="4000500"/><a:ext cx="5486400" cy="4343400"/></a:xfrm>'
+        . '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>'
+        . '<p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="en-US"/></a:p></p:txBody>'
+        . '</p:sp></p:spTree></p:cSld>%s<p:notesStyle/>'
         . '</p:notesMaster>';
 
     /**
@@ -111,14 +139,16 @@ final class NotesChainPass
         $presentation = self::read($zip, 'ppt/presentation.xml', $path) ?? '';
         $presentationRels = self::read($zip, 'ppt/_rels/presentation.xml.rels', $path) ?? '';
         $id = self::freeRelationshipId($presentationRels);
+        [$theme, $themeXml] = self::notesTheme($zip, $names, $path);
 
         $pending[self::NOTES_MASTER] = sprintf(
             self::NOTES_MASTER_XML,
             self::colourMap($zip, $names, $path),
         );
         $pending[self::NOTES_MASTER_RELS] = self::relationships([
-            'rId1' => ['theme', '../theme/theme1.xml'],
+            'rId1' => ['theme', '../theme/' . basename($theme)],
         ]);
+        $pending[$theme] = $themeXml;
         $pending['ppt/_rels/presentation.xml.rels'] = self::addRelationship(
             $presentationRels,
             $id,
@@ -126,8 +156,12 @@ final class NotesChainPass
             'notesMasters/notesMaster1.xml',
         );
         $pending['ppt/presentation.xml'] = self::addNotesMasterId($presentation, $id);
-        $pending['[Content_Types].xml'] = self::addContentType(
+        $pending['[Content_Types].xml'] = self::addContentTypes(
             self::read($zip, '[Content_Types].xml', $path) ?? '',
+            [
+                self::NOTES_MASTER => self::NOTES_MASTER_TYPE,
+                $theme => self::THEME_TYPE,
+            ],
         );
 
         foreach ($pending as $name => $xml) {
@@ -312,17 +346,95 @@ final class NotesChainPass
         );
     }
 
-    private static function addContentType(string $contentTypes): string
+    /**
+     * `<Override>` entries for parts this pass adds, keyed by part name.
+     *
+     * Keyed on the part rather than the type because the theme type is already in the file for
+     * `theme1.xml`: a check for the type would see it there and skip the notes theme's own entry,
+     * which leaves a part with no content type and a deck that will not open.
+     *
+     * @param array<string, string> $types part name => content type
+     */
+    private static function addContentTypes(string $contentTypes, array $types): string
     {
-        if (str_contains($contentTypes, self::NOTES_MASTER_TYPE)) {
-            return $contentTypes;
+        foreach ($types as $part => $type) {
+            if (str_contains($contentTypes, sprintf('PartName="/%s"', $part))) {
+                continue;
+            }
+
+            $contentTypes = str_replace(
+                '</Types>',
+                sprintf('<Override PartName="/%s" ContentType="%s"/></Types>', $part, $type),
+                $contentTypes,
+            );
         }
 
-        return str_replace(
-            '</Types>',
-            sprintf('<Override PartName="/%s" ContentType="%s"/></Types>', self::NOTES_MASTER, self::NOTES_MASTER_TYPE),
-            $contentTypes,
-        );
+        return $contentTypes;
+    }
+
+    /**
+     * A theme for the notes master to have, as a part name and the theme to put in it.
+     *
+     * Copied rather than shared, because this is what PowerPoint requires and nothing in the
+     * package says so. A notes master whose theme relationship points at the slide master's
+     * theme is well-formed, passes the ECMA-376 schemas, and is refused by PowerPoint on open —
+     * and it is refused silently enough that the schema check reports the deck clean. What the
+     * bisection that found this established: every other link in the chain, in every order and
+     * spelling, left PowerPoint repairing the deck; giving the notes master a theme of its own
+     * is what made it open. The copy is the same theme, so the note is still drawn in the deck's
+     * fonts, which is the only reason sharing was ever tempting.
+     *
+     * A second copy is paid for rather than avoided because the alternative is a deck that does
+     * not open. `ppt/theme/theme1.xml` is assumed because PHPPresentation writes exactly one
+     * theme, and the file is named from the slide master's own relationship rather than assumed
+     * so that a package with two themes cannot end up with the notes master's copy overwriting
+     * one of them.
+     *
+     * @param list<string> $names
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function notesTheme(ZipArchive $zip, array $names, string $path): array
+    {
+        $source = 'ppt/theme/theme1.xml';
+
+        foreach ($names as $name) {
+            if (preg_match('~^ppt/slideMasters/_rels/slideMaster\d+\.xml\.rels$~', $name) === 1) {
+                $rels = self::read($zip, $name, $path);
+
+                if ($rels !== null && preg_match('~Target="\.\./(theme/theme\d+\.xml)"~', $rels, $found) === 1) {
+                    $source = 'ppt/' . $found[1];
+                }
+
+                break;
+            }
+        }
+
+        $theme = self::read($zip, $source, $path) ?? '';
+        $copy = self::freeThemeName($names);
+
+        return [$copy, $theme];
+    }
+
+    /**
+     * A theme part name nothing in the package is using.
+     *
+     * One above the highest already there, for the reason {@see self::freeRelationshipId()} gives
+     * and not because themes are numbered consecutively by anything.
+     *
+     * @param list<string> $names
+     */
+    private static function freeThemeName(array $names): string
+    {
+        $highest = 0;
+
+        foreach ($names as $name) {
+            if (preg_match('~^ppt/theme/theme(\d+)\.xml$~', $name, $found) === 1) {
+                $highest = max($highest, (int) $found[1]);
+            }
+        }
+
+        return sprintf('ppt/theme/theme%d.xml', $highest + 1);
     }
 
     /**

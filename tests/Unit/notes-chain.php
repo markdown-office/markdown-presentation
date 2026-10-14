@@ -52,6 +52,27 @@ function relationshipsOf(Pptx $pptx, string $part): array
 }
 
 /**
+ * Where a relationship target lands, as a part name.
+ *
+ * Resolved rather than compared as written because `../theme/theme1.xml` and `theme/theme1.xml`
+ * name the same part, and the two masters' relationship parts are written from different
+ * directories — so a comparison of the strings would call two different themes equal.
+ */
+function resolvesTo(string $part, string $target): string
+{
+    $segments = explode('/', ltrim(dirname($part) . '/' . $target, '/'));
+
+    for ($index = 0; $index < count($segments); $index++) {
+        if ($segments[$index] === '..' && $index > 0) {
+            array_splice($segments, $index - 1, 2);
+            $index--;
+        }
+    }
+
+    return implode('/', $segments);
+}
+
+/**
  * The notes slides in a built deck.
  *
  * @return list<string>
@@ -75,6 +96,39 @@ it('gives every notes slide a relationship back to its slide and on to a notes m
             ->toHaveKey('slide')
             ->toHaveKey('notesMaster');
     }
+});
+
+it('gives the notes master a theme of its own, and declares it, rather than sharing the slide master\'s', function () {
+    // The one defect here that nothing else in the package could have caught. Every part
+    // validates against the ECMA-376 schemas whether the notes master shares the theme or has a
+    // copy of it, the relationship is legal OPC either way, and a deck with a shared theme opens
+    // in LibreOffice and in every converter here — PowerPoint repairs it, silently, which is
+    // what the earlier version of this pass produced.
+    //
+    // So the assertion is that the notes master resolves to a part of its own, that the part it
+    // resolves to is the deck's own theme rather than a second set of defaults, and that the new
+    // part is declared. The last of the three is only meaningful because of the first: an
+    // `Override` names one part, the theme type is already declared for the slide master's
+    // theme, and a pass that checked for the type rather than the part name would find it there
+    // and leave the notes theme with no content type at all.
+    //
+    // Resolved through the relationship rather than compared as written, because a target of
+    // `../theme/theme1.xml` and a target of `theme/theme1.xml` name the same part, and the two
+    // masters' relationship parts are written from different directories.
+    $pptx = noted();
+    $slideMaster = 'ppt/slideMasters/slideMaster1.xml';
+    $notesMaster = 'ppt/notesMasters/notesMaster1.xml';
+    $shared = resolvesTo($slideMaster, relationshipsOf($pptx, $slideMaster)['theme'] ?? '');
+    $own = resolvesTo($notesMaster, relationshipsOf($pptx, $notesMaster)['theme'] ?? '');
+
+    expect($shared)->not->toBe('')
+        ->and($own)->not->toBe($shared)
+        ->and($pptx->parts())->toContain($own)
+        // The copy is the same theme, so a note is drawn in the deck's own fonts and palette.
+        ->and($pptx->part($own))->toBe($pptx->part($shared))
+        ->and($pptx->part('[Content_Types].xml'))->toContain(
+            sprintf('PartName="/%s" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"', $own),
+        );
 });
 
 it('writes the notes master the notes slides hang from, with the slide master colour map', function () {

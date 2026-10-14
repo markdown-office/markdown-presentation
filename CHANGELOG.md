@@ -320,10 +320,13 @@ All notable changes to this project are documented here. The format follows
   What counts as "cannot draw" is not `extension_loaded()`. A build of Imagick with no SVG
   delegate registers `SVG` anyway, hands the file to ImageMagick's own renderer, and
   returns a picture with every `<text>` and `<path>` in it dropped — it does not fail, so
-  the capability is probed by drawing a letter. That is the same probe and the same
-  argument the Word half uses, and here it matters more rather than less: Word keeps the
-  vector beside the raster, so a weak delegate costs fidelity, whereas here the raster is
-  the only copy.
+  the capability is probed by drawing a letter. A build compiled without fontconfig fails the
+  same way and for a blunter reason: it reports zero fonts, so `RenderFreetype` raises on the
+  first `<text>` it is given and the glyph never appears. That one was blamed on a missing SVG
+  delegate for a while, which the delegate list in the same build contradicts. That is the same
+  probe and the same argument the Word half uses, and here it matters more rather than less:
+  Word keeps the vector beside the raster, so a weak delegate costs fidelity, whereas here the
+  raster is the only copy.
 
   The loss is real and is written down: the deck carries a raster, so a diagram is a
   picture at the size it was drawn, and what it shows is what the machine that drew it
@@ -363,9 +366,20 @@ All notable changes to this project are documented here. The format follows
   nothing, and the notes master a notes slide inherits its text formatting from did not exist.
   The slide names its notes slide, so the other two links are now written from that pairing —
   read out of the slide's own relationship rather than from the number in the file name. The
-  notes master takes its colour map from the slide master and its theme relationship points at
-  the presentation's existing theme part, so a note is drawn in the deck's own fonts rather than
-  a second set of defaults nobody chose. A deck with no note in it is not touched at all.
+  notes master takes its colour map from the slide master, so a note resolves its colours the
+  way the rest of the deck does. A deck with no note in it is not touched at all.
+
+  **A notes master needs a theme of its own, and the first version of this fix made every
+  deck carrying a note unopenable.** Pointing the notes master at the slide master's theme is
+  legal OPC — a part can be the target of any number of relationships — and every part still
+  validated against the ECMA-376 schemas. PowerPoint repaired those decks instead, silently,
+  so nothing here objected until a deck was actually opened in PowerPoint. The bisection that
+  found it put the fault on the `notesMasterIdLst`: declaring a valid master at all was enough,
+  and the theme was the one link left to change. `ppt/theme/theme2.xml` is now a copy of the
+  deck's own theme, so a note is still drawn in the deck's fonts; the copy is named from the
+  slide master's own relationship rather than assumed, so a package holding two themes cannot
+  have it overwrite one. An `Override` names one part, so the copy needs a content type of its
+  own even though the theme type is already declared for `theme1.xml`.
 
 - **A numbered list that begins above one counts on.** `7.` and `8.` rendered as `7.` and `7.`
   outside PowerPoint. PHPPresentation writes the start of a numbering on every paragraph of it
