@@ -531,6 +531,22 @@ final class ShapeWriter
         $this->place($written, $box, $box->height);
         $written->setRotation($shape->placement->rotate);
 
+        // The shape's own text, in the shape's own body — one shape in the file, and the
+        // native thing: double-click the arrow and the cursor is in the arrow, and dragging the
+        // arrow drags the words with it, which two overlapping shapes do not do.
+        //
+        // What it costs is everything {@see self::freeText()} can do and this cannot.
+        // PHPPresentation writes `<a:r><a:t>…</a:t></a:r>` with no `a:rPr`, so the words are
+        // drawn in `tx1` — the theme's body text colour, which is what the page is read against
+        // and which follows `dark:`. So a label is legible on a filled shape in both themes, and
+        // what it has no contrast against is the shape's *own fill* where that is close to the
+        // page's: a pale fill on a dark theme, or a dark one on a light theme. There is no
+        // attribute that changes it, and one object and no styling is the other half of the
+        // trade. A label that has to be legible against its own fill is a `:::content` box.
+        if ($shape->label !== '') {
+            $written->setText($shape->label);
+        }
+
         return $written;
     }
 

@@ -81,29 +81,26 @@ layout: blank
 `rotate` turns a shape about the middle of its own box. The box does not move, so a rotated
 shape can reach past the edge of the slide while its box stays inside it.
 
+Three arrows, and two ways of putting words on one. The first has a `:::content` box over it
+turned to match — styled Markdown, and a second shape to keep in step. The second and third
+carry a `label` in the shape's own body: one shape you can double-click and drag, with words you
+cannot style, because PHPPresentation writes them with no `a:rPr` at all.
+
 ::arrow{left=5% top=34% width=32% height=15% fill=accent1 rotate=-12}
 
 :::content{left=5% top=38% width=32% height=7% rotate=-12 align=center vertical-align=middle font-size=16}
 **Retention** 94%
 :::
 
-::arrow{left=39% top=34% width=32% height=15% fill=accent3 rotate=12}
+::arrow{left=39% top=34% width=32% height=15% fill=accent3 rotate=12 label="Churn 6%"}
 
-:::content{left=39% top=38% width=32% height=7% rotate=12 align=center vertical-align=middle font-size=16}
-**Churn** 6%
-:::
-
-::arrow{left=73% top=34% width=22% height=15% fill=accent2 rotate=0}
-
-:::content{left=73% top=38% width=22% height=7% align=center vertical-align=middle font-size=16}
-unturned
-:::
+::arrow{left=73% top=34% width=22% height=15% fill=none stroke=accent2 stroke-width=2 label="unturned"}
 
 ::line{left=30% top=70% width=40% height=1% fill=accent1 rotate=-8}
 
 :::content{left=6% top=82% width=88% height=14% font-size=12 align=center}
-A `:::content` box is a shape too, so it carries `rotate` as well — which is how a label is
-turned *with* its arrow rather than laid straight across it.
+A `:::content` box is a shape too, so it carries `rotate` — which is how a label is turned *with*
+its arrow. A `label` gets that for free, because it is inside the shape rather than over it.
 :::
 
 ---

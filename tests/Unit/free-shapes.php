@@ -1035,3 +1035,74 @@ it('turns a text block with its shape, which is what a label on a tilted arrow i
     expect(substr_count($deck->part(SLIDE_ONE), 'rot="20880000"'))->toBe(2)
         ->and($deck->shapeNames())->toBe(['arrow', 'content']);
 });
+
+it('puts a label in the shape it belongs to, as one shape rather than two', function () {
+    // The claim that separates `label` from `:::content`: one `<p:sp>` carrying both the
+    // geometry and the words. Double-click it in PowerPoint and the cursor is in the arrow,
+    // which is what two overlapping shapes cannot offer.
+    $deck = freeShapeDeckFile(
+        "---\nlayout: blank\n---\n\n::arrow{width=200 height=60 label=\"Retention 94%\"}\n",
+    );
+
+    expect($deck->shapeNames())->toBe(['arrow'])
+        ->and($deck->part(SLIDE_ONE))->toContain('<a:t><![CDATA[Retention 94%]]></a:t>')
+        ->and(substr_count($deck->part(SLIDE_ONE), '<p:sp>'))->toBe(1);
+});
+
+it('writes no words for a shape with no label', function () {
+    // The element itself is there either way: `p:sp` has a `txBody` whether or not it has
+    // anything in it, and PHPPresentation writes the empty run to fill it. What matters is that
+    // no words appear, which is the only part a reader sees.
+    $deck = freeShapeDeckFile("---\nlayout: blank\n---\n\n::rectangle{}\n");
+
+    expect($deck->slideText())->toBe('')
+        ->and($deck->part(SLIDE_ONE))->toContain('<a:t><![CDATA[]]></a:t>');
+});
+
+it('writes a label in the body colour of the theme it was rendered with', function () {
+    // No `a:rPr` is written, so the words are drawn in `tx1` — whatever the master's colour map
+    // makes text. That is why a label follows `dark:` and why it has contrast against the page
+    // rather than against the shape's own fill.
+    $slide = "---\nlayout: blank\n---\n\n::arrow{width=200 height=60 fill=accent1 label=\"Hi\"}\n";
+    $deck = freeShapeDeckFile($slide);
+
+    expect($deck->part(SLIDE_ONE))->not->toContain('<a:rPr')
+        ->and($deck->part('ppt/slideMasters/slideMaster1.xml'))->not->toBe('')
+        ->and($deck->part('ppt/slides/slide1.xml'))->not->toContain('<a:rPr');
+});
+
+it('turns a shape with a label on it, because the words are in the shape', function () {
+    // The other half of the trade against `:::content`: no second `rotate` to keep in step,
+    // because there is no second shape.
+    $deck = freeShapeDeckFile(
+        "---\nlayout: blank\n---\n\n::arrow{width=200 height=60 rotate=-12 label=\"Retention\"}\n",
+    );
+
+    // `-12` is written as 348 because the reader wraps, and 348 is the same angle.
+    expect($deck->part(SLIDE_ONE))->toContain('<a:xfrm rot="20880000"')
+        ->and($deck->shapeNames())->toBe(['arrow']);
+});
+
+it('refuses a label on a picture, which has no text body to put one in', function (string $attribute) {
+    expect(fn () => placedShapes(sprintf("::image{src=\"%s\" %s}\n", basename(freeShapePicture()), $attribute)))
+        ->toThrow(MalformedShape::class, 'which it has nowhere to put');
+})->with(['label="Hi"', 'label=""']);
+
+it('refuses a label on a placed text block, whose body is already its text', function () {
+    // Putting the same words in the same place twice, which is what both label refusals are
+    // about: a picture has no body to hold one and a text block already has one full.
+    expect(fn () => placedShapes(":::content{label=\"Hi\"}\nWords.\n:::\n"))
+        ->toThrow(MalformedShape::class, 'the body between the fences is already its text');
+});
+
+it('refuses a bare label, which asks for the attribute rather than for its value', function () {
+    expect(fn () => placedShapes("::arrow{width=100 height=60 label}\n"))
+        ->toThrow(MalformedShape::class, 'A bare attribute asks for the attribute rather than for its value');
+});
+
+it('reads no label onto a shape that was not written with one', function () {
+    // The default, and what a picture and a text block carry: nothing reads it, so it is empty
+    // rather than absent, and there is no third state to get wrong.
+    expect(placedShape("::rectangle{}\n")->label)->toBe('')
+        ->and(placedShape("::rectangle{label=\"Hi\"}\n")->label)->toBe('Hi');
+});

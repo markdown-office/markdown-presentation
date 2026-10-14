@@ -81,13 +81,26 @@ All notable changes to this project are documented here. The format follows
   that is a claim about its **box**, and a square turned forty-five degrees reaches past the
   edge of the slide while its box stays inside it. What is checked is what the deck placed.
 
-- **There is no `text` attribute on a free shape, and a `:::content` box over it is the
-  answer.** Draw the shape, then put a text block over it and give both the same `rotate`.
-  PHPPresentation will put a string inside an autoshape, and writes one plain run with no
-  `a:rPr` — no size, no face, no colour — with `algn="ctr"` and `anchor="ctr"` written into
-  the element rather than read from anything. So a `text` attribute would be a second way to
-  put words on a slide that is worse in every respect except that it is one line shorter: no
-  Markdown, no runs, no link, and type the deck cannot ask for.
+- **`label` puts words inside one of the ten ink shapes, as one shape rather than two.**
+  `::arrow{label="Retention 94%"}` is a single `<p:sp>` carrying both the geometry and the
+  text, which is the native thing: double-click the arrow in PowerPoint and the cursor is in
+  the arrow, and dragging the arrow drags the words with it. It turns with the shape without a
+  second `rotate` to keep in step.
+
+  What it costs is everything a `:::content` box can do and this cannot. PHPPresentation writes
+  `<a:r><a:t>…</a:t></a:r>` with **no `a:rPr`**, so the words are drawn in `tx1` — the theme's
+  body text colour, which follows `dark:` — at whatever size that defaults to, centred on both
+  axes because `algn="ctr"` and `anchor="ctr"` are written into the element rather than read
+  from anything, and with no Markdown, so `**bold**` is six literal asterisks. The ink
+  contrasts with the **page**, not with the shape's own fill: a label is legible on a filled
+  shape in either theme, and what washes out is a fill close to the page's own tone.
+
+  So there are two ways to put words on a shape, and they answer different questions. `label`
+  is one object you can double-click and drag, with words you cannot style. `:::content` over
+  the shape is styled Markdown, and two objects that PowerPoint edits as two. A `label` is
+  refused on `::image`, which is a `p:pic` with no text body at all, and on `:::content`,
+  whose body is already its text — putting the same words in the same place twice is the
+  mistake both refusals are about.
 
 - **A placed picture is fitted to its box by the same call a picture in a column uses.**
   `AbstractGraphic::setWidth()` re-derives the height from the picture's ratio and

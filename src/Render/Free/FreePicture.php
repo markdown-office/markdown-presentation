@@ -30,7 +30,7 @@ final class FreePicture extends FreeShape
         public readonly Image $image,
         public readonly string $fit,
     ) {
-        parent::__construct($kind, $placement, $step, $paint);
+        parent::__construct($kind, $placement, $step, $paint, '');
     }
 
     public static function at(

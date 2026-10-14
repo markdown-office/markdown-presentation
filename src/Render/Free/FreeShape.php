@@ -13,11 +13,15 @@ namespace MarkdownPresentation\Render\Free;
  * whose frame was missing would be two states the draw site has to defend against. Three
  * classes make both impossible rather than merely discouraged.
  *
- * The paint is here rather than on the two that use it because a shape that is neither type
- * nor a picture is an ink shape whatever else becomes of it — which is what lets
- * {@see \MarkdownPresentation\Render\ShapeWriter::free()} treat the ink case as the one that is
- * left rather than as a third thing to match. A {@see FreePicture} never paints: `::image`
- * offers no `fill` or `stroke`, so its paint is the default and nothing reads it.
+ * The paint and the label are here rather than on the subclasses that use them, because a
+ * shape that is neither type nor a picture is an ink shape whatever else becomes of it — which
+ * is what lets {@see \MarkdownPresentation\Render\ShapeWriter::free()} treat the ink case as
+ * the one that is left rather than as a third thing to match.
+ *
+ * A {@see FreePicture} never paints and never carries a label: `::image` offers neither, and a
+ * picture is a `p:pic` with no text body to put one in. A {@see FreeText} never carries a
+ * label either — its body is Markdown, so a label on it would be a second way to put the same
+ * words in the same box. Both hold the default, which nothing reads.
  *
  * The step is the one the deck wrote this on and nothing else, because a free shape does not
  * occupy a column: {@see \MarkdownPresentation\Render\PresentationRenderer} writes it in
@@ -26,11 +30,16 @@ namespace MarkdownPresentation\Render\Free;
  */
 abstract class FreeShape
 {
+    /**
+     * @param string $label The shape's own text, or '' for none. See
+     *                      {@see \MarkdownPresentation\Render\Free\ShapeKind::attributes()}.
+     */
     protected function __construct(
         public readonly ShapeKind $kind,
         public readonly Placement $placement,
         public readonly int $step,
         public readonly Paint $paint,
+        public readonly string $label,
     ) {
     }
 

@@ -5,22 +5,17 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render\Free;
 
 /**
- * One of the nine ink-only shapes, drawn as a PHPPresentation autoshape.
+ * One of the ten ink-only shapes, drawn as a PHPPresentation autoshape.
  *
- * Its own class rather than nothing at all because it is written differently: an autoshape's
- * stroke is an {@see \PhpOffice\PhpPresentation\Style\Outline} of one colour and one width, so
- * {@see \MarkdownPresentation\Render\ShapeWriter} writes the paint through `getOutline()` and
- * not through the {@see \PhpOffice\PhpPresentation\Style\Border} a text box and a picture take.
+ * Its own class because it is written differently from the other two: an autoshape's stroke is
+ * an {@see \PhpOffice\PhpPresentation\Style\Outline} of one colour and one width, and it is the
+ * only one of the three with a text body of its own — which is what {@see FreeShape::$label}
+ * is written into.
  */
 final class FreeAutoShape extends FreeShape
 {
-    private function __construct(ShapeKind $kind, Placement $placement, int $step, Paint $paint)
+    public static function at(ShapeKind $kind, Placement $placement, int $step, Paint $paint, string $label): self
     {
-        parent::__construct($kind, $placement, $step, $paint);
-    }
-
-    public static function at(ShapeKind $kind, Placement $placement, int $step, Paint $paint): self
-    {
-        return new self($kind, $placement, $step, $paint);
+        return new self($kind, $placement, $step, $paint, $label);
     }
 }

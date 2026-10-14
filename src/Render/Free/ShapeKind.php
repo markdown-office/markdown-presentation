@@ -49,6 +49,15 @@ enum ShapeKind: string
     /** How the type inside a free text block is set. */
     private const TYPE = ['color', 'font-size', 'font-family', 'align', 'vertical-align', 'padding'];
 
+    /**
+     * The shape's own text — one plain run inside the shape rather than a box over it.
+     *
+     * On the ink shapes and nowhere else. `::image` is a `p:pic`, which has no text body at
+     * all, and `:::content` is a box whose body is Markdown, so a label on either would be a
+     * second way to put the same words in the same place.
+     */
+    private const LABEL = ['label'];
+
     /** What a picture is taken from and how it is fitted to its box. */
     private const PICTURE = ['src', 'alt', 'fit'];
 
@@ -88,8 +97,8 @@ enum ShapeKind: string
         $attributes = match ($this) {
             self::Image => [...self::PLACEMENT, ...self::PICTURE],
             self::Content => [...self::PLACEMENT, ...self::PAINT, ...self::TYPE],
-            self::RoundRect => [...self::PLACEMENT, ...self::PAINT, 'border-radius'],
-            default => [...self::PLACEMENT, ...self::PAINT],
+            self::RoundRect => [...self::PLACEMENT, ...self::PAINT, ...self::LABEL, 'border-radius'],
+            default => [...self::PLACEMENT, ...self::PAINT, ...self::LABEL],
         };
 
         sort($attributes);

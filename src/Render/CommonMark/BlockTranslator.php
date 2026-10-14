@@ -42,6 +42,7 @@ use MarkdownPresentation\Render\Free\FreePicture;
 use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Render\Free\FreeShapes;
+use MarkdownPresentation\Render\Free\Length;
 use MarkdownPresentation\Render\Free\Paint;
 use MarkdownPresentation\Render\Free\Pictures;
 use MarkdownPresentation\Render\Free\Placement;
@@ -686,11 +687,22 @@ final class BlockTranslator
         $name = $kind->value;
         $theme = $state->theme;
 
-        // Before the generic refusal, because it says more: `border-radius` is a real attribute
-        // of this vocabulary and only one shape has the corners for it, where "not an
-        // attribute" would be true of it and useless.
+        // Before the generic refusal, because it says more. `border-radius` is a real attribute
+        // of this vocabulary and only one shape has the corners for it; a `label` is a real one
+        // and two of the twelve have nowhere to put it. "Not an attribute" would be true of
+        // both and useless for either.
         if ($kind !== ShapeKind::RoundRect && $attributes->has('border-radius')) {
             throw MalformedShape::radius($state->slide, $name);
+        }
+
+        if ($attributes->has('label') && ($kind === ShapeKind::Image || $kind->isContent())) {
+            throw MalformedShape::noLabel(
+                $state->slide,
+                $name,
+                $kind === ShapeKind::Image
+                    ? 'a picture is a `p:pic`, which carries no text of its own'
+                    : 'the body between the fences is already its text',
+            );
         }
 
         self::attributes($state->slide, $name, $attributes, $kind);
@@ -726,7 +738,13 @@ final class BlockTranslator
             return [];
         }
 
-        $state->place(FreeAutoShape::at($kind, $placement, $state->step, $paint));
+        $state->place(FreeAutoShape::at(
+            $kind,
+            $placement,
+            $state->step,
+            $paint,
+            Length::written($state->slide, $name, 'label', $attributes, ''),
+        ));
 
         return [];
     }

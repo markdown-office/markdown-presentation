@@ -326,6 +326,14 @@ it('does not claim again what the code does not do', function (string $claim) {
     // way, that a box which *does* fit is a promise about the ink on the slide.
     'a free shape is checked against the slide edge once it is turned' => 'the turned shape is checked against the edge',
     'a free shape inside the slide means its turned corners are too' => 'its corners stay inside the slide',
+    // The ink of a shape's own `label` was described as the reader's default and called
+    // unreadable on a filled shape. It is `tx1` — the theme's body text colour, which follows
+    // `dark:` — so it is legible on a filled shape in either theme, and what it has no contrast
+    // against is the shape's *own fill* where that is close to the page's. The phrases are the
+    // two halves of the wrong claim, and the README has to be able to say what the ink is
+    // without firing on either.
+    'a shape label is drawn in the reader default text colour' => 'whatever the reader defaults text to',
+    'a shape label is unreadable on a filled shape' => 'unreadable on a filled shape or a dark one',
     // There is no `text` attribute on a free shape, and the reason is that `:::content` over
     // the shape can be styled and this could not. There is no guard for it, and the reason is
     // the one above: the README has to be able to name `::arrow{text="…"}` in the sentence

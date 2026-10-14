@@ -928,10 +928,10 @@ resize, so a rotated shape is still the box you placed — which is also how a l
 :::
 ```
 
-A `:::content` box is a shape, so it carries `rotate` like the other eleven. That is the whole
-of how to put text inside a rotated shape, and it is discussed under
-[A placed text block](#a-placed-text-block) — there is no `text` attribute, and the reason is
-there too.
+A `:::content` box is a shape, so it carries `rotate` like the other eleven — which is how a
+label is turned with the arrow it sits on. The other way to put words on a shape, the shape's
+own `label`, turns with it for free; both are under
+[Text inside a shape](#text-inside-a-shape).
 
 Three rules, each for a reason:
 
@@ -1036,6 +1036,7 @@ An unrecognised name is refused, never quietly black.
 | `alpha` | the shapes, `::content` | 0–100 for the whole shape; one percentage, written on every colour it has |
 | `stroke-width` | the shapes, `::content` | in points; `0` is a hairline |
 | `border-radius` | `::roundrect` only | in pixels |
+| `label` | the ten ink shapes | the shape's own text — see [Text inside a shape](#text-inside-a-shape) |
 | `src`, `alt`, `fit` | `::image` | |
 | `color`, `font-size`, `font-family`, `align`, `vertical-align`, `padding` | `::content` only | |
 
@@ -1074,43 +1075,47 @@ a *second* way to put words on a slide, and it would be the worse one — see
 
 #### Text inside a shape
 
-The question this section answers is the obvious one: how do you get a label onto an arrow, a
-badge or a panel, the way a diagram has them?
+There are **two** ways, and the choice is one object against styled text.
+
+`label` is the shape's own text, in the shape's own body:
 
 ```markdown
-::arrow{left=5% top=34% width=32% height=15% fill=accent1 rotate=-12}
+::arrow{left=6% top=20% width=34% height=13% fill=accent1 label="Retention 94%" rotate=-6}
+```
 
-:::content{left=5% top=38% width=32% height=7% rotate=-12 align=center vertical-align=middle font-size=16}
+That is **one shape in the file**, and it is the native thing: double-click the arrow in
+PowerPoint and the cursor is in the arrow, and dragging the arrow drags the words with it. It
+also turns with the shape without a second `rotate` to keep in step.
+
+What it costs, and it is a real cost:
+
+| | |
+| --- | --- |
+| **No Markdown** | one plain run, so `**bold**` is six literal asterisks |
+| **No type control** | PHPPresentation writes `<a:r><a:t>…</a:t></a:r>` with **no `a:rPr`** — no size, no face, no colour, and no attribute here that reaches one |
+| **Centred, both ways** | `algn="ctr"` and `anchor="ctr"` are written into the element rather than read from anything |
+| **One ink** | `tx1`, the theme's body text colour. It follows `dark:`, so a label is legible on a filled shape in either theme — what it has no contrast against is the shape's *own fill* where that is close to the page's, and a pale fill on a dark theme is the case that washes out |
+
+`:::content` over the shape is the other way, and it is what the label is for when any of that
+matters — Markdown, `**bold**`, a [link](#links), `color`, `font-size`, `font-family`, `align`,
+`padding`, and a `rotate` to match:
+
+```markdown
+::arrow{left=6% top=20% width=34% height=13% fill=accent1 rotate=-6}
+
+:::content{left=6% top=22% width=34% height=9% rotate=-6 align=center vertical-align=middle font-size=16}
 **Retention** 94%
 :::
 ```
 
-Two shapes, not one shape with words in it. That is the answer, and it is worth having on its
-own terms:
+**Two shapes in the file, not one.** That is the whole of the trade: `label` is one object you
+can double-click and drag, with words you cannot style; `:::content` is words you can style, on
+an object that does not move when the shape moves. PowerPoint edits them as two things, because
+they are two things.
 
-- **Everything a text block can do, and the shape's own text cannot.** `**bold**`, `*italic*`,
-  a [link](#links), a bullet list. A shape's own text is one plain string with no markup in it.
-- **Type you control.** `color`, `font-size`, `font-family`, `align`, `vertical-align`,
-  `padding` — and `rotate`, so the label turns with the shape it labels.
-- **One shape each, and therefore two in the file.** A shape with text in it and the same shape
-  without are different objects to every reader, and PowerPoint edits them as one.
-
-The alternative is available underneath and is deliberately not exposed. PHPPresentation will
-put a string inside an autoshape, and it writes exactly this:
-
-```xml
-<a:p><a:pPr algn="ctr"/><a:r><a:t>Retention</a:t></a:r></a:p>
-```
-
-No `a:rPr` — no size, no face, no colour, so the run takes whatever the shape's style says,
-which on a blank layout is the theme's body text. `algn="ctr"` and `anchor="ctr"` are written
-into the element rather than read from anything, so there is no alignment to ask for. And it is
-one string: no Markdown, no runs, no link. Exposing that as `::arrow{text="…"}` would be a
-second way to put words on a slide that is worse in every respect except that it is one line
-shorter.
-
-So the vocabulary has one way to put text on a slide, it is the one that can be styled, and it
-composes with `rotate`.
+A `label` is refused on `::image`, which is a `p:pic` with no text body at all, and on
+`:::content`, whose body is already its text — putting the same words in the same place twice is
+the mistake both refusals are about.
 
 #### What is refused, and how it reads
 

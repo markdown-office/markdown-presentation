@@ -26,7 +26,7 @@ final class FreeText extends FreeShape
         public readonly TextFrame $frame,
         public readonly TextStyle $style,
     ) {
-        parent::__construct($kind, $placement, $step, $paint);
+        parent::__construct($kind, $placement, $step, $paint, '');
     }
 
     public static function at(

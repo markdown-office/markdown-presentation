@@ -87,11 +87,13 @@ A few of these are here because the render is the only honest evidence:
   both axes while the ellipse is 20% of its width, so they are the same height and not the
   same width. That is what resolving a circle's percentages against the height buys: the
   spelling that reads as "a circle inside an ellipse" draws one.
-- **`12`, the fourth slide.** Three arrows, two of them tilted, and a `:::content`
-  label given the *same* `rotate` as the arrow it sits on — which is how a label
-  is turned with its shape rather than laid straight across it. A shape with text
-  in it is not offered: `:::content` over the shape can be styled and rotated,
-  and the shape's own text cannot.
+- **`12`, the fourth slide.** Three tilted arrows and the two ways of putting
+  words on one. The first has a `:::content` box over it given the *same*
+  `rotate` — styled Markdown, and a second shape to keep in step. The other two
+  carry a `label` inside the arrow itself: one `<p:sp>`, so it is what you
+  double-click and drag, with words you cannot style because PHPPresentation
+  writes them with no `a:rPr` at all. Look at the third one — `**Churn**` in a
+  label is six literal asterisks, where the first arrow's is real bold.
 - **`12`, the fifth slide.** Ten ink shapes on one slide, each its own
   `<p:sp>`. The rule is a rectangle a pixel tall rather than a connector,
   which is what a `---` has always been.
