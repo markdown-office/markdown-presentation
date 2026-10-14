@@ -43,7 +43,7 @@ final class MeasureRoundingPass
      * One spacing measure: the two elements are siblings in the vocabulary, both are declared as
      * whole numbers, and the writer produces both by multiplying a float.
      */
-    private const MEASURE = '~(<a:spc(?:Pts|Pct) val=")([+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(")~';
+    private const MEASURE = '~(<a:spc(?:Pts|Pct) val=")([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)(")~';
 
     /**
      * Rewrites the package in place, and reports how many parts it changed.
@@ -129,7 +129,7 @@ final class MeasureRoundingPass
      */
     private static function whole(string $measure): string
     {
-        if (preg_match('~^[+-]?[0-9]+$~', $measure) === 1) {
+        if (preg_match('~^[+-]?\d+$~', $measure) === 1) {
             return $measure;
         }
 
