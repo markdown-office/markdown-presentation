@@ -352,7 +352,7 @@ final class SlideGeometry
     private function bodyTop(): int
 {
     return $this->band(2.6);
-}
+    }
 
     /**
      * The room a title has above the body, in pixels: the band {@see self::bodyTop()} leaves,
@@ -377,7 +377,7 @@ final class SlideGeometry
     private function titleRoom(): int
 {
     return max(1, $this->bodyTop() - $this->band(0.6) - $this->style->blockGap());
-}
+    }
 
     /**
      * The body boxes of a role, in reading order. `two-column` and `image-text` give two
@@ -523,13 +523,13 @@ final class SlideGeometry
     return match (true) {
         $block instanceof TextFrame => $this->spaceAbove($block->leading()),
         $block instanceof Heading => self::HEADING_ABOVE * $this->headingSize($block->level),
-        $block instanceof ListBlock => $this->block() * self::LIST_GAP,
-        $block instanceof Quote => $this->half(),
+        $block instanceof ListBlock => $this->fraction(self::LIST_GAP),
+        $block instanceof Quote => $this->fraction(self::PARAGRAPH_GAP),
         $block instanceof Table, $block instanceof Code,
-        $block instanceof Rule, $block instanceof Image => $this->solid(),
-        default => $this->half(),
+        $block instanceof Rule, $block instanceof Image => $this->fraction(self::SOLID_GAP),
+        default => $this->fraction(self::PARAGRAPH_GAP),
     };
-}
+    }
 
     /**
      * The air left below a block, in points. The same answer as {@see self::spaceBelow()} read
@@ -541,13 +541,13 @@ final class SlideGeometry
     return match (true) {
         $block instanceof TextFrame => $this->spaceBelow($block->trailing()),
         $block instanceof Heading => self::HEADING_BELOW * $this->headingSize($block->level),
-        $block instanceof ListBlock => $this->block() * self::LIST_GAP,
-        $block instanceof Quote => $this->half(),
+        $block instanceof ListBlock => $this->fraction(self::LIST_GAP),
+        $block instanceof Quote => $this->fraction(self::PARAGRAPH_GAP),
         $block instanceof Table, $block instanceof Code,
-        $block instanceof Rule, $block instanceof Image => $this->solid(),
-        default => $this->half(),
+        $block instanceof Rule, $block instanceof Image => $this->fraction(self::SOLID_GAP),
+        default => $this->fraction(self::PARAGRAPH_GAP),
     };
-}
+    }
 
     /**
      * The gap after a paragraph, in points, which is the one the theme sets.
@@ -555,7 +555,7 @@ final class SlideGeometry
     private function block(): float
 {
     return $this->style->blockGap() / self::PIXELS_PER_POINT;
-}
+    }
 
     /**
      * The air between two blocks, in pixels.
@@ -572,22 +572,19 @@ final class SlideGeometry
     public function gapBetween(Block|TextFrame $above, Block|TextFrame $below): float
 {
     return ($this->spaceBelow($above) + $this->spaceAbove($below)) * self::PIXELS_PER_POINT;
-}
+    }
 
     /**
-     * What a paragraph leaves on one side of itself, in points.
+     * A fraction of the theme's block gap, in points.
+     *
+     * One method rather than one per gap, because every gap but a heading's is a fraction of
+     * `block:` and the gap beside a list, the gap beside a table and the gap beside a
+     * paragraph are that one multiplication with three different numbers — which is what makes
+     * the model tunable from the theme rather than from here.
      */
-    private function half(): float
-{
-    return $this->block() * self::PARAGRAPH_GAP;
-}
-
-    /**
-     * What a block with an edge of its own leaves on one side of itself, in points.
-     */
-    private function solid(): float
-{
-    return $this->block() * self::SOLID_GAP;
-}
+    private function fraction(float $part): float
+    {
+        return $this->block() * $part;
+    }
 
 }
