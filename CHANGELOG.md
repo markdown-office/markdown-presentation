@@ -67,6 +67,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The free-shape reading moved out of `BlockTranslator`, and a shape is no longer read by
+  the thing that reads blocks.** A free shape is not a block — it takes no column, is not
+  measured against the layout's box, and there is nothing for a walk to walk over — so
+  `Render\Free\ShapeReader` reads it onto the slide's state and the translator is a translator
+  again, at sixteen methods where it was twenty-four.
+
+  Two readings both callers needed are now one class each rather than a copy in each: the
+  list walk is `Render\CommonMark\FrameReader`, because a column of type and the Markdown
+  between a `:::content`'s fences want the same answer to what nesting depth a bullet is at;
+  and the picture walk is `Render\CommonMark\PictureReader`, because `![…](x.png)` and
+  `::image{src="x.png"}` must reach the filesystem through the *same* `PathScope` — one of
+  them resolving a path on its own would be a deck able to point outside the directory it was
+  given, written in a spelling nobody reads the tests for.
+
+  `PresentationRenderer`'s two write passes and its stack pass are one method too, so the
+  order shapes go down the screen is decided in one place: twenty methods, where the count
+  was twenty-one and had been nineteen before this branch.
+
 - **`rotate` turns a free shape about the middle of its own box**, on all twelve — the box
   does not move and does not resize, so a rotated shape is still the box that was placed. A
   `:::content` box is a shape, so it turns too, which is how a label is turned *with* the arrow

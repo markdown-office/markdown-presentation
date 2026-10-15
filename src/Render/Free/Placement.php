@@ -113,16 +113,34 @@ final class Placement
 
         [$across, $down] = self::ANCHORS[$anchor];
 
-        $x = $across === 'start' ? $left : ($across === 'end' ? $left - $width : $left - (int) round($width / 2));
-        $y = $down === 'start' ? $top : ($down === 'end' ? $top - $height : $top - (int) round($height / 2));
+        $x = self::justified($left, $width, $across);
+        $y = self::justified($top, $height, $down);
 
-        self::withinSlide($slide, $name, $left, $top, $width, $height, $x, $y);
+        self::withinSlide($slide, $name, $left, $top, new Box($x, $y, $width, $height));
 
         return new self(
             new Box($x, $y, $width, $height),
             self::layer($slide, $name, $attributes),
             self::rotation($slide, $name, $attributes),
         );
+    }
+
+    /**
+     * Where the box's near edge goes, given the point `left` or `top` names.
+     *
+     * `start` puts the point at the near edge, `end` at the far one and `centre` halfway —
+     * which is the whole of what an anchor is, and the reason it is a method of its own rather
+     * than a conditional written out twice. Rounding rather than truncating is the same call
+     * {@see Length::pixels()} makes, and an odd size would otherwise sit a half pixel off the
+     * point the author wrote.
+     */
+    private static function justified(int $point, int $size, string $how): int
+    {
+        return match ($how) {
+            'start' => $point,
+            'end' => $point - $size,
+            default => $point - (int) round($size / 2),
+        };
     }
 
     /**
@@ -232,6 +250,29 @@ final class Placement
             ];
         }
 
+        return self::circular($slide, $name, $attributes, $width, $height);
+    }
+
+    /**
+     * The two sides of a circle, which are one number.
+     *
+     * Every branch resolves a percentage against the height rather than against its own axis, so
+     * `width=10% height=10%` is the square the author wrote rather than 96 by 54. Why a circle is
+     * the one exception is on {@see self::ANCHORS} and on the `sizes` call above.
+     *
+     * @return array{0: int, 1: int}
+     *
+     * @throws MalformedShape
+     */
+    private static function circular(
+        int $slide,
+        string $name,
+        DirectiveAttributes $attributes,
+        string $width,
+        string $height,
+    ): array {
+        // Neither written is the biggest circle the slide's height allows, which is the same
+        // default every other shape follows rather than a special one.
         if (!$attributes->has('width') && !$attributes->has('height')) {
             return [SlideGeometry::HEIGHT, SlideGeometry::HEIGHT];
         }
@@ -239,7 +280,6 @@ final class Placement
         if (!$attributes->has('width') || !$attributes->has('height')) {
             $across = $attributes->has('width');
             $written = $across ? $width : $height;
-
             $side = self::side($slide, $name, $across ? 'width' : 'height', $written, self::axis($written, SlideGeometry::HEIGHT));
 
             return [$side, $side];
@@ -293,18 +333,27 @@ final class Placement
     }
 
     /**
-     * @throws MalformedShape
-     */
-    private static function withinSlide(
-        int $slide,
-        string $name,
-        int $left,
-        int $top,
-        int $width,
-        int $height,
-        int $x,
-        int $y,
-    ): void {
+ * Refuse a box that does not lie within the slide.
+ *
+ * Clamped instead, this is the shape quietly drawn somewhere the author did not ask for, with
+ * nothing in the file to say so — the outcome the whole refusal exists to prevent. The four
+ * edges are told apart rather than tested as one inequality because each gets a different
+ * sentence: "before the left edge" and "reaches 1020px" are different failures, and a message
+ * that named the wrong one would send the author looking in the wrong place.
+ *
+ * @param int $left Where the deck put the box's left edge, which `$box->x` is not: an anchored
+ *                  box's edge is at `$left` and the box starts somewhere else.
+ * @param int $top  The same for the top edge.
+ *
+ * @throws MalformedShape
+ */
+    private static function withinSlide(int $slide, string $name, int $left, int $top, Box $box): void
+    {
+        $x = $box->x;
+        $y = $box->y;
+        $width = $box->width;
+        $height = $box->height;
+
         [$where, $wide] = match (true) {
             $x < 0 => [sprintf('at left %dpx, which is %dpx before the left edge', $left, -$x), true],
             $y < 0 => [sprintf('at top %dpx, which is %dpx above the top edge', $top, -$y), false],

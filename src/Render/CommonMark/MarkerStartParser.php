@@ -60,13 +60,17 @@ final class MarkerStartParser implements BlockStartParserInterface
 
     public function tryStart(Cursor $cursor, MarkdownParserStateInterface $parserState): ?BlockStart
     {
-        // Four spaces of indentation is a code block in CommonMark, and a marker a deck
-        // wrote inside one is code like anything else in it.
+        $written = $cursor->getRemainder();
+
+        // One exit, because "this is not mine" is the answer three of the four paths below
+        // give and a method with four `return`s makes the reader check each one to find out
+        // whether they are the same answer or three different ones.
+        //
+        // Four spaces of indentation is a code block in CommonMark, and a marker a deck wrote
+        // inside one is code like anything else in it.
         if ($cursor->isIndented()) {
             return BlockStart::none();
         }
-
-        $written = $cursor->getRemainder();
 
         // Stands aside for a container this library draws, so the generic directives extension
         // reads it as one: `:::content{…}` is a fence with attributes and a body, which is what
@@ -77,17 +81,27 @@ final class MarkerStartParser implements BlockStartParserInterface
             return BlockStart::none();
         }
 
+        return $this->claimed($cursor, $written) ?? BlockStart::none();
+    }
+
+    /**
+     * The marker this class recognises on a line, or null where it recognises none.
+     *
+     * @return ?BlockStart Null for a line that is not a marker at all, which is what most lines
+     *                    in a slide are.
+     */
+    private function claimed(Cursor $cursor, string $written): ?BlockStart
+    {
         foreach (self::MARKERS as $pattern => $kind) {
             if (preg_match($pattern, $written, $match) !== 1) {
                 continue;
             }
 
-            $marker = new Marker($kind, $match[1] ?? null, $written);
             $cursor->advanceToEnd();
 
-            return BlockStart::of(new MarkerContinueParser($marker))->at($cursor);
+            return BlockStart::of(new MarkerContinueParser(new Marker($kind, $match[1] ?? null, $written)))->at($cursor);
         }
 
-        return BlockStart::none();
+        return null;
     }
 }

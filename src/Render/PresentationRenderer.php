@@ -593,8 +593,54 @@ final class PresentationRenderer
             $next++;
         }
 
-        foreach ($this->stack($slide, $content, $role, $writer, $number, $geometry, $next) as $id => $step) {
-            $steps[$id] = $step;
+        // The layout's own shapes, between the two layers. Stacked rather than written one at a
+        // time because {@see TextFrame::group()} decides which blocks share one text frame
+        // first: the air between two of them is then the frame's own paragraph spacing rather
+        // than room taken out of the column between two boxes.
+        $blocks = $content->blocks();
+        $columns = $this->columns($content, $role, $geometry, $number);
+
+        foreach ($geometry->body($role) as $column => $box) {
+            $y = $box->y;
+            $bottom = $box->y + $box->height;
+            $drawables = TextFrame::group($this->visible($blocks, $columns, $column));
+            $last = count($drawables) - 1;
+
+            foreach ($drawables as $at => $drawable) {
+                // A drawable that is a block is its own step; a {@see TextFrame} is several
+                // blocks drawn as one shape, and every block in a frame is on the same step —
+                // {@see TextFrame::group()} ends a run at a step boundary for exactly that
+                // reason — so the frame's step is its first block's.
+                $step = $drawable instanceof TextFrame ? $drawable->firstStep() : $drawable->step();
+
+                // A column whose contents are taller than its box runs off the bottom of it,
+                // and an image spends the whole of the room left — so both the cursor and the
+                // height are held inside the box. A shape that does not fit is drawn as small as
+                // the room allows rather than over whatever is under it, and
+                // {@see self::overflow()} is what says that it had to be.
+                $y = min($y, $bottom - SlideGeometry::MIN_SIZE);
+                $room = max(0, $bottom - $y);
+                $wanted = $writer->height($drawable, $box, $room);
+                $height = max(min($wanted, $room), SlideGeometry::MIN_SIZE);
+
+                if ($height < $wanted) {
+                    $this->overflow($number, $step, $column, $drawable->name(), $wanted, $room);
+                }
+
+                $writer->write($slide, $drawable, new Box($box->x, $y, $box->width, $height), $height);
+                $steps[$next++] = $step;
+
+                // The air between two shapes is the air between the two blocks at the seam,
+                // which is the pair {@see TextFrame::group()} put next to one another — so a
+                // table under a paragraph gets the room a table wants whatever the frame
+                // around either of them, and a heading's own air above it is spent between
+                // shapes as it is spent between paragraphs. Nothing is added after the last
+                // one: room below the last shape of a column is the column's, not the
+                // layout's, and spending it there is what pushes a slide off its own bottom.
+                if ($at < $last) {
+                    $y += $height + (int) round($geometry->gapBetween($drawable, $drawables[$at + 1]));
+                }
+            }
         }
 
         foreach ($content->shapes() as $shape) {
@@ -778,88 +824,6 @@ final class PresentationRenderer
         $note = new Note();
         $note->createRichTextShape()->createTextRun($text);
         $slide->setNote($note);
-    }
-
-    /**
-     * Every block of a slide, stacked into the role's body boxes, and the step each written
-     * shape belongs to.
-     *
-     * Stacked as shapes rather than as blocks: {@see TextFrame::group()} decides which blocks
-     * share one text frame first, because the air between two of them is then the frame's own
-     * paragraph spacing rather than room taken out of the column between two boxes. What
-     * follows is the arithmetic it has always been, one drawable at a time.
-     *
-     * `$first` is the id the first shape written here will take, which is one past the title
-     * where there is one. The ids are counted rather than looked up because a shape's id is
-     * its position in the slide's shape collection — the tree's own group is 1, and
-     * PHPPresentation's `writeShapeCollection()` increments before it uses the number — and
-     * {@see ShapeWriter::write()} adds exactly one shape per call, which is what makes the
-     * count and the file agree.
-     *
-     * @param SlideBlocks $content The slide's blocks and the column each was written for.
-     *
-     * @return array<int, int> Shape id to the step it appears on, in write order.
-     *
-     * @throws UnsupportedColumn
-     */
-    private function stack(
-        WrittenSlide $slide,
-        SlideBlocks $content,
-        LayoutRole $role,
-        ShapeWriter $writer,
-        int $number,
-        SlideGeometry $geometry,
-        int $first,
-    ): array {
-        $blocks = $content->blocks();
-        $columns = $this->columns($content, $role, $geometry, $number);
-        $steps = [];
-
-        foreach ($geometry->body($role) as $column => $box) {
-            $y = $box->y;
-            $bottom = $box->y + $box->height;
-            $visible = $this->visible($blocks, $columns, $column);
-            $drawables = TextFrame::group($visible);
-            $last = count($drawables) - 1;
-
-            foreach ($drawables as $at => $drawable) {
-                // A drawable that is a block is its own step; a {@see TextFrame} is several
-                // blocks drawn as one shape, and every block in a frame is on the same step —
-                // {@see TextFrame::group()} ends a run at a step boundary for exactly that
-                // reason — so the frame's step is its first block's.
-                $step = $drawable instanceof TextFrame ? $drawable->firstStep() : $drawable->step();
-
-                // A column whose contents are taller than its box runs off the bottom of it,
-                // and an image spends the whole of the room left — so both the cursor and
-                // the height are held inside the box. A shape that does not fit is drawn as
-                // small as the room allows rather than over whatever is under it, and
-                // {@see self::overflow()} is what says that it had to be.
-                $y = min($y, $bottom - SlideGeometry::MIN_SIZE);
-                $room = max(0, $bottom - $y);
-                $wanted = $writer->height($drawable, $box, $room);
-                $height = max(min($wanted, $room), SlideGeometry::MIN_SIZE);
-
-                if ($height < $wanted) {
-                    $this->overflow($number, $step, $column, $drawable->name(), $wanted, $room);
-                }
-
-                $writer->write($slide, $drawable, new Box($box->x, $y, $box->width, $height), $height);
-                $steps[$first++] = $step;
-
-                // The air between two shapes is the air between the two blocks at the seam,
-                // which is the pair {@see TextFrame::group()} put next to one another — so a
-                // table under a paragraph gets the room a table wants whatever the frame
-                // around either of them, and a heading's own air above it is spent between
-                // shapes as it is spent between paragraphs. Nothing is added after the last
-                // one: room below the last shape of a column is the column's, not the
-                // layout's, and spending it there is what pushes a slide off its own bottom.
-                if ($at < $last) {
-                    $y += $height + (int) round($geometry->gapBetween($drawable, $drawables[$at + 1]));
-                }
-            }
-        }
-
-        return $steps;
     }
 
     /**

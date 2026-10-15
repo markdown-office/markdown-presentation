@@ -48,6 +48,7 @@ use MarkdownPresentation\Render\Free\Pictures;
 use MarkdownPresentation\Render\Free\Placement;
 use MarkdownPresentation\Render\Free\ShapeKind;
 use MarkdownPresentation\Render\Free\TextStyle;
+use MarkdownPresentation\Render\Free\ShapeReader;
 use MarkdownPresentation\Render\ImageConverter;
 use MarkdownPresentation\Render\Run;
 use MarkdownPresentation\Render\SlideBlocks;
@@ -70,17 +71,6 @@ use MarkdownPresentation\Theme\Theme;
 final class BlockTranslator
 {
     /**
-     * A quoted line: three spaces of indentation, a `>` and one space of it. Whatever is
-     * left is the sentence.
-     *
-     * Written out rather than read off the parser's own quote block because a quote on a
-     * slide is the deck's own text with one marker taken off each line — and a nested quote,
-     * a list inside a quote and a sentence CommonMark reads as part of one are all the same
-     * thing here: words, one level in.
-     */
-    private const QUOTE = '/\A {0,3}>[ \t]?(.*)\z/';
-
-    /**
      * The steps one slide may build up in.
      *
      * 500 is two orders of magnitude above any build-up a person writes — a slide with five
@@ -93,10 +83,20 @@ final class BlockTranslator
 
     private readonly InlineTranslator $inline;
 
-    public function __construct(private readonly ImageConverter $images = new ImageConverter())
-    {
+    private readonly PictureReader $pictures;
+
+    private readonly FrameReader $frames;
+
+    private readonly ShapeReader $shapes;
+
+    public function __construct(
+        private readonly ImageConverter $images = new ImageConverter(),
+    ) {
         $this->environment = SlideEnvironment::build();
         $this->inline = new InlineTranslator($this->environment);
+        $this->pictures = new PictureReader($this->images);
+        $this->frames = new FrameReader($this->inline);
+        $this->shapes = new ShapeReader($this->inline, $this->pictures, $this->frames);
     }
 
     /**
@@ -213,11 +213,11 @@ final class BlockTranslator
             // A free shape is placed rather than laid out, so it is not a block and takes no
             // column: it goes on the state for {@see SlideBlocks} to carry beside the blocks,
             // and the walk moves on. {@see self::free()} is where it is read.
-            $node instanceof DirectiveBlock => $this->free($node, $state),
+            $node instanceof DirectiveBlock => $this->shape($node, $state),
             $node instanceof LeagueHeading => $this->placed(new Heading($this->inline->runs($node), $node->getLevel(), $state->step), $state),
             $node instanceof ThematicBreak => $this->placed(new Rule($state->step), $state),
             $node instanceof FencedCode || $node instanceof IndentedCode => $this->placed($this->code($node, $state), $state),
-            $node instanceof LeagueList => $this->placed(new ListBlock($this->items($node, 1, [], $state), $state->step), $state),
+            $node instanceof LeagueList => $this->placed($this->frames->list($node, $state), $state),
             $node instanceof BlockQuote => $this->quote($node, $state),
             $node instanceof LeagueTable => $this->placed($this->table($node, $state), $state),
             $node instanceof HtmlBlock => $this->placed($this->html($node, $state), $state),
@@ -247,7 +247,7 @@ final class BlockTranslator
         $only = $node instanceof Paragraph && iterator_count($node->children()) === 1 ? $node->firstChild() : null;
 
         if ($only instanceof Image) {
-            return $this->placed($this->image($only, $state), $state);
+            return $this->placed($this->pictures->node($only, $state, $this->inline), $state);
         }
 
         return $this->placed(new ParagraphBlock($this->inline->runs($node), $state->step), $state);
@@ -393,122 +393,18 @@ final class BlockTranslator
     }
 
     /**
-     * The items of a list and of every list inside it, at the depth each was nested at.
-     *
-     * The depth comes off the tree rather than off an indent, which is where a list written
-     * `1. a` and continued at the item's own indent agrees with the hand-written walk, and
-     * where a list that mixes its markers does not: CommonMark starts a second list there,
-     * and that walk keeps one list with a bullet and a number in it.
-     *
-     * @param list<array{level: int, runs: list<Run>, ordered: bool, start: ?int}> $items
-     *
-     * @return list<array{level: int, runs: list<Run>, ordered: bool, start: ?int}>
-     *
-     * @throws UnsupportedLink
-     */
-    private function items(LeagueList $node, int $level, array $items, SlideState $state): array
-    {
-        $data = $node->getListData();
-        $ordered = $data->type === LeagueList::TYPE_ORDERED;
-
-        // A numbering that begins at one needs nothing: no `startAt` is written for it at all,
-        // and every reader counts on from one. One that begins at any other number has the same
-        // `startAt` written on each of its paragraphs — which is what PowerPoint expects, and
-        // continues itself — and LibreOffice restarts at each one instead, so `7.` and `8.` read
-        // as `7.` and `7.` there. Every item of such a list therefore carries its own number,
-        // and nothing is left to a reader to infer.
-        $explicit = $ordered && $data->start !== 1;
-        $number = $data->start;
-        $first = true;
-
-        foreach ($node->children() as $item) {
-            // The number the list was opened with, on its first item alone: an item that carries
-            // on from the one above it has no number of its own to draw. A numbering that
-            // begins above one is the exception, and every one of its items carries its own.
-            $start = $first ? $data->start : null;
-
-            if ($explicit) {
-                $start = $number;
-            }
-
-            $items[] = [
-                'level' => $level,
-                'runs' => $this->itemRuns($item, $state),
-                'ordered' => $ordered,
-                'start' => $ordered ? $start : null,
-            ];
-
-            $first = false;
-            $number++;
-
-            foreach ($item->children() as $child) {
-                if ($child instanceof LeagueList) {
-                    $items = $this->items($child, $level + 1, $items, $state);
-                }
-            }
-        }
-
-        return $items;
-    }
-
-    /**
-     * The words of one list item, without the lists nested inside it.
-     *
-     * Read before them rather than after, because a bullet is drawn before the bullets
-     * under it: the deck writes the parent first and the tree holds its children first, and
-     * a slide that showed them the other way round would read bottom up.
-     *
-     * @return list<Run>
-     *
-     * @throws UnsupportedLink
-     */
-    private function itemRuns(Node $item, SlideState $state): array
-    {
-        $runs = [];
-
-        foreach ($item->children() as $child) {
-            if ($child instanceof LeagueList) {
-                continue;
-            }
-
-            if ($child instanceof Paragraph || $child instanceof LeagueTable) {
-                array_push($runs, ...$this->inline->runs($child, ' '));
-
-                continue;
-            }
-
-            // A shape written inside a bullet — a fence, a block of HTML — is not one
-            // a slide draws there, so it is read as the words it carries. Dropping it would
-            // drop the words the author wrote, which is the one outcome neither parser is
-            // allowed to offer.
-            $lines = implode("\n", array_map(trim(...), $state->lines($child)));
-
-            array_push($runs, ...$this->inline->runsIn($lines, ' '));
-        }
-
-        return $runs;
-    }
-
-    /**
-     * A quoted block, as the sentences it carries.
+     * A quoted block, as the sentences it carries and whatever followed it.
      *
      * Read from the deck's own lines, one `>` at a time, because that is what a quote is on a
      * slide. A line that is not marked ends it — CommonMark's rule and this one's — and
      * whatever followed it is content again rather than part of the quotation.
      *
      * @return list<array{0: Code|Heading|ImageBlock|ListBlock|ParagraphBlock|Quote|Rule|Table, 1: int}>
-     *
-     * @throws ImageNotFound
-     * @throws MalformedShape
-     * @throws UnknownDirective
-     * @throws UnknownMarker
-     * @throws UnsupportedImageFormat
-     * @throws UnsupportedLink
      */
     private function quote(BlockQuote $node, SlideState $state): array
     {
         $lines = $state->lines($node);
-        $quoted = $this->quoted($node, $state);
+        $quoted = $this->frames->quoted($node, $state);
 
         $blocks = $this->placed(new Quote($this->inline->runsIn(implode("\n", $quoted)), $state->step), $state);
 
@@ -582,89 +478,11 @@ final class BlockTranslator
     }
 
     /**
-     * The picture on a line of its own, as the shape it is drawn as.
+     * A free shape, which is not a block and takes no column.
      *
-     * The alt text is the label's words with its markup taken out, which is what a screen
-     * reader reads. The hand-written walk takes the label as the raw text between the brackets,
-     * so a `![*a picture*](x.png)` is described as `a picture` here and as `*a picture*` there.
-     *
-     * @throws ImageNotFound
-     * @throws UnsupportedImageFormat
-     * @throws UnsupportedLink
-     */
-    private function image(Image $node, SlideState $state): ImageBlock
-    {
-        // Decoded, because that is how a name with a space in it is written: CommonMark has no
-        // bare space in a destination, so `my picture.png` is a paragraph and `my%20picture.png`
-        // is the picture. league hands the target over encoded, and looking for the encoded
-        // spelling on disk is looking for a file nobody has.
-        return $this->resolved(
-            rawurldecode($node->getUrl()),
-            // The alt text is the label's words with its markup taken out, which is what a
-            // screen reader reads. The hand-written walk takes the label as the raw text
-            // between the brackets, so a `![*a picture*](x.png)` is described as `a picture`
-            // here and as `*a picture*` there.
-            InlineTranslator::text($this->inline->runs($node)),
-            $state,
-        );
-    }
-
-    /**
-     * A picture the deck named, as the block it is drawn from.
-     *
-     * The one place a path is turned into a picture, whether it was named by `![…](x.png)` or
-     * by `::image{src="x.png"}`: the same {@see PathScope}, the same
-     * {@see \MarkdownPresentation\Exception\ImageNotFound} for a file that is not there or not
-     * under the deck's directory, and the same conversion — so a deck cannot read a file by
-     * writing a directive that it could not read by writing an image.
-     *
-     * @throws ImageNotFound
-     * @throws UnsupportedImageFormat
-     */
-    private function resolved(string $written, string $alt, SlideState $state): ImageBlock
-    {
-        if (PathScope::isUrl($written)) {
-            throw ImageNotFound::aUrl($state->slide, $written);
-        }
-
-        // Where a path is written *from* says nothing about whether it is allowed: what is
-        // allowed is where it lands.
-        $joined = str_starts_with($written, '/') ? $written : rtrim($state->directory, '/') . '/' . $written;
-
-        if (!is_file($joined)) {
-            throw ImageNotFound::at($state->slide, $written, $joined);
-        }
-
-        // `realpath()` rather than the path as written, because `..` and a symlink both walk
-        // out of a directory that a prefix test says they are inside.
-        $resolved = PathScope::canonical($joined);
-
-        if ($resolved === null || !$state->files->holds($resolved)) {
-            throw ImageNotFound::outside($state->slide, $written, $resolved ?? $joined, $state->files->roots());
-        }
-
-        return new ImageBlock(
-            $written,
-            $resolved,
-            $this->images->png($state->slide, $written, $resolved),
-            $alt,
-            $state->step,
-        );
-    }
-
-    /**
-     * A free-placement directive, read as the one shape it is written as.
-     *
-     * The walk carries no shape back — a free shape is not a block and takes no column — so it
-     * goes on the {@see SlideState} for {@see SlideBlocks} to hand to the renderer beside the
-     * layout's own shapes. Everything about it is read here rather than at draw time, because
-     * the attribute vocabulary is per directive ({@see ShapeKind::attributes()}) and an
-     * attribute nobody reads is a failure that must be a failure before a byte is written.
-     *
-     * {@see Refusals} has already refused every name this library does not draw, so the `null`
-     * below is the assertion that it still holds rather than a second way of catching the same
-     * mistake — and it raises the same failure, so the message an author sees does not depend
-     * on which of the two spots got there first.
+     * Always an empty list, and that is the whole of it: the shape went onto the {@see
+     * SlideState} for {@see SlideBlocks} to carry beside the blocks, and this walk has nothing
+     * to walk over it. {@see ShapeReader} is where it is read.
      *
      * @return list<array{0: Code|Heading|ImageBlock|ListBlock|ParagraphBlock|Quote|Rule|Table, 1: int}>
      *
@@ -672,256 +490,13 @@ final class BlockTranslator
      * @throws MalformedShape
      * @throws UnknownDirective
      * @throws UnsupportedImageFormat
+     * @throws UnsupportedLink
      */
-    private function free(DirectiveBlock $node, SlideState $state): array
+    private function shape(DirectiveBlock $node, SlideState $state): array
     {
-        // Not a branch: {@see Refusals::leaves()} has refused every leaf under a name this library
-        // does not draw, before the walk began, so a name that is not one of ours cannot
-        // arrive. The `??` is there because a `null` below would reach the dispatch and draw
-        // nothing without saying so, and a name this library does draw is one the refusal does
-        // not cover — so the two must agree rather than one of them be assumed.
-        $kind = FreeShapes::kindOf($node->getName())
-            ?? throw UnknownDirective::leaf($state->slide, Refusals::oneLine($state->written($node)));
-
-        $attributes = $node->getAttributes();
-        $name = $kind->value;
-        $theme = $state->theme;
-
-        // Before the generic refusal, because it says more. `border-radius` is a real attribute
-        // of this vocabulary and only one shape has the corners for it; a `label` is a real one
-        // and two of the twelve have nowhere to put it. "Not an attribute" would be true of
-        // both and useless for either.
-        if ($kind !== ShapeKind::RoundRect && $attributes->has('border-radius')) {
-            throw MalformedShape::radius($state->slide, $name);
-        }
-
-        if ($attributes->has('label') && ($kind === ShapeKind::Image || $kind->isContent())) {
-            throw MalformedShape::noLabel(
-                $state->slide,
-                $name,
-                $kind === ShapeKind::Image
-                    ? 'a picture is a `p:pic`, which carries no text of its own'
-                    : 'the body between the fences is already its text',
-            );
-        }
-
-        self::attributes($state->slide, $name, $attributes, $kind);
-        self::label($state->slide, $state->written($node), $node->getLabel());
-
-        $placement = Placement::read($state->slide, $name, $attributes, $kind);
-
-        if ($kind === ShapeKind::Image) {
-            $state->place(FreePicture::at(
-                $kind,
-                $placement,
-                $state->step,
-                Paint::none(),
-                $this->namedPicture($attributes, $state),
-                Pictures::fit($state->slide, $name, $attributes),
-            ));
-
-            return [];
-        }
-
-        $paint = Paint::read($state->slide, $name, $attributes, $theme);
-
-        if ($kind->isContent()) {
-            $state->place(FreeText::at(
-                $kind,
-                $placement,
-                $state->step,
-                $paint,
-                $this->frame($node, $state),
-                TextStyle::read($state->slide, $name, $attributes, $theme),
-            ));
-
-            return [];
-        }
-
-        $state->place(FreeAutoShape::at(
-            $kind,
-            $placement,
-            $state->step,
-            $paint,
-            Length::written($state->slide, $name, 'label', $attributes, ''),
-        ));
+        $this->shapes->read($node, $state);
 
         return [];
-    }
-
-    /**
-     * An attribute this directive does not read.
-     *
-     * Refused rather than ignored, and the whole of why: an ignored attribute is the one
-     * mistake in this vocabulary that leaves nothing behind. A shape drawn without the fill
-     * that was asked for is a deck that renders, and the reader has no way of knowing which
-     * half of what they wrote arrived.
-     *
-     * @throws MalformedShape
-     */
-    private static function attributes(
-        int $slide,
-        string $name,
-        DirectiveAttributes $attributes,
-        ShapeKind $kind,
-    ): void {
-        $read = $kind->attributes();
-
-        foreach (array_keys($attributes->toArray()) as $attribute) {
-            if (!in_array($attribute, $read, true)) {
-                throw MalformedShape::unknownAttribute($slide, $name, $attribute, $read);
-            }
-        }
-    }
-
-    /**
-     * A label in brackets, which a free shape has nowhere to put.
-     *
-     * @throws MalformedShape
-     */
-    private static function label(int $slide, string $written, ?string $label): void
-    {
-        if ($label !== null && $label !== '') {
-            throw MalformedShape::label($slide, Refusals::oneLine($written));
-        }
-    }
-
-    /**
-     * The Markdown between a `:::content`'s fences, as the one frame it is drawn as.
-     *
-     * Only the blocks a {@see TextFrame} holds, because one directive is one shape: see {@see
-     * \MarkdownPresentation\Render\Free\FreeText}. Everything else is refused by name rather
-     * than drawn, because a table or a picture here would be a second shape and the click
-     * chain counts shapes by the position they were written in.
-     *
-     * The step every block carries is the one the container was written on, so a free text
-     * block is revealed by the click that reached it rather than by one of its own — there is
-     * no marker inside it to carry a step.
-     *
-     * @throws ImageNotFound
-     * @throws MalformedShape
-     * @throws UnsupportedImageFormat
-     * @throws UnsupportedLink
-     */
-    private function frame(DirectiveBlock $node, SlideState $state): TextFrame
-    {
-        $written = Refusals::oneLine($state->written($node));
-        $blocks = [];
-
-        foreach ($node->children() as $child) {
-            $blocks[] = match (true) {
-                $child instanceof Marker => throw MalformedShape::marker(
-                    $state->slide,
-                    $written,
-                    Refusals::oneLine($child->written()),
-                ),
-                $child instanceof DirectiveBlock => throw MalformedShape::body($state->slide, $written, 'directive'),
-                $child instanceof FencedCode, $child instanceof IndentedCode => throw MalformedShape::body(
-                    $state->slide,
-                    $written,
-                    'code',
-                ),
-                $child instanceof LeagueTable => throw MalformedShape::body($state->slide, $written, 'table'),
-                $child instanceof ThematicBreak => throw MalformedShape::body($state->slide, $written, 'rule'),
-                $child instanceof LeagueHeading => new Heading(
-                    $this->inline->runs($child),
-                    $child->getLevel(),
-                    $state->step,
-                ),
-                $child instanceof LeagueList => new ListBlock($this->items($child, 1, [], $state), $state->step),
-                $child instanceof BlockQuote => new Quote(
-                    $this->inline->runsIn(implode("\n", $this->quoted($child, $state))),
-                    $state->step,
-                ),
-                default => $this->contentParagraph($child, $written, $state),
-            };
-        }
-
-        if ($blocks === []) {
-            throw MalformedShape::emptyBody($state->slide, $written);
-        }
-
-        return new TextFrame($blocks);
-    }
-
-    /**
-     * A paragraph of a free text block, which is a paragraph or a refusal.
-     *
-     * A picture on a line of its own is one here as it is in a column — the rule that a
-     * picture is a picture only on a line of its own is what makes `![a logo](x.png)` a shape
-     * rather than a sentence with a hole in it, and it is the same rule in both places.
-     *
-     * An HTML block is text, exactly as it is in a column: this library has no opinion about
-     * what a deck says about HTML and draws the words in it.
-     *
-     * @throws MalformedShape
-     * @throws UnsupportedLink
-     */
-    private function contentParagraph(Node $node, string $written, SlideState $state): ParagraphBlock
-    {
-        $only = $node instanceof Paragraph && iterator_count($node->children()) === 1 ? $node->firstChild() : null;
-
-        if ($only instanceof Image) {
-            throw MalformedShape::body($state->slide, $written, 'image');
-        }
-
-        // An HTML block is text rather than a shape, exactly as it is in a column: this library has
-        // no opinion about what a deck says about HTML and draws the words in it.
-        if ($node instanceof HtmlBlock) {
-            return new ParagraphBlock(
-                $this->inline->runsIn(implode("\n", array_map(trim(...), $state->lines($node)))),
-                $state->step,
-            );
-        }
-
-        return new ParagraphBlock($this->inline->runs($node), $state->step);
-    }
-
-    /**
-     * The words of a quoted block, one `>` at a time.
-     *
-     * Shared with {@see self::quote()} so that a quote inside a free text block is the same
-     * thing a quote in a column is, and a line that ends the quotation is content again in
-     * both.
-     *
-     * @return list<string>
-     */
-    private function quoted(BlockQuote $node, SlideState $state): array
-    {
-        $lines = $state->lines($node);
-        $quoted = [];
-        $offset = 0;
-
-        while (isset($lines[$offset]) && preg_match(self::QUOTE, $lines[$offset], $match) === 1) {
-            $quoted[] = $match[1];
-            $offset++;
-        }
-
-        return $quoted;
-    }
-
-    /**
-     * The picture a `::image` names, through the same rules a picture in a column goes through.
-     *
-     * @throws ImageNotFound
-     * @throws MalformedShape
-     * @throws UnsupportedImageFormat
-     */
-    private function namedPicture(DirectiveAttributes $attributes, SlideState $state): ImageBlock
-    {
-        $src = $attributes->getString('src');
-
-        if ($src === null || trim($src) === '') {
-            throw MalformedShape::attributeValue(
-                $state->slide,
-                ShapeKind::Image->value,
-                'src',
-                'src',
-                'A picture names the file it draws: src="chart.png". The path is read from the directory the deck is in.',
-            );
-        }
-
-        return $this->resolved($src, $attributes->getString('alt', '') ?? '', $state);
     }
 
     /**
