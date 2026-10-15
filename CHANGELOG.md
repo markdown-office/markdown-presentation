@@ -470,6 +470,22 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A placed text block was shrunk to its own text, so `vertical-align` had nothing to align
+  against.** `height=48 vertical-align=middle` was written at the 23px that one line at 14pt
+  takes, anchored centre — so the text centred in 23px sitting at the top of a 48px space and
+  rode high by `(48 − 23) / 2`. Measured on a deck of eleven slides, every centred box was off
+  by between 8 and 13.5 pixels, always upwards, and the box in the file was not the box the
+  deck wrote.
+
+  This is also why the composable way to put words on a shape did not work: draw the shape,
+  put a `:::content` box over it with the same alignment, and the box would not stay where it
+  was put. A deck places a box and aligns text inside it, so the box is now the one it
+  declared, and only an overflow takes the room away — which is reported when it happens, as
+  before.
+
+  Found by rebuilding an existing eleven-slide deck in Markdown, which is the first thing this
+  library has been asked to reproduce from another tool and a deck it had never been given.
+
 - **`padding` on a placed text block was written into the file but never measured.** The inset
   reaches the shape through `ShapeWriter::freeText()` and did not reach
   `ShapeWriter::textWidth()`, which subtracted the default inset whatever the deck had asked
@@ -490,9 +506,6 @@ All notable changes to this project are documented here. The format follows
   pixel of text, so a single `W` set at 24 points measured as **23 lines**. The clamp is now
   at zero, which leaves a box with no room in it to be reported as not fitting — the truth for
   a box narrower than its own padding.
-
-  Found by rebuilding an existing eleven-slide deck in Markdown, which is the first thing this
-  library has been asked to reproduce from another tool and a deck it had never been given.
 
 - **A small SVG could take gigabytes to refuse.** The ceiling on a picture is on the pixels,
   and for a vector those pixels were allocated before anything asked whether they were allowed:
