@@ -310,6 +310,10 @@ it('does not claim again what the code does not do', function (string $claim) {
     // A deck asking for it must be told, not given something else — so a page may not claim a
     // free picture fills its box and loses its edges.
     'a free picture fills its box and loses its edges' => 'fills the box and crops',
+    // A theme's own comment claimed its palette made "eleven slides" agree, and the deck using
+    // it has nine. A count in prose about a file that changes is wrong the moment the file does,
+    // and nothing reads prose to say so — which is why the phrase is barred rather than fixed.
+    'a theme comment counts the slides that use it' => 'slides that agree',
     // A free picture was placed with `setWidth()` and `setHeight()`, which each re-derive the
     // other from the ratio, so a 2:1 picture in a square box came back at twice the width. It
     // is right for a picture whose ratio matches its box, so a page may not claim the box is
