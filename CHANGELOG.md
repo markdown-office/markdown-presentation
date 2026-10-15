@@ -22,6 +22,10 @@ All notable changes to this project are documented here. The format follows
 
   `examples/markdown/14-shadows.md` is five shadow types on five kinds of object.
 
+  Every claim the gallery makes about that deck and about `13-placed-deck.md` is now checked
+  against a real conversion, which is what `tests/Readme/examples-decks.php` exists to do and
+  what it was not doing for either of them.
+
 - **A `pitch` theme, and an example deck built out of free shapes.**
   Near-black and a gold on white with one blue for anything a reader is meant to act on — the
   palette a proposal wants and a template rarely has. `examples/markdown/13-placed-deck.md` is a
@@ -492,6 +496,27 @@ All notable changes to this project are documented here. The format follows
   on — each asserted where it is decided.
 
 ### Fixed
+
+- **A shadow drawn for the word "transparent" was an opaque black one.** `shadow-color` read
+  through the same `Colour::read()` that answers `fill` and `stroke`, where `none` and
+  `transparent` mean *do not draw this*. A shadow has nowhere to record an absent colour —
+  DrawingML draws an outer shadow as a coloured copy of the shape — so the null was answered
+  with a default and `shadow-color=transparent` came out as
+  `<a:srgbClr val="000000"><a:alpha val="100000"/>`: the most opaque shadow the format allows,
+  requested by spelling the opposite. Both are now refused by name, and the refusal says how to
+  say what was meant: leave off every shadow attribute. The two spellings live in one place,
+  `Colour::isNone()`, because a caller that has to recognise them and a caller that has to
+  answer for them are two lists that drift.
+
+- **An unbounded `shadow-distance` or `shadow-blur` was written as a fraction of an EMU
+  coordinate.** PHPPresentation converts pixels to EMU with a **float** multiply, so a large
+  value arrives at the writer as a float and PHP prints it as `9.525E+14` —
+  `shadow-distance=99999999999999999999` came out as `dist="8.785261865104174e+22"`, which
+  `ST_PositiveCoordinate` cannot hold. PowerPoint opens the file; a schema-validating consumer,
+  Keynote, Google Slides or a server-side renderer is not obliged to. A distance and a blur are
+  now refused past the slide's width plus its height, which is where the switch to scientific
+  notation is four orders of magnitude away, and where nothing a deck author can see is left
+  unreachable.
 
 - **A placed text block was shrunk to its own text, so `vertical-align` had nothing to align
   against.** `height=48 vertical-align=middle` was written at the 23px that one line at 14pt

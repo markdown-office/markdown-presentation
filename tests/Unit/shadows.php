@@ -5,7 +5,6 @@ declare(strict_types=1);
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\MalformedShape;
 use MarkdownPresentation\Render\CommonMark\BlockTranslator;
-use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Render\Free\Shadow;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
@@ -62,13 +61,7 @@ function shadowOf(string $directive): ?Shadow
         $theme,
     );
 
-    foreach ($blocks->shapes() as $shape) {
-        if ($shape instanceof FreeText) {
-            return $shape->style === null ? null : ($shape->shadow ?? null);
-        }
-    }
-
-    return $blocks->shapes()[0]->shadow ?? null;
+    return $blocks->shapes()[0]->shadow;
 }
 
 it('writes no effect list on a shape that named no shadow', function () {
@@ -196,4 +189,99 @@ it('reads a shadow onto the shape rather than only onto the file', function () {
 
 it('reads no shadow where the deck named none', function () {
     expect(shadowOf('::rectangle{fill=lt2}'))->toBeNull();
+});
+
+it('refuses a shadow colour of none rather than painting a black one', function () {
+    // `none` means the thing is not drawn everywhere else in this library, and a shadow that
+    // is not drawn is spelled by leaving off every shadow attribute. Answering a request for
+    // no colour with the most opaque colour there is the opposite of what was written.
+    expect(fn () => shadowed("::rectangle{fill=lt2 shadow-color=none shadow-blur=4}\n"))
+        ->toThrow(MalformedShape::class, 'leave off every shadow attribute');
+});
+
+it('refuses a shadow colour of transparent, which means the same thing and no less', function () {
+    expect(fn () => shadowed("::rectangle{fill=lt2 shadow-color=transparent shadow-blur=4}\n"))
+        ->toThrow(MalformedShape::class, 'A shadow is drawn, so a shadow colour is one of the four role names');
+});
+
+it('refuses no shadow on any kind of shape, not only the first', function (string $directive) {
+    expect(fn () => shadowed($directive . "\n"))
+        ->toThrow(MalformedShape::class, 'leave off every shadow attribute');
+})->with([
+    'rectangle' => '::rectangle{fill=lt2 shadow-color=none}',
+    'roundrect' => '::roundrect{fill=lt2 shadow-color=none border-radius=8}',
+    'image' => '::image{src="__PICTURE__" shadow-color=none}',
+    'content' => ":::content{width=300 shadow-color=none}\nWords.\n:::",
+]);
+
+it('still takes a shadow colour of a role name, a slot and a hex', function (string $written) {
+    $xml = shadowed("::rectangle{fill=lt2 shadow-color=$written shadow-blur=4}\n")
+        ->part('ppt/slides/slide1.xml');
+
+    preg_match('#<a:outerShdw.*?<a:srgbClr val="([0-9A-F]{6})"#s', $xml, $match);
+
+    expect($match[1] ?? '')->toBe(strtoupper(ltrim($written, '#')));
+})->with(['#4C1D95', '#4c1d95']);
+
+it('refuses a distance further than the slide rather than writing a fraction of an EMU coordinate', function () {
+    // `pixelsToEmu()` answers a float and PHP writes a large one as `9.525E+14`, which
+    // `ST_PositiveCoordinate` cannot hold. Unbounded it arrived as
+    // `dist="8.785261865104174e+22"`: PowerPoint reads one, an `xsd:long` does not.
+    expect(fn () => shadowed("::rectangle{fill=lt2 shadow-distance=99999999999999999999}\n"))
+        ->toThrow(MalformedShape::class, 'reaches further than the slide is wide and tall together (1500px)');
+});
+
+it('refuses a blur further than the slide too, and says which of the two it is', function () {
+    expect(fn () => shadowed("::rectangle{fill=lt2 shadow-blur=9223372036854775807}\n"))
+        ->toThrow(MalformedShape::class, 'A shadow blur of 9223372036854775807 pixels reaches further than the slide');
+});
+
+it('writes the furthest shadow that is allowed, as a whole EMU number', function () {
+    // The boundary has to be one that renders: at 1500px the EMU value is 14287500, which is
+    // an exact integer in a double and short enough that no `precision` turns it into
+    // scientific notation.
+    $reach = MarkdownPresentation\Render\SlideGeometry::WIDTH + MarkdownPresentation\Render\SlideGeometry::HEIGHT;
+
+    $xml = shadowed("::rectangle{fill=lt2 shadow-distance=$reach}\n")->part('ppt/slides/slide1.xml');
+
+    preg_match('#<a:outerShdw[^>]*\bdist="([^"]*)"#', $xml, $match);
+
+    expect($reach)->toBe(1500)
+        ->and($match[1] ?? '')->toBe('14287500');
+});
+
+it('refuses one pixel past that, so the bound is the bound rather than nearly', function () {
+    expect(fn () => shadowed("::rectangle{fill=lt2 shadow-distance=1501}\n"))
+        ->toThrow(MalformedShape::class, 'reaches further than the slide is wide and tall together (1500px)');
+});
+
+it('never writes a shadow coordinate in scientific notation, whatever the deck asks for', function () {
+    // The claim the bound exists for, read off the file rather than off the number in the
+    // message: no `dist` or `blurRad` may carry an `E`.
+    // Strings, not integers: PHP prints a 20-digit integer as `1.0E+20`, so a deck built from
+    // one would be refused for reading it as a fraction — and the assertion below would never
+    // run, which is the one thing a test like this must not be.
+    foreach (['1', '12', '960', '1500', '1501', '99999999999999999999'] as $written) {
+        try {
+            $xml = shadowed("::rectangle{fill=lt2 shadow-distance=$written shadow-blur=$written}\n")
+                ->part('ppt/slides/slide1.xml');
+        } catch (MalformedShape) {
+            continue;
+        }
+
+        preg_match_all('/\b(?:dist|blurRad)="([^"]*)"/', $xml, $matches);
+
+        foreach ($matches[1] as $coordinate) {
+            expect($coordinate)->toMatch('/\A[0-9]+\z/');
+        }
+    }
+});
+
+it('writes no shadow at all where the deck asked for no colour rather than a black one', function () {
+    // The shape that had this defect drew a solid black shadow at 100% for the word
+    // "transparent", and the file said `<a:srgbClr val="000000"><a:alpha val="100000"/>`.
+    expect(fn () => shadowed("::rectangle{fill=lt2 shadow-color=transparent}\n"))
+        ->toThrow(MalformedShape::class)
+        ->and(shadowed("::rectangle{fill=lt2}\n")->part('ppt/slides/slide1.xml'))
+        ->not->toContain('outerShdw');
 });

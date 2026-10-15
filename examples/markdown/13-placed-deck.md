@@ -443,7 +443,7 @@ layout: blank
 :::
 
 :::content{left=48 top=67 width=864 height=58 font-size=32 color=dk1 vertical-align=middle padding=0}
-**The Next Four Quarters**
+**The Next Three Quarters**
 :::
 
 ::rectangle{left=48 top=140 width=278 height=346 fill=lt2}

@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Render\Free;
 
 use MarkdownOffice\CommonMark\Directive\Directive\DirectiveAttributes;
 use MarkdownPresentation\Exception\MalformedShape;
+use MarkdownPresentation\Render\SlideGeometry;
 use MarkdownPresentation\Theme\Theme;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Style\Color;
@@ -39,6 +40,23 @@ final class Shadow
 {
     private const ROTATION = '/\A(-?\d+)(deg)?\z/';
 
+    /**
+     * How far a shadow may reach, in pixels.
+     *
+     * The slide's width plus its height, which is longer than its diagonal — a deliberate
+     * over-estimate rather than a square root, because the bound is a promise about what a
+     * deck author could need and not a measurement of what they can see.
+     *
+     * It is bounded because {@see \PhpOffice\Common\Drawing::pixelsToEmu()} answers a **float**,
+     * and PHP writes a large float as `9.525E+14` — where it switches is the `precision` ini
+     * rather than anything this library decides, and `ST_PositiveCoordinate` is an `xsd:long`
+     * either way. Unbounded, `shadow-distance=99999999999999999999` arrived as
+     * `dist="8.785261865104174e+22"`: PowerPoint reads one, and a validator, Keynote or a
+     * server-side renderer is not obliged to. At this bound the largest value written is
+     * 14287500, well inside a double's exact integers and below any `precision`.
+     */
+    private const REACH = SlideGeometry::WIDTH + SlideGeometry::HEIGHT;
+
     private function __construct(
         public readonly Color $colour,
         public readonly int $distance,
@@ -68,7 +86,7 @@ final class Shadow
         }
 
         $alpha = self::alpha($slide, $name, $attributes);
-        $colour = Colour::read($slide, $name, 'shadow-color', $attributes, $theme, 'ink') ?? new Color('000000');
+        $colour = self::colour($slide, $name, $attributes, $theme);
 
         return new self(
             $colour,
@@ -80,9 +98,46 @@ final class Shadow
     }
 
     /**
+     * The colour the shadow is drawn in, or the theme's own ink where the deck named none.
+     *
+     * **`none` and `transparent` are refused rather than read.** {@see Colour::read()} answers
+     * null for exactly those two and for nothing else — an unknown slot is refused rather than
+     * read as an absent colour — so a fallback here would be reachable only by a deck that
+     * asked for no colour, and it would answer with the most opaque colour there is. Everywhere
+     * else in the library `none` means the thing is not drawn, and a library that has spent
+     * every refusal on that argument cannot be the one place where `shadow-color=none` paints
+     * a solid black shadow at full opacity. The refusal names the way to say what was meant:
+     * drop every shadow attribute, and there is no shadow.
+     *
+     * @throws MalformedShape
+     */
+    private static function colour(
+        int $slide,
+        string $name,
+        DirectiveAttributes $attributes,
+        Theme $theme,
+    ): Color {
+        $written = Length::written($slide, $name, 'shadow-color', $attributes, 'ink');
+
+        if (Colour::isNone($written)) {
+            throw MalformedShape::attributeValue(
+                $slide,
+                $name,
+                'shadow-color',
+                $written,
+                'A shadow is drawn, so a shadow colour is one of the four role names, a theme slot, or a hex value: '
+                . 'shadow-color=ink, shadow-color=accent1, shadow-color=#4C1D95. For no shadow at all, '
+                . 'leave off every shadow attribute.',
+            );
+        }
+
+        return Colour::read($slide, $name, 'shadow-color', $attributes, $theme, 'ink') ?? new Color('000000');
+    }
+
+    /**
      * The shadow as PHPPresentation writes it.
      *
-     * Not chained onto the shape: {@see \PhpOffice\PhpPresentation\Shape\AbstractShape::setShadow()}
+     * Not chained onto the shape: {@see \PhpOffice\PhpPresentation\AbstractShape::setShadow()}
      * answers the shadow rather than the shape, so a chain through it ends on the wrong object.
      */
     public function apply(AbstractShape $target): void
@@ -132,7 +187,7 @@ final class Shadow
                 $name,
                 $attribute,
                 $written,
-                sprintf('A shadow %s is a whole number of pixels, and cannot be negative: %s=0, %s=12.', str_starts_with($attribute, 'shadow-blur') ? 'blur' : 'distance', $attribute, $attribute),
+                sprintf('A shadow %s is a whole number of pixels, and cannot be negative: %s=0, %s=12.', self::word($attribute), $attribute, $attribute),
             );
         }
 
@@ -144,11 +199,36 @@ final class Shadow
                 $name,
                 $attribute,
                 $written,
-                sprintf('A shadow %s cannot be negative. Leave it off for none: %s=0.', str_starts_with($attribute, 'shadow-blur') ? 'blur' : 'distance', $attribute),
+                sprintf('A shadow %s cannot be negative. Leave it off for none: %s=0.', self::word($attribute), $attribute),
+            );
+        }
+
+        // Bounded for the reason {@see self::REACH} gives: pixels are multiplied into an EMU
+        // coordinate that has to survive being written as a whole number, and nothing a deck
+        // can see is further away than the slide is wide and tall together.
+        if ($pixels > self::REACH) {
+            throw MalformedShape::attributeValue(
+                $slide,
+                $name,
+                $attribute,
+                $written,
+                sprintf(
+                    'A shadow %s of %d pixels reaches further than the slide is wide and tall together (%dpx), and a distance is written in EMU — one that large is written as a fraction of a whole number rather than the whole number. For no shadow: %s=0.',
+                    self::word($attribute),
+                    $pixels,
+                    self::REACH,
+                    $attribute,
+                ),
             );
         }
 
         return $pixels;
+    }
+
+    /** The word a shadow message uses for a length: a blur is one, a distance is the other. */
+    private static function word(string $attribute): string
+    {
+        return str_starts_with($attribute, 'shadow-blur') ? 'blur' : 'distance';
     }
 
     /**

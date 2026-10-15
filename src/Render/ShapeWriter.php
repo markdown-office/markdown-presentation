@@ -54,9 +54,7 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
  * `HEADER_ROW` by both halves of the table, so a column width or a row height decided once in
  * each place is a table whose drawn cells do not match the room they were measured for.
  * `bodySize()` is the same crossing for text: the height of a frame, the line count of a
- * paragraph and the runs both of them draw all read it. Those are the places a split would
- * have to cut, and each is a place where the seam runs through a fact two methods must agree
- * on.
+ * paragraph and the runs both of them draw all read it.
  *
  * The placed shapes this class also draws cross three more, and they are the reason it was
  * not the obvious place to put them instead. `filled()` is the one place a fill becomes
@@ -65,9 +63,10 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
  * from. `runs()` writes every run's size, face and colour and `restyled()` then overrides
  * all three in place, so the two have to agree on where a run's type lives. `textHeight()`
  * measures a frame once for a column and again through `sized()` for a text block the deck
- * sized itself, and `freeText()` draws what the second measured. Those are the places a split
- * would have to cut, and each is a place where the seam runs through a fact two methods must
- * agree on.
+ * sized itself, and `freeText()` draws what the second measured.
+ *
+ * Each of those is a place a split would have to cut, and each is a place where the seam
+ * runs through a fact two methods must agree on.
  *
  * Every shape is named after the kind of thing it was drawn from, so the whole mapping can be
  * read off `ppt/slides/slideN.xml` without opening the library. A {@see TextFrame} is the one
@@ -76,7 +75,7 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
  *
  * @phpstan-import-type Piece from TextMetric
  * @phpstan-import-type FrameParagraph from TextFrame
-*/
+ */
 final class ShapeWriter
 {
     /** Which row of a table is its header, counting from the first. */

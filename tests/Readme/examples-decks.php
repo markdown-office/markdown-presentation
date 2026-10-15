@@ -137,6 +137,10 @@ it('converts each deck that is not the rejected one', function (string $name) {
     PICTURE_DECK,
     '08-code.md',
     '09-inline-markup.md',
+    '11-type-scale.md',
+    '12-free-shapes.md',
+    '13-placed-deck.md',
+    '14-shadows.md',
 ]);
 
 it('refuses the deck whose conversion is the failure it exists to demonstrate', function () use ($root) {
@@ -315,4 +319,249 @@ it('lays a two-column build out for a picture the first click has not shown', fu
     // into a column that has already been filled — which is the case a build-up has to get right
     // and the one a single-column example cannot show.
     expect($pptx->reveals(7))->toBe([['text', 'text'], ['image']]);
+});
+
+/**
+ * Every shape of a slide, one per element, with the name the file gave it.
+ *
+ * Split on the opening tags rather than on a closing one, so a `p:pic` is a shape of its own
+ * rather than the tail of the `p:sp` before it — which is what made a picture's shadow and its
+ * name land in different shapes. The split also matches `<p:spPr>`, so a fragment with no name
+ * of its own is reported as null rather than borrowing the next shape's.
+ *
+ * @return list<array{name: ?string, xml: string}>
+ */
+function shapeChunks(Pptx $pptx, int $slide = 1): array
+{
+    $parts = preg_split('#(?=<p:sp>|<p:graphicFrame>|<p:pic>)#', $pptx->part("ppt/slides/slide{$slide}.xml")) ?: [];
+    $chunks = [];
+
+    foreach ($parts as $xml) {
+        preg_match('/name="([^"]*)"/', $xml, $found);
+
+        $chunks[] = ['name' => $found[1] ?? null, 'xml' => $xml];
+    }
+
+    return $chunks;
+}
+
+/**
+ * The shadow on a shape of the given name, as the four numbers the file carries, or null where
+ * no shape of that name casts one.
+ *
+ * Read off the XML rather than through a support helper, because nothing else in the gallery
+ * asks about an effect: a shape's own geometry is a thing `Pptx::positions()` answers, and
+ * extending that to carry an `<a:effectLst>` would put a shadow on every deck the support
+ * object reads for a reason no other deck has.
+ *
+ * The first shape **that has one**, not the first shape of that name, because the decks in this
+ * gallery give several shapes the same name — `14-shadows.md` has nine shapes called `content`
+ * and one of them casts a shadow — and a helper that stopped at the first `content` would
+ * answer "no shadow" about a slide whose text block plainly has one.
+ *
+ * @return array{blur: int, dist: int, dir: int, alpha: int}|null
+ */
+function shadowOn(Pptx $pptx, string $name, int $slide = 1): ?array
+{
+    foreach (shapeChunks($pptx, $slide) as $chunk) {
+        if ($chunk['name'] !== $name) {
+            continue;
+        }
+
+        if (preg_match('#<a:outerShdw[^>]*\bblurRad="(\d+)"[^>]*\bdist="(\d+)"[^>]*\bdir="(\d+)"#', $chunk['xml'], $shadow) !== 1) {
+            continue;
+        }
+
+        // The alpha is the one inside the shadow, which is the first `<a:alpha>` after the
+        // `<a:outerShdw>` — a fill's would otherwise answer for it.
+        preg_match('#<a:outerShdw.*?<a:alpha val="(\d+)"#s', $chunk['xml'], $alpha);
+
+        return [
+            'blur' => (int) $shadow[1],
+            'dist' => (int) $shadow[2],
+            'dir' => (int) $shadow[3] / 60000,
+            'alpha' => (int) ($alpha[1] ?? 100000) / 1000,
+        ];
+    }
+
+    return null;
+}
+
+/** The names of the shapes on a slide that carry a shadow, in the order the file draws them. */
+function shadowedNames(Pptx $pptx, int $slide = 1): array
+{
+    $names = [];
+
+    foreach (shapeChunks($pptx, $slide) as $chunk) {
+        if ($chunk['name'] !== null && str_contains($chunk['xml'], '<a:outerShdw ')) {
+            $names[] = $chunk['name'];
+        }
+    }
+
+    return $names;
+}
+
+it('casts a different kind of shadow on five different kinds of object', function () {
+    [$pptx] = builtDeck('14-shadows.md');
+
+    // The row's claim, read off the file: five ink shapes, each with a shadow, and no two of
+    // them the same shape. A deck that gave all five the same shadow would satisfy "five kinds"
+    // and show one shadow, which is the claim that has rotted before.
+    $shadowed = shadowedNames($pptx);
+
+    expect(array_values(array_filter($shadowed, static fn (string $name): bool => $name !== 'content' && $name !== 'image')))
+        ->toBe(['rectangle', 'roundrect', 'circle', 'hexagon', 'diamond']);
+});
+
+it('gives one shadow an offset with no blur, and another a blur with no offset', function () {
+    [$pptx] = builtDeck('14-shadows.md');
+
+    // "A hard-edged one with no blur at all" and "a glow with no offset" are the two halves of
+    // what `<a:outerShdw>` can hold, and a writer that ignored one of them would leave both
+    // drawing the same thing while the page said otherwise.
+    expect(shadowOn($pptx, 'roundrect'))->toMatchArray(['blur' => 0, 'dist' => 95250])
+        ->and(shadowOn($pptx, 'circle'))->toMatchArray(['blur' => 114300, 'dist' => 0])
+        // "A soft shadow straight down": 90 degrees is straight down, in the sense rotate is.
+        ->and(shadowOn($pptx, 'rectangle'))->toMatchArray(['dir' => 90])
+        ->and(shadowOn($pptx, 'rectangle')['blur'])->toBeGreaterThan(0)
+        ->and(shadowOn($pptx, 'rectangle')['dist'])->toBeGreaterThan(0);
+});
+
+it('throws one shadow at 45 degrees and one upward at 40%', function () {
+    [$pptx] = builtDeck('14-shadows.md');
+
+    expect(shadowOn($pptx, 'hexagon'))->toMatchArray(['dir' => 45])
+        ->and(shadowOn($pptx, 'diamond'))->toMatchArray(['dir' => 180, 'alpha' => 40]);
+});
+
+it('casts a shadow on a text block and on the picture, which is a different element again', function () {
+    [$pptx] = builtDeck('14-shadows.md');
+
+    expect(shadowedNames($pptx))->toHaveCount(7)
+        ->and(shadowOn($pptx, 'image'))->not->toBeNull()
+        ->and(shadowOn($pptx, 'content'))->not->toBeNull();
+});
+
+it('leaves the caption boxes on the shadow slide without one', function () {
+    [$pptx] = builtDeck('14-shadows.md');
+    $slide = $pptx->part('ppt/slides/slide1.xml');
+
+    // "The caption boxes have none", and the reason it is worth a test: a shape naming none of
+    // the five attributes is written with no `<a:effectLst>` at all, so the captions are the
+    // evidence that the feature does not reach every shape on the slide.
+    preg_match_all('#<p:sp>(?:(?!</p:sp>).)*?name="content"#s', $slide, $captions);
+
+    expect(substr_count($slide, '<a:effectLst>'))->toBe(7)
+        ->and(count($captions[0]))->toBeGreaterThan(7);
+});
+
+it('covers the placed deck twice, at its ends, with the theme own near-black', function () {
+    [$pptx] = builtDeck('13-placed-deck.md');
+
+    // "A dark cover and a dark sign-off", each "a full-bleed
+    // `::rectangle{fill=dk1 layer=back}`". Two claims, and they are different: *full-bleed* is
+    // the rectangle covering the slide, and `layer=back` is the rectangle being drawn before
+    // the flow — which is what puts the words on top of it. It is not drawn before the
+    // layout's own title placeholder, because that placeholder is written first whatever the
+    // deck asked for, so asserting `layer=back` means before the first `content` and not
+    // before the first shape.
+    foreach ([1, 8] as $slide) {
+        $full = array_values(array_filter(
+            $pptx->positions($slide),
+            static fn (array $shape): bool => $shape['x'] === 0.0
+                && $shape['y'] === 0.0
+                && $shape['width'] === 960.0
+                && $shape['height'] === 540.0,
+        ));
+
+        $names = $pptx->shapeNames($slide);
+
+        expect($full)->toHaveCount(1)
+            ->and($full[0]['name'])->toBe('rectangle')
+            ->and($pptx->fillOf('rectangle', $slide))->toBe('#0a0a0a')
+            ->and(array_search('rectangle', $names, true))->toBeLessThan(array_search('content', $names, true));
+    }
+});
+
+it('fades decoration over the two dark slides and nowhere else', function () {
+    [$pptx] = builtDeck('13-placed-deck.md');
+    $count = 8;
+
+    // "Translucent decoration over both dark slides" — two shapes on each of the ends, and
+    // none on the six between, because a fade that reached the light slides would be a
+    // different claim from the one the row makes.
+    for ($slide = 1; $slide <= $count; $slide++) {
+        preg_match_all('#<a:alpha val="(\d+)"/>#', $pptx->part("ppt/slides/slide{$slide}.xml"), $alphas);
+
+        $faded = array_filter($alphas[1], static fn (string $value): bool => (int) $value < 100000);
+
+        $ends = $slide === 1 || $slide === $count;
+
+        expect($faded)->toHaveCount($ends ? 2 : 0);
+    }
+});
+
+it('draws the placed deck out of free shapes and nothing else', function () {
+    [$pptx] = builtDeck('13-placed-deck.md');
+
+    // "built out of free shapes and nothing else", which is the claim the deck exists to make.
+    // Every shape on every slide is one the deck placed: `rectangle`, `circle` and the text
+    // blocks, plus the layout's own title on the cover.
+    $names = [];
+
+    for ($slide = 1; $slide <= 8; $slide++) {
+        $names = array_merge($names, $pptx->shapeNames($slide));
+    }
+
+    expect(array_values(array_unique($names)))->toEqualCanonicalizing(['rectangle', 'circle', 'content', 'title']);
+});
+
+it('puts the placed deck agenda on five numbered circles', function () {
+    [$pptx] = builtDeck('13-placed-deck.md');
+
+    // "An agenda of numbered circles" — five of them, on the slide after the cover, and the
+    // numbers are in the text rather than in the shape, which is why the text is checked too.
+    expect(array_filter($pptx->shapeNames(2), static fn (string $name): bool => $name === 'circle'))->toHaveCount(5);
+
+    foreach (['01', '02', '03', '04', '05'] as $number) {
+        expect($pptx->slideText(2))->toContain($number);
+    }
+});
+
+it('builds the placed deck four-pillar comparison out of four rectangles', function () {
+    [$pptx] = builtDeck('13-placed-deck.md');
+
+    // "A four-pillar comparison", which a Markdown table could not have drawn and a shape
+    // grid can: four filled panels, side by side at the same height.
+    $pillars = array_values(array_filter(
+        $pptx->positions(6),
+        static fn (array $shape): bool => $shape['name'] === 'rectangle',
+    ));
+
+    $lefts = array_column($pillars, 'x');
+    $ordered = $lefts;
+    sort($ordered);
+
+    expect($pillars)->toHaveCount(4)
+        ->and(array_values(array_unique(array_column($pillars, 'height'))))->toHaveCount(1)
+        // Side by side, so each one starts further right than the last.
+        ->and($lefts)->toBe($ordered)
+        ->and(array_unique($lefts))->toHaveCount(4);
+});
+
+it('carries no contact detail the placed deck could belong to a real company for', function () {
+    [$pptx] = builtDeck('13-placed-deck.md');
+    $text = $pptx->slideText(1) . $pptx->slideText(8);
+
+    // "The company is invented", and the deck is published, so the claim is that every address
+    // in it is one nobody can be reached at: `.example` is reserved by the IANA precisely so
+    // that it can appear in a document without reaching anybody, and 555 is the range held
+    // back from real numbers.
+    expect($text)->toContain('ridgeline.example')
+        ->and($text)->toContain('+1 555 0100')
+        // An address on any other domain, or a number outside the range held back from real
+        // ones, is a detail somebody could be reached at.
+        ->and(preg_match('/[\w.+-]+@[\w.-]*\.(?!example\b)[\w]+/', $text) === 1)->toBeFalse()
+        ->and(preg_match_all('/\+[\d][\d ().-]{7,}/', $text, $numbers) === 0 ? [] : $numbers[0])
+        ->each->toStartWith('+1 555 ');
 });

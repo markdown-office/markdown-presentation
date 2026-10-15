@@ -1126,10 +1126,10 @@ Five attributes, on all twelve directives:
 | Attribute | | |
 | --- | --- | --- |
 | `shadow-color` | one of the four role names, a theme slot, or hex | `ink` where the deck names none |
-| `shadow-distance` | pixels, never negative | `0` — an offset with no blur is a hard edge |
-| `shadow-blur` | pixels, never negative | `0` |
+| `shadow-distance` | whole pixels, `0` to `1500` | `0` — an offset with no blur is a hard edge |
+| `shadow-blur` | whole pixels, `0` to `1500` | `0` |
 | `shadow-direction` | whole degrees, clockwise from the right | `90` — straight down |
-| `shadow-alpha` | 0–100 | `100` |
+| `shadow-alpha` | `0`–`100` | `100` |
 
 ```markdown
 ::hexagon{fill=lt2 shadow-distance=12 shadow-blur=6 shadow-direction=45 shadow-alpha=50}
@@ -1147,6 +1147,18 @@ with, so an angle is the only way to put one off-axis.
 **One attribute is enough.** `shadow-blur=4` on its own is a shadow, and a shape that names none
 of the five is written with no `<a:effectLst>` at all rather than with one that says the shape
 has no shadow.
+
+**`shadow-color=none` and `shadow-color=transparent` are refused**, even though `fill=none` and
+`stroke=none` mean *do not draw this* and are honoured. A shadow has nowhere to record a colour
+of its own — DrawingML draws an outer shadow as a coloured copy of the shape — so "no colour"
+has no representation there, and answering it with a default would draw a fully opaque black
+shadow for the word *transparent*. For no shadow at all, leave off every shadow attribute.
+
+**A distance or a blur may reach 1500 pixels** — the slide's width plus its height. Beyond that
+the value is refused by name rather than written: PHPPresentation converts pixels to EMU with a
+**float** multiply, and PHP prints a large float as `9.525E+14`, which is not a number
+`ST_PositiveCoordinate` can hold. PowerPoint reads one; a validator, Keynote or a server-side
+renderer need not.
 
 A shadow is on the shape, not on the words inside it: a `label` takes the shadow of the shape it
 sits in, and a `:::content` block casts one from its own border. `::image` casts one too — a
