@@ -1,6 +1,6 @@
-# The palette of a business pitch: a near-black and a gold on white, one blue for anything a
-# reader is meant to act on, and the greys between them. Every colour in the deck comes from
-# this file, so the deck reads as one system rather than as eleven slides that agree.
+# A proposal deck. The dark is near-black rather than black, which is what a projector and a
+# laptop lid both want, and the accent slots carry greys as well as colours -- a card on these
+# slides holds three weights of type and cannot keep going bold for each one.
 name: Pitch
 description: Black, gold and one blue, for a pitch or a proposal.
 author: markdown-office

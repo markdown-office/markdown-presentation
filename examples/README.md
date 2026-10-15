@@ -33,15 +33,13 @@ quietly. The profile and the scratch script go to the temporary directory, so
 
 ## The deck that is not anybody's business
 
-`13-placed-deck.md` exists because a real pitch deck was rebuilt from another tool to find out
-what this library could not do, and that deck is nobody's to publish. It is a fictional bicycle
-frame maker rather than a redacted version of the original: the structure is what carries the
-lesson, and a deck full of placeholders would teach the layout nothing that a deck with a real
-argument does not.
+`13-placed-deck.md` is a fictional bicycle frame maker rather than a redacted version of the
+deck it was rebuilt from, which named a person and their contact details. The structure is what
+makes it an example, and it is the structure an edit should leave alone: putting the original
+company back puts a private document in this repository.
 
-Rebuilding it is what turned up both defects in [PR #11](https://github.com/markdown-office/markdown-presentation/pull/11)
-— `padding` written but never measured, and a placed text block shrunk to its own text so
-`vertical-align` had nothing to align against.
+Rebuilding that deck from another tool is what turned up both defects in [PR #11](https://github.com/markdown-office/markdown-presentation/pull/11)
+— `padding` written but never measured, and a placed text block shrunk to its own text.
 
 ## The one that is not built
 
@@ -110,6 +108,14 @@ A few of these are here because the render is the only honest evidence:
 - **`12`, the fifth slide.** Ten ink shapes on one slide, each its own
   `<p:sp>`. The rule is a rectangle a pixel tall rather than a connector,
   which is what a `---` has always been.
+- **`13`, the cover and the sign-off.** Neither dark slide is a layout: each
+  is a full-bleed `::rectangle{fill=dk1 layer=back}` with everything else drawn
+  over it. The background is set once on the master, so a slide wanting its own
+  colour carries the colour as a shape.
+- **`13`, the pricing slide.** The table is rectangles and text boxes rather
+  than a Markdown table, because this one has a filled header, zebra rows and a
+  right-aligned price column in the accent — and a Markdown table takes its
+  styling from the theme instead.
 - **`03`, the same slide in each of the three themed decks.** The difference is not
   the palette. `default` is Office's colours at the library's own scale with a
   40px margin and a 2px rule; `minimal` is a serif deck with 64px margins, a

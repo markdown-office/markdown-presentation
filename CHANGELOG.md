@@ -8,15 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **A `pitch` theme, and an example deck built entirely out of free shapes.**
+- **A `pitch` theme, and an example deck built out of free shapes.**
   Near-black and a gold on white with one blue for anything a reader is meant to act on — the
-  palette a proposal or a pitch wants and a template rarely has. `examples/markdown/13-placed-deck.md`
-  is nine slides of a fictional bicycle frame maker built with nothing but the twelve
-  directives: a dark cover and a dark sign-off over a full-bleed `layer=back` rectangle, an
-  agenda of numbered circles, a card grid, a hand-built pricing table with zebra rows and a
-  right-aligned column, a four-pillar comparison, and a quarterly roadmap with arrows between
-  phases. It is the first example whose whole subject is free placement, and the company in it
-  is invented.
+  palette a proposal wants and a template rarely has. `examples/markdown/13-placed-deck.md` is a
+  fictional bicycle frame maker positioned entirely by the deck: a dark cover and a dark sign-off
+  over a full-bleed `layer=back` rectangle, an agenda of numbered circles, a card grid, a pricing
+  table built row by row, a four-pillar comparison and a quarterly roadmap. It is the first
+  example whose subject is free placement rather than the vocabulary, and the company is invented
+  because the deck it was rebuilt from was nobody's to publish.
 
 - **Twelve directives that place a shape themselves, so one slide can be styled freely.**
   `::rectangle`, `::roundrect`, `::ellipse`, `::circle`, `::triangle`, `::diamond`,
@@ -469,7 +468,7 @@ All notable changes to this project are documented here. The format follows
 - **A placed text block was shrunk to its own text, so `vertical-align` had nothing to align
   against.** `height=48 vertical-align=middle` was written at the 23px that one line at 14pt
   takes, anchored centre — so the text centred in 23px sitting at the top of a 48px space and
-  rode high by `(48 − 23) / 2`. Measured on a deck of eleven slides, every centred box was off
+  rode high by `(48 − 23) / 2`. Measured on the deck that found it, every centred box was off
   by between 8 and 13.5 pixels, always upwards, and the box in the file was not the box the
   deck wrote.
 
@@ -479,8 +478,8 @@ All notable changes to this project are documented here. The format follows
   declared, and only an overflow takes the room away — which is reported when it happens, as
   before.
 
-  Found by rebuilding an existing eleven-slide deck in Markdown, which is the first thing this
-  library has been asked to reproduce from another tool and a deck it had never been given.
+  Found by rebuilding an existing deck in Markdown, which is the first thing this library has
+  been asked to reproduce from another tool and a deck it had never been given.
 
 - **`padding` on a placed text block was written into the file but never measured.** The inset
   reaches the shape through `ShapeWriter::freeText()` and did not reach
