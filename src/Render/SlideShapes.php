@@ -234,7 +234,17 @@ final class SlideShapes
         $height = $box->height;
 
         if ($shape instanceof FreeText) {
-            $wanted = $writes->writer->sized($shape->frame, $box, $box->height, $shape->style->size);
+            // The padding is passed because the height is measured in the width the text is
+            // drawn in, and {@see \MarkdownPresentation\Render\ShapeWriter::freeText()} is what
+            // writes that inset. Measuring against the default instead is what made a wide
+            // `padding` report a block as fitting when PowerPoint wraps it past its box.
+            $wanted = $writes->writer->sized(
+                $shape->frame,
+                $box,
+                $box->height,
+                $shape->style->size,
+                $shape->style->padding,
+            );
 
             if ($wanted > $height) {
                 $this->overflows->record($writes->number, $shape->step, null, $shape->name(), $wanted, $height);

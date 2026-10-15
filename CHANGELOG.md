@@ -470,6 +470,30 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **`padding` on a placed text block was written into the file but never measured.** The inset
+  reaches the shape through `ShapeWriter::freeText()` and did not reach
+  `ShapeWriter::textWidth()`, which subtracted the default inset whatever the deck had asked
+  for — so the width the text was measured in and the width it is drawn in were two different
+  numbers, in both directions and neither visible from the deck:
+
+  - a `padding` below the default was measured **wider** than it is drawn, so blocks were
+    over-estimated, clamped to a box they fit, and reported as not fitting when they did; and
+  - a `padding` above it was measured **narrower**, so the box was not grown and the text ran
+    over whatever was under it — **without appearing in `overflows()` at all**.
+
+  The second is the one this library states it will not produce. A `:::content{padding=40}`
+  box on a slide with a rule beneath it drew its last line straight through the rule and off
+  the bottom of the slide while the report said the deck was fine.
+
+  A third case fell out of the same line: a box narrower than twenty pixels had its available
+  width clamped up to one pixel, and `TextMetric`'s word-breaking loop counts one line per
+  pixel of text, so a single `W` set at 24 points measured as **23 lines**. The clamp is now
+  at zero, which leaves a box with no room in it to be reported as not fitting — the truth for
+  a box narrower than its own padding.
+
+  Found by rebuilding an existing eleven-slide deck in Markdown, which is the first thing this
+  library has been asked to reproduce from another tool and a deck it had never been given.
+
 - **A small SVG could take gigabytes to refuse.** The ceiling on a picture is on the pixels,
   and for a vector those pixels were allocated before anything asked whether they were allowed:
   `vector()` drew the file and measured the result. A file of **152 bytes** declaring a

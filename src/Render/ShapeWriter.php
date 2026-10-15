@@ -121,11 +121,15 @@ final class ShapeWriter
      * the wrapping, the air between blocks and the insets do not depend on who named the size,
      * and a second copy of {@see self::textHeight()} is a second answer to the same question.
      *
-     * @param int|null $size The size to measure at, in points, or null for the theme's body size.
+     * @param int|null    $size    The size to measure at, in points, or null for the theme's body size.
+     * @param float|null  $padding The inset the text will be drawn with, in pixels, or null for
+     *                             the one PHPPresentation writes. Only a placed text block has
+     *                             one; every other block is laid out by a layout that sets no
+     *                             inset of its own, which is why it has a default.
      */
-    public function sized(Code|TextFrame|Image|Rule|Table $drawable, Box $box, int $room, ?int $size): int
+    public function sized(Code|TextFrame|Image|Rule|Table $drawable, Box $box, int $room, ?int $size, ?float $padding = null): int
     {
-        $width = $this->textWidth($box);
+        $width = $this->textWidth($box, $padding);
 
         return (int) round(match (true) {
             $drawable instanceof TextFrame => $this->textHeight($drawable, $width, $size),
@@ -142,10 +146,24 @@ final class ShapeWriter
      * PHPPresentation insets a text shape's body on all four sides whether it is told to or
      * not, so this is narrower than the box for every block that draws type, and not only
      * for the padding inside a code block's fill.
+     *
+     * `$padding` is the inset the deck asked for, and it is read here rather than left to
+     * {@see SlideGeometry::INSET_X} because this has to be the width the text is *drawn* in.
+     * The two answering differently is the whole of the bug this fixes: a `padding` reaches
+     * the file through {@see self::freeText()} and never reached this, so every `padding=0`
+     * was measured twenty pixels narrower than it was drawn — over-estimating lines and
+     * clamping blocks that fit — and every `padding` above the default was measured wider,
+     * which is the direction that silently loses text off the bottom of a box.
+     *
+     * Zero rather than {@see SlideGeometry::MIN_SIZE} below, because a negative inset is a box
+     * with no room in it and one pixel is not a column. {@see \MarkdownPresentation\Render\TextMetric::lines()}
+     * needs a positive width to terminate its word-breaking loop and treats what it is given
+     * as the narrowest column there is, which reports the block as not fitting — the truth for
+     * a box narrower than its own padding.
      */
-    private function textWidth(Box $box): int
+    private function textWidth(Box $box, ?float $padding = null): int
     {
-        return max(SlideGeometry::MIN_SIZE, $box->width - 2 * SlideGeometry::INSET_X);
+        return max(0, (int) round($box->width - 2 * ($padding ?? SlideGeometry::INSET_X)));
     }
 
     /**
