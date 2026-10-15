@@ -81,9 +81,16 @@ All notable changes to this project are documented here. The format follows
   them resolving a path on its own would be a deck able to point outside the directory it was
   given, written in a spelling nobody reads the tests for.
 
-  `PresentationRenderer`'s two write passes and its stack pass are one method too, so the
-  order shapes go down the screen is decided in one place: twenty methods, where the count
-  was twenty-one and had been nineteen before this branch.
+  `PresentationRenderer` is fifteen methods, where the count was twenty-one and had been
+  nineteen before this branch. **All three write passes and the column arithmetic moved to
+  `Render\SlideShapes`**, because they are one idea — the shapes a deck placed behind the
+  layout's own, the layout's own, and the shapes it placed over them — and the order *is*
+  `layer`: a later shape in `p:spTree` is drawn over an earlier one. Split across methods on
+  the renderer, that reason was hidden; in one class it is the class.
+
+  `Render\Overflows` is the report itself rather than an array on the renderer, because two
+  places write to it and because strictness is a fact about the report rather than about the
+  deck: the same measurement decides whether to clamp and say so, or to raise.
 
 - **`rotate` turns a free shape about the middle of its own box**, on all twelve — the box
   does not move and does not resize, so a rotated shape is still the box that was placed. A
