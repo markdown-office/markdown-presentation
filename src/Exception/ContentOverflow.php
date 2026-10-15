@@ -17,15 +17,21 @@ namespace MarkdownPresentation\Exception;
  */
 final class ContentOverflow extends InvalidInput
 {
-    public static function on(int $slide, int $step, int $column, string $block, int $wanted, int $available): self
+    /**
+     * @param ?int $column Null for a shape the deck placed itself, which is in no column.
+     */
+    public static function on(int $slide, int $step, ?int $column, string $block, int $wanted, int $available): self
     {
+        $where = $column === null
+            ? sprintf('its "%s" text block', $block)
+            : sprintf('column %d: its %s', $column + 1, $block);
+
         return new self(sprintf(
-            'Slide %d, step %d, column %d: its %s needs %dpx of height and %dpx are left. '
+            'Slide %d, step %d, %s needs %dpx of height and %dpx are left. '
             . 'Shorten it, put it on a slide of its own, or render without the strict check to have it clamped.',
             $slide,
             $step,
-            $column + 1,
-            $block,
+            $where,
             $wanted,
             $available,
         ));

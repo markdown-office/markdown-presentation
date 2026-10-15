@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Exception;
 
+use MarkdownPresentation\Render\Free\FreeShapes;
+
 /**
  * A directive this library does not act on, in the frontmatter or in the body of a slide.
  *
@@ -89,14 +91,19 @@ final class UnknownDirective extends InvalidInput
     }
 
     /**
-     * A `:::` line that is neither a `:::click` region nor the `:::` that closes one.
-     */
+ * A `:::` fence naming something this format does not draw.
+ *
+ * A `:::` line with no name in it — `:::`, `::: {.panel}` — never reaches the generic
+ * directives extension at all, because {@see \MarkdownPresentation\Render\CommonMark\MarkerStartParser}
+ * claims every three-colon line it does not stand aside for, so this is where it is refused.
+ */
     public static function container(int $slide, string $fence): self
     {
         return new self(sprintf(
             'Slide %d opens the container "%s", which is not something a slide draws. Three colons '
-            . 'open a step region as ":::click" and close it as ":::"; divide a deck with a "---" '
-            . 'line, write a section as a heading, and write a note as a quote: "> ".',
+            . 'open a step region as ":::click" and close it as ":::"; a placed text block is ":::content" '
+            . 'with its Markdown between the fences; divide a deck with a "---" line, write a section as a '
+            . 'heading, and write a note as a quote: "> ".',
             $slide,
             $fence,
         ));
@@ -118,24 +125,26 @@ final class UnknownDirective extends InvalidInput
             $slide,
         ));
     }
-
     /**
      * A `::name` leaf under a name this format does not read.
-     *
-     * The container fence and the unclosed note each have a message of their own, so this one
-     * is only reached by a name that is neither: `::bogus`, `::note[label]`. Drawn as text it
-     * is the same failure {@see self::comment()} exists to prevent, reached by the spelling
-     * the grammar admits and the other three refusals do not look at.
+ *
+ * The container fence and the unclosed note each have a message of their own, so this one is
+ * only reached by a name that is neither: `::bogus`, `::note[label]`. Drawn as text it is the
+ * same failure {@see self::comment()} exists to prevent, reached by the spelling the grammar
+ * admits and the other three refusals do not look at.
+ *
+     * Names the free shapes as well as the markers, because a leaf is far more often a
+     * misspelt shape than a Slidev directive and the whole vocabulary fits in a sentence.
      */
     public static function leaf(int $slide, string $directive): self
     {
         return new self(sprintf(
-            'Slide %d opens the directive "%s", which is not something a slide draws. Two colons '
-            . 'mark a step as "::click" or a column as "::column"; three open a step region as '
-            . '":::click" and close it as ":::"; write a note as "::note", its text, and a '
-            . 'closing "::".',
+            'Slide %d opens the directive "%s", which is not something a slide draws. The free shapes are: %s. '
+            . 'Two colons mark a step as "::click" or a column as "::column" and three open a step region as '
+            . '":::click"; a placed text block is ":::content" with its Markdown between the fences.',
             $slide,
             $directive,
+            implode(', ', FreeShapes::names()),
         ));
     }
 }

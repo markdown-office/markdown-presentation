@@ -28,6 +28,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `09-inline-markup.md` | `09-inline-markup.pptx` | A `title:` carrying `**bold**` and `*italic*` |
 | `10-rejected.md` | **nothing** | Conditional content the way Slidev writes it |
 | `11-type-scale.md` | two files | The same slides in `default` and in `dense`, the one theme whose whole scale is smaller at once — body, title, margins, gutter, block gap and rule. The table and the code block are twelve points in both, because those two sizes are the library's, which is what leaves them to read the two pages against |
+| `12-free-shapes.md` | `12-free-shapes.pptx` | Shapes placed by the deck rather than by the layout: a panel behind the text, a badge and a chevron, tilted arrows whose labels turn with them, text blocks in boxes of their own, a circle and an ellipse sharing a centre, and all ten ink shapes with a picture on one page |
 
 ## The one that is not built
 
@@ -76,6 +77,26 @@ A few of these are here because the render is the only honest evidence:
   no margin either — the box it is fitted to is the whole page. The logo is
   square and the page is not, so the picture keeps its own proportions inside
   that box and the air either side of it is the shape not filling it.
+- **`12`, the second slide.** The panel is `layer=back`, so it is written
+  before the layout's own shapes and the text is drawn on top of it; the badge
+  and the chevron have no layer and are written after, so they sit over
+  everything. Open the shape list in PowerPoint and the order is the write
+  order.
+- **`12`, the third slide.** The circle and the ellipse share a centre, because both are
+  `anchor=center` on the same two numbers — and the circle is 14% of the slide's height on
+  both axes while the ellipse is 20% of its width, so they are the same height and not the
+  same width. That is what resolving a circle's percentages against the height buys: the
+  spelling that reads as "a circle inside an ellipse" draws one.
+- **`12`, the fourth slide.** Three tilted arrows and the two ways of putting
+  words on one. The first has a `:::content` box over it given the *same*
+  `rotate` — styled Markdown, and a second shape to keep in step. The other two
+  carry a `label` inside the arrow itself: one `<p:sp>`, so it is what you
+  double-click and drag, with words you cannot style because PHPPresentation
+  writes them with no `a:rPr` at all. Look at the third one — `**Churn**` in a
+  label is six literal asterisks, where the first arrow's is real bold.
+- **`12`, the fifth slide.** Ten ink shapes on one slide, each its own
+  `<p:sp>`. The rule is a rectangle a pixel tall rather than a connector,
+  which is what a `---` has always been.
 - **`03`, the same slide in each of the three themed decks.** The difference is not
   the palette. `default` is Office's colours at the library's own scale with a
   40px margin and a 2px rule; `minimal` is a serif deck with 64px margins, a

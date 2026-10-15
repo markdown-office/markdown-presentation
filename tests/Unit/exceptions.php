@@ -9,6 +9,7 @@ use MarkdownPresentation\Exception\FencedFrontmatter;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\MalformedShape;
 use MarkdownPresentation\Exception\MalformedTemplate;
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\ThemeNotFound;
@@ -87,6 +88,7 @@ it('reports what a deck author can fix under the class that says so', function (
         FencedFrontmatter::class,
         ImageNotFound::class,
         MalformedFrontmatter::class,
+        MalformedShape::class,
         MalformedTemplate::class,
         MalformedTheme::class,
         ThemeNotFound::class,
@@ -240,7 +242,9 @@ it('names a slide and a file in every failure, because the fix is in the message
         ->and(ContentOverflow::on(3, 2, 0, 'code', 1150, 396)->getMessage())
         ->toContain('Slide 3')
         ->and(ContentOverflow::on(3, 2, 0, 'code', 1150, 396)->getMessage())->toContain('code')
-        ->and(UnsupportedColumn::beyond(4, 'content', 1)->getMessage())->toContain('Slide 4');
+        ->and(UnsupportedColumn::beyond(4, 'content', 1)->getMessage())->toContain('Slide 4')
+        ->and(ContentOverflow::on(4, 1, null, 'content', 400, 100)->getMessage())->toContain('Slide 4')
+        ->and(MalformedShape::offSlide(5, 'rectangle', 'at top 600px', 540, 'tall')->getMessage())->toContain('Slide 5');
 });
 
 it('names the alternatives wherever a failure is a name the author can change', function (string $message, string $alternative) {
@@ -268,6 +272,10 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'a container fence a slide cannot draw' => [
         UnknownDirective::container(4, '::: note')->getMessage(),
         'Three colons open a step region as ":::click"',
+    ],
+    'a container fence that could have been a placed text block' => [
+        UnknownDirective::container(4, '::: {.panel}')->getMessage(),
+        'a placed text block is ":::content" with its Markdown between the fences',
     ],
     'a note nothing closes' => [
         UnknownDirective::unclosedNote(3)->getMessage(),
@@ -326,5 +334,50 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'a file that is not an image at all' => [
         UnsupportedImageFormat::notAnImage(1, 'diagram.pdf')->getMessage(),
         'cannot read as an image at all',
+    ],
+    'a free shape under a name that is not one' => [
+        UnknownDirective::leaf(3, '::rect')->getMessage(),
+        'The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, '
+        . 'line, rectangle, roundrect, triangle.',
+    ],
+    'an attribute a free shape does not read' => [
+        MalformedShape::unknownAttribute(3, 'image', 'fill', ['alt', 'fit', 'height', 'left', 'src', 'top', 'width'])->getMessage(),
+        'The attributes are: alt, fit, height, left, src, top, width.',
+    ],
+    'an attribute value nothing can be' => [
+        MalformedShape::attributeValue(3, 'rectangle', 'left', 'blue', 'A length is a number.')->getMessage(),
+        'a left of "blue". A length is a number.',
+    ],
+    'a box past the edge of the slide' => [
+        MalformedShape::offSlide(3, 'rectangle', 'at left 900px, which reaches 1020px', 960, 'wide')->getMessage(),
+        'within the 960px wide slide',
+    ],
+    'a circle given two sizes' => [
+        MalformedShape::notSquare(3, '120', '80')->getMessage(),
+        'give one size or the other',
+    ],
+    'a label on a free shape' => [
+        MalformedShape::label(3, '::rectangle[Panel]')->getMessage(),
+        'has no title of its own',
+    ],
+    'a body that is not type' => [
+        MalformedShape::body(3, ':::content', 'table')->getMessage(),
+        'whose body holds a table',
+    ],
+    'a free text block with nothing in it' => [
+        MalformedShape::emptyBody(3, ':::content')->getMessage(),
+        'with no body',
+    ],
+    'a corner radius on a shape without corners' => [
+        MalformedShape::radius(3, 'rectangle')->getMessage(),
+        'Write it as "::roundrect".',
+    ],
+    'a fit that is a crop rather than a fit' => [
+        MalformedShape::coverFit(3, 'image')->getMessage(),
+        'which is a crop rather than a fit',
+    ],
+    'a step marker inside a placed text block' => [
+        MalformedShape::marker(3, ':::content', '::click')->getMessage(),
+        'one box on one step',
     ],
 ]);

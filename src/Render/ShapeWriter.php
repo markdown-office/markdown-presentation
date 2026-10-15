@@ -13,14 +13,24 @@ use MarkdownPresentation\Render\Block\Paragraph;
 use MarkdownPresentation\Render\Block\Quote;
 use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
+use MarkdownPresentation\Render\Free\FreeAutoShape;
+use MarkdownPresentation\Render\Free\FreePicture;
+use MarkdownPresentation\Render\Free\FreeShape;
+use MarkdownPresentation\Render\Free\FreeText;
+use MarkdownPresentation\Render\Free\Pictures;
+use MarkdownPresentation\Render\Free\ShapeKind;
+use MarkdownPresentation\Render\Free\TextStyle;
 use MarkdownPresentation\Theme\Theme;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Shape\AutoShape;
+use PhpOffice\PhpPresentation\Shape\AbstractGraphic;
 use PhpOffice\PhpPresentation\Shape\Drawing\AbstractDrawingAdapter;
 use PhpOffice\PhpPresentation\Shape\Drawing\Base64;
 use PhpOffice\PhpPresentation\Shape\Drawing\File;
 use PhpOffice\PhpPresentation\Shape\RichText;
 use PhpOffice\PhpPresentation\Shape\RichText\Paragraph as TextParagraph;
+use PhpOffice\PhpPresentation\Shape\RichText\Run as TextRun;
+use PhpOffice\PhpPresentation\Shape\RichText\TextElementInterface;
 use PhpOffice\PhpPresentation\Shape\Table as TableShape;
 use PhpOffice\PhpPresentation\Slide;
 use PhpOffice\PhpPresentation\Style\Alignment;
@@ -47,6 +57,17 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
  * paragraph and the runs both of them draw all read it. Those are the places a split would
  * have to cut, and each is a place where the seam runs through a fact two methods must agree
  * on.
+ *
+ * The placed shapes this class also draws cross three more, and they are the reason it was
+ * not the obvious place to put them instead. `filled()` is the one place a fill becomes
+ * `FILL_SOLID` or `FILL_NONE`, read by an autoshape and by a placed text box alike, because
+ * `Fill::FILL_UNSET` means *inherit* and a shape on a blank layout has nothing to inherit
+ * from. `runs()` writes every run's size, face and colour and `restyled()` then overrides
+ * all three in place, so the two have to agree on where a run's type lives. `textHeight()`
+ * measures a frame once for a column and again through `sized()` for a text block the deck
+ * sized itself, and `freeText()` draws what the second measured. Those are the places a split
+ * would have to cut, and each is a place where the seam runs through a fact two methods must
+ * agree on.
  *
  * Every shape is named after the kind of thing it was drawn from, so the whole mapping can be
  * read off `ppt/slides/slideN.xml` without opening the library. A {@see TextFrame} is the one
@@ -85,10 +106,29 @@ final class ShapeWriter
      */
     public function height(Code|TextFrame|Image|Rule|Table $drawable, Box $box, int $room): int
     {
+        return $this->sized($drawable, $box, $room, null);
+    }
+
+    /**
+     * The same height, for a text frame whose own `font-size` is not the theme's body size.
+     *
+     * A placed text block carries a size its attributes named, and a frame measured at the
+     * body's size is a measurement of type this block does not draw: a 24pt heading measured at
+     * 16pt is shorter than it is, and the block would be clamped to room it did not need and
+     * the last paragraph would be reported as lost when it was not.
+     *
+     * One method rather than two because the arithmetic is the same in every other respect —
+     * the wrapping, the air between blocks and the insets do not depend on who named the size,
+     * and a second copy of {@see self::textHeight()} is a second answer to the same question.
+     *
+     * @param int|null $size The size to measure at, in points, or null for the theme's body size.
+     */
+    public function sized(Code|TextFrame|Image|Rule|Table $drawable, Box $box, int $room, ?int $size): int
+    {
         $width = $this->textWidth($box);
 
         return (int) round(match (true) {
-            $drawable instanceof TextFrame => $this->textHeight($drawable, $width),
+            $drawable instanceof TextFrame => $this->textHeight($drawable, $width, $size),
             $drawable instanceof Table => $this->tableHeight($drawable, $box),
             $drawable instanceof Rule => SlideGeometry::RULE_HEIGHT,
             $drawable instanceof Code => $this->codeHeight($drawable, $width),
@@ -203,14 +243,14 @@ final class ShapeWriter
      * which is why this sums a height per block rather than multiplying one line height by a
      * total line count.
      */
-    private function textHeight(TextFrame $frame, int $width): float
+    private function textHeight(TextFrame $frame, int $width, ?int $size): float
     {
         $blocks = $frame->blocks();
         $last = count($blocks) - 1;
         $height = 0.0;
 
         foreach ($blocks as $at => $block) {
-            $height += $this->inFrameHeight($block, $width);
+            $height += $this->inFrameHeight($block, $width, $size);
 
             if ($at < $last) {
                 $height += $this->gapBetween($block, $blocks[$at + 1]);
@@ -228,9 +268,9 @@ final class ShapeWriter
      * see {@see TextFrame::blocks()} — and because a list is several paragraphs of one block,
      * walked here as the items it is.
      */
-    private function inFrameHeight(Heading|Paragraph|Quote|ListBlock $block, int $width): float
+    private function inFrameHeight(Heading|Paragraph|Quote|ListBlock $block, int $width, ?int $at): float
     {
-        $size = $this->entrySize($block);
+        $size = $at ?? $this->entrySize($block);
         $lines = 0;
         $breaks = 0;
 
@@ -433,7 +473,245 @@ final class ShapeWriter
         return $widths;
     }
 
+        /**
+     * A shape the deck placed itself, as the one shape it is written as.
+     *
+     * Three cases rather than one because PHPPresentation takes the paint of each differently: an
+     * autoshape is written with an {@see \PhpOffice\PhpPresentation\Style\Outline} of one colour and
+     * one width, while a text box and a picture take a {@see Border}. That is the whole of why a
+     * dashed outline is offered on neither and refused by name instead.
+     *
+     * @param Box $box    The box the deck placed the shape in.
+     * @param int $height How tall to draw it, which is the box unless the text did not fit in it.
+     */
+    public function free(Slide $slide, FreeShape $shape, Box $box, int $height): AbstractShape
+    {
+        $written = match (true) {
+            $shape instanceof FreeText => $this->freeText($slide, $shape, $box, $height),
+            $shape instanceof FreePicture => $this->freePicture($slide, $shape),
+            // Everything else is one of the nine ink-only shapes, which is what a free shape is
+            // when it is neither type nor a picture: {@see FreeShape} has three subclasses and
+            // this is the one that is left.
+            default => $this->autoshape($slide, $shape),
+        };
+
+        return $written->setName($shape->name());
+    }
+
     /**
+     * One of the nine ink-only shapes, painted through its outline.
+     *
+     * `getOutline()` rather than `getBorder()` because that is what the writer reads for an
+     * autoshape — and because `a:noFill` on it is what says "no stroke". A `Border` left alone
+     * writes an `a:ln` with no fill in it, which is valid and means *inherit*, and a free shape
+     * has nothing to inherit from but the theme.
+     *
+     * @param FreeShape $shape Any free shape that is not type and not a picture. Takes the base
+     *                         class rather than {@see FreeAutoShape} because the ink case is the
+     *                         one that is left rather than a third thing to match.
+     */
+    private function autoshape(Slide $slide, FreeShape $shape): AbstractShape
+    {
+        $written = $slide->createAutoShape();
+        $paint = $shape->paint;
+
+        // PHPPresentation's AutoShape defaults to a heart, so a shape left unset is a heart on
+        // the slide rather than a rectangle.
+        $written->setType($shape->kind->autoShape() ?? AutoShape::TYPE_RECTANGLE);
+
+        if ($shape->kind === ShapeKind::RoundRect && $paint->radius > 0) {
+            $written->setRoundRectCorner($paint->radius);
+        }
+
+        $this->filled($written->getFill(), $paint->fill);
+        $this->filled($written->getOutline()->getFill(), $paint->stroke);
+        $written->getOutline()->setWidth($this->lineWidth($paint->strokeWidth));
+
+        $box = $shape->placement->box;
+        $this->place($written, $box, $box->height);
+        $written->setRotation($shape->placement->rotate);
+
+        // The shape's own text, in the shape's own body — one shape in the file, and the
+        // native thing: double-click the arrow and the cursor is in the arrow, and dragging the
+        // arrow drags the words with it, which two overlapping shapes do not do.
+        //
+        // What it costs is everything {@see self::freeText()} can do and this cannot.
+        // PHPPresentation writes `<a:r><a:t>…</a:t></a:r>` with no `a:rPr`, so the words are
+        // drawn in `tx1` — the theme's body text colour, which is what the page is read against
+        // and which follows `dark:`. So a label is legible on a filled shape in both themes, and
+        // what it has no contrast against is the shape's *own fill* where that is close to the
+        // page's: a pale fill on a dark theme, or a dark one on a light theme. There is no
+        // attribute that changes it, and one object and no styling is the other half of the
+        // trade. A label that has to be legible against its own fill is a `:::content` box.
+        if ($shape->label !== '') {
+            $written->setText($shape->label);
+        }
+
+        return $written;
+    }
+
+    /**
+     * A fill as the deck named it, or `a:noFill` where it named none.
+     *
+     * Said rather than left alone on both: a `Fill` left at its default writes nothing at all,
+     * which for a shape means *inherit from the theme*, and a free shape is drawn on a blank
+     * layout where there is nothing behind it to inherit from. `a:noFill` is the only way to
+     * mean "nothing".
+     */
+    private function filled(Fill $fill, ?Color $colour): void
+    {
+        $fill->setFillType($colour === null ? Fill::FILL_NONE : Fill::FILL_SOLID);
+
+        if ($colour !== null) {
+            $fill->setStartColor($colour);
+        }
+    }
+
+    /**
+     * A stroke's width in pixels, which is the unit an {@see \PhpOffice\PhpPresentation\Style\Outline}
+     * is written in.
+     *
+     * A minimum of one because a deck is written in points and `stroke-width=0.25` is three
+     * tenths of a pixel, which `a:ext` has no way to say.
+     */
+    private function lineWidth(float $points): int
+    {
+        return max(1, (int) round($points * SlideGeometry::PIXELS_PER_POINT));
+    }
+
+    /**
+     * A picture in the box the deck put it in.
+     *
+     * The same {@see Image} block and the same {@see self::fromFile()} and
+     * {@see self::fromBytes()} a picture in a column goes through; only the box is different,
+     * and `fit=stretch` is the one flag — {@see self::image()} centres a picture in its box and
+     * a stretched one fills it.
+     */
+    private function freePicture(Slide $slide, FreePicture $shape): AbstractDrawingAdapter
+    {
+        // The same fork {@see self::image()} makes, for the same reason: a converted picture
+        // carries its bytes and its size with them and is written from those, while a file is
+        // measured by PHPPresentation from the path it was given.
+        $converted = $shape->image->converted;
+
+        // Both arms: `converted` is null for every format PHPPresentation can embed, so the
+        // file path is what a placed picture usually takes and the bytes are for a WebP or an
+        // SVG, which a `.pptx` cannot hold on its own.
+        $written = $converted === null
+            ? $this->fromFile($slide, $shape->image)
+            : $this->fromBytes($slide, $converted);
+
+        // The alt text is what a screen reader reads and what PowerPoint's own pane shows, and
+        // a file path read aloud is not a description of a picture. {@see self::image()} has
+        // the longer version of why nothing in the file records where the deck found it.
+        $written->setDescription($shape->image->alt === '' ? $shape->image->written : $shape->image->alt);
+
+        $box = $shape->placement->box;
+
+        // `stretch` turns the ratio off, and then {@see self::place()} is the whole of it —
+        // both dimensions stick, because there is no ratio left for either to re-derive from.
+        if ($shape->fit === Pictures::STRETCH) {
+            $written->setResizeProportional(false);
+            $this->place($written, $box, $box->height);
+            $written->setRotation($shape->placement->rotate);
+
+            return $written;
+        }
+
+        // `contain` is the default and needs the fit the column path uses: see
+        // {@see self::fitted()} on why `place()` is not enough on its own.
+        $this->place($written, $box, $box->height);
+        $this->fitted($written, $box, $box->height);
+        $written->setRotation($shape->placement->rotate);
+
+        return $written;
+    }
+
+    /**
+     * A text block in the box the deck put it in, painted and set as its attributes asked.
+     *
+     * The paragraphs come from {@see self::textFrame()} and are then overridden rather than
+     * written a second time: the frame already knows the air between blocks, how a list is
+     * numbered and what a quote is, and a second writer for the same frame would be a second
+     * answer to each of those.
+     */
+    private function freeText(Slide $slide, FreeText $shape, Box $box, int $height): RichText
+    {
+        $written = $this->textFrame($slide, $shape->frame, $box, $height);
+        $paint = $shape->paint;
+        $style = $shape->style;
+
+        $this->filled($written->getFill(), $paint->fill);
+
+        // A border left alone writes `LINE_SINGLE` in PHPPresentation's default, so the absence
+        // of one has to be said rather than left.
+        $written->getBorder()->setLineStyle($paint->stroke === null ? Border::LINE_NONE : Border::LINE_SINGLE);
+
+        if ($paint->stroke !== null) {
+            $written->getBorder()->setLineWidth($paint->strokeWidth)->setColor($paint->stroke);
+        }
+
+        if ($style->padding !== null) {
+            $written->setInsetLeft($style->padding)
+                ->setInsetRight($style->padding)
+                ->setInsetTop($style->padding)
+                ->setInsetBottom($style->padding);
+        }
+
+        foreach ($written->getParagraphs() as $paragraph) {
+            $paragraph->getAlignment()->setHorizontal($style->align)->setVertical($style->verticalAlign);
+        }
+
+        $this->restyled($written, $style);
+        $written->setRotation($shape->placement->rotate);
+
+        return $written;
+    }
+
+    /**
+     * The ink, the size and the face of every run of a placed text block, as its attributes
+     * named them.
+     *
+     * The runs rather than the shape, because a paragraph carries the size its own runs are
+     * drawn at and a shape carries none — so this is the same set of paragraphs
+     * {@see self::runs()} wrote, one level down. A run with no colour of its own would take the
+     * paragraph's, and {@see self::runs()} gives every one of them a colour, so that is where
+     * a `color` has to go to be in the file.
+     */
+    private function restyled(RichText $shape, TextStyle $style): void
+    {
+        // {@see TextFrame::blocks()} is the text vocabulary, every one of its paragraphs is
+        // written by {@see self::runs()}, and that gives each of their runs a face, a size and
+        // a colour of its own. So the runs are where the three are set, and the paragraph is
+        // not: a paragraph's font is the default its runs sit on top of, and nothing reads it.
+        foreach ($shape->getParagraphs() as $paragraph) {
+            // A paragraph holds runs, breaks and fields, and only a run carries a face, a size
+            // and a colour — so the filter is what says which. Nothing here writes a break or
+            // a field, so in practice every element is a run; the filter is there because the
+            // type is the format's and not ours, and a deck that reaches one should lose it
+            // quietly rather than fatal on a method the element does not have.
+            $runs = array_filter(
+                $paragraph->getRichTextElements(),
+                static fn (TextElementInterface $element): bool => $element instanceof TextRun,
+            );
+
+            foreach ($runs as $run) {
+                if ($style->colour !== null) {
+                    $run->getFont()->setColor($style->colour);
+                }
+
+                if ($style->size !== null) {
+                    $run->getFont()->setSize($style->size);
+                }
+
+                if ($style->face !== null) {
+                    $run->getFont()->setName($style->face);
+                }
+            }
+        }
+    }
+
+/**
      *
      * The shape a drawable becomes, added to the slide.
      *
@@ -682,21 +960,40 @@ final class ShapeWriter
 
         $this->place($shape, $box, $height);
 
+        $this->fitted($shape, $box, $height);
+
+        return $shape;
+    }
+
+    /**
+     * A picture fitted to the room it was given, and centred in what is left of it.
+     *
+     * {@see AbstractGraphic::setWidthAndHeight()} **once**, and never {@see self::place()}'s
+     * separate width and height calls for a picture that keeps its ratio: with proportional
+     * resize on, `setWidth()` re-derives the height from the ratio and `setHeight()` then
+     * re-derives the width from *that*, so a 2:1 picture in a square box comes back twice as
+     * wide as the box. The compounding is invisible for a picture whose ratio happens to match
+     * its box and wrong by a factor of the ratio for every other one.
+     *
+     * Centred on both axes, because the slack is only ever on one of them: a picture that fills
+     * the box's width has a gap above and below and none at the sides. The offsets are floored
+     * at the box because `setWidthAndHeight()` rounds the losing dimension *up*, and centring
+     * that would push the picture past the block below it.
+     *
+     * @param int $room How tall the picture may be, which is the box unless it was clamped.
+     */
+    private function fitted(AbstractGraphic $shape, Box $box, int $room): void
+    {
         // The room the block was given may have run out, so the box it is fitted to is
         // clamped before the ratio is read off it: a zero dimension disables the
         // proportional fit and hands the picture the negative room unchanged.
         $width = max($box->width, SlideGeometry::MIN_SIZE);
-        $tall = max($height, SlideGeometry::MIN_SIZE);
+        $tall = max($room, SlideGeometry::MIN_SIZE);
+
         $shape->setWidthAndHeight($width, $tall);
 
-        // Centred on both axes, because the slack is only ever on one of them: an image that
-        // fills the box's width has a gap above and below and none at the sides. The offsets
-        // are floored at the box because `setWidthAndHeight()` rounds the losing dimension
-        // *up*, and centring that would push the picture past the block below it.
         $shape->setOffsetX($box->x + max(0, intdiv($width - $shape->getWidth(), 2)))
             ->setOffsetY($box->y + max(0, intdiv($tall - $shape->getHeight(), 2)));
-
-        return $shape;
     }
 
     /**

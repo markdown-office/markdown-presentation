@@ -459,10 +459,13 @@ $renderer->render(
 
 foreach ($renderer->overflows() as $overflow) {
     printf(
-        "slide %d step %d column %d: %s wants %dpx, %dpx left\n",
+        "slide %d step %d %s: %s wants %dpx, %dpx left\n",
         $overflow['slide'],
         $overflow['step'],
-        $overflow['column'] + 1,
+        // A shape the deck placed itself is in no column, and `null + 1` would say column 1.
+        $overflow['column'] === null
+            ? sprintf('placed "%s"', $overflow['block'])
+            : sprintf('column %d', $overflow['column'] + 1),
         $overflow['block'],
         $overflow['wanted'],
         $overflow['available'],
@@ -476,9 +479,10 @@ slide 1 step 1 column 1: code wants 1150px, 396px left
 
 One entry per shape that had to be clamped, so a slide whose contents are taller than its
 box reports every shape below the point it ran out. A run of paragraphs and lists is one
-shape, so it is one entry where there used to be one per block. The list is emptied by each
-`render()`: a layout belongs to one deck, so a caller converting several in a loop reads the
-last one's.
+shape, so it is one entry where there used to be one per block. A [free shape](#free-shapes)
+is in no column at all, so its entry carries `null` rather than a number in front of nothing.
+The list is emptied by each `render()`: a layout belongs to one deck, so a caller converting
+several in a loop reads the last one's.
 
 A caller that would rather have no file than a file with a slide on it that is missing
 something asks for the strict renderer, and gets `ContentOverflow` naming the slide, the
@@ -783,6 +787,385 @@ all. And **a placeholder written `<p:ph idx="1"/>` is a body**: PowerPoint leave
 where the schema's default applies, and `idx` alone is what identifies it, so a reader that
 matches `type` as written inherits nothing from the master and *Title and Content* silently
 loses its body box.
+
+### Free shapes
+
+Everything so far is laid out for you. A **free shape** is one you place yourself, in pixels or
+in fractions of the slide, and it is written in the body of a slide with the same two-colon
+directives the step markers use:
+
+```markdown
+---
+layout: blank
+---
+
+::rectangle{fill=panel layer=back}
+
+::circle{left=8% top=10% width=6% height=6% fill=accent1}
+
+:::content{left=20% top=40% width=60% height=40% fill=none font-size=20}
+## Q3 review
+- 4,182 signups
+:::
+```
+
+Twelve names are drawn, and nothing else — a name outside them is a failure that lists all
+twelve, so the vocabulary is in the error rather than in a place you have to find:
+
+| Directive | Draws |
+| --- | --- |
+| `::rectangle` | a rectangle |
+| `::roundrect` | a rounded one, with `border-radius` |
+| `::ellipse` | an ellipse |
+| `::circle` | an ellipse that is as wide as it is tall |
+| `::triangle` | an isosceles triangle |
+| `::diamond` | a diamond |
+| `::chevron` | a chevron |
+| `::hexagon` | a hexagon |
+| `::arrow` | a right-pointing arrow |
+| `::line` | a hairline rule as thick as its `stroke-width` |
+| `::image` | a picture |
+| `:::content` … `:::` | Markdown, in a box you sized |
+
+`layout: blank` is what most of these want: a slide whose whole content is free shapes has no
+title to place them around. They work on any role, and a shape is written over or under the
+role's own shapes according to its `layer`.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+$deck = (new DeckParser())->parse(
+    "---\nlayout: blank\n---\n\n::rectangle{left=0 top=0 width=100% height=100% fill=panel layer=back}\n"
+    . "::circle{left=50% top=50% width=10% height=10% fill=accent1 anchor=center}\n"
+    . ":::content{left=8% top=40% width=40% height=20% font-size=18}\nWords.\n:::\n",
+);
+$path = sys_get_temp_dir() . '/deck.pptx';
+(new PresentationRenderer())->render($deck, $path);
+
+$zip = new ZipArchive();
+$zip->open($path);
+$slide = $zip->getFromName('ppt/slides/slide1.xml');
+// The shape tree itself is the first name and carries none, so it is left out.
+preg_match_all('#<p:cNvPr id="\d+" name="([^"]*)"#', $slide, $names);
+echo implode(' ', array_filter($names[1])), "\n";
+
+// 9525 EMU is the pixel PHPPresentation converts at.
+preg_match('#name="circle".*?<a:off x="(\d+)" y="(\d+)"#s', $slide, $circle);
+printf("%d,%d\n", intdiv($circle[1], 9525), intdiv($circle[2], 9525));
+```
+
+```text
+rectangle circle content
+453,243
+```
+
+`rectangle` is written first because it is `layer=back`; `content` and `circle` are written
+after the layout's own shapes, so they are drawn over them. A later shape in `p:spTree` is the
+one on top, which is the whole of what `layer` means and the reason a panel behind a slide's
+text has to be written before the text.
+
+#### Placement
+
+Six attributes, on every name:
+
+| Attribute | Default | |
+| --- | --- | --- |
+| `left`, `top` | `0` | where the box starts |
+| `width`, `height` | `100%` | its size, so a shape with no attributes is full bleed |
+| `anchor` | `nw` | which corner `left` and `top` name: `nw` `n` `ne` `e` `se` `s` `sw` `w` `center` |
+| `layer` | `front` | `back` writes the shape before the layout's own, `front` after |
+| `rotate` | `0` | degrees clockwise, about the middle of the box: `45`, `-30`, `45deg` |
+
+`anchor` is what makes a percentage usable for centring, which is the thing a model reaches for
+most often. `left=50% top=50% anchor=center` puts the box's **middle** at the middle of the
+slide rather than its corner:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Render\CommonMark\BlockTranslator;
+use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Theme\Theme;
+
+$blocks = (new BlockTranslator())->parse(
+    "::rectangle{left=50% top=50% width=20% height=20% anchor=center}\n",
+    1,
+    '.',
+    new PathScope(['.']),
+    Theme::defaults(),
+);
+
+foreach ($blocks->shapes() as $shape) {
+    $box = $shape->placement->box;
+    printf("%d,%d %dx%d\n", $box->x, $box->y, $box->width, $box->height);
+}
+```
+
+```text
+384,216 192x108
+```
+
+A box lies **within** the slide. One that does not is refused with the numbers rather than
+clamped, because a shape quietly drawn somewhere other than where it was asked for is a deck
+that renders and shows something the author did not write — and nothing in the file says so.
+Full bleed is still reachable, because `left=0 width=100%` is exactly the edge.
+
+That is a claim about the **box**, and `rotate` is what makes it worth saying so: a square
+turned forty-five degrees keeps its hundred-pixel box and reaches past the edge of it. What
+is checked is what the deck placed; the tilt is the author's.
+
+### Turning a shape
+
+`rotate` turns a shape about the **middle of its own box**. The box does not move and does not
+resize, so a rotated shape is still the box you placed — which is also how a label is turned
+*with* the arrow it sits on:
+
+```markdown
+::arrow{left=5% top=34% width=32% height=15% fill=accent1 rotate=-12}
+
+:::content{left=5% top=38% width=32% height=7% rotate=-12 align=center vertical-align=middle font-size=16}
+**Retention** 94%
+:::
+```
+
+A `:::content` box is a shape, so it carries `rotate` like the other eleven — which is how a
+label is turned with the arrow it sits on. The other way to put words on a shape, the shape's
+own `label`, turns with it for free; both are under
+[Text inside a shape](#text-inside-a-shape).
+
+Three rules, each for a reason:
+
+| | |
+| --- | --- |
+| **Whole degrees only** | `a:xfrm rot` is in sixtieths of a degree and the setter is an `int`, so `22.5` is a `TypeError` rather than a rounded angle. It is refused with the spelling that works. |
+| **Negative and past a turn are fine** | `rotate=-12` is a counter-clockwise tilt and `rotate=400` is a turn and a bit. Both are wrapped to a single turn rather than refused, which is what PowerPoint does when it reads one. |
+| **A full turn is no turn** | `rotate=360` and `rotate=0` write no `rot` at all, rather than `rot="0"` or `rot="21600000"`. |
+
+Rotation is invisible on `::circle` and `::ellipse` — an ellipse turned ninety degrees looks
+exactly like an ellipse. It shows where a shape has a corner to be different at.
+
+#### Measurements
+
+Two readings of a bare number, and the difference is what each is written in everywhere else
+here: **a position or a size on the slide is pixels**, and **a size of type or of line is
+points**. Both spellings are accepted anywhere, and a percentage only where there is an axis to
+resolve it against.
+
+| Written | Means |
+| --- | --- |
+| `320`, `320px` | 320 pixels |
+| `40%` | 40% of 960 across, or of 540 down |
+| `2pt` | two points — 2⅔ pixels |
+| `left=320` | 320px, the first reading |
+| `font-size=24` | 24pt, the second |
+
+A circle's **two percentages resolve against the height**, which is the one decision here that
+is not a rule. `width=10% height=10%` is the square the author wrote, and resolved against their
+own axes the two would be 96 by 54 — an ellipse that reads as a mistake rather than as a
+circle. One axis makes the spelling mean what it says, and it makes the defaults work: a circle
+with no size at all is the biggest one the slide's height allows rather than one 420px too wide.
+
+A circle with one size takes it for both. With two that differ it is refused, because squaring
+it silently would draw something other than the box the deck wrote:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+foreach (["::circle{width=120}\n", "::circle{width=120 height=80}\n"] as $slide) {
+    try {
+        (new PresentationRenderer())->render((new DeckParser())->parse($slide), sys_get_temp_dir() . '/deck.pptx');
+    } catch (Exception $failure) {
+        echo $failure->getMessage(), "\n\n";
+    }
+}
+```
+
+```text
+Slide 1 gives a "::circle" a width of 120 and a height of 80. A circle is as wide as it is tall; give one size or the other.
+
+```
+
+#### Colour
+
+A colour is `none`, one of the four names a shape *plays*, one of the twelve theme *slots*, or
+a hex value:
+
+| Written | Means |
+| --- | --- |
+| `none` | nothing — written `a:noFill`, not inherited |
+| `page` `ink` `subtle` `panel` | what the page behind the slide, the body text, a quote and a code block's panel are each drawn in |
+| `accent1`–`accent6`, `dk1` `lt1` `dk2` `lt2`, `hlink` `folHlink` | the theme's own slots |
+| `#4C1D95` | that hex, with or without the `#` |
+
+The four role names come first because they are what the rest of the library paints with: a
+free shape and a laid-out one are the same colour on the same theme. A deck written in them
+survives a theme swap and one written in hex does not.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Render\CommonMark\BlockTranslator;
+use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Theme\ThemeResolver;
+
+$blocks = (new BlockTranslator())->parse(
+    "::rectangle{fill=panel stroke=accent1}\n",
+    1,
+    '.',
+    new PathScope(['.']),
+    (new ThemeResolver())->resolve('default')->theme(),
+);
+
+foreach ($blocks->shapes() as $shape) {
+    printf("%s on %s\n", $shape->paint->fill?->getRGB(), $shape->paint->stroke?->getRGB());
+}
+```
+
+```text
+E7E6E6 on 4472C4
+```
+
+An unrecognised name is refused, never quietly black.
+
+#### The rest of the attributes
+
+| Attribute | On | |
+| --- | --- | --- |
+| `fill`, `stroke` | the shapes, `::content` | |
+| `alpha` | the shapes, `::content` | 0–100 for the whole shape; one percentage, written on every colour it has |
+| `stroke-width` | the shapes, `::content` | in points; `0` is a hairline |
+| `border-radius` | `::roundrect` only | in pixels |
+| `label` | the ten ink shapes | the shape's own text — see [Text inside a shape](#text-inside-a-shape) |
+| `src`, `alt`, `fit` | `::image` | |
+| `color`, `font-size`, `font-family`, `align`, `vertical-align`, `padding` | `::content` only | |
+
+`fit` is `contain` (keep the ratio, fit inside, centred) or `stretch` (take the box exactly).
+`fit=cover` is refused by name: it is a crop rather than a fit, PHPPresentation writes a picture
+either proportional or stretched, and there is nowhere to put the crop rectangle — so it would
+be drawn as `contain` and left to be noticed.
+
+#### A placed text block
+
+`:::content` is Markdown between its fences, drawn as **one** box:
+
+```markdown
+:::content{left=8% top=60% width=40% height=30% fill=none color=ink font-size=18 align=left}
+## Q3 review
+- Shipped the **new** pricing page
+- 4,182 signups
+:::
+```
+
+It holds paragraphs, headings, lists and quotes — the blocks a text frame holds anywhere else.
+A table, a code block, a picture and a rule are each a shape of their own, and each is refused
+by name rather than drawn, because a shape's id in the file is its position in the slide's
+shape collection and the renderer counts them rather than looking them up. A `::click` or a
+`::column` inside one is refused too: it is one box on one step.
+
+Text that does not fit is clamped to the box and reported by
+`overflows()` like any other block, with no column behind the entry — there is no column, and
+putting `0` there would be a number in front of nothing.
+
+**There is no `text` attribute on a shape, and `:::content` is why.** A shape with text in it
+is expressible today, and it is the composable version: draw the shape, then put a
+`:::content` box over it and give both the same `rotate`. What a `text` attribute would add is
+a *second* way to put words on a slide, and it would be the worse one — see
+[Text inside a shape](#text-inside-a-shape).
+
+#### Text inside a shape
+
+There are **two** ways, and the choice is one object against styled text.
+
+`label` is the shape's own text, in the shape's own body:
+
+```markdown
+::arrow{left=6% top=20% width=34% height=13% fill=accent1 label="Retention 94%" rotate=-6}
+```
+
+That is **one shape in the file**, and it is the native thing: double-click the arrow in
+PowerPoint and the cursor is in the arrow, and dragging the arrow drags the words with it. It
+also turns with the shape without a second `rotate` to keep in step.
+
+What it costs, and it is a real cost:
+
+| | |
+| --- | --- |
+| **No Markdown** | one plain run, so `**bold**` is six literal asterisks |
+| **No type control** | PHPPresentation writes `<a:r><a:t>…</a:t></a:r>` with **no `a:rPr`** — no size, no face, no colour, and no attribute here that reaches one |
+| **Centred, both ways** | `algn="ctr"` and `anchor="ctr"` are written into the element rather than read from anything |
+| **One ink** | `tx1`, the theme's body text colour. It follows `dark:`, so a label is legible on a filled shape in either theme — what it has no contrast against is the shape's *own fill* where that is close to the page's, and a pale fill on a dark theme is the case that washes out |
+| **Centred in the box** | not in the shape's visual mass, so on an asymmetric one — `::arrow` above all — the words read as pushed towards the tail |
+
+`:::content` over the shape is the other way, and it is what the label is for when any of that
+matters — Markdown, `**bold**`, a [link](#links), `color`, `font-size`, `font-family`, `align`,
+`padding`, and a `rotate` to match:
+
+```markdown
+::arrow{left=6% top=20% width=34% height=13% fill=accent1 rotate=-6}
+
+:::content{left=6% top=22% width=34% height=9% rotate=-6 align=center vertical-align=middle font-size=16}
+**Retention** 94%
+:::
+```
+
+**Two shapes in the file, not one.** That is the whole of the trade: `label` is one object you
+can double-click and drag, with words you cannot style; `:::content` is words you can style, on
+an object that does not move when the shape moves. PowerPoint edits them as two things, because
+they are two things.
+
+A `label` is refused on `::image`, which is a `p:pic` with no text body at all, and on
+`:::content`, whose body is already its text — putting the same words in the same place twice is
+the mistake both refusals are about.
+
+#### What is refused, and how it reads
+
+An attribute a directive does not read is refused rather than ignored, and that is the whole of
+the design: an ignored attribute is the one mistake here that leaves no trace at all.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+$decks = [
+    "::rect{a=1}\n",
+    "::rectangle{left=900 width=120}\n",
+    "::circle{width=120 height=80}\n",
+    "::rectangle{fill=chartreuse}\n",
+    "::rectangle{rotate=22.5}\n",
+    "::image{src=\"chart.png\" fill=accent1}\n",
+];
+
+foreach ($decks as $slide) {
+    try {
+        (new PresentationRenderer())->render(
+            (new DeckParser())->parse($slide),
+            sys_get_temp_dir() . '/deck.pptx',
+        );
+    } catch (Exception $failure) {
+        echo $failure->getMessage(), "\n\n";
+    }
+}
+```
+
+```text
+Slide 1 opens the directive "::rect{a=1}", which is not something a slide draws. The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, line, rectangle, roundrect, triangle. Two colons mark a step as "::click" or a column as "::column" and three open a step region as ":::click"; a placed text block is ":::content" with its Markdown between the fences.
+
+Slide 1 places "rectangle" at left 900px with a width of 120px, which reaches 1020px. A free shape lies within the 960px wide slide: write left=0 width=100% for one that reaches the edge.
+
+Slide 1 gives a "::circle" a width of 120 and a height of 80. A circle is as wide as it is tall; give one size or the other.
+
+Slide 1 gives "rectangle" a fill of "chartreuse". A colour is none, page, ink, subtle, panel, a theme slot (dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), or a hex value such as #4C1D95.
+
+Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
+
+Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, rotate, src, top, width.
+```
+
+Two things are **not** offered and are refused rather than approximated: a dashed outline,
+because PHPPresentation writes an autoshape's stroke as one colour and one width; and a label
+in brackets, because a free shape has nowhere to put one.
 
 ### Steps
 
@@ -1246,7 +1629,7 @@ foreach ([":::note\nHello.\n:::\n", "<v-click>Hello.</v-click>\n"] as $slide) {
 ```
 
 ```text
-Slide 1 opens the container ":::note", which is not something a slide draws. Three colons open a step region as ":::click" and close it as ":::"; divide a deck with a "---" line, write a section as a heading, and write a note as a quote: "> ".
+Slide 1 opens the container ":::note", which is not something a slide draws. Three colons open a step region as ":::click" and close it as ":::"; a placed text block is ":::content" with its Markdown between the fences; divide a deck with a "---" line, write a section as a heading, and write a note as a quote: "> ".
 Slide 1 has the element "<v-click>", which is not something a slide draws. A step is "::click" on a line of its own, and there is no other element.
 ```
 

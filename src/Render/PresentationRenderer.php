@@ -29,8 +29,11 @@ use MarkdownPresentation\Render\Block\Rule;
 use MarkdownPresentation\Render\Block\Table;
 use MarkdownPresentation\Render\CommonMark\BlockTranslator;
 use MarkdownPresentation\Render\CommonMark\InlineTranslator;
+use MarkdownPresentation\Render\Free\FreeShape;
+use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
+use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeResolver;
 use PhpOffice\PhpPresentation\PhpPresentation;
 use PhpOffice\PhpPresentation\Slide as WrittenSlide;
@@ -63,6 +66,11 @@ use PhpOffice\PhpPresentation\Slide\SlideLayout;
  * the directive's own text. That last one is the case this library exists for: a deck
  * written by a model, a directive it does not know, and a slide with the directive printed
  * on it reads as a rendered deck.
+ *
+ * A **free shape** is the other half of what a slide's body can carry, and this renderer is
+ * where it is drawn: {@see \MarkdownPresentation\Render\Free\FreeShape} is placed rather than
+ * laid out, so it takes no column and is not measured against the layout's box — see
+ * {@see self::placed()}, which is the write order a `layer` decides.
  *
  * Two things it does not do are somebody else's job, and both classes that do them sit in
  * this directory rather than being reached through a caller: {@see MasterLayouts} writes the
@@ -120,9 +128,11 @@ final class PresentationRenderer
      * Every block that did not fit its slide during the last render, in the order they were
      * laid out.
      *
-     * @var list<array{slide: int, step: int, column: int, block: string, wanted: int, available: int}>
+     * An object rather than an array because it is written from two places — the layout's own
+     * stacking and the shapes a deck placed itself — and because strictness is a fact about the
+     * report rather than about the deck. See {@see Overflows}.
      */
-    private array $overflows = [];
+    private readonly Overflows $overflows;
 
     private readonly PathScope $files;
 
@@ -147,10 +157,11 @@ final class PresentationRenderer
         private readonly string $directory = '.',
         private readonly ThemeResolver $themes = new ThemeResolver(),
         private readonly BlockTranslator $blocks = new BlockTranslator(),
-        private readonly bool $strict = false,
+        bool $strict = false,
         array $imageRoots = [],
     ) {
         $this->files = new PathScope([$this->directory, ...$imageRoots]);
+        $this->overflows = new Overflows($strict);
     }
 
     /**
@@ -171,11 +182,11 @@ final class PresentationRenderer
      * one deck: a caller converting several in a loop wants the last one's overflows, not
      * all of them.
      *
-     * @return list<array{slide: int, step: int, column: int, block: string, wanted: int, available: int}>
+     * @return list<array{slide: int, step: int, column: ?int, block: string, wanted: int, available: int}>
      */
     public function overflows(): array
     {
-        return $this->overflows;
+        return $this->overflows->all();
     }
 
     /**
@@ -186,11 +197,14 @@ final class PresentationRenderer
      * @throws TooManySlides    When the deck asks for more slides than {@see self::MAX_SLIDES}.
      * @throws \MarkdownPresentation\Exception\Exception When the file cannot be written.
      *
+     * @throws \MarkdownPresentation\Exception\MalformedShape When a free-placement directive
+     *     names an attribute it does not read, or gives one a value it cannot be.
+     *
      * @return string The path written.
      */
     public function render(Deck $deck, string $path): string
     {
-        $this->overflows = [];
+        $this->overflows->forget();
 
         // Before anything is read rather than while the slides are being built, so a deck
         // over the ceiling is refused with no work done rather than after every one of them.
@@ -220,7 +234,8 @@ final class PresentationRenderer
         $layouts = MasterLayouts::build($presentation, $deck, $theme, $used, $this->blocks->inline());
 
         $writer = new ShapeWriter($theme->theme(), $geometry);
-        $blocks = $this->blocks($deck);
+        $shapes = new SlideShapes($geometry, $this->overflows);
+        $blocks = $this->blocks($deck, $theme->theme());
         $builds = [];
 
         foreach ($deck->slides() as $slide) {
@@ -233,7 +248,7 @@ final class PresentationRenderer
                 $roles[$slide->index()],
                 $layouts,
                 $writer,
-                $geometry,
+                $shapes,
                 $blocks[$slide->index()],
             );
         }
@@ -293,14 +308,19 @@ final class PresentationRenderer
      * all — an image that does not resolve, a marker that goes backwards — is a failure with
      * no file written behind it, rather than one found after the first few slides are built.
      *
+     * The theme comes with the deck because a free shape may be written in its colours, and
+     * resolving `fill=panel` needs the theme the deck named. Refusing `fill=chartreuse` once a
+     * shape exists would be too late to have written no file.
+     *
      * @return array<int, SlideBlocks>
      *
      * @throws ImageNotFound
+     * @throws \MarkdownPresentation\Exception\MalformedShape
      * @throws UnknownDirective
      * @throws UnknownMarker
      * @throws UnsupportedImageFormat
      */
-    private function blocks(Deck $deck): array
+    private function blocks(Deck $deck, Theme $theme): array
     {
         $blocks = [];
 
@@ -310,6 +330,7 @@ final class PresentationRenderer
                 $source->index() + 1,
                 $this->directory,
                 $this->files,
+                $theme,
             );
         }
 
@@ -477,6 +498,8 @@ final class PresentationRenderer
      *
      * @param SlideBlocks             $content The slide's blocks and the column each was written for.
      * @param array<string, SlideLayout> $layouts
+     * @param SlideShapes             $shapes  Writes everything below the title, in the order
+     *                                      a `layer` decides.
      *
      * @return array<int, int> Shape id to the step it appears on, in write order.
      *
@@ -488,16 +511,17 @@ final class PresentationRenderer
         LayoutRole $role,
         array $layouts,
         ShapeWriter $writer,
-        SlideGeometry $geometry,
+        SlideShapes $shapes,
         SlideBlocks $content,
     ): array {
-        $title = $geometry->title($role);
-        $level = $source->frontmatterValue('level');
+        $level = $this->depth($source->frontmatterValue('level'), $source->index() + 1);
+        $title = $shapes->title($role, $level);
+
         $content = $this->underTitle(
             $content,
             $source,
             $title !== null,
-            $this->depth($level, $source->index() + 1),
+            $level,
         );
 
         $slide = $presentation->createSlide();
@@ -513,20 +537,18 @@ final class PresentationRenderer
         $next = self::FIRST_SHAPE_ID;
 
         if ($title !== null && $source->title() !== null) {
-            $size = $this->depth($level, $source->index() + 1);
-
             $writer->title(
                 $slide,
                 $this->blocks->inline()->runsIn($source->title()),
                 $title['box'],
-                $size === null ? $title['size'] : $geometry->titleSize($title['size'], $size),
+                $title['size'],
                 $title['alignment'],
             );
 
             $next++;
         }
 
-        return $this->stack($slide, $content, $role, $writer, $source->index() + 1, $geometry, $next);
+        return $shapes->write($slide, $content, $role, $writer, $source->index() + 1, $next);
     }
 
     /**
@@ -615,6 +637,7 @@ final class PresentationRenderer
         $blocks = $content->blocks();
         $columns = $content->columns();
         $markers = $content->columnMarkers();
+        $shapes = $content->shapes();
         $heading = null;
         $at = 0;
 
@@ -638,7 +661,7 @@ final class PresentationRenderer
             // blank slide's title already is.
             return $hasTitleBox
                 ? $content
-                : new SlideBlocks([$this->titleHeading($title, $depth), ...$blocks], [0, ...$columns], $markers);
+                : new SlideBlocks([$this->titleHeading($title, $depth), ...$blocks], [0, ...$columns], $markers, $shapes);
         }
 
         $drawn = $heading;
@@ -661,8 +684,9 @@ final class PresentationRenderer
                 array_merge(array_slice($kept, 0, $at), array_slice($kept, $at + 1)),
                 array_merge(array_slice($columns, 0, $at), array_slice($columns, $at + 1)),
                 $markers,
+                $shapes,
             )
-            : new SlideBlocks($kept, $columns, $markers);
+            : new SlideBlocks($kept, $columns, $markers, $shapes);
     }
 
     private function note(WrittenSlide $slide, string $text): void
@@ -670,178 +694,5 @@ final class PresentationRenderer
         $note = new Note();
         $note->createRichTextShape()->createTextRun($text);
         $slide->setNote($note);
-    }
-
-    /**
-     * Every block of a slide, stacked into the role's body boxes, and the step each written
-     * shape belongs to.
-     *
-     * Stacked as shapes rather than as blocks: {@see TextFrame::group()} decides which blocks
-     * share one text frame first, because the air between two of them is then the frame's own
-     * paragraph spacing rather than room taken out of the column between two boxes. What
-     * follows is the arithmetic it has always been, one drawable at a time.
-     *
-     * `$first` is the id the first shape written here will take, which is one past the title
-     * where there is one. The ids are counted rather than looked up because a shape's id is
-     * its position in the slide's shape collection — the tree's own group is 1, and
-     * PHPPresentation's `writeShapeCollection()` increments before it uses the number — and
-     * {@see ShapeWriter::write()} adds exactly one shape per call, which is what makes the
-     * count and the file agree.
-     *
-     * @param SlideBlocks $content The slide's blocks and the column each was written for.
-     *
-     * @return array<int, int> Shape id to the step it appears on, in write order.
-     *
-     * @throws UnsupportedColumn
-     */
-    private function stack(
-        WrittenSlide $slide,
-        SlideBlocks $content,
-        LayoutRole $role,
-        ShapeWriter $writer,
-        int $number,
-        SlideGeometry $geometry,
-        int $first,
-    ): array {
-        $blocks = $content->blocks();
-        $columns = $this->columns($content, $role, $geometry, $number);
-        $steps = [];
-
-        foreach ($geometry->body($role) as $column => $box) {
-            $y = $box->y;
-            $bottom = $box->y + $box->height;
-            $visible = $this->visible($blocks, $columns, $column);
-            $drawables = TextFrame::group($visible);
-            $last = count($drawables) - 1;
-
-            foreach ($drawables as $at => $drawable) {
-                // A drawable that is a block is its own step; a {@see TextFrame} is several
-                // blocks drawn as one shape, and every block in a frame is on the same step —
-                // {@see TextFrame::group()} ends a run at a step boundary for exactly that
-                // reason — so the frame's step is its first block's.
-                $step = $drawable instanceof TextFrame ? $drawable->firstStep() : $drawable->step();
-
-                // A column whose contents are taller than its box runs off the bottom of it,
-                // and an image spends the whole of the room left — so both the cursor and
-                // the height are held inside the box. A shape that does not fit is drawn as
-                // small as the room allows rather than over whatever is under it, and
-                // {@see self::overflow()} is what says that it had to be.
-                $y = min($y, $bottom - SlideGeometry::MIN_SIZE);
-                $room = max(0, $bottom - $y);
-                $wanted = $writer->height($drawable, $box, $room);
-                $height = max(min($wanted, $room), SlideGeometry::MIN_SIZE);
-
-                if ($height < $wanted) {
-                    $this->overflow($number, $step, $column, $drawable->name(), $wanted, $room);
-                }
-
-                $writer->write($slide, $drawable, new Box($box->x, $y, $box->width, $height), $height);
-                $steps[$first++] = $step;
-
-                // The air between two shapes is the air between the two blocks at the seam,
-                // which is the pair {@see TextFrame::group()} put next to one another — so a
-                // table under a paragraph gets the room a table wants whatever the frame
-                // around either of them, and a heading's own air above it is spent between
-                // shapes as it is spent between paragraphs. Nothing is added after the last
-                // one: room below the last shape of a column is the column's, not the
-                // layout's, and spending it there is what pushes a slide off its own bottom.
-                if ($at < $last) {
-                    $y += $height + (int) round($geometry->gapBetween($drawable, $drawables[$at + 1]));
-                }
-            }
-        }
-
-        return $steps;
-    }
-
-    /**
-     * A block that did not fit, said out loud.
-     *
-     * Clamping without saying so is the one thing this library must not do: a slide with a
-     * block quietly squeezed into the last pixel renders as a deck, and nobody looking at it
-     * can tell what is missing. Strict mode raises instead, for a caller that would rather
-     * have no file.
-     *
-     * @param int $step The step of the block that did not fit, which is the click the reader
-     *                  would have reached it on.
-     *
-     * @throws ContentOverflow
-     */
-    private function overflow(int $slide, int $step, int $column, string $block, int $wanted, int $available): void
-    {
-        if ($this->strict) {
-            throw ContentOverflow::on($slide, $step, $column, $block, $wanted, $available);
-        }
-
-        $this->overflows[] = [
-            'slide' => $slide,
-            'step' => $step,
-            'column' => $column,
-            'block' => $block,
-            'wanted' => $wanted,
-            'available' => $available,
-        ];
-    }
-
-    /**
-     * Which column each block belongs to, once the slide's layout has agreed to them.
-     *
-     * What the deck wrote, read off the parser rather than guessed here: a `::column` moves
-     * the blocks after it into the next column and nothing else does, so a heading is a
-     * heading and a slide that writes no `::column` fills the first column and leaves the rest
-     * empty. A column nothing was written in is not an error either: the alternative is
-     * guessing which block was meant to be in it.
-     *
-     * The count is the layout's and not the library's, because the boxes are the fact: a
-     * template that gives a role three body placeholders has made it three columns whatever
-     * the role is called. That is why `$geometry` is the merged one {@see self::render()}
-     * built rather than a fresh {@see SlideGeometry} — the two disagreeing is what laid a
-     * template-backed column out and left it empty.
-     *
-     * Measured on the markers rather than on the column a block landed in, because a marker
-     * with nothing after it leaves no block behind, and a rule that turns on what follows the
-     * last marker of a slide is a rule a deck cannot see. N markers ask for the columns zero
-     * through N, so a role has to have more than N of them — which covers the one marker on a
-     * role with one column, the third on a slide with two, and either of them written at the
-     * end of a slide where nothing follows.
-     *
-     * @return list<int>
-     *
-     * @throws UnsupportedColumn
-     */
-    private function columns(SlideBlocks $content, LayoutRole $role, SlideGeometry $geometry, int $slide): array
-    {
-        $available = count($geometry->body($role));
-
-        if ($content->columnMarkers() >= $available) {
-            throw UnsupportedColumn::beyond($slide, $role->value, $available);
-        }
-
-        return $content->columns();
-    }
-
-    /**
-     * The blocks of one column, in order.
-     *
-     * Every one of them, whatever step it is on: a build-up is one slide holding every
-     * block, and which of them a reader can see is what the click chain says rather than
-     * which of them were written.
-     *
-     * @param list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table> $blocks
-     * @param list<int>                                                       $columns Which column each block belongs to.
-     *
-     * @return list<Code|Heading|Image|ListBlock|Paragraph|Quote|Rule|Table>
-    */
-    private function visible(array $blocks, array $columns, int $column): array
-    {
-        $visible = [];
-
-        foreach ($blocks as $offset => $block) {
-            if ($columns[$offset] === $column) {
-                $visible[] = $block;
-            }
-        }
-
-        return $visible;
     }
 }

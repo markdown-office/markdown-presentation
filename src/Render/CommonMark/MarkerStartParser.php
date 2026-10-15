@@ -8,6 +8,7 @@ use League\CommonMark\Parser\Block\BlockStart;
 use League\CommonMark\Parser\Block\BlockStartParserInterface;
 use League\CommonMark\Parser\Cursor;
 use League\CommonMark\Parser\MarkdownParserStateInterface;
+use MarkdownPresentation\Render\Free\FreeShapes;
 
 /**
  * Recognises the markers a slide is written with: `::click`, `::column`, `:::click` and the
@@ -40,27 +41,67 @@ final class MarkerStartParser implements BlockStartParserInterface
         '/\A[ \t]*:::.*\z/' => MarkerKind::Container,
     ];
 
+    /**
+     * A directive name on a `:::` line, which is the one thing the catch-all above has to let
+     * through.
+     *
+     * Matched here rather than left to the generic directives extension to parse, because
+     * deciding whether to stand aside at all needs the name and nothing else — and a line this
+     * class does not claim becomes that extension's problem, which is a stricter parser with a
+     * container body of its own rather than this one.
+     *
+     * The trailing `(?:…|\z)` is what says "and nothing follows", so `:::content` is a
+     * container and `:::contentile` is not. Deliberately stricter than the RFC's own name
+     * pattern, which a container written without a name also satisfies by matching nothing: an
+     * empty name is not a free shape, and `::: {.cls}` has to stay a marker so that it is
+     * refused with the fence in the message.
+     */
+    private const NAME = '/\A[ \t]*:{3,}[ \t]*([A-Za-z][A-Za-z0-9_-]*)(?:[ \t\[\{\n]|\z)/';
+
     public function tryStart(Cursor $cursor, MarkdownParserStateInterface $parserState): ?BlockStart
     {
-        // Four spaces of indentation is a code block in CommonMark, and a marker a deck
-        // wrote inside one is code like anything else in it.
+        $written = $cursor->getRemainder();
+
+        // One exit, because "this is not mine" is the answer three of the four paths below
+        // give and a method with four `return`s makes the reader check each one to find out
+        // whether they are the same answer or three different ones.
+        //
+        // Four spaces of indentation is a code block in CommonMark, and a marker a deck wrote
+        // inside one is code like anything else in it.
         if ($cursor->isIndented()) {
             return BlockStart::none();
         }
 
-        $written = $cursor->getRemainder();
+        // Stands aside for a container this library draws, so the generic directives extension
+        // reads it as one: `:::content{…}` is a fence with attributes and a body, which is what
+        // that extension exists to parse, and this class exists for the two markers whose
+        // argument the RFC's syntax has nowhere to put. Claimed here rather than there because
+        // this class runs first and would otherwise take every three-colon line.
+        if (preg_match(self::NAME, $written, $match) === 1 && FreeShapes::kindOf($match[1])?->isContainer() === true) {
+            return BlockStart::none();
+        }
 
+        return $this->claimed($cursor, $written) ?? BlockStart::none();
+    }
+
+    /**
+     * The marker this class recognises on a line, or null where it recognises none.
+     *
+     * @return ?BlockStart Null for a line that is not a marker at all, which is what most lines
+     *                    in a slide are.
+     */
+    private function claimed(Cursor $cursor, string $written): ?BlockStart
+    {
         foreach (self::MARKERS as $pattern => $kind) {
             if (preg_match($pattern, $written, $match) !== 1) {
                 continue;
             }
 
-            $marker = new Marker($kind, $match[1] ?? null, $written);
             $cursor->advanceToEnd();
 
-            return BlockStart::of(new MarkerContinueParser($marker))->at($cursor);
+            return BlockStart::of(new MarkerContinueParser(new Marker($kind, $match[1] ?? null, $written)))->at($cursor);
         }
 
-        return BlockStart::none();
+        return null;
     }
 }

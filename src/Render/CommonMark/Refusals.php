@@ -10,6 +10,7 @@ use League\CommonMark\Node\Inline\Text;
 use League\CommonMark\Node\Node;
 use MarkdownOffice\CommonMark\Directive\Node\DirectiveBlock;
 use MarkdownPresentation\Exception\UnknownDirective;
+use MarkdownPresentation\Render\Free\FreeShapes;
 
 /**
  * The three things a slide cannot carry and this library is not told about by the grammar:
@@ -55,12 +56,17 @@ final class Refusals
     private const NOTE = 'note';
 
     /**
-     * The leaf directives a slide draws.
+     * The leaf directives a slide draws that are not free shapes.
      *
      * A note is not among them because a note is not a leaf: it is `::note`, its text, and a
      * closing `::`. {@see self::notes()} has already taken a bare one off the content or
      * refused it as unclosed, so a leaf still carrying the name at this point is one written
      * with a label or attributes on it, which is not the note this library means.
+     *
+     * A free shape is not among them either, because {@see FreeShapes} is the whole of those
+     * and {@see self::leaves()} asks it rather than carrying a second list that would stop
+     * agreeing with the first.
+     *
      * @var list<string>
      */
     public const LEAF = ['click', 'column'];
@@ -189,7 +195,11 @@ final class Refusals
             if ($child instanceof DirectiveBlock) {
                 $name = $child->getName();
 
-                if (!$child->isContainer() && !in_array(strtolower($name ?? ''), self::LEAF, true)) {
+                if (
+                    !$child->isContainer()
+                    && !in_array(strtolower($name ?? ''), self::LEAF, true)
+                    && FreeShapes::kindOf($name) === null
+                ) {
                     throw UnknownDirective::leaf($state->slide, self::oneLine($state->written($child)));
                 }
             }

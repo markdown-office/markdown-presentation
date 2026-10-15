@@ -297,6 +297,50 @@ it('does not claim again what the code does not do', function (string $claim) {
     // SVG used to be written as, is not guarded instead of the live claims.
     'an svg is carried into the package as the file itself' => 'the only one of these three that is not re-encoded',
     'an svg is put in the deck unexamined' => 'written into the package byte for byte',
+
+    // A free shape past the edge of the slide was clamped to it, which is the one outcome this
+    // library will not have: a deck that renders, showing a shape somewhere the author did not
+    // put it, and nothing in the file to say so. It is refused with the numbers now, so no page
+    // or comment may argue that a shape off the slide is pulled back onto it. `CHANGELOG.md`
+    // has to be able to name what it used to do, so the phrase is the reasoning rather than the
+    // spelling.
+    'a free shape past the edge is pulled back onto it' => 'is moved to fit inside the slide',
+    // `fit=cover` is refused rather than drawn as `contain`: it is a crop, and PHPPresentation
+    // writes a picture either proportional or stretched with nowhere to put the crop rectangle.
+    // A deck asking for it must be told, not given something else — so a page may not claim a
+    // free picture fills its box and loses its edges.
+    'a free picture fills its box and loses its edges' => 'fills the box and crops',
+    // A free picture was placed with `setWidth()` and `setHeight()`, which each re-derive the
+    // other from the ratio, so a 2:1 picture in a square box came back at twice the width. It
+    // is right for a picture whose ratio matches its box, so a page may not claim the box is
+    // kept exactly — the box is what the picture is fitted *into*, not what it fills.
+    'a free picture takes its box exactly' => 'takes the box exactly and ignores it',
+    // A dashed outline on a free shape. An autoshape's stroke is one colour and one width in
+    // the file PHPPresentation writes, so a dash is not something this library can draw and is
+    // refused by name rather than dropped — and a page may not claim one is offered.
+    'a free shape can be given a dashed outline' => 'a dashed outline on a free shape',
+    // A free shape lying within the slide is a claim about its *box*, and `rotate` is what
+    // makes the difference matter: a square turned forty-five degrees reaches past the edge
+    // while its box stays inside it. What is refused is the box. A page may not say the turned
+    // shape is the thing that is checked — and, because the same reasoning applies the other
+    // way, that a box which *does* fit is a promise about the ink on the slide.
+    'a free shape is checked against the slide edge once it is turned' => 'the turned shape is checked against the edge',
+    'a free shape inside the slide means its turned corners are too' => 'its corners stay inside the slide',
+    // The ink of a shape's own `label` was described as the reader's default and called
+    // unreadable on a filled shape. It is `tx1` — the theme's body text colour, which follows
+    // `dark:` — so it is legible on a filled shape in either theme, and what it has no contrast
+    // against is the shape's *own fill* where that is close to the page's. The phrases are the
+    // two halves of the wrong claim, and the README has to be able to say what the ink is
+    // without firing on either.
+    'a shape label is drawn in the reader default text colour' => 'whatever the reader defaults text to',
+    'a shape label is unreadable on a filled shape' => 'unreadable on a filled shape or a dark one',
+    // There is no `text` attribute on a free shape, and the reason is that `:::content` over
+    // the shape can be styled and this could not. There is no guard for it, and the reason is
+    // the one above: the README has to be able to name `::arrow{text="…"}` in the sentence
+    // that says the attribute does not exist, and a phrase guard cannot tell that from a page
+    // offering it. The decision is pinned by the XML the README quotes instead — one run, no
+    // `a:rPr`, `algn` and `anchor` written into the element — which cannot be edited into
+    // meaning the opposite without also being visibly wrong.
 ]);
 
 it('has no decorative dividers in it', function () {
@@ -339,7 +383,12 @@ it('says in the code why ShapeWriter is not split', function () {
     // And the argument has to be the crossings rather than a count, because a count is wrong
     // the moment one method moves and a name is not. Each of these is read by the measure
     // half of the class and by the draw half.
-    foreach (['columns()', 'rowHeights()', 'HEADER_ROW', 'bodySize()'] as $crossing) {
+    //
+    // The last three arrived with free placement, and they are here for the reason the first
+    // four are: a reason for a red finding that does not name what was added to the class
+    // stops describing it, and the next person to read it either splits the class on the
+    // strength of an argument that no longer holds or silences the finding.
+    foreach (['columns()', 'rowHeights()', 'HEADER_ROW', 'bodySize()', 'filled()', 'runs()', 'textHeight()'] as $crossing) {
         expect($doc)->toContain($crossing);
     }
 });

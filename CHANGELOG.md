@@ -8,6 +8,54 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Twelve directives that place a shape themselves, so one slide can be styled freely.**
+  `::rectangle`, `::roundrect`, `::ellipse`, `::circle`, `::triangle`, `::diamond`,
+  `::chevron`, `::hexagon`, `::arrow`, `::line`, `::image` and `:::content` … `:::` are
+  written in the body of a slide, in the same two-colon syntax the step markers use:
+
+  ```markdown
+  ::rectangle{left=0 top=30% width=100% height=64% fill=panel layer=back}
+
+  :::content{left=8% top=47% width=52% height=42% font-size=15}
+  ## Fill, stroke, alpha
+  :::
+  ```
+
+  Everything above this is laid out for you. A free shape is placed by the deck, in pixels or
+  in fractions of the slide, and coloured in the theme's own slots so it survives a theme
+  swap. Three decisions are worth knowing:
+
+  - **A box lies within the slide, and one that does not is refused with the numbers.**
+    Clamping it would be a shape quietly drawn somewhere the author did not ask for, and
+    nothing in the file would say so. `left=0 width=100%` is exactly the edge, so full bleed
+    is still one spelling.
+  - **An attribute a directive does not read is refused rather than ignored**, and the failure
+    names the attributes that one does. An ignored attribute is the one mistake in a
+    vocabulary like this that leaves no trace at all: a shape drawn without the fill that was
+    asked for, on a deck that looks rendered.
+  - **A placed text block is one shape.** It holds the blocks a text frame holds anywhere
+    else — paragraphs, headings, lists, quotes — and a table, a code block, a picture or a
+    rule inside one is refused by name. A shape's id in the file is its position in the
+    slide's shape collection, and the renderer counts them rather than looking them up, so a
+    body that could produce two shapes would put the click chain and the file out of step.
+
+  `layer=back` writes a shape before the layout's own and `layer=front` after, so a panel
+  behind a slide's text and a badge over it are the same attribute with two values. A free
+  shape sits on the step it was written on, so a `::click` above one reveals it like any
+  other. Text that does not fit is clamped and reported by `overflows()`, with no column
+  behind the entry — there is no column, and putting `0` there would be a number in front of
+  nothing.
+
+  Two things are **not** offered and are refused by name rather than approximated: `fit=cover`,
+  which is a crop rather than a fit and has nowhere to go in the shape PHPPresentation
+  writes; and a dashed outline, because an autoshape's stroke is one colour and one width.
+  A label in brackets is refused too — a free shape has nowhere to put one.
+
+  `MarkerStartParser` now stands aside for a `:::` container whose name it draws, which is
+  what lets the generic directives extension parse `:::content` as a container with a body
+  rather than have the marker parser take every three-colon line. Everything a `:::click`
+  region does is unchanged.
+
 - **A fourth theme, `dense`, and a deck that exists to be looked at twice.**
   `themes/corporate-dark` is the one that was larger than the library's own scale; nothing
   shipped that was smaller, and a spacing model that is a fraction of a type size is only
@@ -18,6 +66,98 @@ All notable changes to this project are documented here. The format follows
   theme's `headings` scale says.
 
 ### Changed
+
+- **The free-shape reading moved out of `BlockTranslator`, and a shape is no longer read by
+  the thing that reads blocks.** A free shape is not a block — it takes no column, is not
+  measured against the layout's box, and there is nothing for a walk to walk over — so
+  `Render\Free\ShapeReader` reads it onto the slide's state and the translator is a translator
+  again, at sixteen methods where it was twenty-four.
+
+  Two readings both callers needed are now one class each rather than a copy in each: the
+  list walk is `Render\CommonMark\FrameReader`, because a column of type and the Markdown
+  between a `:::content`'s fences want the same answer to what nesting depth a bullet is at;
+  and the picture walk is `Render\CommonMark\PictureReader`, because `![…](x.png)` and
+  `::image{src="x.png"}` must reach the filesystem through the *same* `PathScope` — one of
+  them resolving a path on its own would be a deck able to point outside the directory it was
+  given, written in a spelling nobody reads the tests for.
+
+  `PresentationRenderer` is fifteen methods, where the count was twenty-one and had been
+  nineteen before this branch. **All three write passes and the column arithmetic moved to
+  `Render\SlideShapes`**, because they are one idea — the shapes a deck placed behind the
+  layout's own, the layout's own, and the shapes it placed over them — and the order *is*
+  `layer`: a later shape in `p:spTree` is drawn over an earlier one. Split across methods on
+  the renderer, that reason was hidden; in one class it is the class.
+
+  `Render\Overflows` is the report itself rather than an array on the renderer, because two
+  places write to it and because strictness is a fact about the report rather than about the
+  deck: the same measurement decides whether to clamp and say so, or to raise.
+
+  `Render\Writes` — the slide, the writer and the slide's number, which are the same for every
+  draw on a slide and were three parameters on every method here — and the title box, which is
+  the one shape this class does not place itself and the only question the renderer still had to
+  carry a `SlideGeometry` for.
+
+- **`rotate` turns a free shape about the middle of its own box**, on all twelve — the box
+  does not move and does not resize, so a rotated shape is still the box that was placed. A
+  `:::content` box is a shape, so it turns too, which is how a label is turned *with* the arrow
+  it sits on. Whole degrees only, because `a:xfrm rot` is in sixtieths of a degree and the
+  setter is an `int` and a fraction would be a `TypeError` rather than a rounded angle. Negative
+  and past a turn are wrapped to a single turn rather than refused: `rotate=-12` is a
+  counter-clockwise tilt, and wrapping is what bounds the number, since an unbounded one
+  overflows the multiplication into a `TypeError` on a deck nobody can act on. A full turn
+  writes no `rot` at all rather than `rot="0"`.
+
+  This is also what narrows one of the promises above: a free shape lies within the slide, but
+  that is a claim about its **box**, and a square turned forty-five degrees reaches past the
+  edge of the slide while its box stays inside it. What is checked is what the deck placed.
+
+- **`label` puts words inside one of the ten ink shapes, as one shape rather than two.**
+  `::arrow{label="Retention 94%"}` is a single `<p:sp>` carrying both the geometry and the
+  text, which is the native thing: double-click the arrow in PowerPoint and the cursor is in
+  the arrow, and dragging the arrow drags the words with it. It turns with the shape without a
+  second `rotate` to keep in step.
+
+  What it costs is everything a `:::content` box can do and this cannot. PHPPresentation writes
+  `<a:r><a:t>…</a:t></a:r>` with **no `a:rPr`**, so the words are drawn in `tx1` — the theme's
+  body text colour, which follows `dark:` — at whatever size that defaults to, centred on both
+  axes because `algn="ctr"` and `anchor="ctr"` are written into the element rather than read
+  from anything, and with no Markdown, so `**bold**` is six literal asterisks. The ink
+  contrasts with the **page**, not with the shape's own fill: a label is legible on a filled
+  shape in either theme, and what washes out is a fill close to the page's own tone.
+
+  So there are two ways to put words on a shape, and they answer different questions. `label`
+  is one object you can double-click and drag, with words you cannot style. `:::content` over
+  the shape is styled Markdown, and two objects that PowerPoint edits as two. A `label` is
+  refused on `::image`, which is a `p:pic` with no text body at all, and on `:::content`,
+  whose body is already its text — putting the same words in the same place twice is the
+  mistake both refusals are about.
+
+- **A placed picture is fitted to its box by the same call a picture in a column uses.**
+  `AbstractGraphic::setWidth()` re-derives the height from the picture's ratio and
+  `setHeight()` then re-derives the width from *that*, so placing with two calls compounds
+  the ratio: a 2:1 picture in a square box came back at twice the width. It is invisible for a
+  picture whose ratio happens to match its box, which is why only some pictures came out wrong
+  and a test on the rest would have passed. `fit=stretch` was never affected — it turns the
+  ratio off first — and `contain`, the default, was.
+
+- **`UnknownDirective::container()` and `::leaf()` now name the free shapes**, because
+  `::content` and `::rectangle` are the two names an author who has met this library is most
+  likely to reach for, and a refusal that does not mention them reads as a refusal of the
+  whole idea rather than of the spelling. Both messages also say what a placed text block
+  looks like, which is the one thing a `:::` line can be that is not a step region.
+
+- **`BlockTranslator::parse()` takes the theme**, and `SlideState` carries it. A free shape may
+  be written in the theme's colours, so `fill=panel` is a reference that needs the theme a deck
+  named — and an attribute nobody reads has to be refused before anything is built, which is
+  before there is a shape to hand a colour to.
+
+- **`SlideBlocks` carries a fourth list, the shapes the deck placed itself**, beside the
+  blocks and the columns. They are not blocks: a free shape is placed rather than laid out,
+  takes no column, and is not measured against the layout's box.
+
+- **`PresentationRenderer::overflows()` reports a `null` column** for a block that is in no
+  column, which today means a free text block. Saying `column 0` about one would be a number
+  in front of nothing.
 
 - **Public methods removed from `Render\SlideGeometry`, `Render\TextFrame` and
   `Render\ShapeWriter`.** All of them went because the behaviour they served went:
