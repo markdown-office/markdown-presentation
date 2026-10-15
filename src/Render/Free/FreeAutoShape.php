@@ -14,8 +14,14 @@ namespace MarkdownPresentation\Render\Free;
  */
 final class FreeAutoShape extends FreeShape
 {
-    public static function at(ShapeKind $kind, Placement $placement, int $step, Paint $paint, string $label): self
-    {
-        return new self($kind, $placement, $step, $paint, $label);
+    public static function at(
+        ShapeKind $kind,
+        Placement $placement,
+        int $step,
+        Paint $paint,
+        string $label,
+        ?Shadow $shadow,
+    ): self {
+        return new self($kind, $placement, $step, $paint, $label, $shadow);
     }
 }

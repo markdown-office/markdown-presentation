@@ -25,8 +25,9 @@ final class FreeText extends FreeShape
         Paint $paint,
         public readonly TextFrame $frame,
         public readonly TextStyle $style,
+        ?Shadow $shadow,
     ) {
-        parent::__construct($kind, $placement, $step, $paint, '');
+        parent::__construct($kind, $placement, $step, $paint, '', $shadow);
     }
 
     public static function at(
@@ -36,7 +37,8 @@ final class FreeText extends FreeShape
         Paint $paint,
         TextFrame $frame,
         TextStyle $style,
+        ?Shadow $shadow,
     ): self {
-        return new self($kind, $placement, $step, $paint, $frame, $style);
+        return new self($kind, $placement, $step, $paint, $frame, $style, $shadow);
     }
 }

@@ -29,8 +29,9 @@ final class FreePicture extends FreeShape
         Paint $paint,
         public readonly Image $image,
         public readonly string $fit,
+        ?Shadow $shadow,
     ) {
-        parent::__construct($kind, $placement, $step, $paint, '');
+        parent::__construct($kind, $placement, $step, $paint, '', $shadow);
     }
 
     public static function at(
@@ -40,7 +41,8 @@ final class FreePicture extends FreeShape
         Paint $paint,
         Image $image,
         string $fit,
+        ?Shadow $shadow,
     ): self {
-        return new self($kind, $placement, $step, $paint, $image, $fit);
+        return new self($kind, $placement, $step, $paint, $image, $fit, $shadow);
     }
 }

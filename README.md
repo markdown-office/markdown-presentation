@@ -1039,6 +1039,7 @@ An unrecognised name is refused, never quietly black.
 | `label` | the ten ink shapes | the shape's own text — see [Text inside a shape](#text-inside-a-shape) |
 | `src`, `alt`, `fit` | `::image` | |
 | `color`, `font-size`, `font-family`, `align`, `vertical-align`, `padding` | `::content` only | |
+| `shadow-color`, `shadow-distance`, `shadow-blur`, `shadow-direction`, `shadow-alpha` | all twelve | see [A shadow](#a-shadow) |
 
 `fit` is `contain` (keep the ratio, fit inside, centred) or `stretch` (take the box exactly).
 `fit=cover` is refused by name: it is a crop rather than a fit, PHPPresentation writes a picture
@@ -1118,6 +1119,39 @@ A `label` is refused on `::image`, which is a `p:pic` with no text body at all, 
 `:::content`, whose body is already its text — putting the same words in the same place twice is
 the mistake both refusals are about.
 
+#### A shadow
+
+Five attributes, on all twelve directives:
+
+| Attribute | | |
+| --- | --- | --- |
+| `shadow-color` | one of the four role names, a theme slot, or hex | `ink` where the deck names none |
+| `shadow-distance` | pixels, never negative | `0` — an offset with no blur is a hard edge |
+| `shadow-blur` | pixels, never negative | `0` |
+| `shadow-direction` | whole degrees, clockwise from the right | `90` — straight down |
+| `shadow-alpha` | 0–100 | `100` |
+
+```markdown
+::hexagon{fill=lt2 shadow-distance=12 shadow-blur=6 shadow-direction=45 shadow-alpha=50}
+```
+
+**Distance and blur are pixels, not points.** A shadow is a size on the slide and the slide is
+measured in pixels, which is the rule the rest of this page states for a position and a size.
+PowerPoint's own UI offers shadow size in points, so this is a deliberate departure from it
+rather than an oversight.
+
+**Direction is degrees** and is wrapped the way `rotate` is: `shadow-direction=360` and
+`shadow-direction=0` are the same, and `-90` is `270`. There is no x/y pair to place a shadow
+with, so an angle is the only way to put one off-axis.
+
+**One attribute is enough.** `shadow-blur=4` on its own is a shadow, and a shape that names none
+of the five is written with no `<a:effectLst>` at all rather than with one that says the shape
+has no shadow.
+
+A shadow is on the shape, not on the words inside it: a `label` takes the shadow of the shape it
+sits in, and a `:::content` block casts one from its own border. `::image` casts one too — a
+`p:pic` carries an effect list of its own.
+
 #### What is refused, and how it reads
 
 An attribute a directive does not read is refused rather than ignored, and that is the whole of
@@ -1160,7 +1194,7 @@ Slide 1 gives "rectangle" a fill of "chartreuse". A colour is none, page, ink, s
 
 Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
 
-Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, rotate, src, top, width.
+Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.
 ```
 
 Two things are **not** offered and are refused rather than approximated: a dashed outline,

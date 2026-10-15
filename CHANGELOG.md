@@ -8,6 +8,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A shadow on every free shape.** Five attributes — `shadow-color`, `shadow-distance`,
+  `shadow-blur`, `shadow-direction` and `shadow-alpha` — on all twelve directives, written as
+  `<a:effectLst>`. Distance and blur are **pixels**, not points: a shadow is a size on the slide
+  and the slide is measured in pixels, which is what PHPPresentation takes and so nothing is
+  converted. The direction is degrees and is wrapped the way `rotate` is, because there is no
+  x/y pair to place a shadow with and an angle is the only way to put one off-axis.
+
+  One attribute is enough, and a shape that names none of the five is written with no effect
+  list at all rather than with one that says the shape has no shadow. A `label` takes the
+  shadow of the shape it sits in, `:::content` casts one from its own border, and `::image`
+  casts one because a `p:pic` carries an effect list of its own.
+
+  `examples/markdown/14-shadows.md` is five shadow types on five kinds of object.
+
 - **A `pitch` theme, and an example deck built out of free shapes.**
   Near-black and a gold on white with one blue for anything a reader is meant to act on — the
   palette a proposal wants and a template rarely has. `examples/markdown/13-placed-deck.md` is a

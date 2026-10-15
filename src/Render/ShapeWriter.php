@@ -513,6 +513,11 @@ final class ShapeWriter
             default => $this->autoshape($slide, $shape),
         };
 
+        // Applied here rather than in each of the three, because it is the one thing all three
+        // take the same way and a shadow written in three places is a shadow that three of them
+        // can disagree about.
+        $shape->shadow?->apply($written);
+
         return $written->setName($shape->name());
     }
 
