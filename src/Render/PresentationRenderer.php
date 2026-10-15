@@ -248,7 +248,6 @@ final class PresentationRenderer
                 $roles[$slide->index()],
                 $layouts,
                 $writer,
-                $geometry,
                 $shapes,
                 $blocks[$slide->index()],
             );
@@ -512,17 +511,17 @@ final class PresentationRenderer
         LayoutRole $role,
         array $layouts,
         ShapeWriter $writer,
-        SlideGeometry $geometry,
         SlideShapes $shapes,
         SlideBlocks $content,
     ): array {
-        $title = $geometry->title($role);
-        $level = $source->frontmatterValue('level');
+        $level = $this->depth($source->frontmatterValue('level'), $source->index() + 1);
+        $title = $shapes->title($role, $level);
+
         $content = $this->underTitle(
             $content,
             $source,
             $title !== null,
-            $this->depth($level, $source->index() + 1),
+            $level,
         );
 
         $slide = $presentation->createSlide();
@@ -538,13 +537,11 @@ final class PresentationRenderer
         $next = self::FIRST_SHAPE_ID;
 
         if ($title !== null && $source->title() !== null) {
-            $size = $this->depth($level, $source->index() + 1);
-
             $writer->title(
                 $slide,
                 $this->blocks->inline()->runsIn($source->title()),
                 $title['box'],
-                $size === null ? $title['size'] : $geometry->titleSize($title['size'], $size),
+                $title['size'],
                 $title['alignment'],
             );
 

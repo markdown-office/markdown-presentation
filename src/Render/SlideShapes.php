@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Exception\UnsupportedColumn;
-use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
 use MarkdownPresentation\Render\Block\Image;
@@ -18,6 +17,25 @@ use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Theme\LayoutRole;
 use PhpOffice\PhpPresentation\Slide as WrittenSlide;
+
+/**
+ * Where a slide is being written, and by whom.
+ *
+ * The three things every draw on one slide needs and none of them vary within it. They are an
+ * object rather than three parameters on every method here, which is what kept
+ * {@see SlideShapes::column()} over the parameter ceiling for a week before it was noticed.
+ *
+ * @internal
+ */
+final class Writes
+{
+    public function __construct(
+        public readonly WrittenSlide $slide,
+        public readonly ShapeWriter $writer,
+        public readonly int $number,
+    ) {
+    }
+}
 
 /**
  * Every shape on one slide, in the order they go down the screen, and the step each is on.
@@ -42,6 +60,32 @@ final class SlideShapes
     }
 
     /**
+     * The title box of a role, and the size its type is drawn at, which is the only one this
+     * class does not place itself.
+     *
+     * Asked of the geometry through here rather than the renderer reaching into it, because a
+     * caller should not have to carry a geometry *and* the thing that uses it — and because
+     * `$level` is a question about this box: it is the frontmatter's `level:` read as a title
+     * size rather than as a heading.
+     *
+     * @param ?int $level The depth `level:` named, or null where it named none.
+     *
+     * @return ?array{box: Box, size: int, alignment: string}
+     */
+    public function title(LayoutRole $role, ?int $level): ?array
+    {
+        $title = $this->geometry->title($role);
+
+        if ($title === null || $level === null) {
+            return $title;
+        }
+
+        $title['size'] = $level <= 1 ? $title['size'] : $this->geometry->headingSize($level - 1);
+
+        return $title;
+    }
+
+    /**
      * @param int $first The id the first shape takes, which is one past the title where there is
      *                    one — see {@see PresentationRenderer::render()} for where that comes
      *                    from.
@@ -59,19 +103,20 @@ final class SlideShapes
         int $first,
     ): array {
         $steps = [];
+        $writes = new Writes($slide, $writer, $number);
         $next = $first;
 
         foreach ($content->shapes() as $shape) {
             if ($shape->isBack()) {
-                $steps[$next++] = $this->placed($slide, $shape, $writer, $number);
+                $steps[$next++] = $this->placed($shape, $writes);
             }
         }
 
-        $next = $this->stacked($slide, $content, $role, $writer, $number, $next, $steps);
+        $next = $this->stacked($content, $role, $writes, $steps, $next);
 
         foreach ($content->shapes() as $shape) {
             if (!$shape->isBack()) {
-                $steps[$next++] = $this->placed($slide, $shape, $writer, $number);
+                $steps[$next++] = $this->placed($shape, $writes);
             }
         }
 
@@ -86,28 +131,27 @@ final class SlideShapes
      * paragraph spacing rather than room taken out of the column between two boxes.
      *
      * `$steps` is added to rather than returned, because the ids of the two placed layers run
-     * straight through it and returning a partial map to be merged would be the same fact
-     * twice.
+     * straight through it and returning a partial map to be merged would be the same fact twice.
      *
      * @param array<int, int> $steps Grown by this pass.
+     *
+     * @return int The id the next shape takes.
      *
      * @throws UnsupportedColumn
      */
     private function stacked(
-        WrittenSlide $slide,
         SlideBlocks $content,
         LayoutRole $role,
-        ShapeWriter $writer,
-        int $number,
-        int $first,
+        Writes $writes,
         array &$steps,
+        int $first,
     ): int {
         $blocks = $content->blocks();
-        $columns = $this->columns($content, $role, $number);
+        $columns = $this->columns($content, $role, $writes->number);
         $next = $first;
 
         foreach ($this->geometry->body($role) as $column => $box) {
-            $next = $this->column($slide, $writer, $number, $column, $box, $blocks, $columns, $steps, $next);
+            $next = $this->column($column, $box, $blocks, $columns, $writes, $steps, $next);
         }
 
         return $next;
@@ -123,13 +167,11 @@ final class SlideShapes
      * @return int The id the next shape takes.
      */
     private function column(
-        WrittenSlide $slide,
-        ShapeWriter $writer,
-        int $number,
         int $column,
         Box $box,
         array $blocks,
         array $columns,
+        Writes $writes,
         array &$steps,
         int $first,
     ): int {
@@ -152,14 +194,19 @@ final class SlideShapes
             // allows rather than over whatever is under it.
             $y = min($y, $bottom - SlideGeometry::MIN_SIZE);
             $room = max(0, $bottom - $y);
-            $wanted = $writer->height($drawable, $box, $room);
+            $wanted = $writes->writer->height($drawable, $box, $room);
             $height = max(min($wanted, $room), SlideGeometry::MIN_SIZE);
 
             if ($height < $wanted) {
-                $this->overflows->record($number, $step, $column, $drawable->name(), $wanted, $room);
+                $this->overflows->record($writes->number, $step, $column, $drawable->name(), $wanted, $room);
             }
 
-            $writer->write($slide, $drawable, new Box($box->x, $y, $box->width, $height), $height);
+            $writes->writer->write(
+                $writes->slide,
+                $drawable,
+                new Box($box->x, $y, $box->width, $height),
+                $height,
+            );
             $steps[$next++] = $step;
 
             // The air between two shapes is the air between the two blocks at the seam, which is
@@ -181,22 +228,22 @@ final class SlideShapes
      * Only a text block is measured: the other two are exactly the box the deck gave them, and a
      * picture's own ratio is what {@see ShapeWriter} fits it to.
      */
-    private function placed(WrittenSlide $slide, FreeShape $shape, ShapeWriter $writer, int $number): int
+    private function placed(FreeShape $shape, Writes $writes): int
     {
         $box = $shape->placement->box;
         $height = $box->height;
 
         if ($shape instanceof FreeText) {
-            $wanted = $writer->sized($shape->frame, $box, $box->height, $shape->style->size);
+            $wanted = $writes->writer->sized($shape->frame, $box, $box->height, $shape->style->size);
 
             if ($wanted > $height) {
-                $this->overflows->record($number, $shape->step, null, $shape->name(), $wanted, $height);
+                $this->overflows->record($writes->number, $shape->step, null, $shape->name(), $wanted, $height);
             }
 
             $height = max(min($wanted, $height), SlideGeometry::MIN_SIZE);
         }
 
-        $writer->free($slide, $shape, $box, $height);
+        $writes->writer->free($writes->slide, $shape, $box, $height);
 
         return $shape->step;
     }

@@ -92,6 +92,11 @@ All notable changes to this project are documented here. The format follows
   places write to it and because strictness is a fact about the report rather than about the
   deck: the same measurement decides whether to clamp and say so, or to raise.
 
+  `Render\Writes` — the slide, the writer and the slide's number, which are the same for every
+  draw on a slide and were three parameters on every method here — and the title box, which is
+  the one shape this class does not place itself and the only question the renderer still had to
+  carry a `SlideGeometry` for.
+
 - **`rotate` turns a free shape about the middle of its own box**, on all twelve — the box
   does not move and does not resize, so a rotated shape is still the box that was placed. A
   `:::content` box is a shape, so it turns too, which is how a label is turned *with* the arrow
