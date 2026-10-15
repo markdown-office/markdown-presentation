@@ -22,19 +22,20 @@ use MarkdownPresentation\Tests\Support\Scratch;
  *   over whatever was under it — **without appearing in `overflows()` at all**, which is the
  *   one outcome this library states it will not produce.
  *
- * Every height here is read back out of the written file rather than asked of the renderer,
- * because the number under test is the one a reader ends up looking at and the renderer's own
- * opinion of it is the thing that was wrong. The insets themselves were always right —
- * `tests/Unit/free-shapes.php` pins that half — and this is about the other half.
+ * The height asserted here is the one the renderer *measured*, read out of an overflow
+ * report, and never the height of the shape that was written: a placed text block is now
+ * drawn at the box the deck declared rather than shrunk to its text, so the drawn height
+ * says what the deck asked for and not what the text needed. The insets themselves were
+ * always right — `tests/Unit/free-shapes.php` pins that half — and this is about the other.
  */
 
 /**
- * The drawn height of one placed text block in pixels, and whether it was reported as not
- * fitting.
+ * What the renderer measured for one placed text block, in pixels, or null when it fitted.
  *
- * @return array{0: int, 1: bool}
+ * The box is deliberately short enough that the text overflows it, which is what puts the
+ * measured height in the report where a test can read it.
  */
-function placedText(string $attributes, string $text, int $height): array
+function wantedHeight(string $attributes, string $text, int $height = 40): ?int
 {
     $path = Scratch::file('padding.pptx', '');
 
@@ -49,11 +50,28 @@ function placedText(string $attributes, string $text, int $height): array
         $path,
     );
 
+    return $renderer->overflows()[0]['wanted'] ?? null;
+}
+
+/** The drawn height of one placed text block, in pixels, read back out of the written file. */
+function drawnHeight(string $attributes, string $text, int $height): int
+{
+    $path = Scratch::file('padding.pptx', '');
+
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse(sprintf(
+            "---\nlayout: blank\n---\n\n:::content{left=10 top=0 %s height=%d font-size=14}\n%s\n:::\n",
+            $attributes,
+            $height,
+            $text,
+        )),
+        $path,
+    );
+
     preg_match('#<a:ext cx="\d+" cy="(\d+)"#', Pptx::open($path)->part('ppt/slides/slide1.xml'), $extension);
 
-    // EMU per pixel: 9525. Rounded the way the renderer rounds a box, so the assertion is
-    // about the layout rather than about the conversion.
-    return [(int) round(((int) ($extension[1] ?? 0)) / 9525), $renderer->overflows() !== []];
+    // EMU per pixel: 9525.
+    return (int) round(((int) ($extension[1] ?? 0)) / 9525);
 }
 
 /**
@@ -84,37 +102,31 @@ function shortBody(): string
 
 it('measures a padding=0 block in the whole box rather than twenty pixels less', function () {
     // Both boxes leave 300px for the text: one because it has no padding and is 320 wide, one
-    // because it asks for none and is 300 wide. They have to come out the same height, and
-    // shorter than the 280px column the default inset leaves a 300px box.
-    [$padded] = placedText('width=300 padding=0', straddling(), 520);
-    [$inset] = placedText('width=320', straddling(), 520);
-
-    expect($padded)->toBe($inset)
-        ->and($padded)->toBeLessThan(placedText('width=300', straddling(), 520)[0]);
+    // because it asks for none and is 300 wide. They have to measure the same, and less than
+    // the 280px column the default inset leaves a 300px box.
+    expect(wantedHeight('width=300 padding=0', straddling()))
+        ->toBe(wantedHeight('width=320', straddling()))
+        ->toBeLessThan(wantedHeight('width=300', straddling()));
 });
 
 it('measures a wide padding in the width the padding leaves', function () {
     // 300 less 120 is 180, which is narrow enough for the same words to need a second line
     // that the 280px default column did not.
-    expect(placedText('width=300 padding=60', shortBody(), 520)[0])
-        ->toBeGreaterThan(placedText('width=300 padding=0', shortBody(), 520)[0]);
+    expect(wantedHeight('width=300 padding=60', shortBody()))
+        ->toBeGreaterThan(wantedHeight('width=300 padding=0', shortBody()));
 });
 
 it('reports a block that a wide padding pushes past its box', function () {
     // The box is tall enough for the height the default inset measures and not tall enough
     // for the height this padding produces. Unfixed, nothing is reported and the text is
     // drawn over whatever is below it.
-    [, $reported] = placedText('width=300 padding=60', shortBody(), 50);
-
-    expect($reported)->toBeTrue();
+    expect(wantedHeight('width=300 padding=60', shortBody(), 50))->not->toBeNull()
+        ->and(wantedHeight('width=300 padding=0', shortBody(), 50))->toBeNull();
 });
 
 it('reports a box narrower than its own padding rather than measuring a column', function () {
     // 60 wide with 60 of padding leaves nothing, which is not a one-pixel column to lay text
     // out in. The measurement clamped the difference to a pixel and the word-breaking loop
     // then counted one line per pixel of text.
-    [$height, $reported] = placedText('width=60 padding=60', 'Wanderung', 200);
-
-    expect($reported)->toBeTrue()
-        ->and($height)->toBeGreaterThan(0);
+    expect(wantedHeight('width=60 padding=60', 'Wanderung', 200))->not->toBeNull();
 });
