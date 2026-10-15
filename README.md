@@ -1656,8 +1656,8 @@ The tools that come with the library are in `tools/`:
 | `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: nothing in the test suite needs it, because CI has no PowerPoint |
 | `tools/build-powerpoint-fixtures.sh` | Rebuilds the two decks in `tests/fixtures/powerpoint/`, which were authored in PowerPoint rather than written by hand |
 
-Four themes ship with the library, and they are four different decks rather than one deck in
-four swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
+Five themes ship with the library, and they are five different decks rather than one deck in
+five swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
 which is the file on disk:
 
 ```yaml path=themes/corporate-dark/theme.yml
@@ -1805,8 +1805,8 @@ try {
 ```
 
 ```text
-corporate-dark, default, dense, minimal
-There is no theme named "corprate-dark". Available: corporate-dark, default, dense, minimal.
+corporate-dark, default, dense, minimal, pitch
+There is no theme named "corprate-dark". Available: corporate-dark, default, dense, minimal, pitch.
 ```
 
 Falling back to the default theme instead would produce a deck in the wrong colours

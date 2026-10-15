@@ -29,6 +29,19 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `10-rejected.md` | **nothing** | Conditional content the way Slidev writes it |
 | `11-type-scale.md` | two files | The same slides in `default` and in `dense`, the one theme whose whole scale is smaller at once — body, title, margins, gutter, block gap and rule. The table and the code block are twelve points in both, because those two sizes are the library's, which is what leaves them to read the two pages against |
 | `12-free-shapes.md` | `12-free-shapes.pptx` | Shapes placed by the deck rather than by the layout: a panel behind the text, a badge and a chevron, tilted arrows whose labels turn with them, text blocks in boxes of their own, a circle and an ellipse sharing a centre, and all ten ink shapes with a picture on one page |
+| `13-placed-deck.md` | `13-placed-deck.pptx` | A whole business pitch built out of free shapes and nothing else — a dark cover and a dark sign-off, an agenda of numbered circles, a card grid, a hand-built pricing table with zebra rows and a right-aligned column, a four-pillar comparison, a quarterly roadmap with arrows between phases, and translucent decoration over both dark slides. The company is invented |
+
+## The deck that is not anybody's business
+
+`13-placed-deck.md` exists because a real pitch deck was rebuilt from another tool to find out
+what this library could not do, and that deck is nobody's to publish. It is a fictional bicycle
+frame maker rather than a redacted version of the original: the structure is what carries the
+lesson, and a deck full of placeholders would teach the layout nothing that a deck with a real
+argument does not.
+
+Rebuilding it is what turned up both defects in [PR #11](https://github.com/markdown-office/markdown-presentation/pull/11)
+— `padding` written but never measured, and a placed text block shrunk to its own text so
+`vertical-align` had nothing to align against.
 
 ## The one that is not built
 
