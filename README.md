@@ -1095,6 +1095,7 @@ What it costs, and it is a real cost:
 | **No type control** | PHPPresentation writes `<a:r><a:t>…</a:t></a:r>` with **no `a:rPr`** — no size, no face, no colour, and no attribute here that reaches one |
 | **Centred, both ways** | `algn="ctr"` and `anchor="ctr"` are written into the element rather than read from anything |
 | **One ink** | `tx1`, the theme's body text colour. It follows `dark:`, so a label is legible on a filled shape in either theme — what it has no contrast against is the shape's *own fill* where that is close to the page's, and a pale fill on a dark theme is the case that washes out |
+| **Centred in the box** | not in the shape's visual mass, so on an asymmetric one — `::arrow` above all — the words read as pushed towards the tail |
 
 `:::content` over the shape is the other way, and it is what the label is for when any of that
 matters — Markdown, `**bold**`, a [link](#links), `color`, `font-size`, `font-family`, `align`,
