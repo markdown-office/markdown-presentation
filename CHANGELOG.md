@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A `pitch` theme, and an example deck built entirely out of free shapes.**
+  Near-black and a gold on white with one blue for anything a reader is meant to act on — the
+  palette a proposal or a pitch wants and a template rarely has. `examples/markdown/13-placed-deck.md`
+  is nine slides of a fictional bicycle frame maker built with nothing but the twelve
+  directives: a dark cover and a dark sign-off over a full-bleed `layer=back` rectangle, an
+  agenda of numbered circles, a card grid, a hand-built pricing table with zebra rows and a
+  right-aligned column, a four-pillar comparison, and a quarterly roadmap with arrows between
+  phases. It is the first example whose whole subject is free placement, and the company in it
+  is invented.
+
 - **Twelve directives that place a shape themselves, so one slide can be styled freely.**
   `::rectangle`, `::roundrect`, `::ellipse`, `::circle`, `::triangle`, `::diamond`,
   `::chevron`, `::hexagon`, `::arrow`, `::line`, `::image` and `:::content` … `:::` are
