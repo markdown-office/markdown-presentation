@@ -67,6 +67,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The package is now `markdown-office/markdown-presentation`.** The repository moved into the
+  `markdown-office` organisation, and every other package in the suite is already named for it —
+  `markdown-office/markdown-word`, `markdown-office/commonmark-generic-directives`. A Composer
+  name is not derived from a repository, so it does not move on its own, and a name left behind
+  under the old vendor is the one entry in the suite that does not say where it lives.
+
+  ```sh
+  composer require markdown-office/markdown-presentation
+  ```
+
+  Nothing has to be aliased and nothing has to keep working: the old name was never on Packagist,
+  so there is no release under it and no consumer to migrate. The only line that changes is the
+  one in your `composer.json`.
+
 - **The free-shape reading moved out of `BlockTranslator`, and a shape is no longer read by
   the thing that reads blocks.** A free shape is not a block — it takes no column, is not
   measured against the layout's box, and there is nothing for a walk to walk over — so

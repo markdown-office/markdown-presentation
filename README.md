@@ -26,7 +26,7 @@ foreach ($deck->slides() as $slide) {
 ## Installation
 
 ```sh
-composer require markdown-presentation/markdown-presentation
+composer require markdown-office/markdown-presentation
 ```
 
 PHP 8.2 or newer, `symfony/yaml` and `phpoffice/phppresentation` as hard dependencies: the
