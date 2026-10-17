@@ -310,6 +310,18 @@ it('does not claim again what the code does not do', function (string $claim) {
     // A deck asking for it must be told, not given something else — so a page may not claim a
     // free picture fills its box and loses its edges.
     'a free picture fills its box and loses its edges' => 'fills the box and crops',
+    // A theme's own comment claimed its palette made "eleven slides" agree, and the deck using
+    // it has nine. A count in prose about a file that changes is wrong the moment the file does,
+    // and nothing reads prose to say so — which is why the phrase is barred rather than fixed.
+    'a theme comment counts the slides that use it' => 'slides that agree',
+    // A shadow colour read through the same path as a fill, where `none` means "do not draw
+    // this" — and a shadow has nowhere to record an absent colour, so the null was answered
+    // with black and the word "transparent" produced a fully opaque shadow.
+    'a shadow colour reads none the way a fill does' => 'none and transparent both mean no shadow',
+    'a shadow colour may be none' => 'a shadow colour reads none the way a fill does',
+    // A shadow distance was written as `dist="8.785261865104174e+22"`, because PHPPresentation
+    // converts pixels to EMU in a float and PHP prints a large one in scientific notation.
+    'a shadow distance is unbounded' => 'however far or wide a deck asks',
     // A free picture was placed with `setWidth()` and `setHeight()`, which each re-derive the
     // other from the ratio, so a 2:1 picture in a square box came back at twice the width. It
     // is right for a picture whose ratio matches its box, so a page may not claim the box is

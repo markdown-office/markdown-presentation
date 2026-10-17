@@ -98,6 +98,10 @@ final class ShapeReader
         DirectiveAttributes $attributes,
         SlideState $state,
     ): FreeShape {
+        // Read before the branch, because every one of the twelve draws a box and can cast one,
+        // and `::image` is no exception: a `p:pic` carries an effect list of its own.
+        $shadow = Shadow::read($state->slide, $kind->value, $attributes, $state->theme);
+
         if ($kind === ShapeKind::Image) {
             return FreePicture::at(
                 $kind,
@@ -106,6 +110,7 @@ final class ShapeReader
                 Paint::none(),
                 $this->picture($attributes, $state),
                 Pictures::fit($state->slide, $kind->value, $attributes),
+                $shadow,
             );
         }
 
@@ -119,6 +124,7 @@ final class ShapeReader
                 $paint,
                 $this->frame($node, $state),
                 TextStyle::read($state->slide, $kind->value, $attributes, $state->theme),
+                $shadow,
             );
         }
 
@@ -128,6 +134,7 @@ final class ShapeReader
             $state->step,
             $paint,
             Length::written($state->slide, $kind->value, 'label', $attributes, ''),
+            $shadow,
         );
     }
 

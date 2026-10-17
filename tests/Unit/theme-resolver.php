@@ -159,7 +159,7 @@ it('says a path that is not there is not there, without listing the names', func
 it('finds the themes that ship with the library by default', function () {
     $resolver = new ThemeResolver(ThemeDirectory::create([], 'working'));
 
-    expect($resolver->available())->toBe(['corporate-dark', 'default', 'dense', 'minimal'])
+    expect($resolver->available())->toBe(['corporate-dark', 'default', 'dense', 'minimal', 'pitch'])
         ->and($resolver->resolve('default')->theme()->name())->toBe('Default')
         ->and($resolver->resolve('corporate-dark')->theme()->colour('accent1'))->toBe('#89B4FA');
 });

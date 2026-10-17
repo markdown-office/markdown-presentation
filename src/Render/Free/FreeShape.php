@@ -33,6 +33,7 @@ abstract class FreeShape
     /**
      * @param string $label The shape's own text, or '' for none. See
      *                      {@see \MarkdownPresentation\Render\Free\ShapeKind::attributes()}.
+     * @param Shadow $shadow The shadow, or null where the deck named none.
      */
     protected function __construct(
         public readonly ShapeKind $kind,
@@ -40,6 +41,7 @@ abstract class FreeShape
         public readonly int $step,
         public readonly Paint $paint,
         public readonly string $label,
+        public readonly ?Shadow $shadow,
     ) {
     }
 

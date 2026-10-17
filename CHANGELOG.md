@@ -8,6 +8,33 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A shadow on every free shape.** Five attributes — `shadow-color`, `shadow-distance`,
+  `shadow-blur`, `shadow-direction` and `shadow-alpha` — on all twelve directives, written as
+  `<a:effectLst>`. Distance and blur are **pixels**, not points: a shadow is a size on the slide
+  and the slide is measured in pixels, which is what PHPPresentation takes and so nothing is
+  converted. The direction is degrees and is wrapped the way `rotate` is, because there is no
+  x/y pair to place a shadow with and an angle is the only way to put one off-axis.
+
+  One attribute is enough, and a shape that names none of the five is written with no effect
+  list at all rather than with one that says the shape has no shadow. A `label` takes the
+  shadow of the shape it sits in, `:::content` casts one from its own border, and `::image`
+  casts one because a `p:pic` carries an effect list of its own.
+
+  `examples/markdown/14-shadows.md` is five shadow types on five kinds of object.
+
+  Every claim the gallery makes about that deck and about `13-placed-deck.md` is now checked
+  against a real conversion, which is what `tests/Readme/examples-decks.php` exists to do and
+  what it was not doing for either of them.
+
+- **A `pitch` theme, and an example deck built out of free shapes.**
+  Near-black and a gold on white with one blue for anything a reader is meant to act on — the
+  palette a proposal wants and a template rarely has. `examples/markdown/13-placed-deck.md` is a
+  fictional bicycle frame maker positioned entirely by the deck: a dark cover and a dark sign-off
+  over a full-bleed `layer=back` rectangle, an agenda of numbered circles, a card grid, a pricing
+  table built row by row, a four-pillar comparison and a quarterly roadmap. It is the first
+  example whose subject is free placement rather than the vocabulary, and the company is invented
+  because the deck it was rebuilt from was nobody's to publish.
+
 - **Twelve directives that place a shape themselves, so one slide can be styled freely.**
   `::rectangle`, `::roundrect`, `::ellipse`, `::circle`, `::triangle`, `::diamond`,
   `::chevron`, `::hexagon`, `::arrow`, `::line`, `::image` and `:::content` … `:::` are
@@ -66,6 +93,20 @@ All notable changes to this project are documented here. The format follows
   theme's `headings` scale says.
 
 ### Changed
+
+- **The package is now `markdown-office/markdown-presentation`.** The repository moved into the
+  `markdown-office` organisation, and every other package in the suite is already named for it —
+  `markdown-office/markdown-word`, `markdown-office/commonmark-generic-directives`. A Composer
+  name is not derived from a repository, so it does not move on its own, and a name left behind
+  under the old vendor is the one entry in the suite that does not say where it lives.
+
+  ```sh
+  composer require markdown-office/markdown-presentation
+  ```
+
+  Nothing has to be aliased and nothing has to keep working: the old name was never on Packagist,
+  so there is no release under it and no consumer to migrate. The only line that changes is the
+  one in your `composer.json`.
 
 - **The free-shape reading moved out of `BlockTranslator`, and a shape is no longer read by
   the thing that reads blocks.** A free shape is not a block — it takes no column, is not
@@ -455,6 +496,64 @@ All notable changes to this project are documented here. The format follows
   on — each asserted where it is decided.
 
 ### Fixed
+
+- **A shadow drawn for the word "transparent" was an opaque black one.** `shadow-color` read
+  through the same `Colour::read()` that answers `fill` and `stroke`, where `none` and
+  `transparent` mean *do not draw this*. A shadow has nowhere to record an absent colour —
+  DrawingML draws an outer shadow as a coloured copy of the shape — so the null was answered
+  with a default and `shadow-color=transparent` came out as
+  `<a:srgbClr val="000000"><a:alpha val="100000"/>`: the most opaque shadow the format allows,
+  requested by spelling the opposite. Both are now refused by name, and the refusal says how to
+  say what was meant: leave off every shadow attribute. The two spellings live in one place,
+  `Colour::isNone()`, because a caller that has to recognise them and a caller that has to
+  answer for them are two lists that drift.
+
+- **An unbounded `shadow-distance` or `shadow-blur` was written as a fraction of an EMU
+  coordinate.** PHPPresentation converts pixels to EMU with a **float** multiply, so a large
+  value arrives at the writer as a float and PHP prints it as `9.525E+14` —
+  `shadow-distance=99999999999999999999` came out as `dist="8.785261865104174e+22"`, which
+  `ST_PositiveCoordinate` cannot hold. PowerPoint opens the file; a schema-validating consumer,
+  Keynote, Google Slides or a server-side renderer is not obliged to. A distance and a blur are
+  now refused past the slide's width plus its height, which is where the switch to scientific
+  notation is four orders of magnitude away, and where nothing a deck author can see is left
+  unreachable.
+
+- **A placed text block was shrunk to its own text, so `vertical-align` had nothing to align
+  against.** `height=48 vertical-align=middle` was written at the 23px that one line at 14pt
+  takes, anchored centre — so the text centred in 23px sitting at the top of a 48px space and
+  rode high by `(48 − 23) / 2`. Measured on the deck that found it, every centred box was off
+  by between 8 and 13.5 pixels, always upwards, and the box in the file was not the box the
+  deck wrote.
+
+  This is also why the composable way to put words on a shape did not work: draw the shape,
+  put a `:::content` box over it with the same alignment, and the box would not stay where it
+  was put. A deck places a box and aligns text inside it, so the box is now the one it
+  declared, and only an overflow takes the room away — which is reported when it happens, as
+  before.
+
+  Found by rebuilding an existing deck in Markdown, which is the first thing this library has
+  been asked to reproduce from another tool and a deck it had never been given.
+
+- **`padding` on a placed text block was written into the file but never measured.** The inset
+  reaches the shape through `ShapeWriter::freeText()` and did not reach
+  `ShapeWriter::textWidth()`, which subtracted the default inset whatever the deck had asked
+  for — so the width the text was measured in and the width it is drawn in were two different
+  numbers, in both directions and neither visible from the deck:
+
+  - a `padding` below the default was measured **wider** than it is drawn, so blocks were
+    over-estimated, clamped to a box they fit, and reported as not fitting when they did; and
+  - a `padding` above it was measured **narrower**, so the box was not grown and the text ran
+    over whatever was under it — **without appearing in `overflows()` at all**.
+
+  The second is the one this library states it will not produce. A `:::content{padding=40}`
+  box on a slide with a rule beneath it drew its last line straight through the rule and off
+  the bottom of the slide while the report said the deck was fine.
+
+  A third case fell out of the same line: a box narrower than twenty pixels had its available
+  width clamped up to one pixel, and `TextMetric`'s word-breaking loop counts one line per
+  pixel of text, so a single `W` set at 24 points measured as **23 lines**. The clamp is now
+  at zero, which leaves a box with no room in it to be reported as not fitting — the truth for
+  a box narrower than its own padding.
 
 - **A small SVG could take gigabytes to refuse.** The ceiling on a picture is on the pixels,
   and for a vector those pixels were allocated before anything asked whether they were allowed:

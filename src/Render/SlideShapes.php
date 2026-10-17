@@ -234,13 +234,29 @@ final class SlideShapes
         $height = $box->height;
 
         if ($shape instanceof FreeText) {
-            $wanted = $writes->writer->sized($shape->frame, $box, $box->height, $shape->style->size);
+            // The padding is passed because the height is measured in the width the text is
+            // drawn in, and {@see \MarkdownPresentation\Render\ShapeWriter::freeText()} is what
+            // writes that inset. Measuring against the default instead is what made a wide
+            // `padding` report a block as fitting when PowerPoint wraps it past its box.
+            $wanted = $writes->writer->sized(
+                $shape->frame,
+                $box,
+                $box->height,
+                $shape->style->size,
+                $shape->style->padding,
+            );
 
             if ($wanted > $height) {
                 $this->overflows->record($writes->number, $shape->step, null, $shape->name(), $wanted, $height);
             }
 
-            $height = max(min($wanted, $height), SlideGeometry::MIN_SIZE);
+            // The declared height, not the measured one. Shrinking the box to its text made
+            // `vertical-align` meaningless: `height=48 vertical-align=middle` was written at
+            // the 23px the text needed, anchored centre in 23px sitting at the top of a 48px
+            // space — so the text rode high by (48 − 23) / 2, and the box the deck named was
+            // not the box in the file. A deck places a box and aligns text inside it, so the
+            // box is the one it declared and only an overflow may take the room away.
+            $height = $wanted > $height ? max($height, SlideGeometry::MIN_SIZE) : $box->height;
         }
 
         $writes->writer->free($writes->slide, $shape, $box, $height);

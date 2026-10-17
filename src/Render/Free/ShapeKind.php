@@ -46,6 +46,21 @@ enum ShapeKind: string
     /** What a shape is painted with. */
     private const PAINT = ['fill', 'alpha', 'stroke', 'stroke-width'];
 
+    /**
+     * The shadow a shape is drawn with, where the shape is a box to cast one.
+     *
+     * On every directive that draws a box, which is all twelve: a label lives inside an ink
+     * shape and so takes the shape's shadow, and a picture is a `p:pic` with an effect list of
+     * its own. Five attributes rather than one shorthand — see {@see Shadow}.
+     */
+    private const SHADOW = [
+        'shadow-color',
+        'shadow-distance',
+        'shadow-blur',
+        'shadow-direction',
+        'shadow-alpha',
+    ];
+
     /** How the type inside a free text block is set. */
     private const TYPE = ['color', 'font-size', 'font-family', 'align', 'vertical-align', 'padding'];
 
@@ -100,6 +115,8 @@ enum ShapeKind: string
             self::RoundRect => [...self::PLACEMENT, ...self::PAINT, ...self::LABEL, 'border-radius'],
             default => [...self::PLACEMENT, ...self::PAINT, ...self::LABEL],
         };
+
+        $attributes = [...$attributes, ...self::SHADOW];
 
         sort($attributes);
 

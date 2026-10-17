@@ -62,7 +62,7 @@ final class Colour
     ): ?Color {
         $written = strtolower(Length::written($slide, $name, $attribute, $attributes, $default ?? self::NONE));
 
-        if ($written === self::NONE || $written === 'transparent') {
+        if (self::isNone($written)) {
             return null;
         }
 
@@ -83,6 +83,21 @@ final class Colour
         }
 
         return $colour;
+    }
+
+    /**
+     * Whether what the deck wrote is one of the two spellings of "there is no colour here".
+     *
+     * Named rather than left to each caller to know, because {@see self::read()} answers null for
+     * exactly these two and nothing else — an unknown slot is refused rather than read as an
+     * absent colour — so a caller that wants to refuse them has to be able to recognise them,
+     * and a second list of spellings is a list that drifts from the first.
+     */
+    public static function isNone(string $written): bool
+    {
+        $written = strtolower($written);
+
+        return $written === self::NONE || $written === 'transparent';
     }
 
     /**

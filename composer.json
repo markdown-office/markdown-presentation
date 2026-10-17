@@ -1,5 +1,5 @@
 {
-    "name": "markdown-presentation/markdown-presentation",
+    "name": "markdown-office/markdown-presentation",
     "description": "The PowerPoint half of markdown-office: a Slidev-compatible deck splitter and a strict theme resolver for Markdown slide decks.",
     "type": "library",
     "keywords": [

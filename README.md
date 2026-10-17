@@ -26,7 +26,7 @@ foreach ($deck->slides() as $slide) {
 ## Installation
 
 ```sh
-composer require markdown-presentation/markdown-presentation
+composer require markdown-office/markdown-presentation
 ```
 
 PHP 8.2 or newer, `symfony/yaml` and `phpoffice/phppresentation` as hard dependencies: the
@@ -1039,6 +1039,7 @@ An unrecognised name is refused, never quietly black.
 | `label` | the ten ink shapes | the shape's own text — see [Text inside a shape](#text-inside-a-shape) |
 | `src`, `alt`, `fit` | `::image` | |
 | `color`, `font-size`, `font-family`, `align`, `vertical-align`, `padding` | `::content` only | |
+| `shadow-color`, `shadow-distance`, `shadow-blur`, `shadow-direction`, `shadow-alpha` | all twelve | see [A shadow](#a-shadow) |
 
 `fit` is `contain` (keep the ratio, fit inside, centred) or `stretch` (take the box exactly).
 `fit=cover` is refused by name: it is a crop rather than a fit, PHPPresentation writes a picture
@@ -1118,6 +1119,51 @@ A `label` is refused on `::image`, which is a `p:pic` with no text body at all, 
 `:::content`, whose body is already its text — putting the same words in the same place twice is
 the mistake both refusals are about.
 
+#### A shadow
+
+Five attributes, on all twelve directives:
+
+| Attribute | | |
+| --- | --- | --- |
+| `shadow-color` | one of the four role names, a theme slot, or hex | `ink` where the deck names none |
+| `shadow-distance` | whole pixels, `0` to `1500` | `0` — an offset with no blur is a hard edge |
+| `shadow-blur` | whole pixels, `0` to `1500` | `0` |
+| `shadow-direction` | whole degrees, clockwise from the right | `90` — straight down |
+| `shadow-alpha` | `0`–`100` | `100` |
+
+```markdown
+::hexagon{fill=lt2 shadow-distance=12 shadow-blur=6 shadow-direction=45 shadow-alpha=50}
+```
+
+**Distance and blur are pixels, not points.** A shadow is a size on the slide and the slide is
+measured in pixels, which is the rule the rest of this page states for a position and a size.
+PowerPoint's own UI offers shadow size in points, so this is a deliberate departure from it
+rather than an oversight.
+
+**Direction is degrees** and is wrapped the way `rotate` is: `shadow-direction=360` and
+`shadow-direction=0` are the same, and `-90` is `270`. There is no x/y pair to place a shadow
+with, so an angle is the only way to put one off-axis.
+
+**One attribute is enough.** `shadow-blur=4` on its own is a shadow, and a shape that names none
+of the five is written with no `<a:effectLst>` at all rather than with one that says the shape
+has no shadow.
+
+**`shadow-color=none` and `shadow-color=transparent` are refused**, even though `fill=none` and
+`stroke=none` mean *do not draw this* and are honoured. A shadow has nowhere to record a colour
+of its own — DrawingML draws an outer shadow as a coloured copy of the shape — so "no colour"
+has no representation there, and answering it with a default would draw a fully opaque black
+shadow for the word *transparent*. For no shadow at all, leave off every shadow attribute.
+
+**A distance or a blur may reach 1500 pixels** — the slide's width plus its height. Beyond that
+the value is refused by name rather than written: PHPPresentation converts pixels to EMU with a
+**float** multiply, and PHP prints a large float as `9.525E+14`, which is not a number
+`ST_PositiveCoordinate` can hold. PowerPoint reads one; a validator, Keynote or a server-side
+renderer need not.
+
+A shadow is on the shape, not on the words inside it: a `label` takes the shadow of the shape it
+sits in, and a `:::content` block casts one from its own border. `::image` casts one too — a
+`p:pic` carries an effect list of its own.
+
 #### What is refused, and how it reads
 
 An attribute a directive does not read is refused rather than ignored, and that is the whole of
@@ -1160,7 +1206,7 @@ Slide 1 gives "rectangle" a fill of "chartreuse". A colour is none, page, ink, s
 
 Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
 
-Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, rotate, src, top, width.
+Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.
 ```
 
 Two things are **not** offered and are refused rather than approximated: a dashed outline,
@@ -1656,8 +1702,8 @@ The tools that come with the library are in `tools/`:
 | `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: nothing in the test suite needs it, because CI has no PowerPoint |
 | `tools/build-powerpoint-fixtures.sh` | Rebuilds the two decks in `tests/fixtures/powerpoint/`, which were authored in PowerPoint rather than written by hand |
 
-Four themes ship with the library, and they are four different decks rather than one deck in
-four swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
+Five themes ship with the library, and they are five different decks rather than one deck in
+five swatches — see [Type scale and rhythm](#type-scale-and-rhythm). Here is one of them,
 which is the file on disk:
 
 ```yaml path=themes/corporate-dark/theme.yml
@@ -1805,8 +1851,8 @@ try {
 ```
 
 ```text
-corporate-dark, default, dense, minimal
-There is no theme named "corprate-dark". Available: corporate-dark, default, dense, minimal.
+corporate-dark, default, dense, minimal, pitch
+There is no theme named "corprate-dark". Available: corporate-dark, default, dense, minimal, pitch.
 ```
 
 Falling back to the default theme instead would produce a deck in the wrong colours

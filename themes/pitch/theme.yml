@@ -1,0 +1,36 @@
+# A proposal deck. The dark is near-black rather than black, which is what a projector and a
+# laptop lid both want, and the accent slots carry greys as well as colours -- a card on these
+# slides holds three weights of type and cannot keep going bold for each one.
+name: Pitch
+description: Black, gold and one blue, for a pitch or a proposal.
+author: markdown-office
+colors:
+  dk1: "#0A0A0A"
+  lt1: "#FFFFFF"
+  dk2: "#525252"
+  lt2: "#F5F5F5"
+  accent1: "#0070F3"
+  accent2: "#D4AF37"
+  accent3: "#737373"
+  accent4: "#A0A0A0"
+  accent5: "#E8E8E8"
+  accent6: "#1A1A1A"
+  hlink: "#0070F3"
+  folHlink: "#D4AF37"
+fonts:
+  heading: Arial
+  body: Arial
+  mono: Menlo
+style:
+  margin: 48
+  gutter: 12
+  block: 10
+  rule: 2
+  body: 12
+  title: 32
+  cover: 44
+  section: 44
+  headings: [24, 20, 16, 14, 12]
+  leading: 1.25
+  heading-weight: bold
+  heading-ink: ink

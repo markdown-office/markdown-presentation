@@ -29,6 +29,18 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `10-rejected.md` | **nothing** | Conditional content the way Slidev writes it |
 | `11-type-scale.md` | two files | The same slides in `default` and in `dense`, the one theme whose whole scale is smaller at once — body, title, margins, gutter, block gap and rule. The table and the code block are twelve points in both, because those two sizes are the library's, which is what leaves them to read the two pages against |
 | `12-free-shapes.md` | `12-free-shapes.pptx` | Shapes placed by the deck rather than by the layout: a panel behind the text, a badge and a chevron, tilted arrows whose labels turn with them, text blocks in boxes of their own, a circle and an ellipse sharing a centre, and all ten ink shapes with a picture on one page |
+| `13-placed-deck.md` | `13-placed-deck.pptx` | A whole business pitch built out of free shapes and nothing else — a dark cover and a dark sign-off, an agenda of numbered circles, a card grid, a hand-built pricing table with zebra rows and a right-aligned column, a four-pillar comparison, a quarterly roadmap with arrows between phases, and translucent decoration over both dark slides. The company is invented |
+| `14-shadows.md` | `14-shadows.pptx` | Five shadow types on five different kinds of object — a soft shadow straight down, a hard-edged one with no blur at all, a glow with no offset, one cast down and to the right, and one thrown upward at 40% — plus a shadow on a `:::content` block and on a `::image` |
+
+## The deck that is not anybody's business
+
+`13-placed-deck.md` is a fictional bicycle frame maker rather than a redacted version of the
+deck it was rebuilt from, which named a person and their contact details. The structure is what
+makes it an example, and it is the structure an edit should leave alone: putting the original
+company back puts a private document in this repository.
+
+Rebuilding that deck from another tool is what turned up both defects in [PR #11](https://github.com/markdown-office/markdown-presentation/pull/11)
+— `padding` written but never measured, and a placed text block shrunk to its own text.
 
 ## The one that is not built
 
@@ -97,6 +109,19 @@ A few of these are here because the render is the only honest evidence:
 - **`12`, the fifth slide.** Ten ink shapes on one slide, each its own
   `<p:sp>`. The rule is a rectangle a pixel tall rather than a connector,
   which is what a `---` has always been.
+- **`13`, the cover and the sign-off.** Neither dark slide is a layout: each
+  is a full-bleed `::rectangle{fill=dk1 layer=back}` with everything else drawn
+  over it. The background is set once on the master, so a slide wanting its own
+  colour carries the colour as a shape.
+- **`13`, the pricing slide.** The table is rectangles and text boxes rather
+  than a Markdown table, because this one has a filled header, zebra rows and a
+  right-aligned price column in the accent — and a Markdown table takes its
+  styling from the theme instead.
+- **`14`.** Seven shadows on one slide and every one is a different kind: a soft
+  one straight down, a hard edge with no blur, a glow with no offset, one at 45
+  degrees, one thrown upward at 40%, and shadows on a `:::content` block and on
+  the picture. The caption boxes have none — a shape that names none of the five
+  attributes is written with no `<a:effectLst>` at all.
 - **`03`, the same slide in each of the three themed decks.** The difference is not
   the palette. `default` is Office's colours at the library's own scale with a
   40px margin and a 2px rule; `minimal` is a serif deck with 64px margins, a
