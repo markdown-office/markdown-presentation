@@ -2164,5 +2164,5 @@ file they name. `tests/Readme/examples.php` is the mechanism.
 
 MIT. See [LICENSE](./LICENSE).
 
-[command-line]: https://markdown-office.dev/guides/command-line/
+[command-line]: https://markdown-office.github.io/documentation/guides/command-line/
 [mdoffice]: https://github.com/markdown-office/mdoffice
