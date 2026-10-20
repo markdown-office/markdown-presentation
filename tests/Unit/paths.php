@@ -164,3 +164,15 @@ it('will not walk out of the archive a theme name sits in', function () {
         // A sibling whose name merely begins with the root's is not inside it.
         ->and($scope->holds('phar://mdoffice.phar/app/themes-elsewhere'))->toBeFalse();
 });
+
+it('reads a path inside the archive the way the file system would read one', function () {
+    // The file system says nothing about a segment that is `.` or nothing at all, and a
+    // path inside an archive has to say the same thing, or the two spellings of one
+    // directory would be two directories.
+    expect(PathScope::resolve('phar://mdoffice.phar/app/./themes'))
+        ->toBe('phar://mdoffice.phar/app/themes')
+        ->and(PathScope::resolve('phar://mdoffice.phar/app//themes'))
+        ->toBe('phar://mdoffice.phar/app/themes')
+        ->and(PathScope::resolve('phar://mdoffice.phar/app/themes/'))
+        ->toBe('phar://mdoffice.phar/app/themes');
+});
