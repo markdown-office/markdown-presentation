@@ -4,6 +4,31 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The PHPPresentation pin moved forward by two commits.** `phpoffice/phppresentation` was
+  pinned to `5458695` of upstream's `master` branch and is now pinned to `67a3b85`, the head
+  of that branch on 2026-10-19. The two commits in between give a chart a language of its
+  own and bring upstream's feature tables up to date.
+
+  **Nothing this library draws changes.** The two upstream files its own APIs live in are
+  byte for byte the same at both commits — `Shape\Table`, which carries `setFirstRow()` and
+  `setBandRow()`, and `Shape\AutoShape`, which carries `setRoundRectCorner()` — and the
+  rest of what upstream changed is charts: `Shape\Chart` gains a language, the chart writer
+  writes one into a chart's parts, and the reader reads one out of a file. This library
+  draws no charts, and reads no `.pptx` through PHPPresentation at all — a theme's
+  `template.pptx` is read as a zip, with DOM, in `Render\TemplateGeometry`.
+
+  The suite is the evidence that nothing moved: the same 1205 tests pass before and after,
+  at 100% coverage and level 9 of static analysis.
+
+  The pin is still a commit of `dev-master` rather than a tag, and has to stay one: the
+  latest release, 1.2.0, carries neither `setFirstRow()` nor `setRoundRectCorner()`. The
+  repository commits no lock file, so the line in `composer.json` is the only statement of
+  what a consumer is given.
+
 ## [0.1.0] - 2026-10-19
 
 ### Added
