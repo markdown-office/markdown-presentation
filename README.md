@@ -39,6 +39,16 @@ commit of the PHPPresentation `master` branch rather than to a tag — see
 vector only beside a raster of it, so something has to draw the raster; without the
 extension an SVG raises rather than going in as a picture no reader can show.
 
+## Command line
+
+There is none in this repository. The command line is [`mdoffice`][mdoffice], one program
+for Markdown to Word and to PowerPoint, which requires this package and calls it rather
+than reimplementing any of it.
+
+Every command, every option and every default is on one page — the
+[documentation][command-line] — and that page is where they are kept, so there is one
+place to look and one place to correct.
+
 ## Splitting a deck
 
 A deck is Markdown. Slides are separated by a line of three dashes, and each slide
@@ -2153,3 +2163,6 @@ file they name. `tests/Readme/examples.php` is the mechanism.
 ## Licence
 
 MIT. See [LICENSE](./LICENSE).
+
+[command-line]: https://markdown-office.github.io/documentation/guides/command-line/
+[mdoffice]: https://github.com/markdown-office/mdoffice
