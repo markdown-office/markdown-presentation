@@ -117,11 +117,33 @@ function converted(string $path, ?Options $options = null): string
 }
 
 /**
+ * The words of a text, in the order they come.
+ *
+ * @return list<string>
+ */
+function wordsOf(string $text): array
+{
+    $words = [];
+
+    foreach (preg_split('/\s+/', trim($text)) ?: [] as $word) {
+        if ($word !== '') {
+            $words[] = $word;
+        }
+    }
+
+    return $words;
+}
+
+/**
  * The words of every slide of a deck, in the order they come.
  *
- * The paragraphs are read rather than the text of a shape, because a
- * placeholder and a text box answer `getPlainText()` differently: the one
- * separates its paragraphs with a line break, the other runs them together.
+ * The paragraphs are read rather than the text of a shape, because a shape of
+ * text answers `getPlainText()` by running its paragraphs together -- and a
+ * shape that is a placeholder is such a shape with a placeholder on it, so it
+ * answers alike.
+ *
+ * A picture is left out: its text is its description, which a deck that was
+ * written from Markdown holds and a deck that was read does not.
  *
  * @return list<list<string>>
  */
@@ -134,15 +156,25 @@ function slideWords(string $path): array
         $words = [];
 
         foreach ($slide->getShapeCollection() as $shape) {
+            if ($shape instanceof TableShape) {
+                foreach ($shape->getRows() as $row) {
+                    foreach ($row->getCells() as $cell) {
+                        foreach (wordsOf($cell->getPlainText()) as $word) {
+                            $words[] = $word;
+                        }
+                    }
+                }
+
+                continue;
+            }
+
             if (! method_exists($shape, 'getParagraphs')) {
                 continue;
             }
 
             foreach ($shape->getParagraphs() as $paragraph) {
-                foreach (preg_split('/\s+/', trim($paragraph->getPlainText())) ?: [] as $word) {
-                    if ($word !== '') {
-                        $words[] = $word;
-                    }
+                foreach (wordsOf($paragraph->getPlainText()) as $word) {
+                    $words[] = $word;
                 }
             }
         }
