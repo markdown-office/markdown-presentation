@@ -137,3 +137,42 @@ it('names a stream wrapper for what it is', function () {
         ->and(PathScope::isUrl(SECRET))->toBeFalse()
         ->and(PathScope::isUrl('C:\\' . SECRET))->toBeFalse();
 });
+
+it('resolves a root inside the archive it is running from', function () {
+    // The one case `realpath()` cannot serve: inside the archive this library ships as,
+    // the built-in themes are `phar://…/themes`, and `realpath()` returns false for every
+    // path under a wrapper. A resolver that only knew how to ask the file system would
+    // refuse every theme by name in the shipped archive.
+    $inside = 'phar://mdoffice.phar/app/vendor/markdown-office/markdown-presentation/themes';
+
+    expect(realpath($inside))->toBeFalse()
+        ->and(PathScope::resolve($inside))->toBe($inside)
+        // A path that is on neither the file system nor the archive is nothing.
+        ->and(PathScope::resolve('/tmp/markdown-presentation-not-here'))->toBeNull();
+});
+
+it('will not walk out of the archive a theme name sits in', function () {
+    // `realpath()` is what resolves `..` for a path on disk; inside an archive nothing does,
+    // so the segments are walked by hand. Without that, a name could leave the archive —
+    // and the root that decides it is the one place that has to be a boundary.
+    $scope = new PathScope(['phar://mdoffice.phar/app/themes']);
+
+    expect(PathScope::resolve('phar://mdoffice.phar/app/../../etc'))
+        ->toBe('phar://mdoffice.phar/etc')
+        ->and($scope->holds('phar://mdoffice.phar/app/themes/house'))->toBeTrue()
+        ->and($scope->holds('phar://mdoffice.phar/etc'))->toBeFalse()
+        // A sibling whose name merely begins with the root's is not inside it.
+        ->and($scope->holds('phar://mdoffice.phar/app/themes-elsewhere'))->toBeFalse();
+});
+
+it('reads a path inside the archive the way the file system would read one', function () {
+    // The file system says nothing about a segment that is `.` or nothing at all, and a
+    // path inside an archive has to say the same thing, or the two spellings of one
+    // directory would be two directories.
+    expect(PathScope::resolve('phar://mdoffice.phar/app/./themes'))
+        ->toBe('phar://mdoffice.phar/app/themes')
+        ->and(PathScope::resolve('phar://mdoffice.phar/app//themes'))
+        ->toBe('phar://mdoffice.phar/app/themes')
+        ->and(PathScope::resolve('phar://mdoffice.phar/app/themes/'))
+        ->toBe('phar://mdoffice.phar/app/themes');
+});

@@ -21,9 +21,9 @@ use MarkdownPresentation\Filesystem\PathScope;
  * error that names the themes that exist, which is a sentence the author of the deck
  * can act on.
  *
- * Every step resolves the path with `realpath()` and holds it to the directories this
- * resolver may read — the working directory, the built-in themes, and whatever else the
- * program rendering allowed. A `theme:` is a path a deck writes, and a deck naming
+ * Every step resolves the path and holds it to the directories this resolver may read —
+ * the working directory, the built-in themes, and whatever else the program rendering
+ * allowed. A `theme:` is a path a deck writes, and a deck naming
  * `../../secrets/theme.yml` used to load it: whatever `author:` that file carried was copied
  * into `docProps/core.xml` of the deck, which is a way to get the contents of a file out
  * through a download. The rules are `Filesystem\PathScope`'s and are the same ones an image
@@ -92,7 +92,7 @@ final class ThemeResolver
      * a typo in a deck, the second is a deck reaching for something.
      *
      * @param string $name  What the deck wrote.
-     * @param string $found The path it resolved to before `realpath()`.
+     * @param string $found The path it resolved to before it was resolved further.
      *
      * @throws ThemeNotFound
      */
@@ -102,7 +102,7 @@ final class ThemeResolver
             throw ThemeNotFound::noDirectory($found);
         }
 
-        $real = PathScope::canonical($found);
+        $real = PathScope::resolve($found);
 
         if ($real === null || !$this->files->holds($real)) {
             throw ThemeNotFound::outside($name, $real ?? $found, $this->files->roots());

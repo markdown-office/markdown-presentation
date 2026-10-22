@@ -13,14 +13,17 @@ namespace MarkdownPresentation\Filesystem;
  * directory and any absolute path was read from wherever it pointed. The deck did not have to
  * be trying: a deck written by a model, from a file it was given, is enough.
  *
- * So a path a deck writes is resolved with `realpath()` and has to land inside one of the
- * roots here. The roots are the renderer's directory by default, and whatever else the
- * calling program allowed — a curated image library is a real case, and it is the *caller's*
- * decision rather than the deck's, which is the whole distinction.
+ * So a path a deck writes is resolved and has to land inside one of the roots here. The
+ * roots are the renderer's directory by default, and whatever else the calling program
+ * allowed — a curated image library is a real case, and it is the *caller's* decision
+ * rather than the deck's, which is the whole distinction.
  *
  * `realpath()` rather than a string prefix because a prefix is not containment: `..` and a
  * symlink both defeat one, and a symlink pointing at `/etc/shadow` is the ordinary way a
- * path that looks harmless turns into a read of the wrong file.
+ * path that looks harmless turns into a read of the wrong file. The one root `realpath()`
+ * cannot serve is a directory inside the archive this library has been bundled into,
+ * where the built-in themes live; that one is resolved by walking its own segments
+ * instead. See {@see self::literal()}.
  */
 final class PathScope
 {
@@ -34,6 +37,9 @@ final class PathScope
      * like that and mean it, so it is refused before the name reaches any of them.
      */
     private const SCHEME = '#\A[a-zA-Z][a-zA-Z0-9+.-]*://#';
+
+    /** The archive prefix, which is the one wrapper this library can find itself inside. */
+    private const PHAR = 'phar://';
 
     /**
      * @var list<string>
@@ -52,12 +58,80 @@ final class PathScope
         $resolved = [];
 
         foreach ($roots as $root) {
-            if (($real = self::canonical($root)) !== null) {
+            if (($real = self::root($root)) !== null) {
                 $resolved[] = $real;
             }
         }
 
         $this->roots = array_values(array_unique($resolved));
+    }
+
+    /**
+     * A root in the spelling paths will be compared against.
+     *
+     * {@see self::canonical()} for a directory on disk, and {@see self::literal()} for one
+     * inside the archive this is running from — which is what the built-in themes are when
+     * this library has been bundled into a `.phar`, and is the case
+     * {@see self::canonical()} cannot serve because `realpath()` does not resolve a
+     * `phar://` path at all.
+     */
+    private static function root(string $path): ?string
+    {
+        return self::canonical($path) ?? self::literal($path);
+    }
+
+    /**
+     * A path resolved by walking its own segments, for one the file system cannot resolve.
+     *
+     * Only for a path inside this library's own archive, and that restriction is the
+     * reason this is safe: a deck cannot hand us a `phar://` path, because
+     * {@see self::isUrl()} refuses every `scheme://` name before it gets here, so the only
+     * archive paths this ever sees are the ones `__DIR__` produced.
+     *
+     * The `..` handling is what keeps it a boundary rather than a formality. Without it a
+     * theme named `../../../etc` would resolve lexically to a path outside the archive —
+     * inside a `phar://` URL, so not a filesystem read, but still a root that holds things
+     * it must not.
+     */
+    private static function literal(string $path): ?string
+    {
+        if (!str_starts_with($path, self::PHAR)) {
+            return null;
+        }
+
+        // `phar://` plus the archive's own path, which may itself contain slashes, plus
+        // the path inside it. The split point is the first slash after the archive.
+        $rest = substr($path, strlen(self::PHAR));
+        $split = explode('/', $rest, 2);
+        $archive = $split[0];
+        $segments = [];
+
+        foreach (explode('/', $split[1] ?? '') as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                array_pop($segments);
+                continue;
+            }
+
+            $segments[] = $segment;
+        }
+
+        return $segments === [] ? null : self::PHAR . $archive . '/' . implode('/', $segments);
+    }
+
+    /**
+     * A path this library's own directory resolved, however it had to be resolved.
+     *
+     * For the built-in themes, which are on disk under a checkout and inside the archive
+     * when the library has been bundled into a `.phar`. Null where neither resolved,
+     * which every caller here reads as "there is no such thing".
+     */
+    public static function resolve(string $path): ?string
+    {
+        return self::root($path);
     }
 
     /**
