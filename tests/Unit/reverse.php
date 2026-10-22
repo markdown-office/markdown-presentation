@@ -117,6 +117,43 @@ function converted(string $path, ?Options $options = null): string
 }
 
 /**
+ * The words of every slide of a deck, in the order they come.
+ *
+ * The paragraphs are read rather than the text of a shape, because a
+ * placeholder and a text box answer `getPlainText()` differently: the one
+ * separates its paragraphs with a line break, the other runs them together.
+ *
+ * @return list<list<string>>
+ */
+function slideWords(string $path): array
+{
+    $presentation = IOFactory::load($path);
+    $slides = [];
+
+    foreach ($presentation->getAllSlides() as $slide) {
+        $words = [];
+
+        foreach ($slide->getShapeCollection() as $shape) {
+            if (! method_exists($shape, 'getParagraphs')) {
+                continue;
+            }
+
+            foreach ($shape->getParagraphs() as $paragraph) {
+                foreach (preg_split('/\s+/', trim($paragraph->getPlainText())) ?: [] as $word) {
+                    if ($word !== '') {
+                        $words[] = $word;
+                    }
+                }
+            }
+        }
+
+        $slides[] = $words;
+    }
+
+    return $slides;
+}
+
+/**
  * The text of every slide of a deck, as it is written.
  *
  * @return list<list<string>>
@@ -731,6 +768,42 @@ it('reads a deck PowerPoint wrote', function () {
         ->and($markdown)->toContain('Tuesday')
         ->and($markdown)->toContain('# Agenda')
         ->and($markdown)->toContain('Where we are');
+});
+
+it('takes a deck PowerPoint wrote apart and puts it back together in another design', function () {
+    $images = Scratch::directoryPath('media');
+
+    $markdown = (new PowerPointToMarkdown(workshopNotes(), new Options(mediaDirectory: $images)))->convert();
+
+    $path = Scratch::file('deck.pptx', '');
+    (new PresentationRenderer(Scratch::directory()))->render(
+        (new DeckParser())->parse($markdown),
+        $path,
+    );
+
+    $read = slideWords(workshopNotes());
+    $written = slideWords($path);
+
+    // The picture in the deck that was read, and the one in the deck that was written.
+    $zip = new \ZipArchive();
+    $zip->open(workshopNotes());
+    $original = $zip->getFromName('ppt/media/image1.png');
+    $zip->close();
+
+    $zip = new \ZipArchive();
+    $zip->open($path);
+    $media = null;
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        if (str_starts_with($zip->getNameIndex($i), 'ppt/media/')) {
+            $media = $zip->getFromName($zip->getNameIndex($i));
+
+            break;
+        }
+    }
+    $zip->close();
+
+    expect($written)->toBe($read)
+        ->and($media)->toBe($original);
 });
 
 it('leaves the pictures out when there is nowhere to put them', function () {
