@@ -1759,8 +1759,6 @@ These are the distinctions a `.pptx` does not record, and what comes back in the
 - **a link inside a run.** A shape whose text is a link comes back as a link; a word inside
   a paragraph that is a link does not.
 - **a chart.** A chart is a drawing, not prose. It is left out rather than half-read.
-- **the picture's own bytes.** A picture comes back as the image the reader can draw, which
-  is a re-encoding of the one in the deck: the same picture, and not the same file.
 
 ## Themes
 

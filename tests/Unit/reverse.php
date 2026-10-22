@@ -94,6 +94,21 @@ function pictureDirectory(): string
 }
 
 /**
+ * A URL that reads a part out of a package made for the test.
+ */
+function zipUrl(string $part, string $contents): string
+{
+    $path = Scratch::file('parts.pptx', '');
+
+    $zip = new \ZipArchive();
+    $zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+    $zip->addFromString($part, $contents);
+    $zip->close();
+
+    return 'zip://' . $path . '#' . $part;
+}
+
+/**
  * The Markdown a deck converts to.
  */
 function converted(string $path, ?Options $options = null): string
@@ -762,4 +777,56 @@ it('reads a deck given as bytes and a deck given as a path the same way', functi
     $fromBytes = (new PowerPointToMarkdown($bytes, new Options(mediaDirectory: null)))->convert();
 
     expect($fromBytes)->toBe($fromPath);
+});
+
+it('takes the picture out of the deck with the bytes the deck holds', function () {
+    $directory = Scratch::directoryPath('media');
+    $path = workshopNotes();
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(mediaDirectory: $directory)))->convert();
+
+    // The picture in the deck, as the package holds it.
+    $zip = new \ZipArchive();
+    $zip->open($path);
+    $original = $zip->getFromName('ppt/media/image1.png');
+    $zip->close();
+
+    $written = glob($directory . '/*.png');
+
+    expect($original)->not->toBeFalse()
+        ->and($written)->toHaveCount(1)
+        ->and((string) file_get_contents($written[0]))->toBe((string) $original);
+});
+
+it('leaves a picture with no path out', function () {
+    $mapper = new ShapeMapper(new Options(mediaDirectory: 'media'));
+
+    expect($mapper->blocks(new Gd(), 1, 0))->toBe([]);
+});
+
+it('leaves a picture whose name is not an image out', function () {
+    $mapper = new ShapeMapper(new Options(mediaDirectory: 'media'));
+
+    $picture = new Gd();
+    $picture->setPath(zipUrl('ppt/media/notes.php', '<?php echo 1;'));
+
+    expect($mapper->blocks($picture, 1, 0))->toBe([]);
+});
+
+it('leaves a picture whose bytes are not an image out', function () {
+    $mapper = new ShapeMapper(new Options(mediaDirectory: 'media'));
+
+    $picture = new Gd();
+    $picture->setPath(zipUrl('ppt/media/dot.png', 'not a picture'));
+
+    expect($mapper->blocks($picture, 1, 0))->toBe([]);
+});
+
+it('takes a vector out as well, which a raster check cannot see', function () {
+    $mapper = new ShapeMapper(new Options(mediaDirectory: 'media'));
+
+    $picture = new Gd();
+    $picture->setPath(zipUrl('ppt/media/dot.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>'));
+
+    expect($mapper->blocks($picture, 1, 0))->toHaveCount(1);
 });

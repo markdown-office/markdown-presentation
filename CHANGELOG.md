@@ -26,10 +26,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- **The PHPPresentation pin moved forward by two commits.** `phpoffice/phppresentation` was
-  pinned to `5458695` of upstream's `master` branch and is now pinned to `67a3b85`, the head
-  of that branch on 2026-10-19. The two commits in between give a chart a language of its
-  own and bring upstream's feature tables up to date.
+- **The PHPPresentation pin moved.** `phpoffice/phppresentation` was pinned to `5458695`
+  of upstream's `master` branch and is now pinned to `b693d695`, which is that branch plus
+  [the fix this library needs from it](https://github.com/PHPOffice/PHPPresentation/pull/1041):
+  a picture read out of a package is given the path it was read from, so it says where it
+  came from and the bytes behind it are the ones the file holds rather than an encoding of
+  them made again.
+
+  The fix is on a branch of [our fork](https://github.com/markdown-office/PHPPresentation),
+  because the pin names a commit and a commit has to be somewhere a consumer can fetch it
+  from. It goes back to upstream's `master` when the pull request is merged.
+
+  The two commits between `5458695` and `67a3b85` give a chart a language of its own and
+  bring upstream's feature tables up to date.
 
   **Nothing this library draws changes.** The two upstream files its own APIs live in are
   byte for byte the same at both commits — `Shape\Table`, which carries `setFirstRow()` and

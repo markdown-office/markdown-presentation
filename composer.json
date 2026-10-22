@@ -26,10 +26,16 @@
         "ext-zip": "*",
         "league/commonmark": "^2.10",
         "markdown-office/commonmark-generic-directives": "^0.2.0",
-        "phpoffice/phppresentation": "dev-master#67a3b85673a7e05c7347e0c3970f9afb2338e246",
+        "phpoffice/phppresentation": "dev-fix/picture-path#b693d695e61821d5dd2158418dcb836ffcfca3df",
         "php": "^8.2",
         "symfony/yaml": "^7.2 || ^8.0"
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/markdown-office/PHPPresentation"
+        }
+    ],
     "require-dev": {
         "ext-simplexml": "*",
         "pestphp/pest": "^3.0 || ^4.0 || ^5.0"

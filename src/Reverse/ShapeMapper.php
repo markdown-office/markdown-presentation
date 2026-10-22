@@ -33,6 +33,14 @@ use PhpOffice\PhpPresentation\Style\Font;
  */
 final class ShapeMapper
 {
+    /**
+     * The picture formats a deck may hold, and the extension each keeps.
+     *
+     * A `.pptx` holds a vector beside a raster of it, and the raster is the one a
+     * reader can show, so the raster is what comes out.
+     */
+    private const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp', 'svg'];
+
     public function __construct(private readonly Options $options)
     {
     }
@@ -292,9 +300,10 @@ final class ShapeMapper
     /**
      * The blocks a picture becomes.
      *
-     * A picture carries its bytes rather than a path, because the path is
-     * decided when the file is written out and not before, and the writer
-     * needs the bytes to write it with.
+     * The picture carries the path it was read from — a `zip://` URL into the
+     * package — and the bytes behind it are the ones the file holds, so the
+     * picture that is written out is the picture that was in the deck rather
+     * than an encoding of it made again.
      *
      * @return list<Block>
      */
@@ -304,16 +313,51 @@ final class ShapeMapper
             return [];
         }
 
-        $extension = $shape->getExtension();
+        $path = $shape->getPath();
 
-        if ($extension === '') {
+        if ($path === '') {
+            return [];
+        }
+
+        $name = basename($path);
+        $contents = @file_get_contents($path);
+
+        if ($contents === false || ! $this->isImage($name, $contents)) {
             return [];
         }
 
         return [Block::image(new Image(
             $shape->getDescription(),
-            sprintf('slide-%d-image-%d.%s', $slide, $image, $extension),
-            $shape->getContents(),
+            sprintf('slide-%d-image-%d.%s', $slide, $image, pathinfo($name, PATHINFO_EXTENSION)),
+            $contents,
         ))];
+    }
+
+    /**
+     * Whether a name and the bytes behind it are an image.
+     *
+     * The extension is checked first because it is free, and because the name
+     * is the half that has to end up on disk. A leading dot is refused along
+     * with it: `.htaccess` is an "extension" in the loose sense that a split on
+     * a dot produces, and it is a configuration file rather than a picture.
+     *
+     * The bytes are checked because the name is chosen by the deck, and an
+     * extension is a claim rather than a fact. `getimagesizefromstring()` knows
+     * the raster formats and says so by returning false for everything else —
+     * and for a vector, which is why one is recognised by its own markup.
+     */
+    private function isImage(string $name, string $bytes): bool
+    {
+        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+        if (str_starts_with($name, '.') || ! in_array($extension, self::IMAGE_EXTENSIONS, true)) {
+            return false;
+        }
+
+        if ($extension === 'svg') {
+            return str_contains($bytes, '<svg');
+        }
+
+        return @getimagesizefromstring($bytes) !== false;
     }
 }
