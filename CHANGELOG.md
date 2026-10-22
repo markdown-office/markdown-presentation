@@ -26,43 +26,41 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- **The PHPPresentation pin moved.** `phpoffice/phppresentation` was pinned to `5458695`
-  of upstream's `master` branch and is now pinned to `b693d695`, which is that branch plus
-  [the fix this library needs from it](https://github.com/PHPOffice/PHPPresentation/pull/1041):
-  a picture read out of a package is given the path it was read from, so it says where it
-  came from and the bytes behind it are the ones the file holds rather than an encoding of
-  them made again.
+- **The PHPPresentation pin moved, and the library can be installed by the public.** The
+  pin was a commit of upstream's `master` branch, which a consumer cannot install: a
+  development version is refused unless the project that asks for it has set
+  `minimum-stability` to `dev`, and a library cannot set that for them. It is now the
+  `1.2.0` release, which is.
 
-  The fix is on a branch of [our fork](https://github.com/markdown-office/PHPPresentation),
-  because the pin names a commit and a commit has to be somewhere a consumer can fetch it
-  from. It goes back to upstream's `master` when the pull request is merged.
+  The release is missing a few things this library needs — a table that says which row is
+  its header, a shape that says how round its corners are, a run of text that says what it
+  is, and a picture that says where it was read from — and they are applied to the
+  installed package as a patch, by [`cweagans/composer-patches`][composer-patches]. The
+  patch is [the difference between the release and upstream's branch][the-patch], which is
+  upstream's own code: this library does not write the code it patches in, and the patch
+  stops being needed when upstream releases the branch.
 
-  The two commits between `5458695` and `67a3b85` give a chart a language of its own and
-  bring upstream's feature tables up to date.
+  **A project that installs this one has to allow the plugin**, which Composer only runs
+  when the project says so. The README says what to add, and the library refuses to work
+  rather than write a deck with the parts missing.
 
-  **Nothing this library draws changes.** The two upstream files its own APIs live in are
-  byte for byte the same at both commits — `Shape\Table`, which carries `setFirstRow()` and
-  `setBandRow()`, and `Shape\AutoShape`, which carries `setRoundRectCorner()` — and the
-  rest of what upstream changed is charts: `Shape\Chart` gains a language, the chart writer
-  writes one into a chart's parts, and the reader reads one out of a file. This library
-  draws no charts, and a theme's `template.pptx` is read as a zip, with DOM, in
-  `Render\TemplateGeometry`.
+  **Nothing this library draws changes.** The patch carries upstream's branch whole, so
+  what the library draws is what it drew before: the same tests pass, and the files the
+  library writes are the same files. The suite is the evidence: 1312 tests pass against
+  the patched release, at 100% coverage and level 9 of static analysis.
 
-  **The pin matters to the reading direction, and to nothing else.** The reader
-  PHPPresentation ships is what reads a deck apart, so a change there is a change in what
-  comes back. Two of its defects are reported upstream rather than worked around: a
-  picture's path is never set, so asking a picture where it came from throws
+  **The fix that has not been merged upstream yet is still not.** Two of upstream's
+  defects are reported rather than worked around: a picture's path is never set, so asking
+  a picture where it came from throws
   ([#1039](https://github.com/PHPOffice/PHPPresentation/issues/1039)), and a raster is
   re-encoded on the way out, so the bytes that come back are not the bytes that went in
-  ([#1040](https://github.com/PHPOffice/PHPPresentation/issues/1040)).
+  ([#1040](https://github.com/PHPOffice/PHPPresentation/issues/1040)). The patch carries
+  the fix for both, and it is upstream's to merge:
+  [#1041](https://github.com/PHPOffice/PHPPresentation/pull/1041) and
+  [#1042](https://github.com/PHPOffice/PHPPresentation/pull/1042).
 
-  The suite is the evidence that nothing moved: the same 1205 tests pass before and after,
-  at 100% coverage and level 9 of static analysis.
-
-  The pin is still a commit of `dev-master` rather than a tag, and has to stay one: the
-  latest release, 1.2.0, carries neither `setFirstRow()` nor `setRoundRectCorner()`. The
-  repository commits no lock file, so the line in `composer.json` is the only statement of
-  what a consumer is given.
+  The repository commits no lock file, so the lines in `composer.json` are the only
+  statement of what a consumer is given.
 
 ## [0.1.0] - 2026-10-19
 
@@ -1772,3 +1770,5 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
   here, and the library's releases trail its `master`.
 
 [0.1.0]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.1.0
+[composer-patches]: https://github.com/cweagans/composer-patches
+[the-patch]: https://github.com/markdown-office/PHPPresentation/blob/patches/1.2.0-to-master/patches/phpoffice-phppresentation-1.2.0-to-master.patch

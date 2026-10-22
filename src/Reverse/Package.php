@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Reverse;
 
 use MarkdownPresentation\Exception\UnreadableDeck;
+use MarkdownPresentation\Exception\UnpatchedDependency;
+use MarkdownPresentation\Fixes;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
 use ZipArchive;
@@ -125,9 +127,12 @@ final class Package
      * The deck, read by the reader that knows the format.
      *
      * @throws UnreadableDeck when the reader refuses the package.
+     * @throws UnpatchedDependency when the reader is not the one this library needs.
      */
     private static function load(string $path): PhpPresentation
     {
+        Fixes::require();
+
         try {
             return IOFactory::createReader('PowerPoint2007')->load($path);
         } catch (\Throwable $failure) {

@@ -19,6 +19,7 @@ use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Fixes;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
 use MarkdownPresentation\Render\Block\Image;
@@ -213,6 +214,8 @@ final class PresentationRenderer
         if ($deck->count() > self::MAX_SLIDES) {
             throw TooManySlides::in($deck->count(), self::MAX_SLIDES);
         }
+
+        Fixes::require();
 
         foreach ($deck->slides() as $slide) {
             $this->check($slide);

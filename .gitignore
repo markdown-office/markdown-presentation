@@ -5,6 +5,10 @@
 /vendor/
 /composer.lock
 
+# The patches the plugin applied, in the same way: it pins this checkout rather than
+# anything a consumer gets.
+/patches.lock.json
+
 # The analyser, fetched by checksum into here by tools/install-phpstan.php. The
 # version and the hash live in that script and in the job that runs it, so nothing
 # but a downloaded binary is ever ignored by accident.

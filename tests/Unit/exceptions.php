@@ -22,6 +22,7 @@ use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
 use MarkdownPresentation\Exception\UnreadableDeck;
 use MarkdownPresentation\Exception\UnreadablePackage;
+use MarkdownPresentation\Exception\UnpatchedDependency;
 use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Exception\UnsupportedLink;
@@ -112,11 +113,15 @@ it('reports what a deck author can fix under the class that says so', function (
     // The three that read a deck back out are here for the same reason: a package that
     // cannot be read, a file that cannot be written and a conversion with nothing to
     // convert are all the caller's, and none of them is fixed by naming something else.
+    //
+    // A PHPPresentation without the fixes is the caller's too: it is what the installer
+    // put there, and no deck author can put it back.
     $callerSide = [
         FileNotWritable::class,
         NothingToConvert::class,
         UnreadableDeck::class,
         UnreadablePackage::class,
+        UnpatchedDependency::class,
     ];
 
     if ($class === Exception::class || $class === InvalidInput::class) {
