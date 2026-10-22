@@ -6,18 +6,21 @@ use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\FencedFrontmatter;
+use MarkdownPresentation\Exception\FileNotWritable;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\MalformedShape;
 use MarkdownPresentation\Exception\MalformedTemplate;
 use MarkdownPresentation\Exception\MalformedTheme;
+use MarkdownPresentation\Exception\NothingToConvert;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Exception\UnreadableDeck;
 use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
@@ -105,7 +108,16 @@ it('reports what a deck author can fix under the class that says so', function (
     // The failures that are not the deck's to fix, which is the day this file was written
     // for: a package this process cannot open is a disk or a download that went wrong, and a
     // deck author told to go and rename something would go and rename something.
-    $callerSide = [UnreadablePackage::class];
+    //
+    // The three that read a deck back out are here for the same reason: a package that
+    // cannot be read, a file that cannot be written and a conversion with nothing to
+    // convert are all the caller's, and none of them is fixed by naming something else.
+    $callerSide = [
+        FileNotWritable::class,
+        NothingToConvert::class,
+        UnreadableDeck::class,
+        UnreadablePackage::class,
+    ];
 
     if ($class === Exception::class || $class === InvalidInput::class) {
         // Neither is a subclass of the other, so the two are asked about as they are.

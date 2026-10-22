@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A `.pptx` can be read back into a deck.** `PowerPointToMarkdown` is the inverse of
+  `Render\PresentationRenderer`: it takes a deck apart and writes it as the Markdown this
+  library writes decks in, so a deck somebody else made can be edited as text and put back
+  together in another design.
+
+  What comes back is the text and the structure, and what does not is the design: the type
+  sizes, the colours and the geometry live in the theme and the master, and neither
+  travels to a new deck. A `.pptx` records what is on a slide, not how it was drawn. The
+  README says in full what the round trip keeps and what it loses.
+
+  The order is the order the slide lists its shapes in, which is the order they were put on
+  it — a slide is a set of boxes rather than a flow, and the order the file records is the
+  one claim about the reading order that the file itself makes. A deck that was made by
+  dragging a column down keeps its columns in that order, where a reader that sorted by
+  position would interleave the column that was moved with the one that was not.
+
 ### Changed
 
 - **The PHPPresentation pin moved forward by two commits.** `phpoffice/phppresentation` was
@@ -18,8 +36,16 @@ All notable changes to this project are documented here. The format follows
   `setBandRow()`, and `Shape\AutoShape`, which carries `setRoundRectCorner()` — and the
   rest of what upstream changed is charts: `Shape\Chart` gains a language, the chart writer
   writes one into a chart's parts, and the reader reads one out of a file. This library
-  draws no charts, and reads no `.pptx` through PHPPresentation at all — a theme's
-  `template.pptx` is read as a zip, with DOM, in `Render\TemplateGeometry`.
+  draws no charts, and a theme's `template.pptx` is read as a zip, with DOM, in
+  `Render\TemplateGeometry`.
+
+  **The pin matters to the reading direction, and to nothing else.** The reader
+  PHPPresentation ships is what reads a deck apart, so a change there is a change in what
+  comes back. Two of its defects are reported upstream rather than worked around: a
+  picture's path is never set, so asking a picture where it came from throws
+  ([#1039](https://github.com/PHPOffice/PHPPresentation/issues/1039)), and a raster is
+  re-encoded on the way out, so the bytes that come back are not the bytes that went in
+  ([#1040](https://github.com/PHPOffice/PHPPresentation/issues/1040)).
 
   The suite is the evidence that nothing moved: the same 1205 tests pass before and after,
   at 100% coverage and level 9 of static analysis.

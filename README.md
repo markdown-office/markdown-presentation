@@ -1689,6 +1689,79 @@ Slide 1 opens the container ":::note", which is not something a slide draws. Thr
 Slide 1 has the element "<v-click>", which is not something a slide draws. A step is "::click" on a line of its own, and there is no other element.
 ```
 
+## Reading a deck back
+
+The other direction: a `.pptx` becomes the Markdown this library writes decks in, so a deck
+somebody else made can be taken apart, edited as text, and put back together in another
+design.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\PowerPointToMarkdown;
+use MarkdownPresentation\Render\PresentationRenderer;
+use MarkdownPresentation\Reverse\Options;
+
+$path = sys_get_temp_dir() . '/deck.pptx';
+
+(new PresentationRenderer())->render(
+    (new DeckParser())->parse("# One\n\nText.\n"),
+    $path,
+);
+
+echo (new PowerPointToMarkdown($path, new Options(mediaDirectory: null)))->convert();
+```
+
+```text
+---
+title: "Untitled Presentation"
+author: "markdown-office"
+---
+
+# One
+
+Text.
+```
+
+The frontmatter carries what the deck said about itself — its title, its author and its
+description — because a deck's own properties are the only thing about it that is not on a
+slide.
+
+What comes back is the text and the structure. What does not is the design: the type sizes,
+the colours and the geometry live in the theme and the master, and neither travels to a new
+deck. A `.pptx` records what is on a slide, not how it was drawn.
+
+| In the deck | In the Markdown |
+| --- | --- |
+| the title placeholder | the heading of the slide |
+| the subtitle placeholder | a paragraph under it |
+| a body placeholder | a list |
+| a text box | a paragraph |
+| a picture | an image, written out beside the deck |
+| a table | a Markdown table |
+| the speaker's note | a `::note` block |
+| the date, the footer and the slide number | nothing |
+
+The order is the order the slide lists its shapes in, which is the order they were put on
+it. A slide is a set of boxes rather than a flow, and the order the file records is the one
+claim about the reading order that the file itself makes.
+
+### What the round trip does not keep
+
+These are the distinctions a `.pptx` does not record, and what comes back in their place:
+
+- **the design.** A type size, a colour and a position are in the theme and the master, and
+  the new deck draws its own.
+- **the layout.** A slide with two columns becomes a slide with two lists. The text of each
+  column keeps its order; the columns do not.
+- **the underline.** PowerPoint has it and Markdown has no way to say it, so a deck whose
+  emphasis is underlined comes back with the emphasis gone. Bold, italic and strike-through
+  come back as themselves.
+- **a link inside a run.** A shape whose text is a link comes back as a link; a word inside
+  a paragraph that is a link does not.
+- **a chart.** A chart is a drawing, not prose. It is left out rather than half-read.
+- **the picture's own bytes.** A picture comes back as the image the reader can draw, which
+  is a re-encoding of the one in the deck: the same picture, and not the same file.
+
 ## Themes
 
 A theme is a **directory**, and only `theme.yml` is required. Nothing is compiled
