@@ -36,6 +36,11 @@ use PhpOffice\PhpPresentation\PhpPresentation;
 final class PowerPointToMarkdown
 {
     /**
+     * The first four bytes of a zip archive, and therefore of a `.pptx`.
+     */
+    private const DECK_MAGIC = "PK\x03\x04";
+
+    /**
      * @param string|null $source The deck to convert: a path, or the bytes of
      *        one. Null leaves the choice to {@see self::convert()}.
      */
@@ -63,7 +68,7 @@ final class PowerPointToMarkdown
             throw NothingToConvert::noSource();
         }
 
-        $package = Package::open($this->source, $this->options);
+        $package = $this->open();
 
         try {
             return $this->write($package, $target);
@@ -114,6 +119,29 @@ final class PowerPointToMarkdown
         } finally {
             $package->close();
         }
+    }
+
+    /**
+     * The package, from a path or from the bytes of a deck.
+     *
+     * A string that begins with the four bytes of a zip archive is the deck
+     * itself; anything else is the name of one. The two cannot be told apart
+     * any other way, and the difference matters: a path is opened where it lies
+     * and the bytes are staged, because `ext-zip` opens files and nothing else.
+     */
+    private function open(): Package
+    {
+        $source = (string) $this->source;
+
+        if (str_starts_with($source, self::DECK_MAGIC)) {
+            return Package::fromString($source, $this->options);
+        }
+
+        if (! is_file($source)) {
+            throw UnreadableDeck::notFound($source);
+        }
+
+        return Package::open($source, $this->options);
     }
 
     private function write(Package $package, ?string $target): string

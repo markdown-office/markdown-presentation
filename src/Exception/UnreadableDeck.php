@@ -26,6 +26,11 @@ final class UnreadableDeck extends Exception
         ));
     }
 
+    public static function notFound(string $path): self
+    {
+        return new self(sprintf('There is no deck at "%s".', $path));
+    }
+
     public static function cannotRead(string $path, string $reason): self
     {
         return new self(sprintf(

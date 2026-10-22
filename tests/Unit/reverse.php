@@ -748,3 +748,18 @@ it('takes the pictures out of a deck that has words as well', function () {
     expect($markdown)->toContain('Words.')
         ->and($markdown)->toContain('![');
 });
+
+it('refuses a source that is neither a deck nor the name of one', function () {
+    expect(fn () => (new PowerPointToMarkdown('/nowhere/deck.pptx'))->convert())
+        ->toThrow(UnreadableDeck::class, 'There is no deck at "/nowhere/deck.pptx"');
+});
+
+it('reads a deck given as bytes and a deck given as a path the same way', function () {
+    $path = writtenDeck("# Harbour lights\n");
+    $bytes = (string) file_get_contents($path);
+
+    $fromPath = (new PowerPointToMarkdown($path, new Options(mediaDirectory: null)))->convert();
+    $fromBytes = (new PowerPointToMarkdown($bytes, new Options(mediaDirectory: null)))->convert();
+
+    expect($fromBytes)->toBe($fromPath);
+});
