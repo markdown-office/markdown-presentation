@@ -45,9 +45,10 @@ There is none in this repository. The command line is [`mdoffice`][mdoffice], on
 for Markdown to Word and to PowerPoint, which requires this package and calls it rather
 than reimplementing any of it.
 
-Every command, every option and every default is on one page — the
-[documentation][command-line] — and that page is where they are kept, so there is one
-place to look and one place to correct.
+Every command, every option and every default is in the
+[documentation][command-line] — a chapter of its own, with the options of each half on a
+page of their own — and that is where they are kept, so there is one place to look and
+one place to correct.
 
 ## Splitting a deck
 
@@ -2164,5 +2165,5 @@ file they name. `tests/Readme/examples.php` is the mechanism.
 
 MIT. See [LICENSE](./LICENSE).
 
-[command-line]: https://markdown-office.github.io/guides/command-line/
+[command-line]: https://markdown-office.github.io/command-line/basic/
 [mdoffice]: https://github.com/markdown-office/mdoffice
