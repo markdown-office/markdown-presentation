@@ -1,0 +1,55 @@
+<?php
+
+declare(strict_types=1);
+
+namespace MarkdownPresentation\Reverse;
+
+/**
+ * Switches for reading a `.pptx` back into a deck.
+ *
+ * The points where a `.pptx` and a deck genuinely do not agree, and nothing else:
+ * a deck is text and a `.pptx` is a package of positioned boxes, and everything
+ * this library has to decide about that difference is a switch here.
+ */
+final class Options
+{
+    /**
+     * @param string|null $mediaDirectory A directory, relative to the deck, the
+     *        pictures are taken out into. Null leaves the pictures out of the
+     *        deck altogether, which is the only honest answer: a deck that
+     *        refers to a picture with no file behind it is a deck with a broken
+     *        image in it.
+     * @param int         $maxPartBytes The largest one part of the package may be
+     *        once decompressed. A `.pptx` is somebody else's file, and a zip says
+     *        nothing about how much room its contents will take up.
+     * @param int         $maxEntries The largest number of parts the package may
+     *        have, read from its central directory and costing no decompression.
+     */
+    public function __construct(
+        public readonly ?string $mediaDirectory = 'media',
+        public readonly string $lineEnding = "\n",
+        public readonly int $maxPartBytes = 268435456,
+        public readonly int $maxEntries = 4096,
+    ) {
+    }
+
+    public function withMediaDirectory(?string $directory): self
+    {
+        return new self($directory, $this->lineEnding, $this->maxPartBytes, $this->maxEntries);
+    }
+
+    public function withLineEnding(string $ending): self
+    {
+        return new self($this->mediaDirectory, $ending, $this->maxPartBytes, $this->maxEntries);
+    }
+
+    public function withMaxPartBytes(int $bytes): self
+    {
+        return new self($this->mediaDirectory, $this->lineEnding, $bytes, $this->maxEntries);
+    }
+
+    public function withMaxEntries(int $entries): self
+    {
+        return new self($this->mediaDirectory, $this->lineEnding, $this->maxPartBytes, $entries);
+    }
+}

@@ -1,6 +1,6 @@
 # Examples
 
-Eleven decks, each demonstrating one thing. `build.php` converts every one into a
+Each deck demonstrates one thing. `build.php` converts every one into a
 real `.pptx` under `out/` and renders **one PNG per slide** beside it, so the
 result can be checked without PowerPoint. One file per slide rather than one per
 deck: a deck's whole question is usually whether slide three overflows, which is

@@ -213,6 +213,9 @@ function pagesWithClaim(string $claim): array
 it('does not claim again what the code does not do', function (string $claim) {
     expect(sourcesWithClaim($claim))->toBe([]);
 })->with([
+    'a placeholder and a text box answer getPlainText() differently' => 'a placeholder and a text box answer `getPlainText()` differently',
+    'a placeholder separates its paragraphs with a line break' => 'separates its paragraphs with a line break',
+    'the examples page counts the decks it lists' => 'Eleven decks',
     'a thematic break inside a slide can be written as ---' => 'thematic break can be written as `---`',
     'the deck frontmatter is a block of its own' => 'frontmatter is a block of its own',
     'an unknown theme falls back to the default one' => 'falls back to the default theme',

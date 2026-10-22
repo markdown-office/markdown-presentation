@@ -26,10 +26,16 @@
         "ext-zip": "*",
         "league/commonmark": "^2.10",
         "markdown-office/commonmark-generic-directives": "^0.2.0",
-        "phpoffice/phppresentation": "dev-master#67a3b85673a7e05c7347e0c3970f9afb2338e246",
+        "phpoffice/phppresentation": "dev-fix/picture-bytes#9150aae1bff3de1364e86816dd5f7b2803d49f35",
         "php": "^8.2",
         "symfony/yaml": "^7.2 || ^8.0"
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/markdown-office/PHPPresentation"
+        }
+    ],
     "require-dev": {
         "ext-simplexml": "*",
         "pestphp/pest": "^3.0 || ^4.0 || ^5.0"
@@ -57,7 +63,7 @@
         "test": "pest",
         "test:unit": "pest --testsuite=unit",
         "test:readme": "pest --testsuite=readme",
-        "test:coverage": "pest --coverage --min=100",
+        "test:coverage": "php -d memory_limit=-1 vendor/bin/pest --coverage --min=100",
         "analyse": "tools/phpstan.sh",
         "check": [
             "@composer validate --strict",
