@@ -31,9 +31,28 @@ composer require markdown-office/markdown-presentation
 
 PHP 8.2 or newer, `symfony/yaml` and `phpoffice/phppresentation` as hard dependencies: the
 frontmatter of a deck and every file of a theme is YAML, and a partial parser is worse for
-the machines that write them than for the people that do. The renderer is pinned to a
-commit of the PHPPresentation `master` branch rather than to a tag — see
-[Conformance](#conformance).
+the machines that write them than for the people that do.
+
+**The project that installs this one has to allow a plugin.** This library writes a few
+things a released PHPPresentation cannot — a table that says which row is its header, a
+shape that says how round its corners are, a picture that says where it was read from — and
+gets them from a patch applied to the installed package. The patch is applied by
+[`cweagans/composer-patches`][composer-patches], which Composer only runs when the project
+allows it:
+
+```json
+{
+    "config": {
+        "allow-plugins": {
+            "cweagans/composer-patches": true
+        }
+    }
+}
+```
+
+Without that line the install stops with Composer's own message naming the plugin. The
+library refuses to work rather than write a deck with the parts missing, and says which
+plugin is the reason.
 
 `ext-imagick` is optional and enables [SVG](#what-an-svg-costs-you). PowerPoint holds a
 vector only beside a raster of it, so something has to draw the raster; without the
@@ -2237,4 +2256,5 @@ file they name. `tests/Readme/examples.php` is the mechanism.
 MIT. See [LICENSE](./LICENSE).
 
 [command-line]: https://markdown-office.github.io/command-line/basic/
+[composer-patches]: https://github.com/cweagans/composer-patches
 [mdoffice]: https://github.com/markdown-office/mdoffice
