@@ -60,23 +60,16 @@ final class ShapeMapper
      */
     public function blocks(AbstractShape $shape, int $slide, int $image, bool $outline = false): array
     {
-        if ($shape instanceof Table) {
-            return $this->table($shape);
-        }
-
-        if ($shape instanceof Gd || $shape instanceof Base64) {
-            return $this->picture($shape, $slide, $image);
-        }
-
-        if ($shape instanceof RichText) {
-            return $this->prose(
+        return match (true) {
+            $shape instanceof Table => $this->table($shape),
+            $shape instanceof Gd || $shape instanceof Base64 => $this->picture($shape, $slide, $image),
+            $shape instanceof RichText => $this->prose(
                 array_values($shape->getParagraphs()),
                 $outline,
                 $this->linkOf($shape),
-            );
-        }
-
-        return [];
+            ),
+            default => [],
+        };
     }
 
     /**
@@ -342,24 +335,46 @@ final class ShapeMapper
             return [];
         }
 
-        $path = $shape->getPath();
+        $readable = $this->readablePicture($shape);
 
-        if ($path === '') {
+        if ($readable === null) {
             return [];
         }
 
-        $name = basename($path);
-        $contents = @file_get_contents($path);
-
-        if ($contents === false || ! $this->isImage($name, $contents)) {
-            return [];
-        }
+        [$name, $contents] = $readable;
 
         return [Block::image(new Image(
             $shape->getDescription(),
             sprintf('slide-%d-image-%d.%s', $slide, $image, pathinfo($name, PATHINFO_EXTENSION)),
             $contents,
         ))];
+    }
+
+    /**
+     * The bytes of a picture, or nothing when it is not one that can be read.
+     *
+     * A picture that cannot be read, or that is not an image at all, is left
+     * out: a deck with an image reference to nothing is a deck with a broken
+     * image in it, which is worse than a deck without the image.
+     *
+     * @return array{0: string, 1: string}|null The name and the bytes of it.
+     */
+    private function readablePicture(Gd|Base64 $shape): ?array
+    {
+        $path = $shape->getPath();
+
+        if ($path === '') {
+            return null;
+        }
+
+        $name = basename($path);
+        $contents = @file_get_contents($path);
+
+        if ($contents === false || ! $this->isImage($name, $contents)) {
+            return null;
+        }
+
+        return [$name, $contents];
     }
 
     /**

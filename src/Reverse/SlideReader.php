@@ -141,23 +141,13 @@ final class SlideReader
 
         $type = $shape->getPlaceholder()?->getType() ?? '';
 
-        if (in_array($type, self::TITLE, true)) {
-            return 'title';
-        }
-
-        if (in_array($type, self::SUBTITLE, true)) {
-            return 'subtitle';
-        }
-
-        if (in_array($type, self::BODY, true)) {
-            return 'body';
-        }
-
-        if (in_array($type, self::FURNITURE, true)) {
-            return 'furniture';
-        }
-
-        return 'free';
+        return match (true) {
+            in_array($type, self::TITLE, true) => 'title',
+            in_array($type, self::SUBTITLE, true) => 'subtitle',
+            in_array($type, self::BODY, true) => 'body',
+            in_array($type, self::FURNITURE, true) => 'furniture',
+            default => 'free',
+        };
     }
 
     /**
