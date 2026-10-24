@@ -171,6 +171,36 @@ jobs:
           echo "::error::under Settings -> Secrets and variables -> Actions."
           exit 1
 
+      # A token that SonarCloud refuses surfaces as a bare 403 on
+      # `/analysis/jres`, several steps into the scanner's own output, where it
+      # reads like a problem with the code rather than with the credential.
+      # Asking first says which of the two it is, and the answer names the
+      # account the token belongs to, which is the thing that has to change.
+      - name: Does SonarCloud accept the token?
+        run: |
+          code=$(curl -sS -o /tmp/sonar-user.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${SONAR_TOKEN}" \
+            https://sonarcloud.io/api/users/current || echo 000)
+
+          if [ "${code}" = "000" ]; then
+            echo "::error::SonarCloud could not be reached, so the analysis cannot run."
+            echo "::error::This is not a statement about the token; it is a statement about the network."
+            exit 1
+          fi
+
+          if [ "${code}" != "200" ]; then
+            echo "::error::SonarCloud answered ${code} for this token, so it will analyse nothing."
+            echo "::error::A token it refuses has been revoked, or belongs to an account that has"
+            echo "::error::no access to the markdown-office organisation."
+            echo "::error::Create one at https://sonarcloud.io/account/security under the account"
+            echo "::error::that owns the organisation, then add it as the repository secret"
+            echo "::error::SONAR_TOKEN under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+          login=$(sed -n 's/.*"login":"\([^"]*\)".*/\1/p' /tmp/sonar-user.json)
+          echo "the token belongs to ${login:-an account SonarCloud did not name}"
+
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # SonarCloud needs the full history to attribute new code, which a
