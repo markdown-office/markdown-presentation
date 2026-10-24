@@ -90,6 +90,28 @@ it('keeps the paragraphs of a title apart', function () {
         ->and($markdown)->not->toContain('First lineSecond line');
 });
 
+it('does not let an empty title take the heading away', function () {
+    // A title that is empty is not a title, so what it held is read as the
+    // blocks it was and the heading the slide already carries is left alone.
+    // Two titles on one slide is unusual, and nothing in the deck says which
+    // of them is the heading, so the order they are in is what decides.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('ctrTitle');
+        $shape->setPlaceHolder(new Placeholder('ctrTitle'));
+        $shape->createParagraph()->createTextRun('Harbour lights');
+
+        $empty = $slide->createRichTextShape();
+        $empty->setName('ctrTitle');
+        $empty->setPlaceHolder(new Placeholder('ctrTitle'));
+        $empty->createParagraph()->createTextRun('   ');
+    });
+
+    $markdown = converted($path);
+
+    expect($markdown)->toContain('# Harbour lights');
+});
+
 it('keeps the paragraphs of a subtitle apart', function () {
     $path = deckWithShapes(static function (AbstractSlide $slide): void {
         $shape = $slide->createRichTextShape();
