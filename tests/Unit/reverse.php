@@ -121,6 +121,73 @@ function tableWithCell(array $paragraphs): TableShape
 }
 
 /**
+ * A picture that declares a canvas of forty thousand by forty thousand.
+ *
+ * The header is what says so, and the header is what the size is read from —
+ * the picture is a few dozen bytes and the data behind it is a stub, because
+ * nothing decodes it: a picture over the ceiling is refused from its header.
+ *
+ * @return string The bytes of the picture.
+ */
+function bombPicture(): string
+{
+    $chunk = static function (string $type, string $data): string {
+        return pack('N', strlen($data)) . $type . $data . pack('N', crc32($type . $data));
+    };
+
+    $header = pack('NN', 40000, 40000) . pack('C', 8) . pack('C', 2) . pack('C', 0) . pack('C', 0) . pack('C', 0);
+
+    return pack('H*', '89504e470d0a1a0a')
+        . $chunk('IHDR', $header)
+        . $chunk('IDAT', gzcompress("\0"))
+        . $chunk('IEND', '');
+}
+
+/**
+ * A deck with one picture in it, holding the bytes named.
+ *
+ * The picture is put into a deck this library wrote, so that the deck is one
+ * the reader accepts and the picture is the only thing hostile about it.
+ */
+function deckWithPicture(string $picture): string
+{
+    $path = Scratch::file('deck.pptx', '');
+
+    $presentation = new PhpPresentation();
+    $slide = $presentation->getActiveSlide();
+
+    $shape = $slide->createRichTextShape();
+    $shape->setName('Text');
+    $shape->createText('A picture');
+
+    $drawing = new Gd();
+    $drawing->setContents($picture);
+    $slide->addShape($drawing);
+
+    IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
+
+    return $path;
+}
+
+/**
+ * A deck whose only shape holds a list nested the given number of levels.
+ */
+function deckWithNestedList(int $levels): string
+{
+    return deckWithShapes(static function (AbstractSlide $slide) use ($levels): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('Text');
+
+        for ($level = 0; $level <= $levels; $level++) {
+            $paragraph = $shape->createParagraph();
+            $paragraph->getAlignment()->setLevel($level);
+            $paragraph->getBulletStyle()->setBulletType(Bullet::TYPE_BULLET);
+            $paragraph->createTextRun('Level ' . $level);
+        }
+    });
+}
+
+/**
  * A URL that reads a part out of a package made for the test.
  */
 function zipUrl(string $part, string $contents): string
@@ -595,6 +662,57 @@ it('refuses a part larger than the limit allows', function () {
     expect(fn () => converted($path, new Options(mediaDirectory: null, maxPartBytes: 16)))
         ->toThrow(UnreadableDeck::class, 'larger than the 16 allowed');
 });
+
+it('refuses a picture larger than a picture is allowed to be', function () {
+    // The reader opens every picture in the deck as it reads it, and a picture
+    // is allocated by the canvas its header declares rather than by the bytes it
+    // is made of: a picture of a couple of hundred kilobytes can ask for a
+    // canvas of several gigabytes. The memory that takes is outside the limit
+    // PHP enforces, so the process is killed rather than the deck refused.
+    //
+    // The picture here declares a canvas of forty thousand by forty thousand.
+    $path = deckWithPicture(bombPicture());
+
+    expect(fn () => converted($path, new Options(mediaDirectory: null)))
+        ->toThrow(UnreadableDeck::class, '40000 x 40000 pixels');
+});
+
+it('refuses a list that nests deeper than a list may nest', function () {
+    // Reading a list is a walk that recurses once per level, and the level
+    // comes from the deck: a shape whose paragraphs sit at ever deeper levels
+    // is a shape the walk never comes back from. Without a ceiling the walk
+    // does not return an error — it runs out of stack and the process dies on
+    // a signal, which is not something a caller can catch.
+    $path = deckWithNestedList(Options::MAX_NESTING + 1);
+
+    expect(fn () => converted($path, new Options(mediaDirectory: null)))
+        ->toThrow(UnreadableDeck::class, 'more than the 32 allowed');
+});
+
+it('refuses a list that nests deeper than a list may nest, when it is written', function () {
+    // The writer walks the same tree the reader built, and it is public API:
+    // a caller holding a tree of blocks can write it without the reader having
+    // seen it, so the ceiling is checked on this side too.
+    $nested = Block::paragraph([]);
+
+    for ($level = 0; $level <= Options::MAX_NESTING + 1; $level++) {
+        $nested = Block::list([Block::item([$nested])]);
+    }
+
+    $writer = new DeckWriter(new Options(mediaDirectory: null));
+
+    expect(fn () => $writer->write([new Slide(1, null, [$nested], null)], new DocumentProperties()))
+        ->toThrow(UnreadableDeck::class, 'more than the 32 allowed');
+});
+
+it('reads a picture that is not one, and leaves it out', function () {
+    // A deck may hold a media part that is not a raster — a vector, a sound —
+    // and the size of a picture cannot be read out of one.
+    $path = deckWithPicture('not a picture at all');
+
+    expect(converted($path, new Options(mediaDirectory: null)))->toContain('A picture');
+});
+
 
 it('refuses a file that is not a deck', function () {
     $path = Scratch::file('not-a-deck.pptx', 'this is not a package');

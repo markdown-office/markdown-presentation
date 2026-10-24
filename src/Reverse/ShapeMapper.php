@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Reverse;
 
+use MarkdownPresentation\Exception\UnreadableDeck;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Shape\Drawing\Base64;
 use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
@@ -195,6 +196,15 @@ final class ShapeMapper
     private function items(array $items, int &$position, int $level): array
     {
         $blocks = [];
+
+        // The walk recurses once per level of nesting, and the level comes from
+        // the deck: a shape whose paragraphs sit at ever deeper levels is a
+        // shape that never comes back, and the walk takes the stack with it
+        // rather than returning an error. The ceiling is checked where the
+        // nesting is read, so a deck that goes past it is refused.
+        if ($level > Options::MAX_NESTING) {
+            throw UnreadableDeck::nestedTooDeep(Options::MAX_NESTING);
+        }
 
         while (isset($items[$position]) && $items[$position]['level'] >= $level) {
             if ($items[$position]['level'] > $level) {

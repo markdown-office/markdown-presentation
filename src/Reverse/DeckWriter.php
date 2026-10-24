@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Reverse;
 
+use MarkdownPresentation\Exception\UnreadableDeck;
 use PhpOffice\PhpPresentation\DocumentProperties;
 
 /**
@@ -169,6 +170,14 @@ final class DeckWriter
     {
         $lines = [];
         $number = 0;
+
+        // The walk down a list recurses once per level, and the nesting is
+        // whatever the deck said it was. A deck whose items nest without end
+        // takes the stack with it rather than returning an error, so the
+        // ceiling is checked where the nesting is written down.
+        if ($depth > Options::MAX_NESTING) {
+            throw UnreadableDeck::nestedTooDeep(Options::MAX_NESTING);
+        }
 
         foreach ($block->children as $item) {
             $number++;
