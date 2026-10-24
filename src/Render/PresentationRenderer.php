@@ -201,6 +201,9 @@ final class PresentationRenderer
      * @throws \MarkdownPresentation\Exception\MalformedShape When a free-placement directive
      *     names an attribute it does not read, or gives one a value it cannot be.
      *
+     * @throws \MarkdownPresentation\Exception\UnpatchedDependency When the installed
+     *     PHPPresentation lacks what this library needs of it.
+     *
      * @return string The path written.
      */
     public function render(Deck $deck, string $path): string

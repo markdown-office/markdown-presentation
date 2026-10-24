@@ -854,6 +854,37 @@ it('changes one option and leaves the others', function () {
         ->and($options->withMaxEntries(1)->maxPartBytes)->toBe($options->maxPartBytes);
 });
 
+it('carries every option through every method that changes one', function () {
+    // The test above names the options one by one, so a fifth option added to
+    // the class would be dropped by every `with*()` and the suite would still
+    // be green. This one reads the class instead, so a new option cannot be
+    // added without the methods carrying it.
+    $properties = (new ReflectionClass(Options::class))->getProperties();
+    $names = array_map(
+        static fn (ReflectionProperty $property): string => $property->getName(),
+        $properties,
+    );
+
+    $options = new Options();
+
+    foreach ($names as $name) {
+        $value = $options->{$name};
+
+        foreach ($names as $other) {
+            $changed = new Options();
+
+            foreach ($names as $set) {
+                $changed = match ($set) {
+                    $name => $changed->{'with' . ucfirst($name)}($value),
+                    default => $changed,
+                };
+            }
+
+            expect($changed->{$other})->toBe($options->{$other});
+        }
+    }
+});
+
 it('escapes the characters that would otherwise be read as Markdown', function (string $text, string $expected) {
     expect(Escaping::text($text))->toBe($expected);
 })->with([

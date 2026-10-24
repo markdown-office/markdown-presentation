@@ -6,6 +6,7 @@ namespace MarkdownPresentation;
 
 use MarkdownPresentation\Exception\FileNotWritable;
 use MarkdownPresentation\Exception\NothingToConvert;
+use MarkdownPresentation\Exception\UnpatchedDependency;
 use MarkdownPresentation\Exception\UnreadableDeck;
 use MarkdownPresentation\Reverse\Block;
 use MarkdownPresentation\Reverse\DeckReader;
@@ -61,6 +62,8 @@ final class PowerPointToMarkdown
      * @throws NothingToConvert when no source was given.
      * @throws UnreadableDeck when the source is not a deck this can read.
      * @throws FileNotWritable when there is a target and it cannot be written.
+     * @throws UnpatchedDependency when the installed PHPPresentation lacks what this
+     *     library needs of it.
      */
     public function convert(?string $target = null): string
     {
@@ -91,6 +94,8 @@ final class PowerPointToMarkdown
      * The deck, as Markdown, from the bytes of one.
      *
      * @throws UnreadableDeck when the bytes are not a deck this can read.
+     * @throws UnpatchedDependency when the installed PHPPresentation lacks what this
+     *     library needs of it.
      */
     public function toMarkdown(string $bytes): string
     {
@@ -109,6 +114,8 @@ final class PowerPointToMarkdown
      *
      * @return list<Slide>
      * @throws UnreadableDeck when the source is not a deck this can read.
+     * @throws UnpatchedDependency when the installed PHPPresentation lacks what this
+     *     library needs of it.
      */
     public function read(string $path): array
     {

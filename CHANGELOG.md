@@ -46,8 +46,8 @@ All notable changes to this project are documented here. The format follows
 
   **Nothing this library draws changes.** The patch carries upstream's branch whole, so
   what the library draws is what it drew before: the same tests pass, and the files the
-  library writes are the same files. The suite is the evidence: 1312 tests pass against
-  the patched release, at 100% coverage and level 9 of static analysis.
+  library writes are the same files. The suite is the evidence: it passes against the
+  patched release, at 100% coverage and level 9 of static analysis.
 
   **The fix that has not been merged upstream yet is still not.** Two of upstream's
   defects are reported rather than worked around: a picture's path is never set, so asking

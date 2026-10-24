@@ -17,8 +17,7 @@ use PhpOffice\PhpPresentation\Slide as PowerPointSlide;
  *
  * - the title, because a title is a title whatever it is drawn at;
  * - the subtitle, for the same reason;
- * - everything else, by where it sits — the top of it first, and the left of it
- *   when two share a top.
+ * - everything else, in the order the slide lists its shapes in.
  *
  * The furniture is left out: a date, a footer and a slide number are on every
  * slide of a deck and say nothing about this one.
@@ -101,7 +100,7 @@ final class SlideReader
 
         $image = 0;
 
-        foreach ($this->byPosition($rest) as [$shape, $outline]) {
+        foreach ($this->asListed($rest) as [$shape, $outline]) {
             $blocks = [...$blocks, ...$this->mapper->blocks($shape, $index + 1, $image, $outline)];
             $image++;
         }
@@ -124,7 +123,7 @@ final class SlideReader
      *
      * @return list<array{AbstractShape, bool}>
      */
-    private function byPosition(array $shapes): array
+    private function asListed(array $shapes): array
     {
         return $shapes;
     }

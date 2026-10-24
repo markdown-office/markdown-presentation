@@ -22,15 +22,13 @@ use PhpOffice\PhpPresentation\Style\Font;
  * The shape of a slide is a set of boxes, and the shape of a deck is a
  * sequence of blocks. This is where the first becomes the second.
  *
- * Three things decide what a shape becomes, and only three:
+ * Two things decide what a shape becomes, and only two:
  *
  * - **What kind of shape it is.** A text box is prose, a table is a table, a
  *   picture is a picture.
  * - **What it says.** A run's bold, italic and strike travel; its size, its
  *   colour and its face do not, because a deck has no way to say them and
  *   because the design of the new deck is not the design of the old one.
- * - **Where it sits.** Only for the order: a slide is a set of boxes, and the
- *   boxes have to be put in an order, and the order is where they are.
  */
 final class ShapeMapper
 {
@@ -51,8 +49,10 @@ final class ShapeMapper
      *
      * @param int   $slide   The slide's number, counting from one, which names
      *        the pictures written out of it.
-     * @param int   $image   How many pictures this slide has already given, so
-     *        that the names do not collide.
+     * @param int   $image   How many shapes this slide has already given, which
+     *        names the pictures so that they do not collide. It counts the
+     *        shapes and not the pictures, so a slide with a text box and then a
+     *        picture names the picture after the second shape.
      * @param bool  $outline Whether the shape is a body placeholder, whose
      *        paragraphs are an outline whether or not the slide says so.
      *
