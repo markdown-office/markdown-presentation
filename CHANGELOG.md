@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-24
 
 ### Added
 
@@ -46,8 +46,8 @@ All notable changes to this project are documented here. The format follows
 
   **Nothing this library draws changes.** The patch carries upstream's branch whole, so
   what the library draws is what it drew before: the same tests pass, and the files the
-  library writes are the same files. The suite is the evidence: 1312 tests pass against
-  the patched release, at 100% coverage and level 9 of static analysis.
+  library writes are the same files. The suite is the evidence: it passes against the
+  patched release, at 100% coverage and level 9 of static analysis.
 
   **The fix that has not been merged upstream yet is still not.** Two of upstream's
   defects are reported rather than worked around: a picture's path is never set, so asking
@@ -61,6 +61,52 @@ All notable changes to this project are documented here. The format follows
 
   The repository commits no lock file, so the lines in `composer.json` are the only
   statement of what a consumer is given.
+
+### Fixed
+
+- **The pictures are written beside the Markdown that names them.** The reference in
+  the Markdown is relative to the Markdown, and the pictures went to the working
+  directory of whatever process happened to be running: for any target outside it,
+  which is every target a caller gives a path to, the link was broken and the
+  picture was where nothing pointed at it. A relative media directory is now
+  resolved against the directory of the Markdown it is written beside.
+
+- **A cell keeps everything written into it.** Only the first block of a cell was
+  read, so a cell with two paragraphs lost the second, and a cell whose paragraph
+  carried a bullet came back empty — a bulleted paragraph is a list rather than a
+  paragraph, and a list has no inline content of its own.
+
+- **A list whose levels jump keeps every item.** The walk that reads the nested
+  items ended when it came back to a level between the one it was reading and the
+  one it had descended to, and everything from the jump onwards was dropped with
+  nothing to say so.
+
+- **The paragraphs of a title are read apart.** `getPlainText()` runs them
+  together, so a title of two paragraphs came back as one line with the words of
+  the two glued to each other, and a subtitle of two paragraphs came back as
+  `A field guideto the North`. A title is one line in Markdown, so only its first
+  paragraph is the heading and the rest are the blocks they are.
+
+- **The alt text of a picture and the address of a link are escaped.** The alt
+  text is a `descr` attribute of the picture, so it is whatever the author
+  typed, and a bracket in it ended the reference early and a newline in it ended
+  the line the reference was on, leaving the rest of it as prose.
+
+### Security
+
+- **A picture over the ceiling is refused before it is opened.** The reader opens
+  every picture in the deck as it reads it, and a picture is allocated by the
+  canvas its header declares rather than by the bytes it is made of: a 1.2 MB PNG
+  that says 40000 by 40000 decodes to 2.9 GB of resident memory, and PHP's
+  `memory_limit` does not contain it, because the allocation is GD's and is
+  outside the heap PHP tracks. The pictures in a deck are now measured from their
+  headers, without decoding them, and a deck holding one over the ceiling is
+  refused. The ceiling is the one the forward direction writes pictures under.
+
+- **A list may not nest without end.** Reading a list recurses once per level,
+  and the level is whatever the deck said it was, so a shape whose paragraphs sit
+  at ever deeper levels is a shape the walk never comes back from — and the walk
+  does not return an error, it runs out of stack and the process dies on a signal.
 
 ## [0.1.0] - 2026-10-19
 
@@ -1770,5 +1816,6 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
   here, and the library's releases trail its `master`.
 
 [0.1.0]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.1.0
+[0.2.0]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.2.0
 [composer-patches]: https://github.com/cweagans/composer-patches
 [the-patch]: https://github.com/markdown-office/PHPPresentation/blob/patches/1.2.0-to-master/patches/phpoffice-phppresentation-1.2.0-to-master.patch

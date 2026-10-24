@@ -23,15 +23,17 @@ use PhpOffice\PhpPresentation\Shape\Table;
  * middle of the work naming a method rather than the reason. A reader of that error
  * would not know to look at the installer.
  *
- * The methods are the ones the library calls, so the check says what the code needs
- * rather than which version carries it. A PHPPresentation that has them by any other
- * means passes, which is what happens once upstream releases them and the patch is
- * dropped.
+ * The methods are the ones the patch adds, so the check says what the code needs
+ * rather than which version carries it. Two of them are not called by this
+ * library — they are there because the patch adds them and a released
+ * PHPPresentation has neither, so they stand in for the patch being applied.
+ * A PHPPresentation that has them by any other means passes, which is what
+ * happens once upstream releases them and the patch is dropped.
  */
 final class Fixes
 {
     /**
-     * The methods the library calls that a released PHPPresentation does not have.
+     * The methods the patch adds, which a released PHPPresentation does not have.
      *
      * @var array<class-string, string>
      */

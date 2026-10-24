@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Reverse;
 
+use MarkdownPresentation\Reverse\Inline;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Shape\RichText;
 use PhpOffice\PhpPresentation\Slide as PowerPointSlide;
@@ -16,8 +17,7 @@ use PhpOffice\PhpPresentation\Slide as PowerPointSlide;
  *
  * - the title, because a title is a title whatever it is drawn at;
  * - the subtitle, for the same reason;
- * - everything else, by where it sits — the top of it first, and the left of it
- *   when two share a top.
+ * - everything else, in the order the slide lists its shapes in.
  *
  * The furniture is left out: a date, a footer and a slide number are on every
  * slide of a deck and say nothing about this one.
@@ -44,7 +44,7 @@ final class SlideReader
     public function read(PowerPointSlide $slide, int $index): Slide
     {
         $title = null;
-        $subtitle = null;
+        $front = [];
         $rest = [];
 
         foreach ($slide->getShapeCollection() as $shape) {
@@ -55,13 +55,40 @@ final class SlideReader
             }
 
             if ($role === 'title' && $shape instanceof RichText) {
-                $title = $this->text($shape) ?? $title;
+                // A title is one line in Markdown, so only the first paragraph of
+                // the title can be the heading. The rest are the title's own
+                // paragraphs and are read as the blocks they are, rather than
+                // being run into the heading: `getPlainText()` runs the
+                // paragraphs together, and a title of two paragraphs came back
+                // as one line with the words of the two glued to each other.
+                //
+                // The paragraphs are read the way any other text is read, which
+                // is what skips the empty one a deck written by PHPPresentation
+                // carries at the front of its shapes.
+                $paragraphs = $this->mapper->prose(array_values($shape->getParagraphs()));
+
+                if ($paragraphs !== []) {
+                    $first = $paragraphs[0];
+                    $remaining = array_slice($paragraphs, 1);
+
+                    $text = trim($this->plain($first->inlines));
+
+                    if ($text !== '') {
+                        $title = $text;
+                    }
+
+                    // A title that is empty is not a title, so what it held is
+                    // read as the blocks it was.
+                    $front = [...$front, ...($text === '' ? $paragraphs : $remaining)];
+                }
 
                 continue;
             }
 
             if ($role === 'subtitle' && $shape instanceof RichText) {
-                $subtitle = $this->text($shape) ?? $subtitle;
+                // A subtitle is read the way any other text is read, so that its
+                // paragraphs stay paragraphs.
+                $front = [...$front, ...$this->mapper->prose(array_values($shape->getParagraphs()))];
 
                 continue;
             }
@@ -69,15 +96,11 @@ final class SlideReader
             $rest[] = [$shape, $role === 'body'];
         }
 
-        $blocks = [];
-
-        if ($subtitle !== null) {
-            $blocks[] = Block::paragraph([Inline::text($subtitle)]);
-        }
+        $blocks = $front;
 
         $image = 0;
 
-        foreach ($this->byPosition($rest) as [$shape, $outline]) {
+        foreach ($this->asListed($rest) as [$shape, $outline]) {
             $blocks = [...$blocks, ...$this->mapper->blocks($shape, $index + 1, $image, $outline)];
             $image++;
         }
@@ -100,7 +123,7 @@ final class SlideReader
      *
      * @return list<array{AbstractShape, bool}>
      */
-    private function byPosition(array $shapes): array
+    private function asListed(array $shapes): array
     {
         return $shapes;
     }
@@ -118,33 +141,33 @@ final class SlideReader
 
         $type = $shape->getPlaceholder()?->getType() ?? '';
 
-        if (in_array($type, self::TITLE, true)) {
-            return 'title';
-        }
-
-        if (in_array($type, self::SUBTITLE, true)) {
-            return 'subtitle';
-        }
-
-        if (in_array($type, self::BODY, true)) {
-            return 'body';
-        }
-
-        if (in_array($type, self::FURNITURE, true)) {
-            return 'furniture';
-        }
-
-        return 'free';
+        return match (true) {
+            in_array($type, self::TITLE, true) => 'title',
+            in_array($type, self::SUBTITLE, true) => 'subtitle',
+            in_array($type, self::BODY, true) => 'body',
+            in_array($type, self::FURNITURE, true) => 'furniture',
+            default => 'free',
+        };
     }
 
     /**
-     * The text of a shape, or null when it has none.
+     * The words of a block, without the formatting around them.
+     *
+     * The title of a slide is a heading, and a heading carries no formatting of
+     * its own, so the words are what is wanted and the bold and the italic are
+     * not. A link is the words inside it.
+     *
+     * @param list<Inline> $inlines
      */
-    private function text(RichText $shape): ?string
+    private function plain(array $inlines): string
     {
-        $text = trim($shape->getPlainText());
+        $text = '';
 
-        return $text === '' ? null : $text;
+        foreach ($inlines as $inline) {
+            $text .= $inline->kind === Inline::LINK ? $this->plain($inline->children) : $inline->text;
+        }
+
+        return $text;
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Reverse;
 
+use MarkdownPresentation\Exception\UnreadableDeck;
 use PhpOffice\PhpPresentation\DocumentProperties;
 
 /**
@@ -170,6 +171,14 @@ final class DeckWriter
         $lines = [];
         $number = 0;
 
+        // The walk down a list recurses once per level, and the nesting is
+        // whatever the deck said it was. A deck whose items nest without end
+        // takes the stack with it rather than returning an error, so the
+        // ceiling is checked where the nesting is written down.
+        if ($depth > Options::MAX_NESTING) {
+            throw UnreadableDeck::nestedTooDeep(Options::MAX_NESTING);
+        }
+
         foreach ($block->children as $item) {
             $number++;
             $marker = $block->ordered ? $number . '. ' : '- ';
@@ -240,7 +249,7 @@ final class DeckWriter
             $cells = [];
 
             foreach ($row->children as $cell) {
-                $cells[] = $this->inlines($cell->children[0]->inlines ?? [], inTable: true);
+                $cells[] = $this->cell($cell);
                 $width = max($width, count($cells));
             }
 
@@ -251,6 +260,40 @@ final class DeckWriter
         array_splice($lines, 1, 0, ['| ' . implode(' | ', array_fill(0, $width, '---')) . ' |']);
 
         return $lines;
+    }
+
+    /**
+     * A cell of a table, as the text of one.
+     *
+     * A cell holds whatever was written into it, which is usually one paragraph
+     * and can be more: a cell with two paragraphs has both of them, and a cell
+     * whose paragraph carries a bullet holds a list rather than a paragraph.
+     * Reading only the first block of the cell, as this did, lost everything
+     * after it — the second paragraph of a cell, and the whole of a bulleted one,
+     * which has no inline content of its own at all.
+     *
+     * A Markdown table cell holds one line of text, so what cannot be written on
+     * one line is written on the next and the cell is left open across the rows:
+     * a Markdown table cannot hold a paragraph break, and pretending otherwise
+     * would produce a table that does not parse.
+     */
+    private function cell(Block $cell): string
+    {
+        $parts = [];
+
+        foreach ($cell->children as $block) {
+            $lines = $this->block($block);
+
+            if ($lines !== []) {
+                $parts[] = implode(' ', $lines);
+            }
+        }
+
+        // A Markdown table cell holds one line of text, so what cannot be written
+        // on one line is written on the next and the cell is left open across the
+        // rows: a Markdown table cannot hold a paragraph break, and pretending
+        // otherwise would produce a table that does not parse.
+        return str_replace("\n", ' ', implode(' ', $parts));
     }
 
     /**
@@ -269,7 +312,11 @@ final class DeckWriter
             return [];
         }
 
-        return [sprintf('![%s](%s)', $image->alt, $this->options->mediaDirectory . '/' . $image->target)];
+        return [sprintf(
+            '![%s](%s)',
+            Escaping::label($image->alt),
+            Escaping::address($this->options->mediaDirectory . '/' . $image->target),
+        )];
     }
 
     /**
@@ -294,7 +341,7 @@ final class DeckWriter
             $lineStart = false;
 
             if ($inline->kind === Inline::LINK) {
-                $out .= '[' . $this->inlines($inline->children, $inTable) . '](' . $inline->url . ')';
+                $out .= '[' . $this->inlines($inline->children, $inTable) . '](' . Escaping::address($inline->url) . ')';
 
                 continue;
             }
