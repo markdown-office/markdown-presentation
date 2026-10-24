@@ -151,7 +151,7 @@ final class PowerPointToMarkdown
 
         $markdown = (new DeckWriter($this->options))->write($slides, $deck->getDocumentProperties());
 
-        $this->writeMedia($slides);
+        $this->writeMedia($slides, $target);
 
         if ($target !== null) {
             self::writeTo($target, $markdown);
@@ -167,17 +167,26 @@ final class PowerPointToMarkdown
      * overwrite a file that was written first, which is what keeps a second
      * conversion of the same deck from replacing what the first wrote.
      *
+     * The pictures go beside the Markdown that names them, because that is where
+     * the reference in it resolves to. A media directory given as a relative path
+     * is therefore resolved against the directory of the file the Markdown goes
+     * to, and not against the working directory of whatever called this: the
+     * reference in the Markdown is relative to the Markdown, so writing the
+     * pictures anywhere else puts them where the reference does not reach.
+     *
      * @param list<Slide> $slides
      *
      * @throws FileNotWritable when the directory or a file in it cannot be written.
      */
-    private function writeMedia(array $slides): void
+    private function writeMedia(array $slides, ?string $target): void
     {
         $directory = $this->options->mediaDirectory;
 
         if ($directory === null) {
             return;
         }
+
+        $directory = $this->mediaDirectory($directory, $target);
 
         if (! is_dir($directory) && ! self::makeDirectory($directory)) {
             throw FileNotWritable::cannotCreateMediaDirectory($directory);
@@ -192,6 +201,42 @@ final class PowerPointToMarkdown
 
             self::writeTo($target, $contents);
         }
+    }
+
+    /**
+     * Where the pictures are written, for a media directory the caller named.
+     *
+     * A directory that is already absolute is used as it stands, and a relative
+     * one is resolved against the directory of the Markdown it is written beside.
+     * With no Markdown to write — the caller asked for the text and nothing
+     * else — the working directory is what there is to resolve against, and the
+     * reference in the text is relative to wherever the caller puts it.
+     *
+     * @param string      $directory The media directory, as it was named.
+     * @param string|null $target    Where the Markdown goes, if it goes anywhere.
+     */
+    private function mediaDirectory(string $directory, ?string $target): string
+    {
+        if ($target === null || self::isAbsolute($directory)) {
+            return $directory;
+        }
+
+        return dirname($target) . '/' . $directory;
+    }
+
+    /**
+     * Whether a path is absolute, on this platform or the other one.
+     *
+     * A path that begins with a separator is absolute wherever it is written,
+     * and so is one that begins with a drive letter on Windows. The library
+     * runs on both, and a path that is absolute on the platform it was written
+     * for is absolute on the one it is read on.
+     */
+    private static function isAbsolute(string $path): bool
+    {
+        return str_starts_with($path, '/')
+            || str_starts_with($path, '\\')
+            || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1;
     }
 
     /**

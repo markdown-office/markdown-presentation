@@ -240,7 +240,7 @@ final class DeckWriter
             $cells = [];
 
             foreach ($row->children as $cell) {
-                $cells[] = $this->inlines($cell->children[0]->inlines ?? [], inTable: true);
+                $cells[] = $this->cell($cell);
                 $width = max($width, count($cells));
             }
 
@@ -251,6 +251,40 @@ final class DeckWriter
         array_splice($lines, 1, 0, ['| ' . implode(' | ', array_fill(0, $width, '---')) . ' |']);
 
         return $lines;
+    }
+
+    /**
+     * A cell of a table, as the text of one.
+     *
+     * A cell holds whatever was written into it, which is usually one paragraph
+     * and can be more: a cell with two paragraphs has both of them, and a cell
+     * whose paragraph carries a bullet holds a list rather than a paragraph.
+     * Reading only the first block of the cell, as this did, lost everything
+     * after it — the second paragraph of a cell, and the whole of a bulleted one,
+     * which has no inline content of its own at all.
+     *
+     * A Markdown table cell holds one line of text, so what cannot be written on
+     * one line is written on the next and the cell is left open across the rows:
+     * a Markdown table cannot hold a paragraph break, and pretending otherwise
+     * would produce a table that does not parse.
+     */
+    private function cell(Block $cell): string
+    {
+        $parts = [];
+
+        foreach ($cell->children as $block) {
+            $lines = $this->block($block);
+
+            if ($lines !== []) {
+                $parts[] = implode(' ', $lines);
+            }
+        }
+
+        // A Markdown table cell holds one line of text, so what cannot be written
+        // on one line is written on the next and the cell is left open across the
+        // rows: a Markdown table cannot hold a paragraph break, and pretending
+        // otherwise would produce a table that does not parse.
+        return str_replace("\n", ' ', implode(' ', $parts));
     }
 
     /**

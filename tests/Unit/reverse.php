@@ -94,6 +94,33 @@ function pictureDirectory(): string
 }
 
 /**
+ * A table with one cell, holding the paragraphs named.
+ *
+ * Each paragraph is a text, the level it sits at, and whether it carries a
+ * bullet — the three things that decide what the cell becomes.
+ *
+ * @param list<array{0: string, 1: int, 2: bool}> $paragraphs
+ */
+function tableWithCell(array $paragraphs): TableShape
+{
+    $table = new TableShape();
+    $cell = $table->createRow()->getCell(0);
+
+    foreach ($paragraphs as [$text, $level, $bullet]) {
+        $paragraph = $cell->createParagraph();
+        $paragraph->getAlignment()->setLevel($level);
+
+        if ($bullet) {
+            $paragraph->getBulletStyle()->setBulletType(Bullet::TYPE_BULLET);
+        }
+
+        $paragraph->createTextRun($text);
+    }
+
+    return $table;
+}
+
+/**
  * A URL that reads a part out of a package made for the test.
  */
 function zipUrl(string $part, string $contents): string
@@ -361,6 +388,34 @@ it('reads a table into a Markdown table', function () {
     expect($markdown)->toContain("| **Deck** | **Slides** |\n| --- | --- |\n| worked in | six |");
 });
 
+it('keeps every paragraph of a cell', function () {
+    // A cell holds whatever was written into it, which can be more than one
+    // paragraph. Reading only the first block of the cell lost the rest.
+    $table = tableWithCell([['First line', 0, false], ['Second line', 0, false]]);
+    $mapper = new ShapeMapper(new Options(mediaDirectory: null));
+    $blocks = $mapper->blocks($table, 1, 0);
+
+    $writer = new DeckWriter(new Options(mediaDirectory: null));
+    $markdown = $writer->write([new Slide(1, null, $blocks, null)], new DocumentProperties());
+
+    expect($markdown)->toContain('First line')
+        ->and($markdown)->toContain('Second line');
+});
+
+it('keeps the text of a cell whose paragraph is a bullet', function () {
+    // A bulleted paragraph in a cell is a list rather than a paragraph, and a
+    // list has no inline content of its own — so reading the cell's first block
+    // as if it were a paragraph gave an empty cell.
+    $table = tableWithCell([['Bulleted', 0, true]]);
+    $mapper = new ShapeMapper(new Options(mediaDirectory: null));
+    $blocks = $mapper->blocks($table, 1, 0);
+
+    $writer = new DeckWriter(new Options(mediaDirectory: null));
+    $markdown = $writer->write([new Slide(1, null, $blocks, null)], new DocumentProperties());
+
+    expect($markdown)->toContain('Bulleted');
+});
+
 it('reads a picture out of the deck and refers to it by name', function () {
     $images = pictureDirectory();
     $directory = Scratch::directoryPath('media');
@@ -380,6 +435,40 @@ it('writes the pictures beside the deck', function () {
     (new PowerPointToMarkdown($path, new Options(mediaDirectory: $directory)))->convert();
 
     expect(glob($directory . '/*'))->not->toBeEmpty();
+});
+
+it('writes the pictures beside the Markdown that names them', function () {
+    // The reference in the Markdown is relative to the Markdown, so the pictures
+    // have to be where it resolves to. Writing them beside the working directory
+    // instead puts them where the reference does not reach, and every conversion
+    // whose target is not in the working directory comes out with a broken image.
+    $images = pictureDirectory();
+    $path = writtenDeck("![A dot](dot.png)\n", $images);
+
+    // A target in a directory of its own, and a working directory that is not
+    // that directory: the two are what a caller gets when the deck is somewhere
+    // else and the Markdown is somewhere else again.
+    $target = Scratch::directoryPath('output') . '/deck.md';
+    $working = Scratch::directoryPath('working');
+
+    $previous = getcwd();
+    chdir($working);
+
+    try {
+        (new PowerPointToMarkdown($path, new Options(mediaDirectory: 'media')))->save($target);
+    } finally {
+        chdir((string) $previous);
+    }
+
+    $markdown = (string) file_get_contents($target);
+
+    // The reference is relative, and the file it names is beside the Markdown.
+    expect($markdown)->toContain('![A dot](media/slide-1-image-0.png)')
+        ->and(is_file(dirname($target) . '/media/slide-1-image-0.png'))->toBeTrue();
+
+    // And nothing was written into the working directory, which is where it went
+    // before and where the reference did not reach.
+    expect(glob($working . '/media/*'))->toBe([]);
 });
 
 it('leaves a picture that is already there alone', function () {
@@ -690,7 +779,14 @@ it('reads a list whose levels jump as the levels say', function () {
         }
     });
 
-    expect(converted($path))->toContain('- Level 0');
+    // Every item survives, and not only the first one: the levels jump from 0 to
+    // 2 and back to 1, and the walk that reads the nested items used to end at
+    // the jump and drop every item from there onwards.
+    $markdown = converted($path);
+
+    expect($markdown)->toContain('- Level 0')
+        ->and($markdown)->toContain('- Level 2')
+        ->and($markdown)->toContain('- Level 1');
 });
 
 it('reads a placeholder of a kind it does not know as free text', function () {

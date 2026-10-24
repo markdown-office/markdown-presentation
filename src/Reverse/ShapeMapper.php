@@ -198,7 +198,26 @@ final class ShapeMapper
 
         while (isset($items[$position]) && $items[$position]['level'] >= $level) {
             if ($items[$position]['level'] > $level) {
-                break;
+                // The item is deeper than this level, so it belongs to the item
+                // before it rather than beside it. The walk that reads the
+                // nested items takes the position with it, and what comes back
+                // may be at a level between the two — a list whose levels jump
+                // from 0 to 2 and back to 1 gives an item at level 1 where the
+                // nested walk left off.
+                //
+                // That item is a child of the item being read, at a level of its
+                // own, so it is read as a nested list of its own rather than
+                // dropped: ending the walk here lost every item from the jump
+                // onwards, with nothing to say so.
+                $ordered = $items[$position]['ordered'];
+
+                // The walk is pointed at the item it is about, so it always takes
+                // that item: the level it is given is the level that item has.
+                $nested = $this->items($items, $position, $items[$position]['level']);
+
+                $blocks[] = Block::item([Block::list($nested, $ordered)]);
+
+                continue;
             }
 
             $item = $items[$position];

@@ -14,11 +14,13 @@ namespace MarkdownPresentation\Reverse;
 final class Options
 {
     /**
-     * @param string|null $mediaDirectory A directory, relative to the deck, the
-     *        pictures are taken out into. Null leaves the pictures out of the
-     *        deck altogether, which is the only honest answer: a deck that
-     *        refers to a picture with no file behind it is a deck with a broken
-     *        image in it.
+     * @param string|null $mediaDirectory A directory the pictures are taken out
+     *        into. A relative one is resolved against the directory of the
+     *        Markdown the pictures are written beside, because the reference to
+     *        them in that Markdown is relative to it; an absolute one is used as
+     *        it stands. Null leaves the pictures out of the deck altogether,
+     *        which is the only honest answer: a deck that refers to a picture
+     *        with no file behind it is a deck with a broken image in it.
      * @param int         $maxPartBytes The largest one part of the package may be
      *        once decompressed. A `.pptx` is somebody else's file, and a zip says
      *        nothing about how much room its contents will take up.
