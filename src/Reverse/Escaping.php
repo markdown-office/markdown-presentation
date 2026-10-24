@@ -70,6 +70,35 @@ final class Escaping
     }
 
     /**
+     * The text of an image reference, or of a link.
+     *
+     * The text is the author's, so it is escaped the way any other text is:
+     * a bracket in it would end the reference early, and a newline in it would
+     * end the line the reference is on and leave the rest of it as prose.
+     */
+    public static function label(string $text): string
+    {
+        return str_replace(['[', ']', "\n", "\r"], ['\\[', '\\]', ' ', ' '], $text);
+    }
+
+    /**
+     * The address of a link, or of an image.
+     *
+     * A space in it would end the address early, and a bracket in it would be
+     * read as the end of the reference, so the address is written between
+     * angle brackets — which is how Markdown says "this is an address and not
+     * the rest of the line".
+     */
+    public static function address(string $url): string
+    {
+        if (preg_match('/[\s<>()]/', $url) === 1) {
+            return '<' . str_replace(['<', '>'], ['\\<', '\\>'], $url) . '>';
+        }
+
+        return $url;
+    }
+
+    /**
      * Escape the beginning of a line so it is not read as a block.
      *
      * Only the first significant character is escaped, which is enough: once it

@@ -68,6 +68,45 @@ function deckWithShapes(callable $build, ?callable $properties = null): string
     return $path;
 }
 
+it('keeps the paragraphs of a title apart', function () {
+    // A title is one line in Markdown, so only the first paragraph of a title
+    // can be the heading. The rest are the title's own paragraphs and are read
+    // as the blocks they are: `getPlainText()` runs them together, so a title
+    // of two paragraphs came back as one line with the words of the two glued
+    // to each other.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('ctrTitle');
+        $shape->setPlaceHolder(new Placeholder('ctrTitle'));
+
+        $shape->createParagraph()->createTextRun('First line');
+        $shape->createParagraph()->createTextRun('Second line');
+    });
+
+    $markdown = converted($path);
+
+    expect($markdown)->toContain('# First line')
+        ->and($markdown)->toContain('Second line')
+        ->and($markdown)->not->toContain('First lineSecond line');
+});
+
+it('keeps the paragraphs of a subtitle apart', function () {
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('subTitle');
+        $shape->setPlaceHolder(new Placeholder('subTitle'));
+
+        $shape->createParagraph()->createTextRun('A field guide');
+        $shape->createParagraph()->createTextRun('to the North');
+    });
+
+    $markdown = converted($path);
+
+    expect($markdown)->toContain('A field guide')
+        ->and($markdown)->toContain('to the North')
+        ->and($markdown)->not->toContain('A field guideto the North');
+});
+
 /**
  * A shape carrying a placeholder of the given type, and its text.
  */
@@ -492,6 +531,37 @@ it('reads a picture out of the deck and refers to it by name', function () {
 
     expect($markdown)->toContain('![')
         ->and($markdown)->toContain($directory . '/slide-1-image-0.png');
+});
+
+it('escapes the alt text of a picture, which is the author\'s', function () {
+    // The alt text is a `descr` attribute of the picture, so it is whatever the
+    // author typed, and a bracket in it ends the reference early. A newline in
+    // it ends the line the reference is on and leaves the rest of it as prose.
+    $image = new Image("a ] bracket\n![evil](http://evil/x.png)", 'slide-1-image-0.png', 'bytes');
+    $writer = new DeckWriter(new Options(mediaDirectory: 'media'));
+
+    $markdown = $writer->write(
+        [new Slide(1, null, [new Block(Block::IMAGE, image: $image)], null)],
+        new DocumentProperties(),
+    );
+
+    expect($markdown)->toContain('a \\] bracket')
+        ->and($markdown)->not->toContain('](' . "\n")
+        ->and($markdown)->not->toContain("\n![evil]");
+});
+
+it('writes the address of a link between angle brackets', function () {
+    // A space in an address ends it early, and a bracket in it is read as the
+    // end of the reference.
+    $link = Inline::link('http://example.com/a b', [Inline::text('a link')]);
+    $writer = new DeckWriter(new Options(mediaDirectory: 'media'));
+
+    $markdown = $writer->write(
+        [new Slide(1, null, [Block::paragraph([$link])], null)],
+        new DocumentProperties(),
+    );
+
+    expect($markdown)->toContain('<http://example.com/a b>');
 });
 
 it('writes the pictures beside the deck', function () {

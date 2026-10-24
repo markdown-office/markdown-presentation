@@ -312,7 +312,11 @@ final class DeckWriter
             return [];
         }
 
-        return [sprintf('![%s](%s)', $image->alt, $this->options->mediaDirectory . '/' . $image->target)];
+        return [sprintf(
+            '![%s](%s)',
+            Escaping::label($image->alt),
+            Escaping::address($this->options->mediaDirectory . '/' . $image->target),
+        )];
     }
 
     /**
@@ -337,7 +341,7 @@ final class DeckWriter
             $lineStart = false;
 
             if ($inline->kind === Inline::LINK) {
-                $out .= '[' . $this->inlines($inline->children, $inTable) . '](' . $inline->url . ')';
+                $out .= '[' . $this->inlines($inline->children, $inTable) . '](' . Escaping::address($inline->url) . ')';
 
                 continue;
             }
