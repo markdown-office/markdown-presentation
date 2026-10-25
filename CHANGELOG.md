@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-10-25
+
+### Fixed
+
+- **A `.pptx` can be read on Windows.** The reader asked the file system for the folder of a
+  part of a package, and a file system answers with the separators of the file system: the
+  folder of a part at the root of a package is named `\` there, and no part of a package is
+  named by one. The reader therefore looked for `_rels/.rels` under a name no package has,
+  found no presentation in the deck, and said that the file was not in the format it
+  supports — "The file … is not in the format supported by class
+  PhpOffice\PhpPresentation\Reader\PowerPoint2007" — which says the file is not a
+  presentation rather than that the reader could not find the one inside it.
+
+  The folder of a part is now found with the slashes of the package, which is what the names
+  of the parts are made of. The fix is
+  [PHPPresentation#1043](https://github.com/PHPOffice/PHPPresentation/pull/1043), and it is
+  upstream's to merge; it is in the patch this library applies, so it is here.
+
+### Changed
+
+- **The patch carries the reader's fix as well.** The patch is the difference between the
+  release a consumer can install and the branch this project is written against, and it now
+  holds the three fixes this library needs from upstream rather than the two it held before.
+  It is [the same file on the same branch][the-patch], at a new commit: the commit is what
+  the URL names, and the checksum is of the file the commit holds.
+
 ## [0.2.0] - 2026-10-25
 
 ### Added
@@ -1833,5 +1859,6 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 
 [0.1.0]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.1.0
 [0.2.0]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.2.0
+[0.2.1]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.2.1
 [composer-patches]: https://github.com/cweagans/composer-patches
 [the-patch]: https://github.com/markdown-office/PHPPresentation/blob/patches/1.2.0-to-master/patches/phpoffice-phppresentation-1.2.0-to-master.patch
