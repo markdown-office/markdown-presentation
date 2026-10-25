@@ -39,9 +39,9 @@
         "patches": {
             "phpoffice/phppresentation": [
                 {
-                    "description": "PHPPresentation 1.2.0 brought up to upstream's master, with the fix that gives a picture the path, the bytes and the name it was read from",
-                    "url": "https://raw.githubusercontent.com/markdown-office/PHPPresentation/474af4fc8815e88f231cd73ac09cdcfcb28c12c8/patches/phpoffice-phppresentation-1.2.0-to-master.patch",
-                    "sha256": "326d82477614aeac1e2f7fa357687422568550cb2b4a3aec3a29611f120de81a"
+                    "description": "PHPPresentation 1.2.0 brought up to upstream's master, with the fixes that give a picture the path, the bytes and the name it was read from, and that find the folder of a part of a package with the slashes of the package",
+                    "url": "https://raw.githubusercontent.com/markdown-office/PHPPresentation/9aa3f4624f1cab54fc5d275397c2fc59cf6f276d/patches/phpoffice-phppresentation-1.2.0-to-master.patch",
+                    "sha256": "0b8f7c150f7ba5d12671fb9e211c9f1a4db549d7609239f49c0cea707a190551"
                 }
             ]
         }
