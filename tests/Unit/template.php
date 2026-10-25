@@ -94,6 +94,73 @@ function templatedDeck(string $markdown): Pptx
     return Pptx::open($path);
 }
 
+/**
+ * A template whose `ppt/presentation.xml` is exactly the given size.
+ *
+ * The exact size is the point of the fixture: a ceiling is only worth a test where a part is on one
+ * side of it and another on the other, and a part of "about" a size is on neither.
+ */
+function templateWithPartOf(int $size): string
+{
+    $path = Scratch::file('oversized.pptx', '');
+
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('ppt/presentation.xml', presentationOf($size));
+    $zip->close();
+
+    return $path;
+}
+
+/**
+ * A `ppt/presentation.xml` of exactly the given size.
+ *
+ * Padded with a comment rather than with spaces, because a comment is something the reader parses
+ * and a run of spaces in front of the root element is not.
+ */
+function presentationOf(int $size): string
+{
+    $declaration = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    $document = '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+        . '<p:sldSz cx="12192000" cy="6858000"/></p:presentation>';
+
+    // A comment is `<!--`, the padding, and `-->`.
+    $padding = $size - strlen($declaration) - strlen($document) - 7;
+
+    return $declaration . '<!--' . str_repeat('x', $padding) . '-->' . $document;
+}
+
+/**
+ * A template whose part says it is smaller than it is.
+ *
+ * The size is written into the archive twice — in the local file header and in the central
+ * directory — and both are patched, so the archive claims a part of a hundred bytes and holds a
+ * megabyte. A reader that believed the claim would read the hundred bytes and never see what is
+ * behind them.
+ */
+function templateThatLiesAboutItsPart(): string
+{
+    $path = Scratch::file('liar.pptx', '');
+
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('ppt/presentation.xml', presentationOf(1024 * 1024));
+    $zip->close();
+
+    $bytes = (string) file_get_contents($path);
+
+    // The uncompressed size sits at 22 in the local file header and at 24 in the directory entry.
+    $local = (int) strpos($bytes, "PK\x03\x04");
+    $central = (int) strrpos($bytes, "PK\x01\x02");
+
+    $bytes = substr_replace($bytes, pack('V', 100), $local + 22, 4);
+    $bytes = substr_replace($bytes, pack('V', 100), $central + 24, 4);
+
+    file_put_contents($path, $bytes);
+
+    return $path;
+}
+
 it('scales a template\'s page onto the one this library writes', function () {
     // The fixture's page is 12192000 × 6858000 EMU, a stock 16:9 PowerPoint slide and 1280 ×
     // 720 of the pixels a `Box` counts in. Dividing by the 9525 EMU a pixel would put every
@@ -290,6 +357,74 @@ it('refuses a template with a part it cannot read', function () {
         (new DeckParser())->parse(themed($theme)),
         Scratch::file('deck.pptx', ''),
     ))->toThrow(MalformedTemplate::class, 'no readable part at ppt/presentation.xml');
+});
+
+it('refuses a template that is missing the part it needs', function () {
+    // A template without `ppt/presentation.xml` says nothing about how big its slides are, and
+    // the part it does not have is named rather than left to be a document that failed to parse.
+    $path = Scratch::file('empty.pptx', '');
+
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('ppt/slideLayouts/slideLayout1.xml', '<p:sldLayout/>');
+    $zip->close();
+
+    expect(fn () => (new TemplateGeometry($path))->boxes())
+        ->toThrow(MalformedTemplate::class, 'no readable part at ppt/presentation.xml');
+});
+
+it('refuses a part of a template that is larger than a part may be', function () {
+    // A zip says how its contents are laid out and nothing about how much room they will take up:
+    // a part of a few kilobytes can inflate to hundreds of megabytes, and the document built from
+    // it costs several times that again in libxml's memory, which PHP's `memory_limit` does not
+    // see. The ceiling is the only thing that bounds it.
+    $path = templateWithPartOf(TemplateGeometry::MAX_PART_BYTES + 1);
+
+    expect(fn () => (new TemplateGeometry($path))->boxes())
+        ->toThrow(
+            MalformedTemplate::class,
+            sprintf('larger than the %d bytes allowed', TemplateGeometry::MAX_PART_BYTES),
+        );
+});
+
+it('reads a part that is as large as the ceiling allows', function () {
+    // The other side of the bound: the ceiling is a number rather than "everything over a few
+    // hundred bytes", and a part of exactly the allowed size is read rather than refused.
+    $size = 4096;
+
+    expect((new TemplateGeometry(templateWithPartOf($size), maxPartBytes: $size))->boxes())->toBe([]);
+});
+
+it('refuses a part one byte over the ceiling', function () {
+    $size = 4096;
+
+    expect(fn () => (new TemplateGeometry(templateWithPartOf($size), maxPartBytes: $size - 1))->boxes())
+        ->toThrow(MalformedTemplate::class, 'larger than the 4095 bytes allowed');
+});
+
+it('refuses a part that says it is smaller than it is', function () {
+    // The size the archive declares is the archive's own claim, and the claim can be false. The
+    // ceiling is applied to what the part really holds, which is the only number that can be
+    // trusted: this part claims a hundred bytes and holds a megabyte.
+    $path = templateThatLiesAboutItsPart();
+
+    expect(fn () => (new TemplateGeometry($path, maxPartBytes: 4096))->boxes())
+        ->toThrow(MalformedTemplate::class, 'larger than the 4096 bytes allowed');
+});
+
+it('refuses a theme whose template has a part too large to read', function () {
+    // The refusal has to reach the caller of the library and not only the reader, or a render ends
+    // in a fatal error that names neither the theme nor the part.
+    $theme = ThemeDirectory::create([
+        'theme.yml' => "name: Oversized\n",
+        'layouts.yml' => CONTENT_LAYOUT,
+        'template.pptx' => (string) file_get_contents(templateWithPartOf(TemplateGeometry::MAX_PART_BYTES + 1)),
+    ]);
+
+    expect(fn () => (new PresentationRenderer())->render(
+        (new DeckParser())->parse(themed($theme)),
+        Scratch::file('deck.pptx', ''),
+    ))->toThrow(MalformedTemplate::class, 'larger than the');
 });
 
 it('leaves a layout that inherits from nothing where the library puts it', function () {

@@ -741,7 +741,9 @@ writes for a layout that does not move the one it inherited. A footer, a date an
 number are placeholders too and are left out rather than laid out as body text.
 
 A template that cannot be read is a named failure — `Exception\MalformedTemplate` — rather
-than a theme that quietly renders as though it had not said where its geometry comes from.
+than a theme that quietly renders as though it had not said where its geometry comes from. A
+part of it that inflates past four megabytes is refused the same way, and the size is what the
+part really holds rather than what the archive says it is.
 
 #### Using your own deck as the template
 

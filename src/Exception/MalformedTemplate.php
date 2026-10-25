@@ -44,4 +44,15 @@ final class MalformedTemplate extends InvalidInput
             $file,
         ));
     }
+
+    public static function partTooLarge(string $file, string $part, int $allowed): self
+    {
+        return new self(sprintf(
+            'The template "%s" has a part at %s that is larger than the %d bytes allowed. A template PowerPoint '
+            . 'can open is one this library can read too.',
+            $file,
+            $part,
+            $allowed,
+        ));
+    }
 }
