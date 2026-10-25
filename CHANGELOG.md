@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A template without the part it needs is refused by name.** A template whose
+  `ppt/presentation.xml` was missing raised `ValueError` from the XML parser rather than the
+  named failure, because `loadXML()` refuses an empty source by raising rather than by returning
+  false. It is now the same failure as a part that is not XML.
+
+### Security
+
+- **A part of a theme's template is read under a ceiling.** A zip says how its contents are
+  laid out and nothing about how much room they will take up: a part of a few kilobytes can
+  inflate to hundreds of megabytes, and the document built from it costs several times that
+  again in libxml's memory, which PHP's `memory_limit` does not see. The parts of a template
+  are now read through a stream and abandoned at four megabytes, and the size is what the part
+  really holds rather than what the archive claims, so a part that lies about itself is caught
+  too. A template with a part over the ceiling is refused by name instead of ending the render
+  in a fatal error that names neither the theme nor the part.
+
 ## [0.2.0] - 2026-10-24
 
 ### Added

@@ -53,6 +53,18 @@ final class TemplateGeometry
     private const TITLE_TYPES = ['title', 'ctrTitle'];
 
     /**
+     * The largest a part of a template may be once it is inflated.
+     *
+     * A zip says how its contents are laid out and nothing about how much room they will take up:
+     * a part of a few kilobytes can inflate to hundreds of megabytes, and the document built from it
+     * costs several times that again. That document is libxml's own memory, which PHP's
+     * `memory_limit` does not see, so this ceiling is the only thing that bounds it.
+     *
+     * Four megabytes is far past any part a template carries.
+     */
+    public const MAX_PART_BYTES = 4 * 1024 * 1024;
+
+    /**
      * `subTitle` is a column because that is what it is on the layout a `title` role maps
      * to, `obj` because a template's content placeholder is as often one of those as a
      * `body`, and `pic` because the layouts this library gives a picture to carry the
@@ -64,9 +76,13 @@ final class TemplateGeometry
 
     /**
      * @param string $path The theme's `template.pptx`.
+     * @param int    $maxPartBytes The largest one part of it may be once it is inflated, which is
+     *        what bounds the document built from it.
      */
-    public function __construct(private readonly string $path)
-    {
+    public function __construct(
+        private readonly string $path,
+        private readonly int $maxPartBytes = self::MAX_PART_BYTES,
+    ) {
     }
 
     /**
@@ -397,9 +413,14 @@ final class TemplateGeometry
      */
     private function document(ZipArchive $zip, string $part): DOMDocument
     {
+        $source = $this->part($zip, $part);
+
         $quiet = libxml_use_internal_errors(true);
         $document = new DOMDocument();
-        $loaded = $document->loadXML((string) $zip->getFromName($part), LIBXML_NONET);
+
+        // An empty part is not a document, and `loadXML()` says so by raising rather than by
+        // returning false, so it is refused here rather than by the parser.
+        $loaded = $source === '' ? false : $document->loadXML($source, LIBXML_NONET);
 
         libxml_clear_errors();
         libxml_use_internal_errors($quiet);
@@ -409,5 +430,36 @@ final class TemplateGeometry
         }
 
         return $document;
+    }
+
+    /**
+     * A part of the template, as far as it will inflate to.
+     *
+     * Read through a stream rather than read whole and measured afterwards, because the size the
+     * archive declares is the archive's own claim: a part that says it is a hundred bytes can hold
+     * a megabyte, and `getFromName()` hands back the hundred bytes while the stream sees the
+     * megabyte.
+     *
+     * @throws MalformedTemplate
+     */
+    private function part(ZipArchive $zip, string $part): string
+    {
+        $stream = $zip->getStream($part);
+
+        if ($stream === false) {
+            return '';
+        }
+
+        // One byte more than the ceiling allows, so that a part over it is abandoned rather than
+        // finished: what it really holds is what the stream says, not what the archive claims.
+        $bytes = (string) stream_get_contents($stream, $this->maxPartBytes + 1);
+
+        fclose($stream);
+
+        if (strlen($bytes) > $this->maxPartBytes) {
+            throw MalformedTemplate::partTooLarge($this->path, $part, $this->maxPartBytes);
+        }
+
+        return $bytes;
     }
 }
