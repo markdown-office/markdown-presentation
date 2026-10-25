@@ -7,6 +7,7 @@ namespace MarkdownPresentation\Reverse;
 use MarkdownPresentation\Exception\UnreadableDeck;
 use MarkdownPresentation\Exception\UnpatchedDependency;
 use MarkdownPresentation\Fixes;
+use MarkdownPresentation\Render\ImageConverter;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
 use ZipArchive;
@@ -92,6 +93,13 @@ final class Package
      * lookup per part and no decompression. A part that lies about its size
      * downward is caught by the reader's own consistency check, and one that
      * lies upward is caught here.
+     *
+     * The pictures are measured too, and for the same reason: the reader opens
+     * every picture in the deck as it reads it, and a picture is allocated by
+     * the canvas its header declares rather than by the bytes it is made of. A
+     * deck of a few hundred kilobytes can hold a picture that asks for six
+     * gigabytes of canvas, and the memory that takes is outside the limit PHP
+     * enforces, so the process is killed rather than the deck being refused.
      */
     private static function bounds(string $path, Options $options): void
     {
@@ -108,18 +116,59 @@ final class Package
 
             for ($index = 0; $index < $zip->numFiles; $index++) {
                 $stat = $zip->statIndex($index) ?: ['name' => '', 'size' => 0];
+                $name = (string) $stat['name'];
 
                 if ((int) $stat['size'] > $options->maxPartBytes) {
                     throw UnreadableDeck::partTooLarge(
                         $path,
-                        (string) $stat['name'],
+                        $name,
                         (int) $stat['size'],
                         $options->maxPartBytes,
                     );
                 }
+
+                self::boundsPicture($path, $name, $zip);
             }
         } finally {
             $zip->close();
+        }
+    }
+
+    /**
+     * Refuse a picture that is larger than a picture is allowed to be.
+     *
+     * The size is read from the picture's own header, without decoding it, so
+     * the cost of refusing a bomb is the cost of reading a few bytes. The
+     * ceiling is the one the forward direction writes pictures under, so a deck
+     * this library wrote can be read back and a deck that cannot be drawn
+     * cannot be read either.
+     *
+     * @param string $name The part the picture is in.
+     */
+    private static function boundsPicture(string $path, string $name, ZipArchive $zip): void
+    {
+        if (! str_starts_with($name, 'ppt/media/')) {
+            return;
+        }
+
+        $bytes = $zip->getFromName($name);
+
+        // A media part that is not a raster — a vector, a sound — has no size to
+        // read, and neither has one the archive cannot hand back at all.
+        $size = $bytes === false ? false : @getimagesizefromstring($bytes);
+
+        if ($size === false) {
+            return;
+        }
+
+        if ($size[0] * $size[1] > ImageConverter::MAX_PIXELS) {
+            throw UnreadableDeck::pictureTooLarge(
+                $path,
+                $name,
+                $size[0],
+                $size[1],
+                ImageConverter::MAX_PIXELS,
+            );
         }
     }
 

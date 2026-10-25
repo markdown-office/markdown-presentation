@@ -68,6 +68,67 @@ function deckWithShapes(callable $build, ?callable $properties = null): string
     return $path;
 }
 
+it('keeps the paragraphs of a title apart', function () {
+    // A title is one line in Markdown, so only the first paragraph of a title
+    // can be the heading. The rest are the title's own paragraphs and are read
+    // as the blocks they are: `getPlainText()` runs them together, so a title
+    // of two paragraphs came back as one line with the words of the two glued
+    // to each other.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('ctrTitle');
+        $shape->setPlaceHolder(new Placeholder('ctrTitle'));
+
+        $shape->createParagraph()->createTextRun('First line');
+        $shape->createParagraph()->createTextRun('Second line');
+    });
+
+    $markdown = converted($path);
+
+    expect($markdown)->toContain('# First line')
+        ->and($markdown)->toContain('Second line')
+        ->and($markdown)->not->toContain('First lineSecond line');
+});
+
+it('does not let an empty title take the heading away', function () {
+    // A title that is empty is not a title, so what it held is read as the
+    // blocks it was and the heading the slide already carries is left alone.
+    // Two titles on one slide is unusual, and nothing in the deck says which
+    // of them is the heading, so the order they are in is what decides.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('ctrTitle');
+        $shape->setPlaceHolder(new Placeholder('ctrTitle'));
+        $shape->createParagraph()->createTextRun('Harbour lights');
+
+        $empty = $slide->createRichTextShape();
+        $empty->setName('ctrTitle');
+        $empty->setPlaceHolder(new Placeholder('ctrTitle'));
+        $empty->createParagraph()->createTextRun('   ');
+    });
+
+    $markdown = converted($path);
+
+    expect($markdown)->toContain('# Harbour lights');
+});
+
+it('keeps the paragraphs of a subtitle apart', function () {
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('subTitle');
+        $shape->setPlaceHolder(new Placeholder('subTitle'));
+
+        $shape->createParagraph()->createTextRun('A field guide');
+        $shape->createParagraph()->createTextRun('to the North');
+    });
+
+    $markdown = converted($path);
+
+    expect($markdown)->toContain('A field guide')
+        ->and($markdown)->toContain('to the North')
+        ->and($markdown)->not->toContain('A field guideto the North');
+});
+
 /**
  * A shape carrying a placeholder of the given type, and its text.
  */
@@ -91,6 +152,100 @@ function pictureDirectory(): string
     imagepng($image, $directory . '/dot.png');
 
     return $directory;
+}
+
+/**
+ * A table with one cell, holding the paragraphs named.
+ *
+ * Each paragraph is a text, the level it sits at, and whether it carries a
+ * bullet — the three things that decide what the cell becomes.
+ *
+ * @param list<array{0: string, 1: int, 2: bool}> $paragraphs
+ */
+function tableWithCell(array $paragraphs): TableShape
+{
+    $table = new TableShape();
+    $cell = $table->createRow()->getCell(0);
+
+    foreach ($paragraphs as [$text, $level, $bullet]) {
+        $paragraph = $cell->createParagraph();
+        $paragraph->getAlignment()->setLevel($level);
+
+        if ($bullet) {
+            $paragraph->getBulletStyle()->setBulletType(Bullet::TYPE_BULLET);
+        }
+
+        $paragraph->createTextRun($text);
+    }
+
+    return $table;
+}
+
+/**
+ * A picture that declares a canvas of forty thousand by forty thousand.
+ *
+ * The header is what says so, and the header is what the size is read from —
+ * the picture is a few dozen bytes and the data behind it is a stub, because
+ * nothing decodes it: a picture over the ceiling is refused from its header.
+ *
+ * @return string The bytes of the picture.
+ */
+function bombPicture(): string
+{
+    $chunk = static function (string $type, string $data): string {
+        return pack('N', strlen($data)) . $type . $data . pack('N', crc32($type . $data));
+    };
+
+    $header = pack('NN', 40000, 40000) . pack('C', 8) . pack('C', 2) . pack('C', 0) . pack('C', 0) . pack('C', 0);
+
+    return pack('H*', '89504e470d0a1a0a')
+        . $chunk('IHDR', $header)
+        . $chunk('IDAT', gzcompress("\0"))
+        . $chunk('IEND', '');
+}
+
+/**
+ * A deck with one picture in it, holding the bytes named.
+ *
+ * The picture is put into a deck this library wrote, so that the deck is one
+ * the reader accepts and the picture is the only thing hostile about it.
+ */
+function deckWithPicture(string $picture): string
+{
+    $path = Scratch::file('deck.pptx', '');
+
+    $presentation = new PhpPresentation();
+    $slide = $presentation->getActiveSlide();
+
+    $shape = $slide->createRichTextShape();
+    $shape->setName('Text');
+    $shape->createText('A picture');
+
+    $drawing = new Gd();
+    $drawing->setContents($picture);
+    $slide->addShape($drawing);
+
+    IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
+
+    return $path;
+}
+
+/**
+ * A deck whose only shape holds a list nested the given number of levels.
+ */
+function deckWithNestedList(int $levels): string
+{
+    return deckWithShapes(static function (AbstractSlide $slide) use ($levels): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('Text');
+
+        for ($level = 0; $level <= $levels; $level++) {
+            $paragraph = $shape->createParagraph();
+            $paragraph->getAlignment()->setLevel($level);
+            $paragraph->getBulletStyle()->setBulletType(Bullet::TYPE_BULLET);
+            $paragraph->createTextRun('Level ' . $level);
+        }
+    });
 }
 
 /**
@@ -361,6 +516,34 @@ it('reads a table into a Markdown table', function () {
     expect($markdown)->toContain("| **Deck** | **Slides** |\n| --- | --- |\n| worked in | six |");
 });
 
+it('keeps every paragraph of a cell', function () {
+    // A cell holds whatever was written into it, which can be more than one
+    // paragraph. Reading only the first block of the cell lost the rest.
+    $table = tableWithCell([['First line', 0, false], ['Second line', 0, false]]);
+    $mapper = new ShapeMapper(new Options(mediaDirectory: null));
+    $blocks = $mapper->blocks($table, 1, 0);
+
+    $writer = new DeckWriter(new Options(mediaDirectory: null));
+    $markdown = $writer->write([new Slide(1, null, $blocks, null)], new DocumentProperties());
+
+    expect($markdown)->toContain('First line')
+        ->and($markdown)->toContain('Second line');
+});
+
+it('keeps the text of a cell whose paragraph is a bullet', function () {
+    // A bulleted paragraph in a cell is a list rather than a paragraph, and a
+    // list has no inline content of its own — so reading the cell's first block
+    // as if it were a paragraph gave an empty cell.
+    $table = tableWithCell([['Bulleted', 0, true]]);
+    $mapper = new ShapeMapper(new Options(mediaDirectory: null));
+    $blocks = $mapper->blocks($table, 1, 0);
+
+    $writer = new DeckWriter(new Options(mediaDirectory: null));
+    $markdown = $writer->write([new Slide(1, null, $blocks, null)], new DocumentProperties());
+
+    expect($markdown)->toContain('Bulleted');
+});
+
 it('reads a picture out of the deck and refers to it by name', function () {
     $images = pictureDirectory();
     $directory = Scratch::directoryPath('media');
@@ -372,6 +555,37 @@ it('reads a picture out of the deck and refers to it by name', function () {
         ->and($markdown)->toContain($directory . '/slide-1-image-0.png');
 });
 
+it('escapes the alt text of a picture, which is the author\'s', function () {
+    // The alt text is a `descr` attribute of the picture, so it is whatever the
+    // author typed, and a bracket in it ends the reference early. A newline in
+    // it ends the line the reference is on and leaves the rest of it as prose.
+    $image = new Image("a ] bracket\n![evil](http://evil/x.png)", 'slide-1-image-0.png', 'bytes');
+    $writer = new DeckWriter(new Options(mediaDirectory: 'media'));
+
+    $markdown = $writer->write(
+        [new Slide(1, null, [new Block(Block::IMAGE, image: $image)], null)],
+        new DocumentProperties(),
+    );
+
+    expect($markdown)->toContain('a \\] bracket')
+        ->and($markdown)->not->toContain('](' . "\n")
+        ->and($markdown)->not->toContain("\n![evil]");
+});
+
+it('writes the address of a link between angle brackets', function () {
+    // A space in an address ends it early, and a bracket in it is read as the
+    // end of the reference.
+    $link = Inline::link('http://example.com/a b', [Inline::text('a link')]);
+    $writer = new DeckWriter(new Options(mediaDirectory: 'media'));
+
+    $markdown = $writer->write(
+        [new Slide(1, null, [Block::paragraph([$link])], null)],
+        new DocumentProperties(),
+    );
+
+    expect($markdown)->toContain('<http://example.com/a b>');
+});
+
 it('writes the pictures beside the deck', function () {
     $images = pictureDirectory();
     $directory = Scratch::directoryPath('media');
@@ -380,6 +594,40 @@ it('writes the pictures beside the deck', function () {
     (new PowerPointToMarkdown($path, new Options(mediaDirectory: $directory)))->convert();
 
     expect(glob($directory . '/*'))->not->toBeEmpty();
+});
+
+it('writes the pictures beside the Markdown that names them', function () {
+    // The reference in the Markdown is relative to the Markdown, so the pictures
+    // have to be where it resolves to. Writing them beside the working directory
+    // instead puts them where the reference does not reach, and every conversion
+    // whose target is not in the working directory comes out with a broken image.
+    $images = pictureDirectory();
+    $path = writtenDeck("![A dot](dot.png)\n", $images);
+
+    // A target in a directory of its own, and a working directory that is not
+    // that directory: the two are what a caller gets when the deck is somewhere
+    // else and the Markdown is somewhere else again.
+    $target = Scratch::directoryPath('output') . '/deck.md';
+    $working = Scratch::directoryPath('working');
+
+    $previous = getcwd();
+    chdir($working);
+
+    try {
+        (new PowerPointToMarkdown($path, new Options(mediaDirectory: 'media')))->save($target);
+    } finally {
+        chdir((string) $previous);
+    }
+
+    $markdown = (string) file_get_contents($target);
+
+    // The reference is relative, and the file it names is beside the Markdown.
+    expect($markdown)->toContain('![A dot](media/slide-1-image-0.png)')
+        ->and(is_file(dirname($target) . '/media/slide-1-image-0.png'))->toBeTrue();
+
+    // And nothing was written into the working directory, which is where it went
+    // before and where the reference did not reach.
+    expect(glob($working . '/media/*'))->toBe([]);
 });
 
 it('leaves a picture that is already there alone', function () {
@@ -507,6 +755,57 @@ it('refuses a part larger than the limit allows', function () {
         ->toThrow(UnreadableDeck::class, 'larger than the 16 allowed');
 });
 
+it('refuses a picture larger than a picture is allowed to be', function () {
+    // The reader opens every picture in the deck as it reads it, and a picture
+    // is allocated by the canvas its header declares rather than by the bytes it
+    // is made of: a picture of a couple of hundred kilobytes can ask for a
+    // canvas of several gigabytes. The memory that takes is outside the limit
+    // PHP enforces, so the process is killed rather than the deck refused.
+    //
+    // The picture here declares a canvas of forty thousand by forty thousand.
+    $path = deckWithPicture(bombPicture());
+
+    expect(fn () => converted($path, new Options(mediaDirectory: null)))
+        ->toThrow(UnreadableDeck::class, '40000 x 40000 pixels');
+});
+
+it('refuses a list that nests deeper than a list may nest', function () {
+    // Reading a list is a walk that recurses once per level, and the level
+    // comes from the deck: a shape whose paragraphs sit at ever deeper levels
+    // is a shape the walk never comes back from. Without a ceiling the walk
+    // does not return an error — it runs out of stack and the process dies on
+    // a signal, which is not something a caller can catch.
+    $path = deckWithNestedList(Options::MAX_NESTING + 1);
+
+    expect(fn () => converted($path, new Options(mediaDirectory: null)))
+        ->toThrow(UnreadableDeck::class, 'more than the 32 allowed');
+});
+
+it('refuses a list that nests deeper than a list may nest, when it is written', function () {
+    // The writer walks the same tree the reader built, and it is public API:
+    // a caller holding a tree of blocks can write it without the reader having
+    // seen it, so the ceiling is checked on this side too.
+    $nested = Block::paragraph([]);
+
+    for ($level = 0; $level <= Options::MAX_NESTING + 1; $level++) {
+        $nested = Block::list([Block::item([$nested])]);
+    }
+
+    $writer = new DeckWriter(new Options(mediaDirectory: null));
+
+    expect(fn () => $writer->write([new Slide(1, null, [$nested], null)], new DocumentProperties()))
+        ->toThrow(UnreadableDeck::class, 'more than the 32 allowed');
+});
+
+it('reads a picture that is not one, and leaves it out', function () {
+    // A deck may hold a media part that is not a raster — a vector, a sound —
+    // and the size of a picture cannot be read out of one.
+    $path = deckWithPicture('not a picture at all');
+
+    expect(converted($path, new Options(mediaDirectory: null)))->toContain('A picture');
+});
+
+
 it('refuses a file that is not a deck', function () {
     $path = Scratch::file('not-a-deck.pptx', 'this is not a package');
 
@@ -575,6 +874,37 @@ it('changes one option and leaves the others', function () {
         ->and($options->withMaxPartBytes(1)->maxEntries)->toBe($options->maxEntries)
         ->and($options->withMaxEntries(1)->maxEntries)->toBe(1)
         ->and($options->withMaxEntries(1)->maxPartBytes)->toBe($options->maxPartBytes);
+});
+
+it('carries every option through every method that changes one', function () {
+    // The test above names the options one by one, so a fifth option added to
+    // the class would be dropped by every `with*()` and the suite would still
+    // be green. This one reads the class instead, so a new option cannot be
+    // added without the methods carrying it.
+    $properties = (new ReflectionClass(Options::class))->getProperties();
+    $names = array_map(
+        static fn (ReflectionProperty $property): string => $property->getName(),
+        $properties,
+    );
+
+    $options = new Options();
+
+    foreach ($names as $name) {
+        $value = $options->{$name};
+
+        foreach ($names as $other) {
+            $changed = new Options();
+
+            foreach ($names as $set) {
+                $changed = match ($set) {
+                    $name => $changed->{'with' . ucfirst($name)}($value),
+                    default => $changed,
+                };
+            }
+
+            expect($changed->{$other})->toBe($options->{$other});
+        }
+    }
 });
 
 it('escapes the characters that would otherwise be read as Markdown', function (string $text, string $expected) {
@@ -690,7 +1020,14 @@ it('reads a list whose levels jump as the levels say', function () {
         }
     });
 
-    expect(converted($path))->toContain('- Level 0');
+    // Every item survives, and not only the first one: the levels jump from 0 to
+    // 2 and back to 1, and the walk that reads the nested items used to end at
+    // the jump and drop every item from there onwards.
+    $markdown = converted($path);
+
+    expect($markdown)->toContain('- Level 0')
+        ->and($markdown)->toContain('- Level 2')
+        ->and($markdown)->toContain('- Level 1');
 });
 
 it('reads a placeholder of a kind it does not know as free text', function () {

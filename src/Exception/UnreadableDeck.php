@@ -61,4 +61,40 @@ final class UnreadableDeck extends Exception
             $allowed,
         ));
     }
+
+    /**
+     * A picture in the deck is larger than a picture is allowed to be.
+     *
+     * The size is the one the picture's header declares, which is what the
+     * memory it takes is measured by: a picture of a few hundred bytes can
+     * declare a canvas of six gigabytes, and the canvas is what is allocated.
+     */
+    public static function pictureTooLarge(string $path, string $part, int $width, int $height, int $allowed): self
+    {
+        return new self(sprintf(
+            'The picture "%s" in the presentation at "%s" measures %d x %d pixels, '
+            . 'which is more than the %d allowed.',
+            $part,
+            $path,
+            $width,
+            $height,
+            $allowed,
+        ));
+    }
+
+    /**
+     * A list in the deck nests deeper than a list may nest.
+     *
+     * The walk down a list recurses once per level, so a list that nests
+     * without end does not come back with an error — it runs out of stack and
+     * the process dies on a signal, which is not something a caller can catch.
+     */
+    public static function nestedTooDeep(int $allowed): self
+    {
+        return new self(sprintf(
+            'The presentation nests a list more than %d levels deep, which is more than the %d allowed.',
+            $allowed,
+            $allowed,
+        ));
+    }
 }

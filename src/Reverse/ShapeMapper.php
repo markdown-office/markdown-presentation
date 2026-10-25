@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Reverse;
 
+use MarkdownPresentation\Exception\UnreadableDeck;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Shape\Drawing\Base64;
 use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
@@ -21,15 +22,13 @@ use PhpOffice\PhpPresentation\Style\Font;
  * The shape of a slide is a set of boxes, and the shape of a deck is a
  * sequence of blocks. This is where the first becomes the second.
  *
- * Three things decide what a shape becomes, and only three:
+ * Two things decide what a shape becomes, and only two:
  *
  * - **What kind of shape it is.** A text box is prose, a table is a table, a
  *   picture is a picture.
  * - **What it says.** A run's bold, italic and strike travel; its size, its
  *   colour and its face do not, because a deck has no way to say them and
  *   because the design of the new deck is not the design of the old one.
- * - **Where it sits.** Only for the order: a slide is a set of boxes, and the
- *   boxes have to be put in an order, and the order is where they are.
  */
 final class ShapeMapper
 {
@@ -50,8 +49,10 @@ final class ShapeMapper
      *
      * @param int   $slide   The slide's number, counting from one, which names
      *        the pictures written out of it.
-     * @param int   $image   How many pictures this slide has already given, so
-     *        that the names do not collide.
+     * @param int   $image   How many shapes this slide has already given, which
+     *        names the pictures so that they do not collide. It counts the
+     *        shapes and not the pictures, so a slide with a text box and then a
+     *        picture names the picture after the second shape.
      * @param bool  $outline Whether the shape is a body placeholder, whose
      *        paragraphs are an outline whether or not the slide says so.
      *
@@ -59,23 +60,16 @@ final class ShapeMapper
      */
     public function blocks(AbstractShape $shape, int $slide, int $image, bool $outline = false): array
     {
-        if ($shape instanceof Table) {
-            return $this->table($shape);
-        }
-
-        if ($shape instanceof Gd || $shape instanceof Base64) {
-            return $this->picture($shape, $slide, $image);
-        }
-
-        if ($shape instanceof RichText) {
-            return $this->prose(
+        return match (true) {
+            $shape instanceof Table => $this->table($shape),
+            $shape instanceof Gd || $shape instanceof Base64 => $this->picture($shape, $slide, $image),
+            $shape instanceof RichText => $this->prose(
                 array_values($shape->getParagraphs()),
                 $outline,
                 $this->linkOf($shape),
-            );
-        }
-
-        return [];
+            ),
+            default => [],
+        };
     }
 
     /**
@@ -196,9 +190,37 @@ final class ShapeMapper
     {
         $blocks = [];
 
+        // The walk recurses once per level of nesting, and the level comes from
+        // the deck: a shape whose paragraphs sit at ever deeper levels is a
+        // shape that never comes back, and the walk takes the stack with it
+        // rather than returning an error. The ceiling is checked where the
+        // nesting is read, so a deck that goes past it is refused.
+        if ($level > Options::MAX_NESTING) {
+            throw UnreadableDeck::nestedTooDeep(Options::MAX_NESTING);
+        }
+
         while (isset($items[$position]) && $items[$position]['level'] >= $level) {
             if ($items[$position]['level'] > $level) {
-                break;
+                // The item is deeper than this level, so it belongs to the item
+                // before it rather than beside it. The walk that reads the
+                // nested items takes the position with it, and what comes back
+                // may be at a level between the two — a list whose levels jump
+                // from 0 to 2 and back to 1 gives an item at level 1 where the
+                // nested walk left off.
+                //
+                // That item is a child of the item being read, at a level of its
+                // own, so it is read as a nested list of its own rather than
+                // dropped: ending the walk here lost every item from the jump
+                // onwards, with nothing to say so.
+                $ordered = $items[$position]['ordered'];
+
+                // The walk is pointed at the item it is about, so it always takes
+                // that item: the level it is given is the level that item has.
+                $nested = $this->items($items, $position, $items[$position]['level']);
+
+                $blocks[] = Block::item([Block::list($nested, $ordered)]);
+
+                continue;
             }
 
             $item = $items[$position];
@@ -313,24 +335,46 @@ final class ShapeMapper
             return [];
         }
 
-        $path = $shape->getPath();
+        $readable = $this->readablePicture($shape);
 
-        if ($path === '') {
+        if ($readable === null) {
             return [];
         }
 
-        $name = basename($path);
-        $contents = @file_get_contents($path);
-
-        if ($contents === false || ! $this->isImage($name, $contents)) {
-            return [];
-        }
+        [$name, $contents] = $readable;
 
         return [Block::image(new Image(
             $shape->getDescription(),
             sprintf('slide-%d-image-%d.%s', $slide, $image, pathinfo($name, PATHINFO_EXTENSION)),
             $contents,
         ))];
+    }
+
+    /**
+     * The bytes of a picture, or nothing when it is not one that can be read.
+     *
+     * A picture that cannot be read, or that is not an image at all, is left
+     * out: a deck with an image reference to nothing is a deck with a broken
+     * image in it, which is worse than a deck without the image.
+     *
+     * @return array{0: string, 1: string}|null The name and the bytes of it.
+     */
+    private function readablePicture(Gd|Base64 $shape): ?array
+    {
+        $path = $shape->getPath();
+
+        if ($path === '') {
+            return null;
+        }
+
+        $name = basename($path);
+        $contents = @file_get_contents($path);
+
+        if ($contents === false || ! $this->isImage($name, $contents)) {
+            return null;
+        }
+
+        return [$name, $contents];
     }
 
     /**

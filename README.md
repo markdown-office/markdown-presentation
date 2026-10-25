@@ -2201,12 +2201,17 @@ produced it. So:
   would not publish. There is no switch that turns the paths off, because a switch is
   something somebody would eventually get wrong.
 
-One sits beside those two rather than under `InvalidInput`:
+Several sit beside those two rather than under `InvalidInput`:
 `MarkdownPresentation\Exception\UnreadablePackage`, for a `.pptx` that cannot be opened and
-a part of one that cannot be decompressed. Nothing a deck names fixes either — it is the
-disk, the download that stopped, the file that was not a deck — and a deck author told to go
-and rename something would go and rename something. It is still under the base class, so the
-same one `catch` reaches it.
+a part of one that cannot be decompressed; `MarkdownPresentation\Exception\UnreadableDeck`,
+for a deck this library cannot read; `MarkdownPresentation\Exception\UnpatchedDependency`,
+when the installed PHPPresentation lacks what the library needs of it;
+`MarkdownPresentation\Exception\NothingToConvert`, when there is nothing to convert; and
+`MarkdownPresentation\Exception\FileNotWritable`, when the result cannot be written. Nothing
+a deck names fixes any of them — it is the disk, the download that stopped, the file that
+was not a deck, the installer — and a deck author told to go and rename something would go
+and rename something. They are all still under the base class, so the same one `catch`
+reaches them.
 
 ```php
 use MarkdownPresentation\Exception\Exception;

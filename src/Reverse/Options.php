@@ -14,11 +14,28 @@ namespace MarkdownPresentation\Reverse;
 final class Options
 {
     /**
-     * @param string|null $mediaDirectory A directory, relative to the deck, the
-     *        pictures are taken out into. Null leaves the pictures out of the
-     *        deck altogether, which is the only honest answer: a deck that
-     *        refers to a picture with no file behind it is a deck with a broken
-     *        image in it.
+     * The deepest a list may nest.
+     *
+     * A list in a deck is a list of items, and an item may hold a list of its
+     * own, and nothing says how deep that goes. Reading one is a walk that
+     * recurses once per level, so a deck whose items nest without end takes
+     * the stack with it: the walk does not return an error, it runs out of
+     * stack and the process dies on a signal.
+     *
+     * Thirty-two is far past any list a person writes, and the ceiling is
+     * checked where the nesting is read rather than after it, so a deck that
+     * goes past it is refused rather than fatal.
+     */
+    public const MAX_NESTING = 32;
+
+    /**
+     * @param string|null $mediaDirectory A directory the pictures are taken out
+     *        into. A relative one is resolved against the directory of the
+     *        Markdown the pictures are written beside, because the reference to
+     *        them in that Markdown is relative to it; an absolute one is used as
+     *        it stands. Null leaves the pictures out of the deck altogether,
+     *        which is the only honest answer: a deck that refers to a picture
+     *        with no file behind it is a deck with a broken image in it.
      * @param int         $maxPartBytes The largest one part of the package may be
      *        once decompressed. A `.pptx` is somebody else's file, and a zip says
      *        nothing about how much room its contents will take up.

@@ -50,12 +50,18 @@ final class Escaping
         $text = strtr($text, self::INLINE);
         $text = self::escapeUnderscores($text);
 
-        // `~~` is GFM strikethrough; a single tilde is ordinary prose.
-        $text = (string) preg_replace('/~~/', '\\~\\~', $text);
+        // `~~` is GFM strikethrough; a single tilde is ordinary prose. The
+        // replacement is a plain one: the tildes it puts there are not looked
+        // at again, because the replacement is done in one pass over the text.
+        $text = str_replace('~~', '\\~\\~', $text);
 
         // `&` is only a problem where it could start a character reference, and
-        // `&amp;` in the output would decode back to a bare ampersand.
-        $text = (string) preg_replace('/&(?=#[0-9]+;?|#x[0-9a-fA-F]+;?|[A-Za-z][A-Za-z0-9]*;)/', '\\\\&', $text);
+        // `&amp;` in the output would decode back to a bare ampersand. The two
+        // shapes of a reference are looked for apart: a number and a name are
+        // different enough that one pattern for both is a harder pattern to
+        // read than two easy ones.
+        $text = (string) preg_replace('/&(?=#\d+;?|#x[\dA-Fa-f]+;?)/', '\\\\&', $text);
+        $text = (string) preg_replace('/&(?=[A-Za-z][A-Za-z\d]*;)/', '\\\\&', $text);
 
         // A `<` only matters where it could open a tag or an autolink, which is
         // why `a < b` is left alone and `<div>` is not. The delimiter is `~`
@@ -67,6 +73,35 @@ final class Escaping
         }
 
         return $lineStart ? self::escapeLineStart($text) : $text;
+    }
+
+    /**
+     * The text of an image reference, or of a link.
+     *
+     * The text is the author's, so it is escaped the way any other text is:
+     * a bracket in it would end the reference early, and a newline in it would
+     * end the line the reference is on and leave the rest of it as prose.
+     */
+    public static function label(string $text): string
+    {
+        return str_replace(['[', ']', "\n", "\r"], ['\\[', '\\]', ' ', ' '], $text);
+    }
+
+    /**
+     * The address of a link, or of an image.
+     *
+     * A space in it would end the address early, and a bracket in it would be
+     * read as the end of the reference, so the address is written between
+     * angle brackets — which is how Markdown says "this is an address and not
+     * the rest of the line".
+     */
+    public static function address(string $url): string
+    {
+        if (preg_match('/[\s<>()]/', $url) === 1) {
+            return '<' . str_replace(['<', '>'], ['\\<', '\\>'], $url) . '>';
+        }
+
+        return $url;
     }
 
     /**
@@ -86,18 +121,17 @@ final class Escaping
             return $text;
         }
 
-        if (str_contains(self::LINE_START, $rest[0])) {
-            return $space . '\\' . $rest;
-        }
-
-        // An ordered list marker, as in a paragraph that opens with "1986. It was…".
-        if (preg_match('/^\d{1,9}([.)])(?=\s|$)/', $rest, $marker) === 1) {
-            $length = strlen($marker[0]);
-
-            return $space . substr($rest, 0, $length - 1) . '\\' . $marker[1] . substr($rest, $length);
-        }
-
-        return $text;
+        // A line that opens with a character that starts a block, or with the
+        // marker of an ordered list, would be read as one rather than as the
+        // prose it is.
+        return match (true) {
+            str_contains(self::LINE_START, $rest[0]) => $space . '\\' . $rest,
+            (bool) preg_match('/^\d{1,9}([.)])(?=\s|$)/', $rest, $marker) => $space
+                . substr($rest, 0, strlen($marker[0]) - 1)
+                . '\\' . $marker[1]
+                . substr($rest, strlen($marker[0])),
+            default => $text,
+        };
     }
 
     /**

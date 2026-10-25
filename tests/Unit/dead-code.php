@@ -215,6 +215,10 @@ it('does not claim again what the code does not do', function (string $claim) {
 })->with([
     'a placeholder and a text box answer getPlainText() differently' => 'a placeholder and a text box answer `getPlainText()` differently',
     'a placeholder separates its paragraphs with a line break' => 'separates its paragraphs with a line break',
+    'the shapes of a slide are ordered by where they sit' => 'by where it sits — the top of it first',
+    'the shapes of a slide are ordered by their position' => 'the order is where they are',
+    'the methods checked are the ones the library calls' => 'the methods are the ones the library calls',
+    'the picture counter counts the pictures of a slide' => 'How many pictures this slide has already given',
     'the examples page counts the decks it lists' => 'Eleven decks',
     'a thematic break inside a slide can be written as ---' => 'thematic break can be written as `---`',
     'the deck frontmatter is a block of its own' => 'frontmatter is a block of its own',
