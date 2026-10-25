@@ -16,15 +16,13 @@ final class Options
     /**
      * The deepest a list may nest.
      *
-     * A list in a deck is a list of items, and an item may hold a list of its
-     * own, and nothing says how deep that goes. Reading one is a walk that
-     * recurses once per level, so a deck whose items nest without end takes
-     * the stack with it: the walk does not return an error, it runs out of
-     * stack and the process dies on a signal.
+     * Reading a list is a walk that recurses once per level, so a deck whose
+     * items nest without end takes the stack with it: the walk does not return
+     * an error, it runs out of stack and the process dies on a signal.
      *
-     * Thirty-two is far past any list a person writes, and the ceiling is
-     * checked where the nesting is read rather than after it, so a deck that
-     * goes past it is refused rather than fatal.
+     * The ceiling is far past any list a person writes, and it is checked
+     * where the nesting is read rather than after it, so a deck that goes past
+     * it is refused rather than fatal.
      */
     public const MAX_NESTING = 32;
 

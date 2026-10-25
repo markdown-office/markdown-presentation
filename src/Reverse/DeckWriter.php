@@ -171,10 +171,8 @@ final class DeckWriter
         $lines = [];
         $number = 0;
 
-        // The walk down a list recurses once per level, and the nesting is
-        // whatever the deck said it was. A deck whose items nest without end
-        // takes the stack with it rather than returning an error, so the
-        // ceiling is checked where the nesting is written down.
+        // The writer is public API: a caller can hand it a tree the reader
+        // never saw, so the ceiling is checked here as well.
         if ($depth > Options::MAX_NESTING) {
             throw UnreadableDeck::nestedTooDeep(Options::MAX_NESTING);
         }
@@ -265,17 +263,13 @@ final class DeckWriter
     /**
      * A cell of a table, as the text of one.
      *
-     * A cell holds whatever was written into it, which is usually one paragraph
-     * and can be more: a cell with two paragraphs has both of them, and a cell
-     * whose paragraph carries a bullet holds a list rather than a paragraph.
-     * Reading only the first block of the cell, as this did, lost everything
-     * after it — the second paragraph of a cell, and the whole of a bulleted one,
-     * which has no inline content of its own at all.
+     * A cell holds whatever was written into it, which can be more than one
+     * block: a bulleted paragraph is a list rather than a paragraph, and a
+     * list has no inline content of its own.
      *
-     * A Markdown table cell holds one line of text, so what cannot be written on
-     * one line is written on the next and the cell is left open across the rows:
-     * a Markdown table cannot hold a paragraph break, and pretending otherwise
-     * would produce a table that does not parse.
+     * A Markdown table cell holds one line of text, so the blocks of a cell are
+     * joined with a space: a Markdown table cannot hold a paragraph break, and
+     * pretending otherwise would produce a table that does not parse.
      */
     private function cell(Block $cell): string
     {
@@ -289,10 +283,6 @@ final class DeckWriter
             }
         }
 
-        // A Markdown table cell holds one line of text, so what cannot be written
-        // on one line is written on the next and the cell is left open across the
-        // rows: a Markdown table cannot hold a paragraph break, and pretending
-        // otherwise would produce a table that does not parse.
         return str_replace("\n", ' ', implode(' ', $parts));
     }
 

@@ -97,11 +97,13 @@ All notable changes to this project are documented here. The format follows
 - **A picture over the ceiling is refused before it is opened.** The reader opens
   every picture in the deck as it reads it, and a picture is allocated by the
   canvas its header declares rather than by the bytes it is made of: a 1.2 MB PNG
-  that says 40000 by 40000 decodes to 2.9 GB of resident memory, and PHP's
-  `memory_limit` does not contain it, because the allocation is GD's and is
-  outside the heap PHP tracks. The pictures in a deck are now measured from their
-  headers, without decoding them, and a deck holding one over the ceiling is
-  refused. The ceiling is the one the forward direction writes pictures under.
+  that says 40000 by 40000 is 1.6 billion pixels, and GD's truecolor is four
+  bytes a pixel, so decoding it asks for 6.4 GB. PHP's `memory_limit` does not
+  contain it, because the allocation is GD's and is outside the heap PHP tracks,
+  so the process is killed rather than the deck refused. The pictures in a deck
+  are now measured from their headers, without decoding them, and a deck holding
+  one over the ceiling is refused. The ceiling is the one the forward direction
+  writes pictures under.
 
 - **A list may not nest without end.** Reading a list recurses once per level,
   and the level is whatever the deck said it was, so a shape whose paragraphs sit

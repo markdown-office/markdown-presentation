@@ -51,15 +51,14 @@ final class Escaping
         $text = self::escapeUnderscores($text);
 
         // `~~` is GFM strikethrough; a single tilde is ordinary prose. The
-        // replacement is a plain one: the tildes it puts there are not looked
-        // at again, because the replacement is done in one pass over the text.
+        // replacement is a plain one: it is done in a single pass, so the
+        // tildes it puts there are not looked at again.
         $text = str_replace('~~', '\\~\\~', $text);
 
         // `&` is only a problem where it could start a character reference, and
-        // `&amp;` in the output would decode back to a bare ampersand. The two
-        // shapes of a reference are looked for apart: a number and a name are
-        // different enough that one pattern for both is a harder pattern to
-        // read than two easy ones.
+        // `&amp;` in the output would decode back to a bare ampersand. A number
+        // and a name are looked for apart, because one pattern for both is
+        // harder to read than two easy ones.
         $text = (string) preg_replace('/&(?=#\d+;?|#x[\dA-Fa-f]+;?)/', '\\\\&', $text);
         $text = (string) preg_replace('/&(?=[A-Za-z][A-Za-z\d]*;)/', '\\\\&', $text);
 
@@ -78,9 +77,9 @@ final class Escaping
     /**
      * The text of an image reference, or of a link.
      *
-     * The text is the author's, so it is escaped the way any other text is:
-     * a bracket in it would end the reference early, and a newline in it would
-     * end the line the reference is on and leave the rest of it as prose.
+     * The text is the author's, so it is escaped: a bracket in it would end the
+     * reference early, and a newline in it would end the line the reference is
+     * on and leave the rest of it as prose.
      */
     public static function label(string $text): string
     {
@@ -122,8 +121,7 @@ final class Escaping
         }
 
         // A line that opens with a character that starts a block, or with the
-        // marker of an ordered list, would be read as one rather than as the
-        // prose it is.
+        // marker of an ordered list, would be read as one rather than as prose.
         return match (true) {
             str_contains(self::LINE_START, $rest[0]) => $space . '\\' . $rest,
             (bool) preg_match('/^\d{1,9}([.)])(?=\s|$)/', $rest, $marker) => $space

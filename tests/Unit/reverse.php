@@ -69,11 +69,9 @@ function deckWithShapes(callable $build, ?callable $properties = null): string
 }
 
 it('keeps the paragraphs of a title apart', function () {
-    // A title is one line in Markdown, so only the first paragraph of a title
-    // can be the heading. The rest are the title's own paragraphs and are read
-    // as the blocks they are: `getPlainText()` runs them together, so a title
-    // of two paragraphs came back as one line with the words of the two glued
-    // to each other.
+    // A title is one line in Markdown, so only its first paragraph is the
+    // heading; the rest are the title's own paragraphs, and `getPlainText()`
+    // runs them together.
     $path = deckWithShapes(static function (AbstractSlide $slide): void {
         $shape = $slide->createRichTextShape();
         $shape->setName('ctrTitle');
@@ -184,11 +182,9 @@ function tableWithCell(array $paragraphs): TableShape
 /**
  * A picture that declares a canvas of forty thousand by forty thousand.
  *
- * The header is what says so, and the header is what the size is read from —
+ * The header is what says so, and the header is what the size is read from:
  * the picture is a few dozen bytes and the data behind it is a stub, because
- * nothing decodes it: a picture over the ceiling is refused from its header.
- *
- * @return string The bytes of the picture.
+ * nothing decodes it.
  */
 function bombPicture(): string
 {
@@ -207,8 +203,8 @@ function bombPicture(): string
 /**
  * A deck with one picture in it, holding the bytes named.
  *
- * The picture is put into a deck this library wrote, so that the deck is one
- * the reader accepts and the picture is the only thing hostile about it.
+ * The deck is one this library wrote, so that the picture is the only thing
+ * hostile about it.
  */
 function deckWithPicture(string $picture): string
 {
@@ -230,9 +226,6 @@ function deckWithPicture(string $picture): string
     return $path;
 }
 
-/**
- * A deck whose only shape holds a list nested the given number of levels.
- */
 function deckWithNestedList(int $levels): string
 {
     return deckWithShapes(static function (AbstractSlide $slide) use ($levels): void {
@@ -518,7 +511,7 @@ it('reads a table into a Markdown table', function () {
 
 it('keeps every paragraph of a cell', function () {
     // A cell holds whatever was written into it, which can be more than one
-    // paragraph. Reading only the first block of the cell lost the rest.
+    // paragraph.
     $table = tableWithCell([['First line', 0, false], ['Second line', 0, false]]);
     $mapper = new ShapeMapper(new Options(mediaDirectory: null));
     $blocks = $mapper->blocks($table, 1, 0);
@@ -598,9 +591,7 @@ it('writes the pictures beside the deck', function () {
 
 it('writes the pictures beside the Markdown that names them', function () {
     // The reference in the Markdown is relative to the Markdown, so the pictures
-    // have to be where it resolves to. Writing them beside the working directory
-    // instead puts them where the reference does not reach, and every conversion
-    // whose target is not in the working directory comes out with a broken image.
+    // have to be where it resolves to.
     $images = pictureDirectory();
     $path = writtenDeck("![A dot](dot.png)\n", $images);
 
@@ -621,7 +612,6 @@ it('writes the pictures beside the Markdown that names them', function () {
 
     $markdown = (string) file_get_contents($target);
 
-    // The reference is relative, and the file it names is beside the Markdown.
     expect($markdown)->toContain('![A dot](media/slide-1-image-0.png)')
         ->and(is_file(dirname($target) . '/media/slide-1-image-0.png'))->toBeTrue();
 
@@ -756,13 +746,9 @@ it('refuses a part larger than the limit allows', function () {
 });
 
 it('refuses a picture larger than a picture is allowed to be', function () {
-    // The reader opens every picture in the deck as it reads it, and a picture
-    // is allocated by the canvas its header declares rather than by the bytes it
-    // is made of: a picture of a couple of hundred kilobytes can ask for a
-    // canvas of several gigabytes. The memory that takes is outside the limit
+    // A picture is allocated by the canvas its header declares rather than by
+    // the bytes it is made of, and the memory that takes is outside the limit
     // PHP enforces, so the process is killed rather than the deck refused.
-    //
-    // The picture here declares a canvas of forty thousand by forty thousand.
     $path = deckWithPicture(bombPicture());
 
     expect(fn () => converted($path, new Options(mediaDirectory: null)))
@@ -771,10 +757,8 @@ it('refuses a picture larger than a picture is allowed to be', function () {
 
 it('refuses a list that nests deeper than a list may nest', function () {
     // Reading a list is a walk that recurses once per level, and the level
-    // comes from the deck: a shape whose paragraphs sit at ever deeper levels
-    // is a shape the walk never comes back from. Without a ceiling the walk
-    // does not return an error — it runs out of stack and the process dies on
-    // a signal, which is not something a caller can catch.
+    // comes from the deck, so without a ceiling the walk runs out of stack and
+    // the process dies on a signal.
     $path = deckWithNestedList(Options::MAX_NESTING + 1);
 
     expect(fn () => converted($path, new Options(mediaDirectory: null)))
@@ -804,7 +788,6 @@ it('reads a picture that is not one, and leaves it out', function () {
 
     expect(converted($path, new Options(mediaDirectory: null)))->toContain('A picture');
 });
-
 
 it('refuses a file that is not a deck', function () {
     $path = Scratch::file('not-a-deck.pptx', 'this is not a package');
@@ -879,8 +862,7 @@ it('changes one option and leaves the others', function () {
 it('carries every option through every method that changes one', function () {
     // The test above names the options one by one, so a fifth option added to
     // the class would be dropped by every `with*()` and the suite would still
-    // be green. This one reads the class instead, so a new option cannot be
-    // added without the methods carrying it.
+    // be green. This one reads the class instead.
     $properties = (new ReflectionClass(Options::class))->getProperties();
     $names = array_map(
         static fn (ReflectionProperty $property): string => $property->getName(),
@@ -1021,8 +1003,7 @@ it('reads a list whose levels jump as the levels say', function () {
     });
 
     // Every item survives, and not only the first one: the levels jump from 0 to
-    // 2 and back to 1, and the walk that reads the nested items used to end at
-    // the jump and drop every item from there onwards.
+    // 2 and back to 1.
     $markdown = converted($path);
 
     expect($markdown)->toContain('- Level 0')

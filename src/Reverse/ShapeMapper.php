@@ -51,8 +51,7 @@ final class ShapeMapper
      *        the pictures written out of it.
      * @param int   $image   How many shapes this slide has already given, which
      *        names the pictures so that they do not collide. It counts the
-     *        shapes and not the pictures, so a slide with a text box and then a
-     *        picture names the picture after the second shape.
+     *        shapes and not the pictures.
      * @param bool  $outline Whether the shape is a body placeholder, whose
      *        paragraphs are an outline whether or not the slide says so.
      *
@@ -190,11 +189,6 @@ final class ShapeMapper
     {
         $blocks = [];
 
-        // The walk recurses once per level of nesting, and the level comes from
-        // the deck: a shape whose paragraphs sit at ever deeper levels is a
-        // shape that never comes back, and the walk takes the stack with it
-        // rather than returning an error. The ceiling is checked where the
-        // nesting is read, so a deck that goes past it is refused.
         if ($level > Options::MAX_NESTING) {
             throw UnreadableDeck::nestedTooDeep(Options::MAX_NESTING);
         }
@@ -202,20 +196,14 @@ final class ShapeMapper
         while (isset($items[$position]) && $items[$position]['level'] >= $level) {
             if ($items[$position]['level'] > $level) {
                 // The item is deeper than this level, so it belongs to the item
-                // before it rather than beside it. The walk that reads the
-                // nested items takes the position with it, and what comes back
-                // may be at a level between the two — a list whose levels jump
-                // from 0 to 2 and back to 1 gives an item at level 1 where the
-                // nested walk left off.
-                //
-                // That item is a child of the item being read, at a level of its
-                // own, so it is read as a nested list of its own rather than
-                // dropped: ending the walk here lost every item from the jump
-                // onwards, with nothing to say so.
+                // before it rather than beside it. The walk is pointed at the
+                // item it is about and takes the level that item has, so what
+                // comes back may be at a level between the two — a list whose
+                // levels jump from 0 to 2 and back to 1 leaves the walk at level
+                // 1, which is deeper than this level and so is read as the next
+                // item of this list, holding a nested list of its own.
                 $ordered = $items[$position]['ordered'];
 
-                // The walk is pointed at the item it is about, so it always takes
-                // that item: the level it is given is the level that item has.
                 $nested = $this->items($items, $position, $items[$position]['level']);
 
                 $blocks[] = Block::item([Block::list($nested, $ordered)]);
@@ -351,11 +339,11 @@ final class ShapeMapper
     }
 
     /**
-     * The bytes of a picture, or nothing when it is not one that can be read.
+     * The bytes of a picture, or nothing when it cannot be read.
      *
-     * A picture that cannot be read, or that is not an image at all, is left
-     * out: a deck with an image reference to nothing is a deck with a broken
-     * image in it, which is worse than a deck without the image.
+     * A picture that cannot be read is left out: a deck with an image reference
+     * to nothing is a deck with a broken image in it, which is worse than a
+     * deck without the image.
      *
      * @return array{0: string, 1: string}|null The name and the bytes of it.
      */

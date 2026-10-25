@@ -171,16 +171,16 @@ jobs:
           echo "::error::under Settings -> Secrets and variables -> Actions."
           exit 1
 
-      # A token that SonarCloud refuses surfaces as a bare 403 on
-      # `/analysis/jres`, several steps into the scanner's own output, where it
-      # reads like a problem with the code rather than with the credential.
-      # Asking first says which of the two it is, and the answer names the
-      # account the token belongs to, which is the thing that has to change.
+      # A token SonarCloud refuses surfaces as a bare 403 in the scanner's own
+      # output, where it reads like a problem with the code rather than with the
+      # credential. Asking first says which of the two it is, and names the
+      # account the token belongs to. Curl writes the code it got through `-w`,
+      # so a host that did not answer is a `000` of its own.
       - name: Does SonarCloud accept the token?
         run: |
           code=$(curl -sS -o /tmp/sonar-user.json -w '%{http_code}' \
             -H "Authorization: Bearer ${SONAR_TOKEN}" \
-            https://sonarcloud.io/api/users/current || echo 000)
+            https://sonarcloud.io/api/users/current || true)
 
           if [ "${code}" = "000" ]; then
             echo "::error::SonarCloud could not be reached, so the analysis cannot run."

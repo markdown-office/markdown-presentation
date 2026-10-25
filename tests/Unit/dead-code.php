@@ -305,6 +305,12 @@ it('does not claim again what the code does not do', function (string $claim) {
     'an svg is carried into the package as the file itself' => 'the only one of these three that is not re-encoded',
     'an svg is put in the deck unexamined' => 'written into the package byte for byte',
 
+    // A decoded picture is as big as the canvas its header declares, and no smaller:
+    // GD's truecolor is four bytes a pixel, so the 40000 by 40000 the changelog put at
+    // 2.9 GB is 6.4 GB. The phrase is the wrong figure itself, because a number is what
+    // a reader checks against the format.
+    'the resident memory of a decoded picture is understated' => '2.9 GB of resident memory',
+
     // A free shape past the edge of the slide was clamped to it, which is the one outcome this
     // library will not have: a deck that renders, showing a shape somewhere the author did not
     // put it, and nothing in the file to say so. It is refused with the numbers now, so no page

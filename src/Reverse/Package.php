@@ -93,13 +93,6 @@ final class Package
      * lookup per part and no decompression. A part that lies about its size
      * downward is caught by the reader's own consistency check, and one that
      * lies upward is caught here.
-     *
-     * The pictures are measured too, and for the same reason: the reader opens
-     * every picture in the deck as it reads it, and a picture is allocated by
-     * the canvas its header declares rather than by the bytes it is made of. A
-     * deck of a few hundred kilobytes can hold a picture that asks for six
-     * gigabytes of canvas, and the memory that takes is outside the limit PHP
-     * enforces, so the process is killed rather than the deck being refused.
      */
     private static function bounds(string $path, Options $options): void
     {
@@ -137,13 +130,15 @@ final class Package
     /**
      * Refuse a picture that is larger than a picture is allowed to be.
      *
-     * The size is read from the picture's own header, without decoding it, so
-     * the cost of refusing a bomb is the cost of reading a few bytes. The
-     * ceiling is the one the forward direction writes pictures under, so a deck
-     * this library wrote can be read back and a deck that cannot be drawn
-     * cannot be read either.
+     * The reader decodes every picture in the deck as it reads it, and a
+     * picture is allocated by the canvas its header declares rather than by
+     * the bytes it is made of. That allocation is GD's, so it is outside the
+     * limit PHP enforces: the process is killed rather than the deck refused.
+     * The size is read from the header without decoding the picture, so the
+     * cost of refusing one is the cost of reading a few bytes.
      *
-     * @param string $name The part the picture is in.
+     * The ceiling is the one the forward direction writes pictures under, so a
+     * deck this library wrote can be read back.
      */
     private static function boundsPicture(string $path, string $name, ZipArchive $zip): void
     {
