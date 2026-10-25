@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Reverse;
 
-use MarkdownPresentation\Reverse\Inline;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Shape\RichText;
 use PhpOffice\PhpPresentation\Slide as PowerPointSlide;
@@ -63,8 +62,6 @@ final class SlideReader
             }
 
             if ($role === 'subtitle' && $shape instanceof RichText) {
-                // A subtitle is read the way any other text is read, so that its
-                // paragraphs stay paragraphs.
                 $front = [...$front, ...$this->mapper->prose(array_values($shape->getParagraphs()))];
 
                 continue;
@@ -91,20 +88,11 @@ final class SlideReader
      * A title is one line in Markdown, so only its first paragraph can be the
      * heading. The rest are the title's own paragraphs and are read as the
      * blocks they are, rather than being run into the heading:
-     * `getPlainText()` runs the paragraphs together, and a title of two
-     * paragraphs came back as one line with the words of the two glued to each
-     * other.
+     * `getPlainText()` runs the paragraphs together.
      *
-     * The paragraphs are read the way any other text is read, which is what
-     * skips the empty one a deck written by PHPPresentation carries at the
-     * front of its shapes.
+     * Reading the paragraphs as blocks is also what skips the empty one a deck
+     * written by PHPPresentation carries at the front of its shapes.
      *
-     * A title that is empty is not a title, so what it held is read as the
-     * blocks it was — and the title the slide carries is the one it carried
-     * before, which is what a second, empty title on the same slide leaves
-     * alone rather than taking away.
-     *
-     * @param RichText  $shape The title's shape.
      * @param string|null $title The title the slide carries so far.
      *
      * @return array{?string, list<Block>} The title the slide carries after
@@ -173,9 +161,8 @@ final class SlideReader
     /**
      * The words of a block, without the formatting around them.
      *
-     * The title of a slide is a heading, and a heading carries no formatting of
-     * its own, so the words are what is wanted and the bold and the italic are
-     * not. A link is the words inside it.
+     * A heading carries no formatting of its own, so the words are what is
+     * wanted and the bold and the italic are not. A link is the words inside it.
      *
      * @param list<Inline> $inlines
      */

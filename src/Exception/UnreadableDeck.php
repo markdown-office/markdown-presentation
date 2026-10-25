@@ -65,9 +65,8 @@ final class UnreadableDeck extends Exception
     /**
      * A picture in the deck is larger than a picture is allowed to be.
      *
-     * The size is the one the picture's header declares, which is what the
-     * memory it takes is measured by: a picture of a few hundred bytes can
-     * declare a canvas of six gigabytes, and the canvas is what is allocated.
+     * The size is the one the picture's header declares, which is the canvas
+     * the reader would allocate: the picture is refused before it is opened.
      */
     public static function pictureTooLarge(string $path, string $part, int $width, int $height, int $allowed): self
     {
@@ -87,7 +86,7 @@ final class UnreadableDeck extends Exception
      *
      * The walk down a list recurses once per level, so a list that nests
      * without end does not come back with an error — it runs out of stack and
-     * the process dies on a signal, which is not something a caller can catch.
+     * the process dies on a signal.
      */
     public static function nestedTooDeep(int $allowed): self
     {
