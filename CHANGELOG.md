@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The generic directives extension is 0.3.0.** Two of its fixes reach this library: a
+  container nested inside another one through a blockquote could not be closed, and the rest
+  of the document was swallowed as its body; and an attribute whose name was all digits was
+  renamed, because PHP casts a numeric-string array key to an integer and the merge
+  renumbered those — `{12=twelve}` came back out as `data-0="twelve"`. The extension also
+  writes an author's attributes under the names they gave them now, where it wrote them
+  into the `data-` namespace before. This library does not see that: it draws directives
+  from the tree rather than from the HTML.
+
 ## [0.2.1] - 2026-10-25
 
 ### Fixed
