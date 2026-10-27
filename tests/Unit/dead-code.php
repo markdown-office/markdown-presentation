@@ -419,6 +419,13 @@ it('does not claim again what the code does not do', function (string $claim) {
     // resolver a caller keeps is not the one the renderer works with: the deck's
     // directory goes to the copy.
     'the resolver a caller keeps is the one the renderer works with' => 'keeps it and gains the deck\'s directory with it',
+
+    // The advice about a colour began with the two spellings of no colour at all and went
+    // on to the roles, so the sentence read as though "none" were a role like the rest. The
+    // advice names them apart from the colours now, and the phrase below is the shape it
+    // had — a page quoting it, or a test asserting on it, is quoting a message this
+    // library does not send.
+    'the advice about a colour lists the absence of a colour among the colours' => 'is none or transparent, page',
 ]);
 
 it('has no decorative dividers in it', function () {

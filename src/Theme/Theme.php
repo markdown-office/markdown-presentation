@@ -138,12 +138,16 @@ final class Theme
      * a message that left one out would send an author to change a name that was right —
      * and the spellings the concept draft used are names like any other, so they belong in
      * the list the message is built from.
+     *
+     * The two spellings of no colour at all are named apart from the colours rather than
+     * beside them: they are the absence of one, and a list that began with them read as
+     * though "none" were a colour like the rest.
      */
     public static function colourAdvice(): string
     {
         return sprintf(
-            'A colour is %s, %s, a theme slot (%s) or a name the concept draft used (%s), '
-            . 'or a hex value such as #4C1D95.',
+            'A colour is either no colour at all (%s), a role (%s), a theme slot (%s), '
+            . 'a name the concept draft used (%s), or a hex value such as #4C1D95.',
             implode(' or ', self::NO_COLOUR),
             implode(', ', self::ROLES),
             implode(', ', self::COLOURS),

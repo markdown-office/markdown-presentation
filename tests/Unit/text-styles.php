@@ -614,7 +614,7 @@ it('refuses a colour that is not a colour', function () {
     [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{color=chartreuse}');
 
     expect(fn () => styledDeck($deck, $directory))
-        ->toThrow(MalformedTextStyle::class, 'A colour is none or transparent, page, ink, subtle, panel');
+        ->toThrow(MalformedTextStyle::class, 'A colour is either no colour at all (none or transparent), a role (page, ink, subtle, panel)');
 });
 
 it('refuses a size that is not a size', function () {

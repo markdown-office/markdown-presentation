@@ -96,7 +96,7 @@ it('refuses a text style whose colour is not a colour', function () {
 
     expect(fn () => $loader->load(themeWithTextStyles("brand:\n  color: chartreuse\n")))
         ->toThrow(MalformedTheme::class, '"brand.color" is "chartreuse", which is not a colour')
-        ->toThrow(MalformedTheme::class, 'A colour is none or transparent, page, ink, subtle, panel');
+        ->toThrow(MalformedTheme::class, 'A colour is either no colour at all (none or transparent), a role (page, ink, subtle, panel)');
 });
 
 it('accepts a colour written as one of the names the concept draft used', function () {
@@ -122,6 +122,29 @@ it('names the names the concept draft used in the advice', function () {
     // which are names like any other.
     expect(Theme::colourAdvice())
         ->toContain('dark1, light1, dark2, light2, hyperlink, followedHyperlink');
+});
+
+it('names every colour that would have been right in the advice, and reads as a sentence', function () {
+    // The advice is built from the list the colours are accepted under, so the two cannot
+    // drift: every name a colour may be written under has to be in it, and so do the two
+    // spellings of no colour at all — which mean the absence of one and are named apart
+    // from the colours rather than beside them, because a list that began with them read
+    // as though "none" were a colour like the rest.
+    $advice = Theme::colourAdvice();
+
+    foreach ([...Theme::colourNames(), ...Theme::NO_COLOUR] as $name) {
+        expect($advice)->toContain($name);
+    }
+
+    expect($advice)->toContain('#4C1D95')
+        ->and($advice)->toStartWith('A colour is ')
+        ->and($advice)->toEndWith('.');
+});
+
+it('names the two spellings of no colour apart from the colours in the advice', function () {
+    // "none" and "transparent" are not colours, and the sentence says so where they are
+    // named rather than listing them among the colours.
+    expect(Theme::colourAdvice())->toContain('no colour at all (none or transparent)');
 });
 
 it('refuses a text style whose colour is not a name at all', function () {

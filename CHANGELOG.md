@@ -224,6 +224,24 @@ All notable changes to this project are documented here. The format follows
   `Free\Colour::ADVICE` is gone, because a constant cannot be built from a list; the
   message is `Theme::colourAdvice()` now.
 
+- **The advice about a colour reads as a sentence.** The advice names every colour that
+  would have been right, and it began with the two spellings of no colour at all: the
+  sentence read as though "none" were a role like the rest, and it is the absence of a
+  colour rather than one.
+
+  The two are named apart from the colours now: "a colour is either no colour at all (none
+  or transparent), a role (page, ink, subtle, panel), a theme slot (dk1, lt1, dk2, lt2,
+  accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), a name the
+  concept draft used (dark1, light1, dark2, light2, hyperlink, followedHyperlink), or a
+  hex value such as #4C1D95." The list is still built from the list the colours are
+  accepted under, so the two cannot drift, and a failure in a theme's file names the same
+  list as a failure in a deck's attribute.
+
+  The page's own list of the colours a shape may be written in left out the six names an
+  earlier draft of the concept used and the second spelling of no colour at all, and said
+  a colour is none, a role, a slot or a hex value — which is not every colour that would
+  have been right.
+
 - **A face named in a way nothing reported is reported now.** The faces a theme names are
   measured with the advance widths of the face that will draw them, and a face with no
   table of its own is measured with the reference face's widths instead — which are not

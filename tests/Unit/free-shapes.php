@@ -345,7 +345,7 @@ it('has no fill or stroke where the deck named none', function () {
 
 it('refuses a colour name nothing is', function (string $attribute) {
     expect(fn () => placedShapes(sprintf("::rectangle{%s=chartreuse}\n", $attribute)))
-        ->toThrow(MalformedShape::class, 'A colour is none or transparent, page, ink, subtle, panel, a theme slot');
+        ->toThrow(MalformedShape::class, 'A colour is either no colour at all (none or transparent), a role (page, ink, subtle, panel), a theme slot');
 })->with([['fill'], ['stroke']]);
 
 it('accepts a colour written as one of the names the concept draft used', function () {

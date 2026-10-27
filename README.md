@@ -1185,14 +1185,15 @@ Slide 1 gives a "::circle" a width of 120 and a height of 80. A circle is as wid
 
 #### Colour
 
-A colour is `none`, one of the four names a shape *plays*, one of the twelve theme *slots*, or
-a hex value:
+A colour is `none` or `transparent`, one of the four names a shape *plays*, one of the twelve
+theme *slots* under either of their two spellings, or a hex value:
 
 | Written | Means |
 | --- | --- |
-| `none` | nothing — written `a:noFill`, not inherited |
+| `none` `transparent` | nothing — written `a:noFill`, not inherited |
 | `page` `ink` `subtle` `panel` | what the page behind the slide, the body text, a quote and a code block's panel are each drawn in |
 | `accent1`–`accent6`, `dk1` `lt1` `dk2` `lt2`, `hlink` `folHlink` | the theme's own slots |
+| `dark1` `light1` `dark2` `light2` `hyperlink` `followedHyperlink` | the same slots, under the names an earlier draft of the concept used |
 | `#4C1D95` | that hex, with or without the `#` |
 
 The four role names come first because they are what the rest of the library paints with: a
@@ -1399,7 +1400,7 @@ Slide 1 places "rectangle" at left 900px with a width of 120px, which reaches 10
 
 Slide 1 gives a "::circle" a width of 120 and a height of 80. A circle is as wide as it is tall; give one size or the other.
 
-Slide 1 gives "rectangle" a fill of "chartreuse". A colour is none or transparent, page, ink, subtle, panel, a theme slot (dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink) or a name the concept draft used (dark1, light1, dark2, light2, hyperlink, followedHyperlink), or a hex value such as #4C1D95.
+Slide 1 gives "rectangle" a fill of "chartreuse". A colour is either no colour at all (none or transparent), a role (page, ink, subtle, panel), a theme slot (dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), a name the concept draft used (dark1, light1, dark2, light2, hyperlink, followedHyperlink), or a hex value such as #4C1D95.
 
 Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
 
