@@ -1412,6 +1412,139 @@ Two things are **not** offered and are refused rather than approximated: a dashe
 because PHPPresentation writes an autoshape's stroke as one colour and one width; and a label
 in brackets, because a free shape has nowhere to put one.
 
+### Slide templates
+
+The furniture of a deck — the wordmark, the rule, the page number — is the same on every
+slide, and writing it out on every slide means changing it on every slide. A **template** is
+that furniture written once: a slide of the deck's own Markdown that names a template, and
+every slide that names it is drawn with it.
+
+```markdown
+---
+template: brand
+---
+:::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+Resilience
+:::
+
+::line{left=5% top=72.889% width=30% height=0.185% stroke=00B4D8 stroke-width=1}
+```
+
+and every slide that wants that furniture says so:
+
+```markdown
+---
+layout: blank
+template: brand
+---
+```
+
+A template's frontmatter names the template and **nothing else**, and that is what tells a
+definition from a slide that draws one: a definition has no `layout:`, because it is not
+drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
+and it does not count towards the number of slides — which is what makes one definition and
+many slides add up to one slide each.
+
+A slide may name several templates, and the chrome of each of them is drawn on it:
+
+```markdown
+---
+layout: blank
+template: [brand, page-number]
+---
+```
+
+`layout:` and `template:` are independent. `layout:` chooses the geometry — the role the
+theme's `layouts.yml` maps onto a box on the page — and `template:` adds furniture on top of
+it. `layout: blank` with `template: brand` is therefore a slide with no furniture of its own
+and the wordmark and the rule drawn where the template puts them.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+$deck = (new DeckParser())->parse(
+    "---\ntemplate: page\n---\n::slide-number{left=94% top=92% width=5% height=6%}\n\n"
+    . "---\nlayout: blank\ntemplate: page\n---\n\n"
+    . "---\nlayout: blank\ntemplate: page\n---\n",
+);
+$path = sys_get_temp_dir() . '/deck.pptx';
+(new PresentationRenderer())->render($deck, $path);
+
+$zip = new ZipArchive();
+$zip->open($path);
+
+for ($slide = 1; $slide <= 2; $slide++) {
+    $xml = $zip->getFromName("ppt/slides/slide{$slide}.xml");
+    preg_match('#<a:t>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</a:t>#s', $xml, $number);
+    echo $number[1], "\n";
+}
+```
+
+```text
+1
+2
+```
+
+#### What a template may hold
+
+Chrome, and nothing else: the free shapes — `::image`, `:::content`, `::line`,
+`::slide-number` — and the words a `:::content` block carries. Ordinary Markdown in a
+template is refused by name, because a template is drawn on every slide that names it and the
+words of a slide written into one would be on every one of them.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+try {
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse("---\ntemplate: brand\n---\n# A heading\n"),
+        sys_get_temp_dir() . '/deck.pptx',
+    );
+} catch (Exception $failure) {
+    echo $failure->getMessage(), "\n";
+}
+```
+
+```text
+The template "brand" holds a heading. A template holds chrome, not content: the free shapes it draws, and the words a ":::content" block carries.
+```
+
+#### The page number
+
+`::slide-number` is a shape like any other: it takes the same placement attributes and is in
+the layer order with them. The renderer fills in the number of the slide it is drawn on, and
+`of=true` writes the number of the deck after it.
+
+```markdown
+::slide-number{left=94% top=92% width=5% height=6% color=94A3B8 font-size=10 font-family=Calibri align=right vertical-align=middle}
+```
+
+"3 / 28" is the third slide of a deck of twenty-eight, and the twenty-eight is the number of
+the slides: a template definition is not one of them.
+
+#### The chrome file
+
+A deck may keep its templates in a file beside it and name it in the deck's frontmatter:
+
+```markdown
+---
+theme: ./theme.yml
+chrome: ./chrome.md
+---
+```
+
+`chrome.md` is a Markdown file of template definitions in the same syntax as a deck, and it is
+resolved against the deck's own directory — so a deck and the furniture it shares travel
+together. A file that is not there is a failure, and so is a file outside the directories the
+render may read: a path a deck wrote is held to the same scope as a picture in it.
+
+**The deck's own templates override the imported ones of the same name** — the same rule the
+theme resolver applies by search order, and the reason a deck can change one word of a house
+style without changing the house style.
+
 ### Steps
 
 Two colons for a boundary, three for a region:

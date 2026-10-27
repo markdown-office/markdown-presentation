@@ -20,7 +20,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `01-kitchen-sink.md` | `01-kitchen-sink.pptx` | Every construct at once: emphasis, `code`, strikethrough, links, nested lists, an ordered list starting at 7, an aligned table with markup in its cells, a two-line quote, code, a rule, and a `::note` becoming a speaker note |
 | `02-layout-roles.md` | `02-layout-roles.pptx` | Every layout role, one per slide |
 | `03-themes.md` | three files | The same deck in `default`, `corporate-dark` and `minimal`, changed by nothing but the `theme:` line — so the three can be put side by side and compared. They differ in type scale, margins, rule weight and heading treatment, not only in palette |
-| `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does |
+| `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does, and a slide drawn with two templates — one the deck defines and one `templates/chrome.md` holds |
 | `05-steps.md` | `05-steps.pptx` | `::click` steps as click animations on one slide, a `:::click` region that is a step of its own, a build-up across two columns, a `::column` written inside a region, a picture held back for its own click, and a `::note` |
 | `06-tables.md` | `06-tables.pptx` | Table alignment, a bold filled header, widths from content |
 | `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column, a WebP converted to PNG, an SVG drawn to PNG, and the three layouts built around one: `image-text`, `image-title` and `image-slide` |
@@ -47,6 +47,10 @@ Rebuilding that deck from another tool is what turned up both defects in [PR #11
 `10-rejected.md` names a directive this library does not have. Converting it is
 the failure it exists to demonstrate, so `build.php` leaves it alone and says
 which file and why.
+
+`templates/chrome.md` is not a deck either: it is a file of templates, and
+`04-frontmatter.md` is the deck that names it. It is in a directory of its own
+because every `.md` file beside the decks is one.
 
 ## The one that needs a rasteriser
 
