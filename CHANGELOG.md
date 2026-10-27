@@ -170,6 +170,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The PowerPoint tool renders the deck it was asked for.** PowerPoint knows a presentation
+  by the name of its file, so a deck staged under the name of a presentation that was already
+  open *was* that presentation: the export was the one that was open before, the deck that
+  was asked for was nowhere, and the tool reported success. Every deck is staged under a name
+  of the run's own now, which no open presentation can have.
+
+  A PDF is written lazily, so a file that exists is a file that may still be being written,
+  and the tool copied one that was still being written. The export is finished when the file
+  has stopped growing and carries the end-of-file marker every PDF ends with, and only then
+  is it copied out. The deck's document is closed after that rather than before it, which is
+  what the comment above that wait had always said.
+
+  The question has an answer of its own in `tools/pdf-is-complete.sh`, so that the test suite
+  can check it: the tool itself needs PowerPoint and the answer does not.
+
 - **A page number written on a slide is drawn on it.** The page number became a shape, and
   the number was filled into it for the chrome of a template — where the shape is read once
   for the deck and drawn on every slide that names it. A slide that wrote one itself drew an

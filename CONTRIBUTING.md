@@ -104,18 +104,30 @@ opens each deck in Microsoft PowerPoint and exports it to PDF:
 osascript tools/render-with-powerpoint.applescript examples/out/*.pptx --out build/powerpoint
 ```
 
-It is a developer tool and nothing in the test suite requires it: continuous integration has no
-PowerPoint, and a test that needed one would be a test that could only be run on one person's
-machine. Every step either produces the file it promised or exits non-zero with the reason —
-a deck that opened and exported nothing is a failure, and so is a directory that cannot be
-written, a deck that is not there and a `--out` that is missing.
+It is a developer tool and almost nothing in the test suite requires it: continuous integration
+has no PowerPoint, and a test that needed one would be a test that could only be run on one
+person's machine. The one part of it the suite does check is the question it asks about a
+finished PDF, which is a file of its own — `tools/pdf-is-complete.sh` — and needs no
+PowerPoint to answer. Every step either produces the file it promised or exits non-zero with
+the reason — a deck that opened and exported nothing is a failure, and so is a directory that
+cannot be written, a deck that is not there and a `--out` that is missing.
 
-Three things about it are worth knowing before running it:
+These are worth knowing before running it:
 
 - **It stages each deck inside PowerPoint's own sandbox container.** Office applications are
   sandboxed and refuse to read a path the user has not granted them with error `-9074`, so the
   deck is copied in, exported there and copied back out. The scratch directory is removed on
   every path through the script, including every failure.
+- **It stages each deck under a name of its own.** PowerPoint knows a presentation by the name
+  of its file, so a deck staged under the name of a presentation that is already open *is*
+  that presentation: the export is the one that was open before, the deck that was asked for
+  is nowhere, and the script reports success. Each deck is staged under a name of the run's
+  own, which no open presentation can have.
+- **It waits for the PDF to be finished.** PowerPoint writes a PDF lazily, so a file that
+  exists is a file that may still be being written, and a copy of that is a copy of half a
+  PDF. The export is finished when the file has stopped growing and carries the end-of-file
+  marker every PDF ends with, and the deck's document is closed after that rather than before
+  it.
 - **It closes only the decks it opened.** A deck somebody had open before the script ran is
   still open afterwards.
 - **It can fail because PowerPoint is in a bad state.** `-9074` from a deck already staged
