@@ -357,6 +357,19 @@ it('reports a face a word names that there is no table for, and not one there is
     ]);
 });
 
+it('reports a face a word names once, however many words name it', function () {
+    // A deck that writes the face on twenty words is one place, and one entry: the words
+    // are on one slide and the attribute is the same one.
+    [$deck, $directory] = wordmark(
+        "brand:\n  color: accent1\n",
+        ':style[Bakery]{font="Comic Sans MS"} and :style[Shop]{font="Comic Sans MS"}',
+    );
+
+    expect(styledRenderer($deck, $directory)->unknownFonts())->toBe([
+        ['face' => 'Comic Sans MS', 'where' => 'a font attribute on slide 1'],
+    ]);
+});
+
 it('refuses a deck whose word names a face it cannot measure when the renderer is strict', function () {
     // Strict is for a caller that would rather have no file than a file whose text was
     // measured with another face's widths, and the message says where the face was named.
