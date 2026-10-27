@@ -625,6 +625,18 @@ they are. So is a construct CommonMark does not call emphasis: `__ Bakery__` and
 `** text**` are text, because a delimiter that opens an emphasis may not be followed by a
 space and one that closes it may not be preceded by one.
 
+**The two halves keep the same rules, and CommonMark does not.** The corpus of the labels
+a style may be given, and of what CommonMark makes of each one, is
+`tests/fixtures/labels.txt`; `tools/compare-label-patterns.php` runs it through both
+halves' rules and through the reference parser. The halves agree with each other on every
+label in it, and they differ from CommonMark in five of them, which the corpus records
+rather than leaves to be found again:
+
+| Label | CommonMark | Here |
+| --- | --- | --- |
+| `___Bakery___`, `_Bakery__`, `__Bakery_ __` | emphasis | text, so the label is drawn as it was written |
+| `a *Bakery**a`, `a *Bakery_*a` | text | a construct, so the label is refused |
+
 **`highlight` is not drawn by this half.** PHPPresentation's font has no setter for one,
 so a highlight would be an element of the run's own properties in the file — a pass over the
 written package rather than a property of a run. Until there is one, the attribute is

@@ -49,6 +49,15 @@ final class StyleReader
      * `~~struck~~` is not among them: it is GFM rather than CommonMark, and a label is
      * plain text, so the tildes are two characters in a word rather than an intent.
      *
+     * The Word half keeps these rules in a list of patterns of its own, and the two lists
+     * are the same: the halves agree with each other on every label in
+     * `tests/fixtures/labels.txt`, which is what the corpus is for. They differ from
+     * CommonMark in five of them, and the corpus records which — a run of three or more
+     * underscores (`___Bakery___`, `_Bakery__`, `__Bakery_ __`) is emphasis to CommonMark
+     * and text here, and a run of one asterisk beside a run of two (`a *Bakery**a`,
+     * `a *Bakery_*a`) is text to CommonMark and a construct here. A change to either
+     * half's rules has to say what it does about them.
+     *
      * @var list<string>
      */
     private const MARKDOWN = [

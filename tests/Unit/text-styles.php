@@ -8,6 +8,7 @@ use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownTextStyle;
 use MarkdownPresentation\Render\PresentationRenderer;
+use MarkdownPresentation\Tests\Support\Doctest;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
@@ -675,4 +676,91 @@ it('draws the four kinds of block a box holds, and a style in each of them', fun
         ->and($colours['paragraph']['colour'])->toBe('00B4D8')
         ->and($colours['quote']['colour'])->toBe('00B4D8')
         ->and($colours['item']['colour'])->toBe('00B4D8');
+});
+
+it('holds a label that is Markdown and draws one that is not', function () {
+    // The corpus is the list of labels a text style may be given and what CommonMark
+    // makes of each one. A label the directive grammar cannot carry — one with a bracket
+    // in it — is left out: the grammar says a label holds no brackets at all.
+    //
+    // The two markers that differ from CommonMark say which way the halves went, and
+    // this half holds what the corpus says it holds: a run of three underscores is
+    // emphasis to CommonMark and text here, and a run of one asterisk beside a run of
+    // two is text to CommonMark and a construct here.
+    $directory = textStyleTheme("brand:\n  color: accent1\n");
+    $labels = file(dirname(__DIR__) . '/fixtures/labels.txt', FILE_IGNORE_NEW_LINES) ?: [];
+    $wrong = [];
+    $held = 0;
+    $drawn = 0;
+    $diverged = [];
+
+    foreach ($labels as $line) {
+        if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+        }
+
+        [$marker, $label] = array_pad(explode(' ', $line, 2), 2, '');
+
+        if (str_contains($label, '[') || str_contains($label, ']')) {
+            continue;
+        }
+
+        $deck = (new DeckParser())->parse(sprintf("---\ntheme: ./theme.yml\n---\n\nA :brand[%s] here.\n", $label));
+        $path = Scratch::file('deck.pptx', '');
+        $verdict = 'drawn';
+
+        try {
+            (new PresentationRenderer($directory))->render($deck, $path);
+        } catch (Throwable $failure) {
+            $verdict = $failure instanceof MalformedTextStyle ? 'refused' : 'failed';
+        }
+
+        $want = in_array($marker, ['markdown', 'text-only'], true) ? 'refused' : 'drawn';
+
+        if ($want !== $verdict) {
+            $wrong[] = sprintf('%s: the corpus says %s, this half says %s', $label, $marker, $verdict);
+        }
+
+        if (in_array($marker, ['markdown-only', 'text-only'], true)) {
+            $diverged[$marker] = true;
+        }
+
+        if ($want === 'refused') {
+            $held++;
+
+            continue;
+        }
+
+        $drawn++;
+    }
+
+    expect($wrong)->toBe([])
+        ->and($held)->toBeGreaterThan(0)
+        ->and($drawn)->toBeGreaterThan(0)
+        ->and($diverged)->toHaveKeys(['markdown-only', 'text-only']);
+});
+
+it('names the labels the halves differ from CommonMark about, in the code', function () {
+    // The docblock has to say where the halves differ from CommonMark, and the labels it
+    // names have to be the labels the corpus records: a docblock that names a label the
+    // corpus does not, or leaves one out, is a claim nothing checks.
+    $doc = (string) file_get_contents(Doctest::root() . '/src/Render/CommonMark/StyleReader.php');
+    $labels = file(dirname(__DIR__) . '/fixtures/labels.txt', FILE_IGNORE_NEW_LINES) ?: [];
+
+    foreach ($labels as $line) {
+        if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+        }
+
+        [$marker, $label] = array_pad(explode(' ', $line, 2), 2, '');
+
+        if (!in_array($marker, ['markdown-only', 'text-only'], true)) {
+            continue;
+        }
+
+        expect($doc)->toContain($label);
+    }
+
+    expect($doc)->toContain('Word half')
+        ->and($doc)->toContain('agree with each other');
 });

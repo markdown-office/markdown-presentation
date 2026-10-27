@@ -224,6 +224,25 @@ All notable changes to this project are documented here. The format follows
   `Free\Colour::ADVICE` is gone, because a constant cannot be built from a list; the
   message is `Theme::colourAdvice()` now.
 
+- **The two halves keep the same rules for a label, and CommonMark does not.** A label is
+  plain text, so a label holding a complete Markdown construct cannot have it honoured.
+  What counts as a construct is CommonMark's own question, and the two halves of the suite
+  answer it the same way — which was the point of the corpus the Word half brought.
+
+  The corpus is here now as well: `tests/fixtures/labels.txt` names every label a style
+  may be given and what CommonMark makes of each one, and
+  `tools/compare-label-patterns.php` runs it through both halves' rules and through the
+  reference parser. The halves agree with each other on every label in it, and they
+  differ from CommonMark in five of them, which the corpus records rather than leaves to
+  be found again: a run of three or more underscores (`___Bakery___`, `_Bakery__`,
+  `__Bakery_ __`) is emphasis to CommonMark and text to both halves, and a run of one
+  asterisk beside a run of two (`a *Bakery**a`, `a *Bakery_*a`) is text to CommonMark and
+  Markdown to both.
+
+  The docblock beside the rules says so, and the test beside it says which labels the
+  docblock has to name — so a change to either half's rules has to say what it does
+  about them.
+
 - **A style named twice is refused by the styles themselves.** The check sat in the theme
   loader, so a `TextStyles` built in code took the last of the two and said nothing about
   it: a theme's file was checked and a `TextStyles` was not. The refusal is inside the
