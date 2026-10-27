@@ -118,8 +118,7 @@ final class MalformedTheme extends InvalidInput
      * Two text styles whose names are the same word.
      *
      * The names are folded, so `Brand` and `brand` are one name: a theme that carries both
-     * has two styles a deck cannot tell apart, and the one of them a deck reaches is the
-     * one that happens to be written last.
+     * has two styles a deck cannot tell apart.
      */
     public static function duplicateStyle(string $file, string $style, string $other): self
     {

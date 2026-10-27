@@ -313,8 +313,8 @@ final class StyleReader
      * it: a face with no table of advance widths is measured with the reference face's
      * widths, and the reader has to be told which word of the slide to change.
      *
-     * Null where the face came from the theme's own style rather than from the word: the
-     * theme's styles are the theme's business and are reported beside it.
+     * Null where the face came from the theme's own style rather than from the word: a face
+     * the theme names is the theme's own to change, and a word's own face is the deck's.
      */
     private function where(DirectiveInline $node, int $slide): ?string
     {

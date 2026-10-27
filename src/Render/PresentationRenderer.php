@@ -233,10 +233,9 @@ final class PresentationRenderer
      * same way, which is the width of a proportional face's letters rather than the width
      * of a code block.
      *
-     * Every place a face is named is an entry: a slot of the theme, a text style of it, a
-     * box the deck placed itself, or an attribute a word carries. The place is what tells
-     * a reader where to change the name, which is the half of the answer the face alone
-     * does not give.
+     * Every place a face is named is an entry: a slot of the theme, or an attribute a word
+     * carries. The place is what tells a reader where to change the name, which is the
+     * half of the answer the face alone does not give.
      *
      * Emptied by {@see self::render()} rather than accumulated, because a layout belongs to
      * one deck: a caller converting several in a loop wants the last one's, not all of them.

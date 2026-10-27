@@ -1738,9 +1738,8 @@ table, because every character in one advances by the same amount: Consolas is m
 550 units to the em, Menlo at 602 and JetBrains Mono at 600. A face with no table of its own
 is measured with the reference face's widths — the ones every face was measured with before
 there were tables of their own — and the face is named by
-`PresentationRenderer::unknownFonts()`, one entry for every place it was named: a slot of the
-theme, a text style of it, a box the deck placed itself, or an attribute a word carries. A
-caller that would rather have no file than a file whose text was measured with another face's
+`PresentationRenderer::unknownFonts()`, one entry for every slot it was named in. A caller
+that would rather have no file than a file whose text was measured with another face's
 widths asks for the strict renderer, and gets `UnknownFont` naming the faces there are
 tables for.
 

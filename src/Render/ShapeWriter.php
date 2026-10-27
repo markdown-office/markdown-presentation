@@ -254,8 +254,7 @@ final class ShapeWriter
      *
      * The face is measured with the reference face's widths, which are not its own, and
      * the report is where that is said: a face that was not measured says nothing. The
-     * place is on the run, because the run is what knows where the face was written — a
-     * word that names a face of its own is the only thing that writes one down.
+     * place is on the run, because the run is what knows where the face was written.
      *
      * A run that names no face is not a finding: the face of the block it is in is the
      * theme's, and the theme's faces are reported beside it.
