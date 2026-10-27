@@ -306,6 +306,20 @@ it('draws a heading in its face\'s own weight when the theme says so', function 
         ->and(headingIsBold($bold))->toBeTrue();
 });
 
+it('measures a heading in the weight it is drawn in', function () {
+    // The other half of the one above: a heading in a theme that says `regular` is drawn in
+    // the face's reading weight, so measuring it in the bold cut is measuring a face that is
+    // not there — and a heading measured a line too tall is a gap under it.
+    //
+    // 161 `h` at 20pt are 1691px in Calibri's regular cut and 1729px in its bold one, and the
+    // body box leaves 860px for the text, so the first takes two lines and the second three.
+    $heading = "---\ntheme: %s\n---\n\n# T\n\nBody.\n\n## " . str_repeat('h', 161) . "\n";
+    $regular = themedDeck(styledTheme(['heading-weight' => 'regular']), $heading);
+    $bold = themedDeck(styledTheme(['heading-weight' => 'bold']), $heading);
+
+    expect($regular->positionOf('text')['height'])->toBeLessThan($bold->positionOf('text')['height']);
+});
+
 it('draws a heading in the accent rather than the body ink when the theme says so', function () {
     // An accent a body could never be painted in, so the two are told apart by the colour
     // rather than by which shape it happened to land on.

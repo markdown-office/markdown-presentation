@@ -311,7 +311,7 @@ final class ShapeWriter
                 $runs,
                 $this->entryWidth($block, $entry, $width),
                 $size,
-                bold: $block instanceof Heading,
+                bold: $block instanceof Heading && $this->geometry->style()->headingIsBold(),
                 face: $this->faceOf($block),
             );
 
