@@ -478,6 +478,111 @@ and backticks inside a code span are characters, so `` `**not bold**` `` is a co
 Code blocks are not coloured. Nothing here lexes a language, and the fence's info string
 is kept only so a reader unzipping the file can see which blocks named which language.
 
+### Inline styles
+
+A box carries one colour, one size and one face, and every word in it takes them or does
+not. A **text style** is a name a theme gives to a set of those, and a word written in one
+is drawn in it:
+
+```markdown
+:::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri}
+Resilience :brand[Bakery]
+:::
+```
+
+That is one box, two words and two colours — which is the whole of what a wordmark is, and
+what a box could not say before.
+
+Three forms, one grammar:
+
+| Written | Means |
+| --- | --- |
+| `:accent[brand]` | the word "brand" in the style the theme names `accent` |
+| `:accent[brand]{color=FF0000}` | the same, with the attributes laid over the style's |
+| `:style[brand]{color=FF0000}` | the word "brand" in the attributes, with no style involved |
+
+The attributes are a closed set:
+
+| Attribute | Carries |
+| --- | --- |
+| `color` | the ink: a role, a theme slot or a hex value — the same vocabulary [a shape's fill](#colour) is written in |
+| `size` | the size of the type, in points |
+| `font` | the family: one of the theme's own font slots or a literal |
+| `bold` | the weight: `true` or `false` |
+| `italic` | the slant: `true` or `false` |
+| `underline` | the underline: `true` or `false` |
+| `strike` | the strike: `true` or `false` |
+| `highlight` | a colour behind the word — **not drawn by this half**, see below |
+
+An attribute overrides the style for the property it names, and for that property only. A
+property neither of them names is not set: the run takes it from the block it is in — the
+`:::content` box's colour, the paragraph's size. Nothing is reset to a default, so a style
+that sets a colour and nothing else changes the colour of a word and leaves the rest of it
+alone.
+
+A face is drawn *and* measured. The words in a box are measured with the advance widths of
+the face they will be drawn in — the theme's own for a frame, the `font-family` of the box
+for a placed one, and the `font` of the style for a word written in one — so a word in a
+narrower face takes fewer lines and the box around it is the height it needs.
+
+**A boolean set to `false` is not "off" but "not set".** `:brand[Bakery]{bold=false}`
+takes the weight off a style that has it, and the word then takes the weight of the block
+it is in — a paragraph's is none and a heading's is bold. The Word half reads it the same
+way, because a run cannot be written with a weight of none.
+
+The named styles come from the theme's `text-styles.yml`, which is optional:
+
+```yaml
+# themes/resilience-bakery/text-styles.yml
+brand:
+  color: accent1
+  bold: true
+muted:
+  color: lt2
+```
+
+A style that sets an attribute that does not exist, a style that sets nothing at all, and a
+style called `style` — the word the raw form is written with — are refused when the theme
+is read.
+
+A name the theme does not have is refused when the deck is read, and the message names the
+styles the theme does have:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+try {
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse("Resilience :brand[Bakery]\n"),
+        sys_get_temp_dir() . '/deck.pptx',
+    );
+} catch (Exception $failure) {
+    echo $failure->getMessage(), "\n";
+}
+```
+
+```text
+Slide 1 has the text style ":brand", which is not a style this theme has. The theme has no text styles; a theme names them in its "text-styles.yml".
+```
+
+**The label is plain text.** The label of a directive is a string rather than Markdown, so
+`:brand[**Bakery**]` would be drawn as `**Bakery**` — a deck that renders and shows
+something the author did not write. It is refused instead, and the message says the two
+ways out: give the style the weight, or write the emphasis in the paragraph around it. A
+bare `*` or `_` is a character and not an intent, so `2 * 3` and `snake_case` are drawn as
+they are.
+
+**`highlight` is not drawn by this half.** PHPPresentation's font has no setter for one,
+so a highlight would be an element of the run's own properties in the file — a pass over the
+written package rather than a property of a run. Until there is one, the attribute is
+refused by name rather than accepted and quietly dropped.
+
+**Breaking**: a deck carrying an inline directive under a name that is not a style is one
+this renderer now stops on. An unknown inline directive used to be drawn as its own source
+text, which is the Word half's behaviour and the opposite of this one's.
+
 ### When a slide is too full
 
 A block taller than the room left for it is clamped — drawn as small as the room allows —
@@ -1634,6 +1739,11 @@ write `.docx` style ids, which a `.pptx` has no use for; mapping them onto shape
 inventing a vocabulary nobody wrote down. A slot that does not exist still fails when the
 theme is loaded, so a typo in a `styles.yml` is never rendered as silence.
 
+`text-styles.yml` **is** read, and it is the one file of a theme that says something about
+the words inside a box rather than about the box — see [Inline styles](#inline-styles). A
+style that sets an attribute nobody reads still fails when the theme is loaded, so a typo in
+a `text-styles.yml` is never rendered as silence either.
+
 ### Frontmatter
 
 The set of directives is closed, and anything outside it is a failure that names the set:
@@ -1685,6 +1795,11 @@ refused too, because a step is `::click` here and a comment is a deck written fo
 whose step marker this one does not read. A plain HTML tag is none of those and is still
 text: `<b>` is not a directive, and this library has no opinion about what a deck says about
 HTML.
+
+An **inline** directive — `:name[text]` — is a [text style](#inline-styles), and one under a
+name the theme does not have is refused the same way: it is a name somebody has to change,
+and the message names the styles the theme does have. It used to be drawn as its own source
+text, which is the Word half's behaviour and the opposite of this one's.
 
 ### What Slidev writes and this does not read
 
@@ -1797,6 +1912,11 @@ These are the distinctions a `.pptx` does not record, and what comes back in the
 - **the underline.** PowerPoint has it and Markdown has no way to say it, so a deck whose
   emphasis is underlined comes back with the emphasis gone. Bold, italic and strike-through
   come back as themselves.
+- **a text style.** A word drawn in a [named style](#inline-styles) comes back as the word,
+  without the style and without the colour it was drawn in. The label of a style is plain
+  text and its syntax has no escape, so a word whose text carries a bracket cannot be
+  written back as a style at all; a round trip that drew the colour of some words and not
+  others would be a deck whose design depended on the text in it.
 - **a link inside a run.** A shape whose text is a link comes back as a link; a word inside
   a paragraph that is a link does not.
 - **a chart.** A chart is a drawing, not prose. It is left out rather than half-read.
@@ -1811,6 +1931,7 @@ themes/corporate-dark/
 ├── theme.yml        required   colours, fonts, type scale, metadata
 ├── styles.yml       optional   Word style-slot overrides
 ├── layouts.yml      optional   semantic role → template layout name
+├── text-styles.yml  optional   named text styles: the words inside a box
 ├── template.pptx    optional   PowerPoint template: where the layouts put their boxes
 ├── README.md        optional   attribution
 └── LICENSE          optional
