@@ -121,10 +121,24 @@ it('refuses a theme path outside the directories the resolver was given', functi
         ->toThrow(ThemeNotFound::class, 'is at "' . $outside . '" rather than one this render may read');
 });
 
-it('resolves a relative path against the working directory, not against the process', function () {
+it('writes a relative path from the working directory when the deck has none of its own', function () {
+    // A deck handed in as a string has no directory beside it, so the working directory
+    // is what a path in it is written from — the same rule a relative image path
+    // follows, and the only one a deck without a directory can follow.
     $resolver = resolverIn(ThemeDirectory::withAcme());
 
     expect($resolver->resolve('./themes/acme')->theme()->name())->toBe('Acme');
+});
+
+it('writes a relative path from the deck\'s own directory', function () {
+    // The theme of a deck is written next to the deck, and the process rendering the
+    // deck is somewhere else entirely: a build script that renders a deck by its path
+    // must not have to change directory first. The path used to be written from the
+    // working directory, so a deck whose theme sat beside it was not found at all.
+    $deck = ThemeDirectory::create(['theme.yml' => "name: Beside\n"], 'deck');
+    $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
+
+    expect($resolver->resolve('./theme.yml')->theme()->name())->toBe('Beside');
 });
 
 it('refuses an absolute theme path outside the directories the resolver was given', function () {
@@ -154,6 +168,46 @@ it('reads a theme from a root the calling program allowed', function () {
     $resolver = new ThemeResolver($working, $builtin, roots: [$library]);
 
     expect($resolver->resolve($library)->theme()->name())->toBe('Shared');
+});
+
+it('finds a theme in a root the calling program allowed, by its name', function () {
+    // The other half of that test: a root is a directory of themes, and a name is looked
+    // for in one of them the way it is in the themes that ship with the library. A
+    // shared library of themes is no use if a name is never looked for in it.
+    $library = ThemeDirectory::create(['shared/theme.yml' => "name: Shared\n"], 'library');
+    $working = ThemeDirectory::create([], 'working');
+    $builtin = ThemeDirectory::create(['builtin/theme.yml' => "name: Builtin\n"], 'builtin');
+    $resolver = new ThemeResolver($working, $builtin, roots: [$library]);
+
+    expect($resolver->resolve('shared')->theme()->name())->toBe('Shared');
+});
+
+it('lists the themes of the roots as well', function () {
+    // A failure names every theme that resolves, so a theme in a root has to be in the
+    // list: a name the resolver would accept and not list is a name the reader of the
+    // failure is left to guess at.
+    $library = ThemeDirectory::create(['shared/theme.yml' => "name: Shared\n"], 'library');
+    $working = ThemeDirectory::create([], 'working');
+    $builtin = ThemeDirectory::create([], 'builtin');
+    $resolver = new ThemeResolver($working, $builtin, roots: [$library]);
+
+    expect($resolver->available())->toBe(['shared']);
+});
+
+it('refuses a theme in a root that resolves outside the roots', function () {
+    // A root is searched now, and a search is not a permission: a theme in one that
+    // resolves outside every root is still a theme this render may not read. The link
+    // is what tells the two apart — the name is inside the root and the file it
+    // reaches is not.
+    $outside = ThemeDirectory::minimal('Stolen');
+    $library = ThemeDirectory::create([], 'library');
+    symlink($outside, $library . '/stolen');
+    $working = ThemeDirectory::create([], 'working');
+    $builtin = ThemeDirectory::create([], 'builtin');
+    $resolver = new ThemeResolver($working, $builtin, roots: [$library]);
+
+    expect(fn () => $resolver->resolve('stolen'))
+        ->toThrow(ThemeNotFound::class, 'is at "' . $outside . '" rather than one this render may read');
 });
 
 it('does not put a theme outside the roots into the file it writes', function () {

@@ -1784,8 +1784,8 @@ These are the distinctions a `.pptx` does not record, and what comes back in the
 
 ## Themes
 
-A theme is a **directory**, and only `theme.yml` is required. Nothing is compiled
-and nothing is a PHP class:
+A theme is a **directory**, and only `theme.yml` is required — a path may name that file
+instead of the directory holding it. Nothing is compiled and nothing is a PHP class:
 
 ```
 themes/corporate-dark/
@@ -1932,11 +1932,13 @@ In "theme.yml": "dark" is not true or false.
 
 A deck names a theme, and the name is looked for in this order:
 
-1. an explicit path — anything with a `/` in it;
+1. an explicit path — anything with a `/` in it, written from the deck's own directory —
+   or the working directory, where the deck has none — unless it names an absolute one;
 2. `./themes/<name>` beside the deck;
 3. `./themes/<name>` beside the working directory;
-4. a theme that ships with the library;
-5. nothing, which is a failure listing every name that *did* resolve.
+4. a theme in a root the calling program allowed;
+5. a theme that ships with the library;
+6. nothing, which is a failure listing every name that *did* resolve.
 
 The deck's own directory comes before the working directory's because a deck and its
 theme are one thing: the theme sits in `themes/` under the directory the deck is in, and
@@ -1968,14 +1970,16 @@ Falling back to the default theme instead would produce a deck in the wrong colo
 with nothing in the output to say so, which is the failure mode this whole library is
 built to avoid.
 
-A theme named by path is loaded from wherever it is — under the directory the resolver was
-given:
+A theme named by a path — anything with a `/` in it — is loaded from wherever it is. The
+path is written from the deck's own directory, the way a relative image path is, and
+`beside()` is how the resolver is told where the deck is: the renderer hands it its own
+directory, which is the directory a relative image path in the deck resolves against.
 
 ```php
 use MarkdownPresentation\Theme\ThemeResolver;
 
 $root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
-$theme = (new ThemeResolver($root))->resolve($root . '/themes/minimal');
+$theme = (new ThemeResolver())->beside($root)->resolve('./themes/minimal');
 
 echo $theme->theme()->name(), "\n";
 echo $theme->directory(), "\n";
@@ -1986,15 +1990,15 @@ Minimal
 <root>/themes/minimal
 ```
 
-A path may name the manifest itself rather than the directory holding it. The theme is
-then that file, and the layouts, the styles and the template beside it are the theme's
-own:
+A path that names an absolute one is read as it stands, and a path may name the manifest
+itself rather than the directory holding it. The theme is then that file, and the layouts,
+the styles and the template beside it are the theme's own:
 
 ```php
 use MarkdownPresentation\Theme\ThemeResolver;
 
 $root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
-$theme = (new ThemeResolver($root))->resolve($root . '/themes/minimal/theme.yml');
+$theme = (new ThemeResolver())->beside($root)->resolve('./themes/minimal/theme.yml');
 
 echo $theme->theme()->name(), "\n";
 echo $theme->directory(), "\n";
@@ -2020,7 +2024,9 @@ The theme "../secrets" is at "/srv/decks/../secrets" rather than one this render
 
 A shared library of themes beside the project is a real case and is reachable, as a
 constructor argument — `new ThemeResolver($root, roots: ['/srv/themes'])` — because that is
-the program's decision and never the deck's.
+the program's decision and never the deck's. A root is a directory of themes, the way the
+themes that ship with the library are one: a name is looked for in it directly, and the
+themes in it are named in the list of the themes that resolve.
 
 ### Layout roles
 

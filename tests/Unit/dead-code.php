@@ -359,6 +359,15 @@ it('does not claim again what the code does not do', function (string $claim) {
     // without firing on either.
     'a shape label is drawn in the reader default text colour' => 'whatever the reader defaults text to',
     'a shape label is unreadable on a filled shape' => 'unreadable on a filled shape or a dark one',
+    // A theme is looked for in a different order now, and the two halves of the suite
+    // had to be made to say the same thing: a path is written from the deck's own
+    // directory rather than from the working directory, and the roots the resolver is
+    // given are looked in rather than only held to. The claims below were all made
+    // about the old order, and each of them is false of the library now.
+    'a theme path is written from the working directory' => 'an explicit path — anything with a `/` in it, resolved against the working',
+    'a theme in a root is named by its path rather than by its name' => 'the roots widen what a deck may reach',
+    'a theme path is loaded from wherever the resolver was given' => 'A theme named by path is loaded from wherever it is',
+    'a relative path is resolved against the working directory' => 'resolves a relative path against the working directory, not against the process',
     // There is no `text` attribute on a free shape, and the reason is that `:::content` over
     // the shape can be styled and this could not. There is no guard for it, and the reason is
     // the one above: the README has to be able to name `::arrow{text="…"}` in the sentence

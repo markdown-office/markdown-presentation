@@ -26,7 +26,26 @@ All notable changes to this project are documented here. The format follows
   it. A file that is not the manifest and a directory without one are two failures, and
   each says which of them it is.
 
+- **A theme path is written from the deck's own directory.** A `theme:` naming a path
+  was written from the *process's* working directory, so `theme: ./theme.yml` — a
+  manifest beside the deck — was found only when the run happened to start in the deck's
+  own directory, and a build script that renders a deck by its path got an error naming
+  a theme the author had written next to it. A path a deck writes is written from beside
+  the deck, which is where a relative image path resolves from too, and the other half of
+  the suite already writes a document's theme path from the document's own directory. A
+  deck read from a pipe has no directory of its own, and the working directory stands in
+  for it.
+
 ### Changed
+
+- **`ThemeResolver` looks in the roots it is given.** They were read into the scope a
+  deck-written path is held to and never looked in, so a shared library of themes beside
+  the project had to be named by its full path. A name is now looked for in each of them
+  directly, the way it is in the themes that ship with this library, and they are named
+  in the list of the themes that resolve — so a failure names them too. A root is a
+  directory of themes, the way the themes that ship with the library are one, and the
+  containment is unchanged: a theme in one that resolves outside every root is still
+  refused.
 
 - **The failure for a theme outside the roots names the path rather than a directory.**
   A theme may be a manifest file as well as a directory now, and the message said what

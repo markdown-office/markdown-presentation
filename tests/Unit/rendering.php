@@ -329,6 +329,21 @@ it('renders a deck whose theme sits beside it', function () {
         ->and($pptx->slideText(1))->toBe('One');
 });
 
+it('renders a deck whose theme is a manifest beside it', function () {
+    // A path a deck writes is written from beside the deck, the way a relative image
+    // path is: `theme: ./theme.yml` names the manifest next to the deck, and a build
+    // script that renders a deck by its path must not have to change directory first.
+    $directory = ThemeDirectory::create([
+        'theme.yml' => "name: Beside\n",
+        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+    ], 'deck');
+
+    $pptx = renderDeck("---\ntheme: ./theme.yml\n---\n\n# One\n", $directory);
+
+    expect($pptx->slideCount())->toBe(1)
+        ->and($pptx->slideText(1))->toBe('One');
+});
+
 it('writes the slides in the order the deck reads them', function () {
     $pptx = renderDeck(TWO_SLIDES);
 
