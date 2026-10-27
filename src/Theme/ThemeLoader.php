@@ -16,10 +16,10 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Reads a theme out of a directory, or out of the manifest that describes one.
  *
- * Only `theme.yml` is required. `styles.yml` and `layouts.yml` are read when they
- * are there, and `template.pptx` is only a path: nothing here opens a `.pptx`,
- * because a theme's template belongs to whoever renders the deck rather than to the
- * loader that found it.
+ * Only `theme.yml` is required. `styles.yml`, `layouts.yml` and `text-styles.yml` are
+ * read when they are there, and `template.pptx` is only a path: nothing here opens a
+ * `.pptx`, because a theme's template belongs to whoever renders the deck rather than to
+ * the loader that found it.
  *
  * Every file of a theme is resolved and held to the caller's {@see PathScope}
  * before it is read, and the template is held before it is named. Holding the
@@ -33,10 +33,14 @@ final class ThemeLoader
     public const THEME_FILE = 'theme.yml';
     public const STYLES_FILE = 'styles.yml';
     public const LAYOUTS_FILE = 'layouts.yml';
+    public const TEXT_STYLES_FILE = 'text-styles.yml';
     public const TEMPLATE_FILE = 'template.pptx';
 
     /** The only key a layouts file may put around its mappings. */
     private const LAYOUTS_KEY = 'layouts';
+
+    /** The smallest a size of type may be, in points. */
+    private const MINIMUM_POINTS = 0.5;
 
     /**
      * @param string         $directory The directory the theme is read from.
@@ -115,7 +119,11 @@ final class ThemeLoader
     {
         return new LoadedTheme(
             $directory,
-            Theme::fromArray($this->mapping($manifest, 'a theme'), $manifest),
+            Theme::fromArray(
+                $this->mapping($manifest, 'a theme'),
+                $manifest,
+                new TextStyles($this->textStyles($directory, $files, $name)),
+            ),
             $this->styles($directory, $files, $name),
             $this->layouts($directory, $files, $name),
             $this->template($directory, $files, $name),
@@ -284,5 +292,156 @@ final class ThemeLoader
         }
 
         return $layouts;
+    }
+
+    /**
+     * The named text styles a theme carries, read from its `text-styles.yml`.
+     *
+     * The file is optional: a theme without one has no named styles, and every named form
+     * in a deck drawn with it is then a name the theme does not have. It is held to the
+     * scope like every other file of the theme, because it is one of them.
+     *
+     * @return array<string, TextStyle>
+     *
+     * @throws ThemeNotFound
+     * @throws Exception
+     */
+    private function textStyles(string $directory, ?PathScope $files, string $name): array
+    {
+        $file = $this->contained($files, $directory . '/' . self::TEXT_STYLES_FILE, $name);
+
+        if (!is_file($file)) {
+            return [];
+        }
+
+        $styles = [];
+
+        foreach ($this->mapping($file, 'a mapping of style names to text styles') as $style => $properties) {
+            $style = (string) $style;
+
+            if ($style === TextStyle::RESERVED) {
+                throw MalformedTheme::reservedStyle($file, $style);
+            }
+
+            if (!is_array($properties) || ($properties !== [] && array_is_list($properties))) {
+                throw MalformedTheme::wrongType($file, $style, 'a mapping of attributes to values');
+            }
+
+            if ($properties === []) {
+                throw MalformedTheme::emptyStyle($file, $style);
+            }
+
+            $styles[$style] = $this->textStyle($file, $style, $properties);
+        }
+
+        return $styles;
+    }
+
+    /**
+     * One named style, as the properties it carries.
+     *
+     * @param array<array-key, mixed> $properties
+     */
+    private function textStyle(string $file, string $name, array $properties): TextStyle
+    {
+        $read = [];
+
+        foreach ($properties as $property => $value) {
+            $property = (string) $property;
+
+            if (!in_array($property, TextStyle::ATTRIBUTES, true)) {
+                throw MalformedTheme::unknownAttribute($file, $name, $property, TextStyle::ATTRIBUTES);
+            }
+
+            if ($property === TextStyle::UNSUPPORTED) {
+                throw MalformedTheme::unsupportedAttribute($file, $name, $property);
+            }
+
+            $read[$property] = $value;
+        }
+
+        return new TextStyle(
+            self::colour($file, $name, $read['color'] ?? null),
+            self::size($file, $name, $read['size'] ?? null),
+            self::family($file, $name, $read['font'] ?? null),
+            self::flag($file, $name, 'bold', $read['bold'] ?? null),
+            self::flag($file, $name, 'italic', $read['italic'] ?? null),
+            self::flag($file, $name, 'underline', $read['underline'] ?? null),
+            self::flag($file, $name, 'strike', $read['strike'] ?? null),
+        );
+    }
+
+    /**
+     * The ink a style is drawn in, as it was written.
+     *
+     * A role, a theme slot or a hex value — the same vocabulary a shape's own colour is
+     * written in, because a run's ink and a shape's fill are the same question.
+     */
+    private static function colour(string $file, string $name, mixed $written): ?string
+    {
+        if ($written === null) {
+            return null;
+        }
+
+        if (!is_string($written) || !Theme::hasColour($written)) {
+            throw MalformedTheme::wrongType($file, $name . '.color', 'a colour: none, a role, a theme slot, or a hex value');
+        }
+
+        return $written;
+    }
+
+    /**
+     * The size of the type a style is drawn at, in points.
+     */
+    private static function size(string $file, string $name, mixed $written): ?int
+    {
+        if ($written === null) {
+            return null;
+        }
+
+        if ((!is_int($written) && !is_float($written)) || $written < self::MINIMUM_POINTS) {
+            throw MalformedTheme::wrongType($file, $name . '.size', 'a number of points, at least half a point');
+        }
+
+        return (int) round($written);
+    }
+
+    /**
+     * The family a style is drawn in, as it was written.
+     *
+     * A slot the theme has not set falls through to being read as a literal, which is the
+     * outcome rather than a refusal: `font: Inter` is a real answer whether or not the
+     * theme names it.
+     */
+    private static function family(string $file, string $name, mixed $written): ?string
+    {
+        if ($written === null) {
+            return null;
+        }
+
+        if (!is_string($written) || trim($written) === '') {
+            throw MalformedTheme::wrongType($file, $name . '.font', 'a font name');
+        }
+
+        return trim($written);
+    }
+
+    /**
+     * A flag a style sets or does not set.
+     *
+     * Only `true` and `false`, because `yes` is a YAML 1.1 truthy string rather than the
+     * flag and a file that means something else by it is a file nobody can read.
+     */
+    private static function flag(string $file, string $name, string $property, mixed $written): ?bool
+    {
+        if ($written === null) {
+            return null;
+        }
+
+        if (!is_bool($written)) {
+            throw MalformedTheme::wrongType($file, $name . '.' . $property, 'true or false');
+        }
+
+        return $written;
     }
 }

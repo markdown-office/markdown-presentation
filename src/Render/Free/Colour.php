@@ -31,15 +31,18 @@ final class Colour
     private const HEX = '/\A#?([0-9A-Fa-f]{6})\z/';
 
     /** How a colour is written when there is none: an unfilled shape, not an unpainted one. */
-    public const NONE = 'none';
+    public const NONE = Theme::NONE;
 
     /**
-     * The four names a shape plays rather than a slot it fills, in the order a message names
-     * them.
+     * What a colour may be written as, for a message that says so.
      *
-     * @var list<string>
+     * One home for it, because the slides half writes colours in three places — a shape's
+     * fill, a text style's ink and the ink of a word inside a paragraph — and three
+     * messages that said it three ways would be three answers to one question.
      */
-    private const ROLES = ['page', 'ink', 'subtle', 'panel'];
+    public const ADVICE = 'A colour is none, page, ink, subtle, panel, a theme slot '
+        . '(dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), '
+        . 'or a hex value such as #4C1D95.';
 
     /**
      * A colour as the deck wrote it, or null where it wrote that there is none.
@@ -74,11 +77,7 @@ final class Colour
                 $name,
                 $attribute,
                 $written,
-                sprintf(
-                    'A colour is none, %s, a theme slot (%s), or a hex value such as #4C1D95.',
-                    implode(', ', self::ROLES),
-                    implode(', ', Theme::COLOURS),
-                ),
+                self::ADVICE,
             );
         }
 

@@ -50,7 +50,7 @@ final class ThemeMapping
      *
      * @throws MalformedTheme
      */
-    public static function read(array $data, string $file = 'theme.yml'): Theme
+    public static function read(array $data, string $file = 'theme.yml', ?TextStyles $styles = null): Theme
     {
         foreach (array_keys($data) as $key) {
             if (!in_array($key, self::KEYS, true)) {
@@ -74,6 +74,7 @@ final class ThemeMapping
             self::readColours($data['colors'] ?? null, $file) ?? $defaults->colours(),
             self::readFonts($data['fonts'] ?? null, $file) ?? $defaults->fonts(),
             StyleMapping::read(self::mapping($data, 'style', $file), $file),
+            $styles ?? new TextStyles(),
         );
     }
 
@@ -87,6 +88,21 @@ final class ThemeMapping
     public static function slot(string $written): string
     {
         return self::ALIASES[$written] ?? $written;
+    }
+
+    /**
+     * The spellings a colour may be written under besides DrawingML's own, and the slot each
+     * of them stands for.
+     *
+     * Public because the spellings are a fact about the vocabulary rather than about the
+     * file, and a caller holding a table of them — the documentation's own reference table,
+     * for one — has no business reading a private constant to find out what they are.
+     *
+     * @return array<string, string>
+     */
+    public static function aliases(): array
+    {
+        return self::ALIASES;
     }
 
     /**

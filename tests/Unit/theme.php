@@ -60,6 +60,20 @@ it('fills in what the file does not name, so a colour scheme is never half-writt
         ->and($theme->fonts())->toBe(Theme::defaults()->fonts());
 });
 
+it('names the spellings a colour may be written under, for a caller that holds a table of them', function () {
+    // The spellings are a fact about the vocabulary rather than about the file, and a
+    // caller holding the documentation's own reference table has no business reading a
+    // private constant to find out what they are.
+    expect(ThemeMapping::aliases())->toBe([
+        'dark1' => Theme::DK1,
+        'light1' => Theme::LT1,
+        'dark2' => Theme::DK2,
+        'light2' => Theme::LT2,
+        'hyperlink' => Theme::HLINK,
+        'followedHyperlink' => Theme::FOL_HLINK,
+    ]);
+});
+
 it('takes the colour names the concept draft used, and speaks DrawingML afterwards', function () {
     $theme = Theme::fromArray([
         'name' => 'Aliases',

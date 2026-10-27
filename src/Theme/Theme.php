@@ -66,6 +66,41 @@ final class Theme
     public const FONTS = ['heading', 'body', 'mono'];
 
     /**
+     * The four names a colour plays rather than the slot it fills, in the order a message
+     * names them.
+     *
+     * `page` is the colour behind every slide, `ink` the colour body text is drawn in,
+     * `subtle` the colour a quote is drawn in and `panel` the colour a code block's own
+     * background is filled with. They are here rather than in the renderer because they
+     * are the theme's own four parts under other names.
+     *
+     * @var list<string>
+     */
+    public const ROLES = ['page', 'ink', 'subtle', 'panel'];
+
+    /**
+     * The word a colour is written as when there is none of it.
+     */
+    public const NONE = 'none';
+
+    /**
+     * Whether a colour may be written this way: a role, a theme slot, one of the spellings
+     * the concept draft used, `none` for no colour at all, or a hex value.
+     *
+     * Asked of the theme rather than of the renderer that draws with the colour, because
+     * the names are the theme's own and a theme file is checked against them when it is
+     * read rather than when a deck happens to use the style that carries the mistake.
+     */
+    public static function hasColour(string $written): bool
+    {
+        return in_array($written, self::ROLES, true)
+            || in_array($written, self::COLOURS, true)
+            || in_array($written, array_keys(ThemeMapping::aliases()), true)
+            || $written === self::NONE
+            || preg_match('/\A#?[0-9A-Fa-f]{6}\z/', $written) === 1;
+    }
+
+    /**
      * @param array<string, string> $colours Canonical colour slot to `#rrggbb`.
      * @param array<string, string> $fonts   Font slot to family name.
      */
@@ -77,6 +112,7 @@ final class Theme
         private readonly array $colours,
         private readonly array $fonts,
         private readonly Style $style,
+        private readonly TextStyles $textStyles = new TextStyles(),
     ) {
     }
 
@@ -121,9 +157,9 @@ final class Theme
      *
      * @throws MalformedTheme
      */
-    public static function fromArray(array $data, string $file = 'theme.yml'): self
+    public static function fromArray(array $data, string $file = 'theme.yml', ?TextStyles $styles = null): self
     {
-        return ThemeMapping::read($data, $file);
+        return ThemeMapping::read($data, $file, $styles);
     }
 
     public function name(): string
@@ -236,7 +272,22 @@ final class Theme
     }
 
     /**
-     * The theme as the array it was read from, in DrawingML's spellings.
+     * The named text styles this theme carries.
+     *
+     * Empty for a theme without a `text-styles.yml`, which is most of them: a style is
+     * something a deck names, and a deck that names none has said nothing about the words
+     * it draws.
+     */
+    public function textStyles(): TextStyles
+    {
+        return $this->textStyles;
+    }
+
+    /**
+     * The theme's `theme.yml` as an array, in DrawingML's spellings.
+     *
+     * The named text styles are not in here: they are read from a file of their own, and a
+     * `theme.yml` that carried them would be a theme with two places to say the same thing.
      *
      * @return array{name: string, description: ?string, author: ?string, dark: bool, colors: array<string, string>, fonts: array<string, string>, style: array<string, mixed>}
      */

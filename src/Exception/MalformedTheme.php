@@ -59,4 +59,58 @@ final class MalformedTheme extends InvalidInput
             $value,
         )));
     }
+
+    /**
+     * A text style that sets an attribute that is not one.
+     *
+     * The attributes are named rather than the keys of a theme, because a text style is
+     * not a theme: it carries the properties of a run and nothing else.
+     *
+     * @param list<string> $attributes
+     */
+    public static function unknownAttribute(string $file, string $style, string $attribute, array $attributes): self
+    {
+        return new self(self::in($file, sprintf(
+            'The style "%s" sets "%s", which is not an attribute of a text style. The attributes are: %s.',
+            $style,
+            $attribute,
+            implode(', ', $attributes),
+        )));
+    }
+
+    /**
+     * A text style that styles nothing.
+     */
+    public static function emptyStyle(string $file, string $style): self
+    {
+        return new self(self::in($file, sprintf(
+            'The style "%s" sets nothing. A style that styles nothing is a mistake.',
+            $style,
+        )));
+    }
+
+    /**
+     * A text style named with the word the raw form is written with.
+     */
+    public static function reservedStyle(string $file, string $style): self
+    {
+        return new self(self::in($file, sprintf(
+            'The style "%s" is named with a reserved word: "style" is how the raw form of a text style is written, '
+            . 'as in ":style[Bakery]{color=00B4D8}".',
+            $style,
+        )));
+    }
+
+    /**
+     * A text style that sets an attribute this half does not draw.
+     */
+    public static function unsupportedAttribute(string $file, string $style, string $attribute): self
+    {
+        return new self(self::in($file, sprintf(
+            'The style "%s" sets a "%s", which the slides half does not draw: a highlight is a colour behind the '
+            . 'word, and this library has no way to write one.',
+            $style,
+            $attribute,
+        )));
+    }
 }
