@@ -13,9 +13,13 @@ namespace MarkdownPresentation\Exception;
  */
 final class ChromeNotFound extends InvalidInput
 {
-    public static function at(string $written, string $found): self
+    /**
+     * @param string $path Where the chrome file was looked for: the path the deck wrote,
+     *                     or the path it resolves to.
+     */
+    public static function at(string $path): self
     {
-        return new self(sprintf('There is no chrome file at "%s".', $found));
+        return new self(sprintf('There is no chrome file at "%s".', $path));
     }
 
     /**

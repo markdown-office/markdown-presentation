@@ -40,7 +40,7 @@ final class ChromeFile
         $joined = str_starts_with($written, '/') ? $written : rtrim($this->directory, '/') . '/' . $written;
 
         if (!is_file($joined)) {
-            throw ChromeNotFound::at($written, $joined);
+            throw ChromeNotFound::at($joined);
         }
 
         // `realpath()` rather than the path as written, because `..` and a symlink both walk
@@ -56,7 +56,7 @@ final class ChromeFile
         $markdown = is_readable($resolved) ? file_get_contents($resolved) : false;
 
         if ($markdown === false) {
-            throw ChromeNotFound::at($written, $resolved);
+            throw ChromeNotFound::at($resolved);
         }
 
         return $markdown;
