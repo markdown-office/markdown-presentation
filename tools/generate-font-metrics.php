@@ -380,8 +380,9 @@ function advancesOf(string $font, array $tables): array
 {
     $hhea = $tables['hhea'] ?? null;
     $hmtx = $tables['hmtx'] ?? null;
+    $maxp = $tables['maxp'] ?? null;
 
-    if ($hhea === null || $hmtx === null) {
+    if ($hhea === null || $hmtx === null || $maxp === null) {
         fwrite(STDERR, "The font has no horizontal metrics.\n");
 
         exit(1);
@@ -392,6 +393,12 @@ function advancesOf(string $font, array $tables): array
 
     for ($glyph = 0; $glyph < $count; ++$glyph) {
         $advances[$glyph] = u16($font, $hmtx['offset'] + $glyph * 4);
+    }
+
+    $glyphs = u16($font, $maxp['offset'] + 4);
+
+    for ($glyph = $count; $glyph < $glyphs; ++$glyph) {
+        $advances[$glyph] = $advances[$count - 1];
     }
 
     return $advances;
