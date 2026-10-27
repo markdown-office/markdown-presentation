@@ -2022,6 +2022,13 @@ found and the roots it may read:
 The theme "../secrets" is at "/srv/decks/../secrets" rather than one this render may read (/srv/decks). Copy it under one of those directories, or give the ThemeResolver that directory as one of its additional roots.
 ```
 
+**The files inside a theme are held to the same roots.** A directory that is inside them
+may hold a `theme.yml` that is a link out of them, and the file the link reaches is read
+as readily as one beside it — the `theme.yml`, the `styles.yml`, the `layouts.yml` and the
+`template.pptx` are each resolved and held before they are used, and the refusal names the
+file it found and the roots it may read. A link that resolves *inside* the roots is a file
+like any other, so a theme laid out with links still reads.
+
 A shared library of themes beside the project is a real case and is reachable, as a
 constructor argument — `new ThemeResolver($root, roots: ['/srv/themes'])` — because that is
 the program's decision and never the deck's. A root is a directory of themes, the way the

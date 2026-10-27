@@ -6,12 +6,12 @@ namespace MarkdownPresentation\Tests\Support;
 
 /**
  * A theme directory built for one test.
-*/
+ */
 final class ThemeDirectory
 {
     /**
      * @param array<string, string> $files File name to contents, relative to the directory.
-    */
+     */
     public static function create(array $files, string $prefix = 'theme'): string
     {
         $directory = Scratch::directoryPath($prefix);
@@ -32,15 +32,35 @@ final class ThemeDirectory
     }
 
     /**
+     * A file of a theme replaced by a link to another path.
+     *
+     * The link is made where the file was, so a theme laid out with links is a theme
+     * like any other: what matters is where the link points, not that it is one.
+     *
+     * @param string $file   The file to replace.
+     * @param string $target The path the link points at.
+     */
+    public static function link(string $file, string $target): string
+    {
+        if (file_exists($file) || is_link($file)) {
+            unlink($file);
+        }
+
+        symlink($target, $file);
+
+        return $file;
+    }
+
+    /**
      * The smallest directory that is a theme: the one file that is required.
-    */
+     */
     public static function minimal(string $name = 'acme'): string
     {
         return self::create(['theme.yml' => sprintf("name: %s\n", $name)]);
     }
 
     /**
- * A working directory holding `themes/acme` and whatever else is asked for beside it.
+     * A working directory holding `themes/acme` and whatever else is asked for beside it.
      *
      * A test about resolving a name needs one theme among others, or there is nothing it
      * could have resolved wrongly, and a test about what a failure lists needs the others

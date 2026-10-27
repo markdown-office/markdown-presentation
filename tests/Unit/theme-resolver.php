@@ -304,3 +304,125 @@ it('gives a local theme the same weight as a built-in one', function () {
 
     expect($resolver->resolve('default')->theme()->name())->toBe('Local');
 });
+
+it('refuses a theme whose manifest is a link out of the roots', function () {
+    // The directory is held to the roots; the files inside it were not. A `theme.yml`
+    // that is a link out of the tree is read as readily as one inside it, and the
+    // `author:` it carries is copied into `docProps/core.xml` of the deck — the same
+    // way out as the path itself was.
+    $outside = ThemeDirectory::create(['theme.yml' => "name: Stolen\nauthor: root\n"], 'outside');
+    $deck = ThemeDirectory::create(['themes/acme/theme.yml' => "name: Acme\n"], 'deck');
+    ThemeDirectory::link($deck . '/themes/acme/theme.yml', $outside . '/theme.yml');
+
+    $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
+
+    expect(fn () => $resolver->resolve('acme'))
+        ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/theme.yml') . '" rather than one this render may read');
+});
+
+it('refuses a theme whose styles file is a link out of the roots', function () {
+    $outside = ThemeDirectory::create(['styles.yml' => "heading.1: ReportTitle\n"], 'outside');
+    $deck = ThemeDirectory::create(['themes/acme/theme.yml' => "name: Acme\n"], 'deck');
+    ThemeDirectory::link($deck . '/themes/acme/styles.yml', $outside . '/styles.yml');
+
+    $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
+
+    expect(fn () => $resolver->resolve('acme'))
+        ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/styles.yml') . '" rather than one this render may read');
+});
+
+it('refuses a theme whose layouts file is a link out of the roots', function () {
+    $outside = ThemeDirectory::create(['layouts.yml' => "layouts:\n  content: Title and Content\n"], 'outside');
+    $deck = ThemeDirectory::create(['themes/acme/theme.yml' => "name: Acme\n"], 'deck');
+    ThemeDirectory::link($deck . '/themes/acme/layouts.yml', $outside . '/layouts.yml');
+
+    $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
+
+    expect(fn () => $resolver->resolve('acme'))
+        ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/layouts.yml') . '" rather than one this render may read');
+});
+
+it('refuses a theme whose template is a link out of the roots', function () {
+    // The loader does not open a `.pptx`; the renderer does, at render time, with
+    // whatever path the theme named. A template that is a link out of the roots is a
+    // file outside them, opened under a name that is inside.
+    $outside = ThemeDirectory::create(['template.pptx' => 'not really a template'], 'outside');
+    $deck = ThemeDirectory::create(['themes/acme/theme.yml' => "name: Acme\n"], 'deck');
+    ThemeDirectory::link($deck . '/themes/acme/template.pptx', $outside . '/template.pptx');
+
+    $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
+
+    expect(fn () => $resolver->resolve('acme'))
+        ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/template.pptx') . '" rather than one this render may read');
+});
+
+it('names the path and the roots when a file of a theme is out of them', function () {
+    // The refusal has to say what would have worked, the way the refusal for a path
+    // out of the roots does: the file it found and the roots it may read.
+    $outside = ThemeDirectory::create(['styles.yml' => "heading.1: ReportTitle\n"], 'outside');
+    $deck = ThemeDirectory::create(['themes/acme/theme.yml' => "name: Acme\n"], 'deck');
+    ThemeDirectory::link($deck . '/themes/acme/styles.yml', $outside . '/styles.yml');
+    $working = ThemeDirectory::create([], 'working');
+    $builtin = ThemeDirectory::create(['builtin/theme.yml' => "name: Builtin\n"], 'builtin');
+    $resolver = (new ThemeResolver($working, $builtin))->beside($deck);
+
+    expect(fn () => $resolver->resolve('acme'))->toThrow(
+        ThemeNotFound::class,
+        sprintf(
+            'The theme "acme" is at "%s" rather than one this render may read (%s).',
+            realpath($outside . '/styles.yml'),
+            implode(', ', [realpath($deck), realpath($working), realpath($builtin)]),
+        ),
+    );
+});
+
+it('reads a theme whose files are all inside the roots', function () {
+    // The other half of the refusals above: a theme whose own files are where it says
+    // they are is a theme that reads.
+    $deck = ThemeDirectory::create([
+        'themes/acme/theme.yml' => "name: Acme\n",
+        'themes/acme/styles.yml' => "heading.1: ReportTitle\n",
+        'themes/acme/layouts.yml' => "layouts:\n  content: Title and Content\n",
+    ], 'deck');
+    $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
+
+    $theme = $resolver->resolve('acme');
+
+    expect($theme->theme()->name())->toBe('Acme')
+        ->and($theme->styles())->toBe(['heading.1' => 'ReportTitle'])
+        ->and($theme->layouts())->toBe(['content' => 'Title and Content']);
+});
+
+it('reads a theme whose own file is a link that stays inside the roots', function () {
+    // A link is not a threat; where it points is. A theme laid out with links — one
+    // file shared by two themes — is a theme that works.
+    $deck = ThemeDirectory::create([
+        'themes/shared/styles.yml' => "heading.1: ReportTitle\n",
+        'themes/acme/theme.yml' => "name: Acme\n",
+    ], 'deck');
+    ThemeDirectory::link($deck . '/themes/acme/styles.yml', $deck . '/themes/shared/styles.yml');
+
+    $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
+
+    expect($resolver->resolve('acme')->styles())->toBe(['heading.1' => 'ReportTitle']);
+});
+
+it('does not open a template outside the roots', function () {
+    // The finding end to end rather than as a refusal: a deck whose theme names a
+    // template outside the roots, and a file written with it. The template is read at
+    // render time, by whoever renders the deck, so the path has to be held to the
+    // scope before it is handed over.
+    $outside = ThemeDirectory::create(['template.pptx' => 'not really a template'], 'outside');
+    $deck = ThemeDirectory::create([
+        'themes/acme/theme.yml' => "name: Acme\n",
+        'themes/acme/layouts.yml' => "layouts:\n  content: Title and Content\n",
+    ], 'deck');
+    ThemeDirectory::link($deck . '/themes/acme/template.pptx', $outside . '/template.pptx');
+    $working = ThemeDirectory::create([], 'working');
+    $source = (new DeckParser())->parse("---\ntheme: ./themes/acme\n---\n# One\n");
+    $path = Scratch::file('deck.pptx', '');
+
+    expect(fn () => (new PresentationRenderer($deck, new ThemeResolver($working)))->render($source, $path))
+        ->toThrow(ThemeNotFound::class, 'rather than one this render may read')
+        ->and(filesize($path))->toBe(0);
+});

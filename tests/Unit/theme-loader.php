@@ -7,6 +7,7 @@ use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
 use MarkdownPresentation\Theme\ThemeLoader;
 
@@ -190,4 +191,29 @@ it('turns a role into the layout name of the theme\'s own template', function ()
 
     expect($loaded->layout('two-column'))->toBe('Two Content')
         ->and($loaded->template())->toBe($loaded->directory() . '/template.pptx');
+});
+
+it('refuses a file of a theme that resolves outside the scope', function () use ($loader) {
+    // The loader's own scope, for a caller that reads a theme without the resolver.
+    // The file is resolved and held, and one that reaches out of the scope is
+    // refused by name.
+    $outside = ThemeDirectory::create(['styles.yml' => "heading.1: ReportTitle\n"], 'outside');
+    $directory = ThemeDirectory::acme();
+    ThemeDirectory::link($directory . '/styles.yml', $outside . '/styles.yml');
+    $scope = new PathScope([$directory]);
+
+    expect(fn () => $loader->load($directory, 'acme', $scope))
+        ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/styles.yml') . '" rather than one this render may read');
+});
+
+it('takes the files of a theme on trust when it has no scope', function () {
+    // The scope is what makes the check; without one the loader reads what it is
+    // given, which is what a theme this library ships is and what a caller naming a
+    // directory of its own is asking for.
+    $loader = new ThemeLoader();
+    $outside = ThemeDirectory::create(['styles.yml' => "heading.1: ReportTitle\n"], 'outside');
+    $directory = ThemeDirectory::acme();
+    ThemeDirectory::link($directory . '/styles.yml', $outside . '/styles.yml');
+
+    expect($loader->load($directory)->styles())->toBe(['heading.1' => 'ReportTitle']);
 });

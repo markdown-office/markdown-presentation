@@ -45,6 +45,12 @@ use MarkdownPresentation\Filesystem\PathScope;
  * into `docProps/core.xml` of the deck, which is a way to get the contents of a file out
  * through a download. The rules are `Filesystem\PathScope`'s and are the same ones an image
  * path has to pass, because both are paths a deck wrote.
+ *
+ * The files *inside* a theme are held to the same scope, because a directory that is
+ * inside it may hold a `theme.yml` that is a link out of it: the path the deck wrote
+ * is inside the scope and the file it reaches is not, which is the pair a check on
+ * the path as written cannot tell. The loader holds each file it reads, and the
+ * template it names, and refuses the one that resolves elsewhere.
  */
 final class ThemeResolver
 {
@@ -130,7 +136,7 @@ final class ThemeResolver
 
         foreach ($this->themeDirectories() as $themes) {
             if (is_dir($directory = $themes . '/' . $name)) {
-                return $this->loader->load($this->held($name, $directory));
+                return $this->loader->load($this->held($name, $directory), $name, $this->files);
             }
         }
 
@@ -160,14 +166,14 @@ final class ThemeResolver
     private function path(string $name, string $found): LoadedTheme
     {
         if (is_file($found)) {
-            return $this->loader->loadManifest($this->held($name, $found));
+            return $this->loader->loadManifest($this->held($name, $found), $name, $this->files);
         }
 
         if (!is_dir($found)) {
             throw ThemeNotFound::noDirectory($found);
         }
 
-        return $this->loader->load($this->held($name, $found));
+        return $this->loader->load($this->held($name, $found), $name, $this->files);
     }
 
     /**

@@ -36,6 +36,16 @@ All notable changes to this project are documented here. The format follows
   deck read from a pipe has no directory of its own, and the working directory stands in
   for it.
 
+- **A theme's own files are held to the directories the render may read.** The resolver
+  held the theme's *directory* to the roots, and the loader read whatever was inside it,
+  so a `theme.yml`, a `styles.yml`, a `layouts.yml` or a `template.pptx` that was a
+  symlink out of the tree was read as readily as one beside it: the `author:` of a linked
+  `theme.yml` reached `docProps/core.xml` of the deck, and a linked `template.pptx` was
+  opened at render time — the way out of the roots that the path itself used to be. Each
+  of them is resolved and held now, and the refusal names the file it found and the roots
+  it may read. A link that resolves *inside* the roots is a file like any other, so a
+  theme laid out with links still reads.
+
 ### Changed
 
 - **`ThemeResolver` looks in the roots it is given.** They were read into the scope a
