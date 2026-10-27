@@ -157,7 +157,6 @@ final class Theme
 
     /**
      * @param array<string, string> $colours Canonical colour slot to `#rrggbb`.
-     * @param array<string, string> $fonts   Font slot to family name.
      */
     public function __construct(
         private readonly string $name,
@@ -165,7 +164,7 @@ final class Theme
         private readonly ?string $author,
         private readonly bool $dark,
         private readonly array $colours,
-        private readonly array $fonts,
+        private readonly Fonts $fonts,
         private readonly Style $style,
         private readonly TextStyles $textStyles = new TextStyles(),
     ) {
@@ -196,11 +195,11 @@ final class Theme
                 self::HLINK => '#0563C1',
                 self::FOL_HLINK => '#954F72',
             ],
-            [
+            new Fonts([
                 'heading' => 'Calibri',
                 'body' => 'Calibri',
                 'mono' => 'Consolas',
-            ],
+            ]),
             Style::defaults(),
         );
     }
@@ -298,32 +297,11 @@ final class Theme
     }
 
     /**
-     * Every font, keyed by its slot.
-     *
-     * @return array<string, string>
+     * The faces this theme draws its words in.
      */
-    public function fonts(): array
+    public function fonts(): Fonts
     {
         return $this->fonts;
-    }
-
-    /** One font, or null when the theme does not set the slot. */
-    public function font(string $slot): ?string
-    {
-        return $this->fonts[$slot] ?? null;
-    }
-
-    /**
-     * The face a name stands for: a slot of this theme's own, or the family as written.
-     *
-     * One place, because three things name a face the same way — a text style's `font`, a
-     * placed box's `font-family` and a style written on a word — and three copies of the
-     * rule are three answers to one question: a name that is a slot here and a literal
-     * there is a face in one deck and a missing table in the next.
-     */
-    public function face(string $written): string
-    {
-        return $this->font($written) ?? $written;
     }
 
     /**
@@ -343,7 +321,7 @@ final class Theme
             $style = $this->textStyles->get($name);
 
             if ($style !== null && $style->font !== null) {
-                $faces[$name] = $this->face($style->font);
+                $faces[$name] = $this->fonts->face($style->font);
             }
         }
 
@@ -373,26 +351,5 @@ final class Theme
     public function textStyles(): TextStyles
     {
         return $this->textStyles;
-    }
-
-    /**
-     * The theme's `theme.yml` as an array, in DrawingML's spellings.
-     *
-     * The named text styles are not in here: they are read from a file of their own, and a
-     * `theme.yml` that carried them would be a theme with two places to say the same thing.
-     *
-     * @return array{name: string, description: ?string, author: ?string, dark: bool, colors: array<string, string>, fonts: array<string, string>, style: array<string, mixed>}
-     */
-    public function toArray(): array
-    {
-        return [
-            'name' => $this->name,
-            'description' => $this->description,
-            'author' => $this->author,
-            'dark' => $this->dark,
-            'colors' => $this->colours,
-            'fonts' => $this->fonts,
-            'style' => StyleMapping::write($this->style),
-        ];
     }
 }

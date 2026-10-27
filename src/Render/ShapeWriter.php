@@ -1362,6 +1362,6 @@ final class ShapeWriter
 
     private function font(string $slot): string
     {
-        return $this->theme->font($slot) ?? '';
+        return $this->theme->fonts()->get($slot) ?? '';
     }
 }

@@ -121,6 +121,14 @@ All notable changes to this project are documented here. The format follows
   a private constant, and a caller holding a table of them — the documentation's own
   reference table — had no way to read them without reflection.
 
+- **The faces a theme draws its words in are a thing of their own.** `Theme::font()` and
+  `Theme::face()` are gone: the three faces a theme names are now a `Fonts`, and the theme
+  hands it out as `Theme::fonts()` — the shape `Theme::style()` and `Theme::textStyles()`
+  already had, because the type scale and the named styles are parts of a theme too. A
+  theme written back out as an array is `ThemeMapping::write()` now, on the same seam
+  `StyleMapping::write()` is on: the file and the value it holds are read and written in
+  one place.
+
 - **`ThemeResolver` looks in the roots it is given.** They were read into the scope a
   deck-written path is held to and never looked in, so a shared library of themes beside
   the project had to be named by its full path. A name is now looked for in each of them

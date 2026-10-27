@@ -752,7 +752,7 @@ final class PresentationRenderer
     private function recordUnknownFaces(Theme $theme, TextMetric $metric): void
     {
         foreach (Theme::FONTS as $slot) {
-            $face = $theme->font($slot);
+            $face = $theme->fonts()->get($slot);
 
             if ($face !== null && !$metric->has($face)) {
                 $this->fonts->record($face, sprintf("the theme's %s slot", $slot), $metric->faces());

@@ -125,7 +125,7 @@ it('measures every shipped theme\'s monospaced face at its own advance', functio
     $faces = [];
 
     foreach ($resolver->available() as $name) {
-        $face = $resolver->resolve($name)->theme()->font('mono');
+        $face = $resolver->resolve($name)->theme()->fonts()->get('mono');
 
         expect($face)->not->toBeNull();
 

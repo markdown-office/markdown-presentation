@@ -7,7 +7,7 @@ namespace MarkdownPresentation\Theme;
 use MarkdownPresentation\Exception\MalformedTheme;
 
 /**
- * A `theme.yml`, and the {@see Theme} it turns into.
+ * A `theme.yml`, and the {@see Theme} it turns into and back into.
  *
  * The seam is the same one {@see Style} draws from {@see StyleMapping}: the spellings and the
  * bounds below belong to the file, and {@see Theme} never sees one, so a theme built in code is
@@ -72,10 +72,31 @@ final class ThemeMapping
             self::text($data, 'author', $file),
             self::readDark($data, $file),
             self::readColours($data['colors'] ?? null, $file) ?? $defaults->colours(),
-            self::readFonts($data['fonts'] ?? null, $file) ?? $defaults->fonts(),
+            new Fonts(self::readFonts($data['fonts'] ?? null, $file) ?? $defaults->fonts()->all()),
             StyleMapping::read(self::mapping($data, 'style', $file), $file),
             $styles ?? new TextStyles(),
         );
+    }
+
+    /**
+     * The theme's `theme.yml` as an array, in DrawingML's spellings.
+     *
+     * The named text styles are not in here: they are read from a file of their own, and a
+     * `theme.yml` that carried them would be a theme with two places to say the same thing.
+     *
+     * @return array{name: string, description: ?string, author: ?string, dark: bool, colors: array<string, string>, fonts: array<string, string>, style: array<string, mixed>}
+     */
+    public static function write(Theme $theme): array
+    {
+        return [
+            'name' => $theme->name(),
+            'description' => $theme->description(),
+            'author' => $theme->author(),
+            'dark' => $theme->isDark(),
+            'colors' => $theme->colours(),
+            'fonts' => $theme->fonts()->all(),
+            'style' => StyleMapping::write($theme->style()),
+        ];
     }
 
     /**
@@ -203,7 +224,7 @@ final class ThemeMapping
             throw MalformedTheme::wrongType($file, 'fonts', 'a mapping of font slots to font names');
         }
 
-        $defaults = Theme::defaults()->fonts();
+        $defaults = Theme::defaults()->fonts()->all();
         $named = [];
 
         foreach ($data as $key => $value) {

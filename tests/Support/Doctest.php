@@ -126,7 +126,7 @@ final class Doctest
             $report .= sprintf("colors.%s: %s\n", $slot, $colour);
         }
 
-        foreach ($theme->fonts() as $slot => $font) {
+        foreach ($theme->fonts()->all() as $slot => $font) {
             $report .= sprintf("fonts.%s: %s\n", $slot, $font);
         }
 

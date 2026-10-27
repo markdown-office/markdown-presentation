@@ -9,6 +9,7 @@ use MarkdownPresentation\Render\SlideGeometry;
 use MarkdownPresentation\Theme\Style;
 use MarkdownPresentation\Theme\StyleMapping;
 use MarkdownPresentation\Theme\Theme;
+use MarkdownPresentation\Theme\ThemeMapping;
 use MarkdownPresentation\Theme\ThemeResolver;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Tests\Support\Pptx;
@@ -49,7 +50,7 @@ function styledTheme(array $style, array $colors = []): Theme
 function themedDeck(Theme $theme, string $markdown = "---\ntheme: %s\n---\n\n# T\n\n## Sub\n\nBody.\n\n***\n"): Pptx
 {
     $directory = Scratch::directoryPath('theme');
-    file_put_contents($directory . '/theme.yml', (string) json_encode($theme->toArray()));
+    file_put_contents($directory . '/theme.yml', (string) json_encode(ThemeMapping::write($theme)));
 
     // A theme with no `layouts.yml` maps no role at all, and a deck is written in the
     // `content` role whether it says so or not — so the mappings a deck needs are the ones

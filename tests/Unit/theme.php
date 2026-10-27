@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Tests\Support\Contrast;
+use MarkdownPresentation\Theme\Fonts;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\Style;
 use MarkdownPresentation\Theme\StyleSlots;
@@ -46,7 +47,7 @@ it('reads a theme, and keeps the twelve colours in DrawingML order', function ()
         ->and(array_keys($theme->colours()))->toBe(Theme::COLOURS)
         ->and($theme->colour('dk1'))->toBe(DK1)
         ->and($theme->colour('accent1'))->toBe(ACCENT1)
-        ->and($theme->font('heading'))->toBe('Inter');
+        ->and($theme->fonts()->get('heading'))->toBe('Inter');
 });
 
 it('fills in what the file does not name, so a colour scheme is never half-written', function () {
@@ -57,7 +58,7 @@ it('fills in what the file does not name, so a colour scheme is never half-writt
     expect($theme->colours())->toHaveCount(12)
         ->and($theme->colour('accent2'))->toBe('#A6E3A1')
         ->and($theme->colour('accent1'))->toBe(Theme::defaults()->colour('accent1'))
-        ->and($theme->fonts())->toBe(Theme::defaults()->fonts());
+        ->and($theme->fonts()->all())->toBe(Theme::defaults()->fonts()->all());
 });
 
 it('names the spellings a colour may be written under, for a caller that holds a table of them', function () {
@@ -110,12 +111,12 @@ it('has no colour and no font for a slot a theme does not set', function () {
     expect($theme->description())->toBeNull()
         ->and($theme->author())->toBeNull()
         ->and($theme->colour('accent9'))->toBeNull()
-        ->and($theme->font('caption'))->toBeNull();
+        ->and($theme->fonts()->get('caption'))->toBeNull();
 });
 
 it('gives the theme back as the array it was read from', function () {
     $theme = Theme::fromArray(['name' => 'Round', 'colors' => ['dk1' => ROUND]]);
-    $array = $theme->toArray();
+    $array = ThemeMapping::write($theme);
 
     expect($array['name'])->toBe('Round')
         ->and($array['colors']['dk1'])->toBe(ROUND)
@@ -126,8 +127,8 @@ it('gives the theme back as the array it was read from', function () {
     // nothing saying so, which is the failure this key exists to make impossible.
     $night = Theme::fromArray(['name' => 'Night', 'dark' => true, 'colors' => $array['colors']]);
 
-    expect($night->toArray()['dark'])->toBeTrue()
-        ->and(Theme::fromArray($night->toArray())->isDark())->toBeTrue();
+    expect(ThemeMapping::write($night)['dark'])->toBeTrue()
+        ->and(Theme::fromArray(ThemeMapping::write($night))->isDark())->toBeTrue();
 });
 
 it('refuses a theme with no name', function () {
@@ -233,7 +234,7 @@ it('reads a file through the mapping and holds no bounds of its own', function (
 
     // A `Theme` constructed directly takes whatever it is given, and is not the file's
     // business to police: this is the half of the seam that has no reader on the other side.
-    $built = new Theme('Built', null, null, false, [], [], Style::defaults());
+    $built = new Theme('Built', null, null, false, [], new Fonts([]), Style::defaults());
 
     expect($built->name())->toBe('Built')
         ->and($built->colours())->toBe([])
