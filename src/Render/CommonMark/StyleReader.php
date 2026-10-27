@@ -23,7 +23,11 @@ use MarkdownPresentation\Theme\Theme;
  * neither of them sets is not set: the run inherits it from the block it is in. Nothing is
  * reset to a default, which is what makes a style a style rather than a set of defaults.
  *
- * @phpstan-type Properties array{colour: ?string, size: ?int, font: ?string, bold: ?bool, italic: ?bool, underline: ?bool, strike: ?bool}
+ * A face a word writes for itself is named with the place it was written in, because a
+ * face with no table of advance widths is measured with another face's widths and the
+ * reader has to be told where to change the name.
+ *
+ * @phpstan-type Properties array{colour: ?string, size: ?int, font: ?string, fontWhere: ?string, bold: ?bool, italic: ?bool, underline: ?bool, strike: ?bool}
  */
 final class StyleReader
 {
@@ -80,6 +84,7 @@ final class StyleReader
             'colour' => $style->colour,
             'size' => $style->size,
             'font' => $style->font,
+            'fontWhere' => $this->where($node, $slide),
             'bold' => $style->bold,
             'italic' => $style->italic,
             'underline' => $style->underline,
@@ -299,6 +304,23 @@ final class StyleReader
         }
 
         return $theme->font($literal) ?? $literal;
+    }
+
+    /**
+     * Where a face the word itself names was named, or null where the word names none.
+     *
+     * The place rather than the face, because the face alone does not say where to change
+     * it: a face with no table of advance widths is measured with the reference face's
+     * widths, and the reader has to be told which word of the slide to change.
+     *
+     * Null where the face came from the theme's own style rather than from the word: the
+     * theme's styles are the theme's business and are reported beside it.
+     */
+    private function where(DirectiveInline $node, int $slide): ?string
+    {
+        return $node->getAttributes()->has('font')
+            ? sprintf('a font attribute on slide %d', $slide)
+            : null;
     }
 
     /**

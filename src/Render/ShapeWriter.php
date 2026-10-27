@@ -86,6 +86,7 @@ final class ShapeWriter
         private readonly Theme $theme,
         private readonly SlideGeometry $geometry = new SlideGeometry(),
         private readonly TextMetric $metric = new TextMetric(),
+        private readonly FontReport $fonts = new FontReport(),
     ) {
     }
 
@@ -235,6 +236,8 @@ final class ShapeWriter
         $pieces = [];
 
         foreach ($runs as $run) {
+            $this->reported($run);
+
             $pieces[] = TextMetric::piece(
                 $run->text,
                 $run->size ?? ($run->code ? SlideGeometry::CODE_SIZE : $size),
@@ -244,6 +247,26 @@ final class ShapeWriter
         }
 
         return $pieces;
+    }
+
+    /**
+     * A face a run names that there is no table of advance widths for, recorded.
+     *
+     * The face is measured with the reference face's widths, which are not its own, and
+     * the report is where that is said: a face that was not measured says nothing. The
+     * place is on the run, because the run is what knows where the face was written — a
+     * word that names a face of its own is the only thing that writes one down.
+     *
+     * A run that names no face is not a finding: the face of the block it is in is the
+     * theme's, and the theme's faces are reported beside it.
+     */
+    private function reported(Run $run): void
+    {
+        if ($run->font === null || $run->fontWhere === null || $this->metric->has($run->font)) {
+            return;
+        }
+
+        $this->fonts->record($run->font, $run->fontWhere, $this->metric->faces());
     }
 
     private function codeHeight(Code $block, int $width): int

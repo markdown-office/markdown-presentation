@@ -69,6 +69,18 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A face a word writes for itself is reported.** The faces a theme names are the faces its
+  text is measured with, and a face with no table of advance widths is measured with the
+  reference face's widths instead — which are not that face's. The report of that said so
+  for the theme's slots and for nothing else, so a word naming a face of its own
+  (`:style[Bakery]{font="Comic Sans MS"}`) was measured with another face's widths and
+  nothing said so, and the strict renderer accepted it.
+
+  The report's second field was `slot` and is `where` now, because a text style, a box and
+  a word's own attribute are not slots. It names the place the face was written in, because
+  the face alone does not say where to change it: `a font attribute on slide 1` for a word,
+  the theme's `heading` slot for the theme.
+
 - **A style's name is a word, and a word does not care about case.** A theme that spelled a
   style `Brand` had it under `:Brand[…]` alone, so a deck writing `:brand[Bakery]` was
   refused with a message naming styles the author could not have written. The names are

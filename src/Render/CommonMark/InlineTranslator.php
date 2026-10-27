@@ -40,7 +40,7 @@ use MarkdownPresentation\Theme\Theme;
  * time rather than written into a file somebody opens.
  *
  * @phpstan-import-type Properties from StyleReader
- * @phpstan-type Style array{bold: ?bool, italic: ?bool, code: bool, strike: ?bool, link: ?string, colour: ?string, size: ?int, font: ?string, underline: ?bool}
+ * @phpstan-type Style array{bold: ?bool, italic: ?bool, code: bool, strike: ?bool, link: ?string, colour: ?string, size: ?int, font: ?string, fontWhere: ?string, underline: ?bool}
  */
 final class InlineTranslator
 {
@@ -95,6 +95,7 @@ final class InlineTranslator
         'colour' => null,
         'size' => null,
         'font' => null,
+        'fontWhere' => null,
         'underline' => null,
     ];
 
@@ -246,6 +247,7 @@ final class InlineTranslator
                 size: $style['size'],
                 font: $style['font'],
                 underline: $style['underline'] === true,
+                fontWhere: $style['fontWhere'],
             ));
         }
     }
@@ -278,6 +280,7 @@ final class InlineTranslator
             size: $style['size'],
             font: $style['font'],
             underline: $style['underline'] === true,
+            fontWhere: $style['fontWhere'],
         ));
     }
 
@@ -428,6 +431,7 @@ final class InlineTranslator
             size: $run->size,
             font: $run->font,
             underline: $run->underline,
+            fontWhere: $run->fontWhere,
         );
     }
 

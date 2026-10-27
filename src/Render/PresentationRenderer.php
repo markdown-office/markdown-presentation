@@ -136,7 +136,8 @@ final class PresentationRenderer
     private readonly Overflows $overflows;
 
     /**
-     * Every face the theme named that this renderer has no table of advance widths for.
+     * Every face the theme or the deck named that this renderer has no table of advance
+     * widths for.
      *
      * See {@see FontReport}, which is the same trade {@see Overflows} makes: the report is
      * where it is said, and strictness is a fact about the report rather than about the deck.
@@ -222,7 +223,8 @@ final class PresentationRenderer
     }
 
     /**
-     * Every face the theme named that this renderer has no table of advance widths for.
+     * Every face the theme or the deck named that this renderer has no table of advance
+     * widths for.
      *
      * A face with no table is measured with the reference face's widths — the widths every
      * face was measured with before there were tables of their own — so a deck naming one
@@ -231,10 +233,15 @@ final class PresentationRenderer
      * same way, which is the width of a proportional face's letters rather than the width
      * of a code block.
      *
+     * Every place a face is named is an entry: a slot of the theme, a text style of it, a
+     * box the deck placed itself, or an attribute a word carries. The place is what tells
+     * a reader where to change the name, which is the half of the answer the face alone
+     * does not give.
+     *
      * Emptied by {@see self::render()} rather than accumulated, because a layout belongs to
      * one deck: a caller converting several in a loop wants the last one's, not all of them.
      *
-     * @return list<array{face: string, slot: string}>
+     * @return list<array{face: string, where: string}>
      */
     public function unknownFonts(): array
     {
@@ -298,7 +305,7 @@ final class PresentationRenderer
         $geometry = (new SlideGeometry(style: $this->theme->style()))->with($this->template($loaded, $used));
         $layouts = MasterLayouts::build($presentation, $deck, $loaded, $used, $this->blocks->inline());
 
-        $writer = new ShapeWriter($this->theme, $geometry, $metric);
+        $writer = new ShapeWriter($this->theme, $geometry, $metric, $this->fonts);
         $shapes = new SlideShapes($geometry, $this->overflows);
         $blocks = $this->blocks($deck, $this->theme);
         $builds = [];
@@ -485,6 +492,9 @@ final class PresentationRenderer
      * every face was measured with before there were tables of their own. The monospaced
      * face is asked about as well: it is measured by its own advance, and which face it is
      * says exactly how wide its text is.
+     *
+     * The slot is named rather than the face alone, because the face alone does not say
+     * where to change it.
      */
     private function recordUnknownFaces(Theme $theme, TextMetric $metric): void
     {
@@ -492,7 +502,7 @@ final class PresentationRenderer
             $face = $theme->font($slot);
 
             if ($face !== null && !$metric->has($face)) {
-                $this->fonts->record($face, $slot, $metric->faces());
+                $this->fonts->record($face, sprintf("the theme's %s slot", $slot), $metric->faces());
             }
         }
     }

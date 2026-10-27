@@ -1730,13 +1730,19 @@ The faces a theme names are also the faces its text is measured with, and there 
 of advance widths for every face the shipped themes name: Calibri, Cambria, Arial, Arial
 Narrow, Georgia, Inter and Roboto. The monospaced faces have their advance rather than a
 table, because every character in one advances by the same amount: Consolas is measured at
-550 units to the em, Menlo at 602 and JetBrains Mono at 600. A theme naming a face with no
-table of its own is measured with the reference face's widths — the ones every face was
-measured with before there were tables of their own — and the face is named by
-`PresentationRenderer::unknownFonts()`, one entry for every slot it was named in. A caller
-that would rather have no file than a file whose text was measured with another face's
+550 units to the em, Menlo at 602 and JetBrains Mono at 600. A face with no table of its own
+is measured with the reference face's widths — the ones every face was measured with before
+there were tables of their own — and the face is named by
+`PresentationRenderer::unknownFonts()`, one entry for every place it was named: a slot of the
+theme, a text style of it, a box the deck placed itself, or an attribute a word carries. A
+caller that would rather have no file than a file whose text was measured with another face's
 widths asks for the strict renderer, and gets `UnknownFont` naming the faces there are
 tables for.
+
+A face a word writes for itself is reported the same way: `:style[Bakery]{font="Comic Sans
+MS"}` is drawn in that face and measured with the reference face's widths, and the report
+names the place it was written in — `a font attribute on slide 1` — because the face alone
+does not say where to change the name.
 
 Two limits worth knowing. All twelve slots are written whether a shape uses them or not:
 DrawingML's `CT_ColorScheme` is twelve required elements, so a scheme missing one is an

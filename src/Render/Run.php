@@ -21,6 +21,10 @@ namespace MarkdownPresentation\Render;
  * that says `bold: false` says that the word carries no weight of its own, and the word
  * takes the block's — which is the same thing as saying nothing about it, and is what
  * makes `false` the way to take the weight off a style that has it.
+ *
+ * A face a word wrote for itself carries the place it was written in beside it, because
+ * the face alone does not say where to change it: a face with no table of advance widths
+ * is measured with another face's, and the report is where that is said.
  */
 final class Run
 {
@@ -29,6 +33,10 @@ final class Run
      * @param ?string $colour The ink, as `#rrggbb`, or null when the run says nothing about it.
      * @param ?int    $size   The size of the type, in points, or null when the run says nothing about it.
      * @param ?string $font   The family, or null when the run says nothing about it.
+     * @param ?string $fontWhere Where the face was written, when a word wrote it for itself:
+     *                            the report names the place, because a face with no table of
+     *                            advance widths is measured with another face's and the
+     *                            reader has to be told where to change the name.
      */
     public function __construct(
         public readonly string $text,
@@ -41,6 +49,7 @@ final class Run
         public readonly ?int $size = null,
         public readonly ?string $font = null,
         public readonly bool $underline = false,
+        public readonly ?string $fontWhere = null,
     ) {
     }
 
@@ -66,6 +75,7 @@ final class Run
             $this->size ?? ($gaps['size'] ?? null),
             $this->font ?? ($gaps['font'] ?? null),
             $this->underline,
+            $this->fontWhere,
         );
     }
 }

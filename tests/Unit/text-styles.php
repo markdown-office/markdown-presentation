@@ -5,6 +5,7 @@ declare(strict_types=1);
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\MalformedTextStyle;
 use MarkdownPresentation\Exception\MalformedTheme;
+use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownTextStyle;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
@@ -309,6 +310,48 @@ it('refuses a named style against a theme that has no text styles', function () 
         ->toThrow(UnknownTextStyle::class, 'The theme has no text styles');
 });
 
+
+/**
+ * A deck drawn in a directory of its own, and the renderer that drew it.
+ *
+ * The renderer rather than the file, because the claim is about the report of the faces it
+ * could not measure, and that report is on the renderer.
+ */
+function styledRenderer(string $markdown, string $directory, bool $strict = false): PresentationRenderer
+{
+    $deck = (new DeckParser())->parse($markdown);
+    $path = Scratch::file('deck.pptx', '');
+
+    $renderer = new PresentationRenderer($directory, strict: $strict);
+    $renderer->render($deck, $path);
+
+    return $renderer;
+}
+
+it('reports a face a word names that there is no table for, and not one there is a table for', function () {
+    // A face a word writes for itself is drawn in it and measured in it, and a face with
+    // no table of advance widths is measured with the reference face's widths — which are
+    // not its own. Nothing said so before, and the promise the metrics work makes is that
+    // a face that was not measured says something.
+    [$deck, $directory] = wordmark(
+        "brand:\n  color: accent1\n",
+        ':style[Bakery]{font=Inter} and :style[Shop]{font="Comic Sans MS"}',
+    );
+
+    expect(styledRenderer($deck, $directory)->unknownFonts())->toBe([
+        ['face' => 'Comic Sans MS', 'where' => 'a font attribute on slide 1'],
+    ]);
+});
+
+it('refuses a deck whose word names a face it cannot measure when the renderer is strict', function () {
+    // Strict is for a caller that would rather have no file than a file whose text was
+    // measured with another face's widths, and the message says where the face was named.
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':style[Bakery]{font="Comic Sans MS"}');
+
+    expect(fn () => styledRenderer($deck, $directory, strict: true))
+        ->toThrow(UnknownFont::class, 'The face "Comic Sans MS" has no table of advance widths')
+        ->toThrow(UnknownFont::class, 'It is named by a font attribute on slide 1');
+});
 
 it('says in the reference that the round trip does not keep a text style', function () {
     // The page is wrong the moment this lands unless it says so: a deck read back out has

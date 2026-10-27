@@ -467,8 +467,8 @@ it('reports a face a theme names that there is no table for', function () {
     // said. A deck laid out with the wrong face and nothing to say so is the failure the
     // tables of faces exist to end.
     expect(renderedIn(themeWithAnUnknownFace())->unknownFonts())->toBe([
-        ['face' => 'Comic Sans MS', 'slot' => 'heading'],
-        ['face' => 'Comic Sans MS', 'slot' => 'body'],
+        ['face' => 'Comic Sans MS', 'where' => "the theme's heading slot"],
+        ['face' => 'Comic Sans MS', 'where' => "the theme's body slot"],
     ]);
 });
 
@@ -483,9 +483,7 @@ it('refuses a deck whose theme names a face it cannot measure when the renderer 
     // measured with another face's widths, and the message names the faces there are
     // tables for.
     expect(fn () => renderedIn(themeWithAnUnknownFace(), strict: true))
-        ->toThrow(
-            UnknownFont::class,
-            'The theme\'s heading face "Comic Sans MS" has no table of advance widths',
-        );
+        ->toThrow(UnknownFont::class, 'The face "Comic Sans MS" has no table of advance widths')
+        ->toThrow(UnknownFont::class, "It is named by the theme's heading slot");
 });
 
