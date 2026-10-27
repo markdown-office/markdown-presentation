@@ -8,15 +8,15 @@ template: wordmark
 
 # Slide templates
 
-The wordmark, the band and the page number are the same on every slide.
+The wordmark, the band and the page number are furniture.
+They are the same on every slide that carries them.
 Writing them out on every slide means changing them on every slide.
-A **template** is that furniture written once.
-It is a block of the deck's own Markdown.
+A **template** is that furniture written once, in the deck's own Markdown.
 Every slide that names it is drawn with it.
 
 A deck gets its templates three ways:
 
-- a **definition** in the deck, a block whose frontmatter names one template
+- a **definition** in the deck, a block whose frontmatter names a template
 - a **slide** that names a template, or several of them
 - a **chrome file** beside the deck, named in the deck's frontmatter
 
@@ -48,6 +48,7 @@ A block whose frontmatter names a template and nothing else is a definition.
 A block that names a template and something else is a slide that draws it, which is why
 this one carries a `layout:` and a `name:` as well.
 
+The cover names one template, this slide names two, and the next names three.
 The wordmark is at the foot on the left and the number is at the foot on the right, and
 neither of them is written on this slide.
 
@@ -75,7 +76,7 @@ template: [wordmark, page]
 
 # The deck's own template wins
 
-`templates/chrome.md` holds a template called `page` as well, and it puts a bare number at
+`templates/chrome.md` holds a template called `page` too, and it puts a bare number at
 the foot of the slide.
 This deck defines its own `page` above, and the deck's own one is the one that is drawn:
 the number is in the theme's `accent1` rather than its `subtle`, at twelve points rather
@@ -95,7 +96,7 @@ template: [wordmark, page]
 
 A definition is not drawn, it has no number, and it does not count towards the number of
 slides.
-This file has five slides and two definitions, and the number at the foot of this page is
-the fifth of five rather than the seventh of seven.
+This file has five slides and two definitions, and the number at the foot of this page
+reads five of five rather than five of seven.
 
 `of=true` is what writes the number of the deck after the number of the slide.

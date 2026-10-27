@@ -16,7 +16,7 @@ Three forms, one grammar:
 - `:accent[brand]{color=FF0000}` — the same, with the attributes laid over the style's
 - `:style[brand]{color=FF0000}` — the word in the attributes, with no style involved
 
-The attributes are a closed set of eight, and this half draws seven of them.
+The attributes are a closed set of eight, and this library draws seven of them.
 
 ---
 layout: blank
@@ -31,7 +31,7 @@ Sextant :brand[Instrument Works] — :muted[est. 1934]
 :::content{left=6% top=47% width=88% height=48% font-size=15}
 Three words and three colours in one box.
 `Sextant` says nothing about itself, so it takes the colour of the box it is in.
-`Instrument Works` is in the theme's `brand` style, which is the theme's `accent1` and bold.
+`Instrument Works` is in the theme's `brand` style, which is `accent1` and bold.
 `est. 1934` is in `muted`, which is the quiet ink at fourteen points.
 
 A style sets the properties it names and leaves the others alone.
@@ -77,7 +77,7 @@ layout: blank
 - `italic` — :style[slanted]{italic=true}
 - `underline` — :style[underlined]{underline=true}
 - `strike` — :style[struck]{strike=true}
-- `highlight` — the one this half does not draw
+- `highlight` — the one this library does not draw
 :::
 
 ---
@@ -107,7 +107,7 @@ layout: blank
 
 # The eighth attribute
 
-A highlight is a colour behind the word, and this half cannot write one.
+A highlight is a colour behind the word, and this library cannot write one.
 The attribute is refused by name rather than accepted and quietly dropped.
 Written `:brand[Barge]{highlight=accent4}`, it says:
 
