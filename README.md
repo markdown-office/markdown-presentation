@@ -1393,7 +1393,7 @@ foreach ($decks as $slide) {
 ```
 
 ```text
-Slide 1 opens the directive "::rect{a=1}", which is not something a slide draws. The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, line, rectangle, roundrect, triangle. Two colons mark a step as "::click" or a column as "::column" and three open a step region as ":::click"; a placed text block is ":::content" with its Markdown between the fences.
+Slide 1 opens the directive "::rect{a=1}", which is not something a slide draws. The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, line, rectangle, roundrect, slide-number, triangle. Two colons mark a step as "::click" or a column as "::column" and three open a step region as ":::click"; a placed text block is ":::content" with its Markdown between the fences.
 
 Slide 1 places "rectangle" at left 900px with a width of 120px, which reaches 1020px. A free shape lies within the 960px wide slide: write left=0 width=100% for one that reaches the edge.
 

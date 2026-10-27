@@ -130,7 +130,7 @@ it('reads every name in the vocabulary', function (string $name) {
         ->and($shape->name())->toBe($name);
 })->with([
     'rectangle', 'roundrect', 'ellipse', 'circle', 'triangle',
-    'diamond', 'chevron', 'hexagon', 'arrow', 'line', 'content',
+    'diamond', 'chevron', 'hexagon', 'arrow', 'line', 'content', 'slide-number',
 ]);
 
 it('names a directive it does not draw, and every name it does', function () {
@@ -140,7 +140,7 @@ it('names a directive it does not draw, and every name it does', function () {
         ->toThrow(
             UnknownDirective::class,
             'The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, '
-            . 'image, line, rectangle, roundrect, triangle.',
+            . 'image, line, rectangle, roundrect, slide-number, triangle.',
         );
 });
 

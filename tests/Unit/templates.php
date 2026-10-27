@@ -381,3 +381,49 @@ it('reads the chrome of a template no slide draws', function () {
     expect(templateFailure($deck))
         ->toContain('The template "brand" cannot be drawn');
 });
+
+/**
+ * The page number a template draws, written the way a deck would write it.
+ */
+const PAGE_NUMBER = '::slide-number{left=94% top=92% width=5% height=6% color=94A3B8 font-size=10 font-family=Calibri align=right vertical-align=middle}';
+
+it('writes the number of the slide on the slide number', function () {
+    $deck = "---\ntemplate: page\n---\n" . PAGE_NUMBER . "\n\n---\nlayout: blank\ntemplate: page\n---\n\n---\nlayout: blank\ntemplate: page\n---\n";
+
+    $file = templateDeck($deck);
+
+    expect($file->shapeNames(1))->toBe(['slide-number'])
+        ->and($file->slideText(1))->toBe('1')
+        ->and($file->slideText(2))->toBe('2');
+});
+
+it('writes the number of the deck after the number of the slide', function () {
+    // "2 / 3": the count is the deck's slides, and a template definition is not one.
+    $deck = "---\ntemplate: page\n---\n::slide-number{left=94% top=92% width=5% height=6% of=true}\n\n---\nlayout: blank\ntemplate: page\n---\n\n---\nlayout: blank\ntemplate: page\n---\n";
+
+    $file = templateDeck($deck);
+
+    expect($file->slideText(1))->toBe('1 / 2')
+        ->and($file->slideText(2))->toBe('2 / 2');
+});
+
+it('agrees about which slides are slides, between the count, the report and the page number', function () {
+    // One definition, three slides and a block that does not fit: the report names the
+    // slide the page number is on, and neither of them counts the definition.
+    $tall = "```\n" . str_repeat("line;\n", 60) . "```\n";
+
+    $deck = "---\nlayout: blank\ntemplate: page\n---\n\n---\ntemplate: page\n---\n" . PAGE_NUMBER . "\n\n---\nlayout: content\ntemplate: page\n---\n" . $tall . "\n---\nlayout: blank\ntemplate: page\n---\n";
+
+    $renderer = new PresentationRenderer(directory: Scratch::directory());
+    $path = $renderer->render((new DeckParser())->parse($deck), Scratch::file('agree.pptx', ''));
+
+    $overflows = $renderer->overflows();
+    $file = Pptx::open($path);
+    $texts = $file->texts(2);
+
+    expect($overflows)->toHaveCount(1)
+        ->and($overflows[0]['slide'])->toBe(2)
+        ->and($file->slideCount())->toBe(3)
+        ->and($texts[count($texts) - 1])->toBe('2')
+        ->and($file->slideText(3))->toBe('3');
+});

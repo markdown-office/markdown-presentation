@@ -7,12 +7,12 @@ namespace MarkdownPresentation\Render\Free;
 use PhpOffice\PhpPresentation\Shape\AutoShape;
 
 /**
- * The twelve free-placement directives: what each one draws and what it may be written with.
+ * The thirteen free-placement directives: what each one draws and what it may be written with.
  *
  * A name per shape rather than one `::shape{t=…}`, because a name is the word a model reaches
  * for and an attribute is a spelling it has to be told. Everything this format does not draw
- * is refused by name, so the twelve here are the whole of the vocabulary — which is only
- * affordable at twelve rather than the hundred and fifty `AutoShape::TYPE_*` holds, and is
+ * is refused by name, so the thirteen here are the whole of the vocabulary — which is only
+ * affordable at thirteen rather than the hundred and fifty `AutoShape::TYPE_*` holds, and is
  * the reason the rest of them are refused rather than exposed.
  *
  * {@see self::attributes()} is what keeps the refusal honest in the other direction: an
@@ -39,6 +39,7 @@ enum ShapeKind: string
     case Line = 'line';
     case Image = 'image';
     case Content = 'content';
+    case SlideNumber = 'slide-number';
 
     /** Where a shape sits, how it is turned and when it is drawn, beside the layout's. */
     private const PLACEMENT = ['left', 'top', 'width', 'height', 'anchor', 'layer', 'rotate'];
@@ -49,7 +50,7 @@ enum ShapeKind: string
     /**
      * The shadow a shape is drawn with, where the shape is a box to cast one.
      *
-     * On every directive that draws a box, which is all twelve: a label lives inside an ink
+     * On every directive that draws a box, which is all thirteen: a label lives inside an ink
      * shape and so takes the shape's shadow, and a picture is a `p:pic` with an effect list of
      * its own. Five attributes rather than one shorthand — see {@see Shadow}.
      */
@@ -68,8 +69,8 @@ enum ShapeKind: string
      * The shape's own text — one plain run inside the shape rather than a box over it.
      *
      * On the ink shapes and nowhere else. `::image` is a `p:pic`, which has no text body at
-     * all, and `:::content` is a box whose body is Markdown, so a label on either would be a
-     * second way to put the same words in the same place.
+     * all, `:::content` is a box whose body is Markdown, and `::slide-number` is written with
+     * the number the renderer fills in.
      */
     private const LABEL = ['label'];
 
@@ -94,7 +95,7 @@ enum ShapeKind: string
             self::Chevron => AutoShape::TYPE_CHEVRON,
             self::Hexagon => AutoShape::TYPE_HEXAGON,
             self::Arrow => AutoShape::TYPE_RIGHT_ARROW,
-            self::Image, self::Content => null,
+            self::Image, self::Content, self::SlideNumber => null,
         };
     }
 
@@ -112,6 +113,7 @@ enum ShapeKind: string
         $attributes = match ($this) {
             self::Image => [...self::PLACEMENT, ...self::PICTURE],
             self::Content => [...self::PLACEMENT, ...self::PAINT, ...self::TYPE],
+            self::SlideNumber => [...self::PLACEMENT, ...self::PAINT, ...self::TYPE, 'of'],
             self::RoundRect => [...self::PLACEMENT, ...self::PAINT, ...self::LABEL, 'border-radius'],
             default => [...self::PLACEMENT, ...self::PAINT, ...self::LABEL],
         };
@@ -150,9 +152,12 @@ enum ShapeKind: string
 
     /**
      * Whether the shape is type rather than ink, and so is measured as words.
+     *
+     * The page number is type: it is a box of words the renderer writes, and it is measured
+     * and drawn like any other one.
      */
     public function isContent(): bool
     {
-        return $this === self::Content;
+        return $this === self::Content || $this === self::SlideNumber;
     }
 }

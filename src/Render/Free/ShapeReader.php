@@ -116,6 +116,20 @@ final class ShapeReader
 
         $paint = Paint::read($state->slide, $kind->value, $attributes, $state->theme);
 
+        if ($kind === ShapeKind::SlideNumber) {
+            // Before the text block below, which is a box whose body the deck wrote: this
+            // one's body is the number, and the renderer writes it.
+            return FreeSlideNumber::at(
+                $kind,
+                $placement,
+                $state->step,
+                $paint,
+                TextStyle::read($state->slide, $kind->value, $attributes, $state->theme),
+                $attributes->getBool('of'),
+                $shadow,
+            );
+        }
+
         if ($kind->isContent()) {
             return FreeText::at(
                 $kind,

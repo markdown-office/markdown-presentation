@@ -35,6 +35,7 @@ use MarkdownPresentation\Render\Block\Table;
 use MarkdownPresentation\Render\CommonMark\BlockTranslator;
 use MarkdownPresentation\Render\CommonMark\InlineTranslator;
 use MarkdownPresentation\Render\Free\FreeShape;
+use MarkdownPresentation\Render\Free\FreeSlideNumber;
 use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Template\ChromeFile;
 use MarkdownPresentation\Template\Definition;
@@ -179,6 +180,11 @@ final class PresentationRenderer
      * @var array<string, list<FreeShape>>
      */
     private array $furniture = [];
+
+    /**
+     * How many slides the deck being rendered has, which is what a page number counts to.
+     */
+    private int $slides = 0;
 
     /**
      * The theme of the deck being rendered.
@@ -331,6 +337,7 @@ final class PresentationRenderer
         // that names a template that is not there, and a template that cannot be drawn, are
         // both failures that happen with no file written behind them.
         $this->templates = $this->templates($deck);
+        $this->slides = $deck->count();
 
         foreach ($deck->slides() as $slide) {
             $this->checkTemplates($slide);
@@ -667,7 +674,9 @@ final class PresentationRenderer
 
         foreach ($this->names($source) as $name) {
             foreach ($this->furniture[$name] as $shape) {
-                $shapes[] = $shape;
+                $shapes[] = $shape instanceof FreeSlideNumber
+                    ? $shape->numbered($source->index() + 1, $this->slides)
+                    : $shape;
             }
         }
 

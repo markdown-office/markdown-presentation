@@ -372,7 +372,7 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'a free shape under a name that is not one' => [
         UnknownDirective::leaf(3, '::rect')->getMessage(),
         'The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, '
-        . 'line, rectangle, roundrect, triangle.',
+        . 'line, rectangle, roundrect, slide-number, triangle.',
     ],
     'an attribute a free shape does not read' => [
         MalformedShape::unknownAttribute(3, 'image', 'fill', ['alt', 'fit', 'height', 'left', 'src', 'top', 'width'])->getMessage(),
