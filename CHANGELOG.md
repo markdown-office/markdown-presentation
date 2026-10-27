@@ -31,9 +31,9 @@ All notable changes to this project are documented here. The format follows
   The named styles come from a theme's `text-styles.yml`, which is optional: a theme
   without one has no named styles, and every named form in a deck drawn with it is then a
   name the theme does not have. A style that sets an attribute nobody reads, a style that
-  sets nothing at all, a style called `style` — the word the raw form is written with — and
-  a style that sets a `highlight`, which this half does not draw, are refused when the
-  theme is read.
+  sets nothing at all, a style that is not a mapping of attributes, a style called `style`
+  — the word the raw form is written with — and a style that sets a `highlight`, which this
+  half does not draw, are refused when the theme is read.
 
 - **A boolean set to `false` is not "off" but "not set".** `:brand[Bakery]{bold=false}`
   takes the weight off a style that has it, and the word then takes the weight of the block

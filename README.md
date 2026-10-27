@@ -552,7 +552,7 @@ package folds the names of the directives themselves. The refusal for a name the
 not have spells the styles it does have the way the theme wrote them, because that is the
 spelling the author has to change.
 
-Five things about a `text-styles.yml` are refused when the theme is read, because each of
+Six things about the shape of a style are refused when the theme is read, because each of
 them is a mistake that would otherwise reach the slide looking as though the line had
 never been written:
 
@@ -560,9 +560,14 @@ never been written:
 | --- | --- |
 | a style that sets an attribute that does not exist | the attributes are a closed set |
 | a style that sets nothing at all | a style that styles nothing is a mistake |
+| a style that is not a mapping of attributes | a style carries one attribute per line |
 | a style called `style` | that word is how the raw form is written |
 | a style that sets a `highlight` | **not drawn by this half**, see below |
 | a style that names another one in a different case | `Brand` and `brand` are one word |
+
+A value that is not one is refused the same way — a colour that is not a colour, a size
+that is not a number of points, a weight that is not `true` or `false` — and the message
+says what the value may be.
 
 A name the theme does not have is refused when the deck is read, and the message names the
 styles the theme does have:
