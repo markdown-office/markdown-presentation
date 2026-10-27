@@ -8,6 +8,37 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **The furniture of a deck can be written once.** A wordmark, a rule and a page number
+  were the same on every slide of a deck, and writing them out on every slide meant
+  changing them on every slide: twenty-eight slides to find and twenty-eight edits to
+  make.
+
+  A **template** is that furniture written once — a slide of the deck's own Markdown that
+  names a template and nothing else, and every slide that names it is drawn with it. A
+  definition is not a slide of the deck: it is not drawn, it has no number, and it does
+  not count towards the number of slides, which is what makes the slide count, the slide
+  numbers, the overflow report and the page number agree about which slides are slides.
+
+  A template holds chrome and nothing else — the free shapes it draws, and the words a
+  `:::content` block carries — because it is drawn on every slide that names it and the
+  words of a slide written into one would be on every one of them. The chrome is drawn
+  over what the slide placed itself, so a full-bleed picture is behind the wordmark and
+  not over it.
+
+  The templates may also live in a file beside the deck, named by the deck's frontmatter
+  and resolved against the deck's own directory, so that a deck and the furniture it
+  shares travel together. The deck's own templates override the imported ones of the same
+  name, the way a deck's own theme overrides the shipped one.
+
+- **The number of a slide is a shape.** A page number was the one piece of furniture a
+  deck had to write out on every slide, because the number of a slide is not known until
+  the deck is split.
+
+  `::slide-number` takes the same placement attributes as every other shape and is in the
+  layer order with them, and `of=true` writes the number of the deck after the number of
+  the slide — "3 / 28", where the 28 is the number of the slides of the deck and a
+  template definition is not one of them.
+
 - **A shipped theme brings named styles.** The five themes that ship carried no
   `text-styles.yml`, so the named form of a text style could only be tried against a theme
   of one's own. `corporate-dark` brings two now — a `brand` in the theme's own accent and a
