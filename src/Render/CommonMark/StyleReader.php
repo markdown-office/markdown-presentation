@@ -303,7 +303,7 @@ final class StyleReader
             throw MalformedTextStyle::value($slide, $name, $attribute, $written, 'A font is a family name.');
         }
 
-        return $theme->font($literal) ?? $literal;
+        return $theme->face($literal);
     }
 
     /**

@@ -109,6 +109,19 @@ All notable changes to this project are documented here. The format follows
   emphasis may not be followed by whitespace, and one that closes it may not be preceded by
   whitespace. A label holding one is drawn as it was written.
 
+- **A face named in a way nothing reported is reported now.** The faces a theme names are
+  measured with the advance widths of the face that will draw them, and a face with no
+  table of its own is measured with the reference face's widths instead — which are not
+  that face's. The report of that said so for the theme's `heading`, `body` and `mono`
+  slots, and for nothing else: a text style naming a face in the theme's `text-styles.yml`
+  and a box naming one with `font-family` were measured with another face's widths and
+  nothing said so, and the strict renderer accepted them. A face with no table is a
+  finding wherever it is named now, and the strict renderer refuses it.
+
+  The report names the place as well as the face, because the face alone does not say
+  where to change it: a slot of the theme, a text style of it, or a box of the deck, and
+  the refusal says which of them named the face.
+
 - **A value with a comma in it names the separator.** The attributes of a directive are
   separated by spaces, and a bare value runs to the next space, so `left=10%, top=20%` is
   read as one value of `10%,` and one attribute nobody reads. The failure said the value

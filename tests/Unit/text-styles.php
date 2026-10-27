@@ -134,6 +134,34 @@ function runXml(Pptx $pptx, string $text, int $slide = 1): string
     return '';
 }
 
+/**
+ * A deck drawn in a directory of its own, and the renderer that drew it.
+ *
+ * The renderer rather than the file, because the claim is about the report of the faces it
+ * could not measure, and that report is on the renderer.
+ */
+function styledRenderer(string $markdown, string $directory, bool $strict = false): PresentationRenderer
+{
+    $deck = (new DeckParser())->parse($markdown);
+    $path = Scratch::file('deck.pptx', '');
+
+    $renderer = new PresentationRenderer($directory, strict: $strict);
+    $renderer->render($deck, $path);
+
+    return $renderer;
+}
+
+/**
+ * A deck whose one slide is a word in a box that names a face of its own.
+ */
+function wordmarkIn(string $face): string
+{
+    return sprintf(
+        "---\ntheme: ./theme.yml\n---\n\n:::content{left=10%% top=10%% width=30%% height=10%% font-size=11 font-family=%s}\nResilience\n:::\n",
+        $face,
+    );
+}
+
 it('colours a word inside a box that has a colour of its own', function () {
     // The wordmark of the review's deck: two words, two colours, one box. A box carried
     // one colour before, so the wordmark was two boxes.
@@ -309,24 +337,6 @@ it('refuses a named style against a theme that has no text styles', function () 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(UnknownTextStyle::class, 'The theme has no text styles');
 });
-
-
-/**
- * A deck drawn in a directory of its own, and the renderer that drew it.
- *
- * The renderer rather than the file, because the claim is about the report of the faces it
- * could not measure, and that report is on the renderer.
- */
-function styledRenderer(string $markdown, string $directory, bool $strict = false): PresentationRenderer
-{
-    $deck = (new DeckParser())->parse($markdown);
-    $path = Scratch::file('deck.pptx', '');
-
-    $renderer = new PresentationRenderer($directory, strict: $strict);
-    $renderer->render($deck, $path);
-
-    return $renderer;
-}
 
 it('draws a word in a named style a shipped theme brings', function () {
     // A shipped theme is the one a deck can name without carrying a theme of its own, and
@@ -506,6 +516,58 @@ it('measures a word in the face a style names', function () {
     // Arial Narrow is narrower than the theme's body face, so the same word takes fewer
     // lines in it and the box is shorter.
     expect($wanted(':brand[' . $word . ']'))->toBeLessThan($wanted($word));
+});
+
+it('reports a face a text style names that there is no table for', function () {
+    // A text style's `font` is a face the theme names, and a face with no table of its own
+    // is measured with the reference face's widths — which are not that face's. The report
+    // is where that is said, and it names the style, because the face alone does not say
+    // where to change it.
+    [$deck, $directory] = wordmark("brand:\n  font: \"Comic Sans MS\"\n", ':brand[Bakery]');
+
+    expect(styledRenderer($deck, $directory)->unknownFonts())->toBe([
+        ['face' => 'Comic Sans MS', 'where' => 'the text style "brand"'],
+    ]);
+});
+
+it('reports a face a placed box names that there is no table for', function () {
+    // A box with a `font-family` of its own is drawn in it, and the face is in the deck
+    // rather than in the theme — so it is asked about once the deck has been read, and the
+    // report names the box and the slide it is on.
+    $directory = textStyleTheme(null);
+
+    expect(styledRenderer(wordmarkIn('"Comic Sans MS"'), $directory)->unknownFonts())->toBe([
+        ['face' => 'Comic Sans MS', 'where' => 'the "content" box on slide 1'],
+    ]);
+});
+
+it('reports no face for a text style and a box that name faces there are tables for', function () {
+    // A face there is a table for is not a finding, and neither is one the theme names by
+    // its own slot: a style that says `font: heading` is the theme's heading face, which the
+    // theme has already said.
+    [$deck, $directory] = wordmark("brand:\n  font: Inter\n", ':brand[Bakery]');
+
+    expect(styledRenderer($deck, $directory)->unknownFonts())->toBe([])
+        ->and(styledRenderer(wordmarkIn('Inter'), $directory)->unknownFonts())->toBe([])
+        ->and(styledRenderer(wordmarkIn('heading'), $directory)->unknownFonts())->toBe([]);
+});
+
+it('refuses a deck whose text style names a face it cannot measure when the renderer is strict', function () {
+    // Strict is for a caller that would rather have no file than a file whose text was
+    // measured with another face's widths, and the message says where the face was named.
+    [$deck, $directory] = wordmark("brand:\n  font: \"Comic Sans MS\"\n", ':brand[Bakery]');
+
+    expect(fn () => styledRenderer($deck, $directory, strict: true))
+        ->toThrow(UnknownFont::class, 'The face "Comic Sans MS" has no table of advance widths')
+        ->toThrow(UnknownFont::class, 'It is named by the text style "brand"');
+});
+
+it('refuses a deck whose placed box names a face it cannot measure when the renderer is strict', function () {
+    $directory = textStyleTheme(null);
+
+    expect(fn () => styledRenderer(wordmarkIn('"Comic Sans MS"'), $directory, strict: true))
+        ->toThrow(UnknownFont::class, 'The face "Comic Sans MS" has no table of advance widths')
+        ->toThrow(UnknownFont::class, 'It is named by the "content" box on slide 1');
 });
 
 it('leaves a word unbold where a style says it is not bold', function () {

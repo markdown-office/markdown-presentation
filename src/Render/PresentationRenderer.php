@@ -233,9 +233,10 @@ final class PresentationRenderer
      * same way, which is the width of a proportional face's letters rather than the width
      * of a code block.
      *
-     * Every place a face is named is an entry: a slot of the theme, or an attribute a word
-     * carries. The place is what tells a reader where to change the name, which is the
-     * half of the answer the face alone does not give.
+     * Every place a face is named is an entry: a slot of the theme, a text style of it, a
+     * box the deck placed itself, or an attribute a word carries. The place is what tells
+     * a reader where to change the name, which is the half of the answer the face alone
+     * does not give.
      *
      * Emptied by {@see self::render()} rather than accumulated, because a layout belongs to
      * one deck: a caller converting several in a loop wants the last one's, not all of them.
@@ -307,6 +308,12 @@ final class PresentationRenderer
         $writer = new ShapeWriter($this->theme, $geometry, $metric, $this->fonts);
         $shapes = new SlideShapes($geometry, $this->overflows);
         $blocks = $this->blocks($deck, $this->theme);
+
+        // The faces the deck named, asked about once the deck has been read and before
+        // anything is built: a box with a `font-family` of its own is drawn in it, and a box
+        // measured with another face's widths is a box measured for type it does not hold.
+        $this->recordUnknownFacesOfTheDeck($blocks, $metric);
+
         $builds = [];
 
         foreach ($deck->slides() as $slide) {
@@ -494,6 +501,12 @@ final class PresentationRenderer
      *
      * The slot is named rather than the face alone, because the face alone does not say
      * where to change it.
+     *
+     * The faces the theme's text styles name are asked about here too, because
+     * `text-styles.yml` is a file of the theme and a style in it is a face the theme
+     * names — a face a word written in that style is drawn in, and therefore measured in.
+     * A style that names one of the theme's own slots is that slot's face and is not a
+     * finding: the theme has already said it.
      */
     private function recordUnknownFaces(Theme $theme, TextMetric $metric): void
     {
@@ -502,6 +515,50 @@ final class PresentationRenderer
 
             if ($face !== null && !$metric->has($face)) {
                 $this->fonts->record($face, sprintf("the theme's %s slot", $slot), $metric->faces());
+            }
+        }
+
+        foreach ($theme->textStyleFaces() as $name => $face) {
+            if (!$metric->has($face)) {
+                $this->fonts->record($face, sprintf('the text style "%s"', $name), $metric->faces());
+            }
+        }
+    }
+
+    /**
+     * The faces the deck named that this renderer has no table of advance widths for,
+     * recorded.
+     *
+     * A box the deck placed itself may name a face of its own with `font-family`, and that
+     * face is the one its words are drawn in and measured in. It is in the deck rather than
+     * in the theme, so it does not exist when the theme is resolved — it exists once the
+     * deck has been read, which is before anything is built and therefore before a byte
+     * reaches the disk.
+     *
+     * The box is named rather than the slide it is on, because a deck that writes two boxes
+     * of the same kind is two boxes and a reader who is told which one to change can find
+     * it; the slide is named as well, because two boxes of the same kind on two slides are
+     * two places and one of them is not the one meant.
+     *
+     * @param array<int, SlideBlocks> $blocks The deck's slides, as they were read.
+     */
+    private function recordUnknownFacesOfTheDeck(array $blocks, TextMetric $metric): void
+    {
+        foreach ($blocks as $index => $slide) {
+            foreach ($slide->shapes() as $shape) {
+                if (!$shape instanceof FreeText) {
+                    continue;
+                }
+
+                $face = $shape->style->face;
+
+                if ($face !== null && !$metric->has($face)) {
+                    $this->fonts->record(
+                        $face,
+                        sprintf('the "%s" box on slide %d', $shape->name(), $index + 1),
+                        $metric->faces(),
+                    );
+                }
             }
         }
     }

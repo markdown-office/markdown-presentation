@@ -441,7 +441,7 @@ with the upright ones made a little wider. The monospaced faces are measured by 
 advance rather than by a table, because every character in one advances by the same amount:
 Consolas advances by 550 units to the em, Menlo by 602 and JetBrains Mono by 600, so a code
 block is measured in the face that will draw it. It is an estimate and says so: kerning is
-not modelled, and a theme naming a face with no table of its own is measured with the
+not modelled, and a face with no table of its own is measured with the
 reference face's widths — the ones every face was measured with before there were tables of
 their own — and the face is named by `unknownFonts()`. Which is why every text shape is
 written `a:normAutofit`. The box keeps the height the layout gave it and the reader scales
@@ -1772,10 +1772,11 @@ table, because every character in one advances by the same amount: Consolas is m
 550 units to the em, Menlo at 602 and JetBrains Mono at 600. A face with no table of its own
 is measured with the reference face's widths — the ones every face was measured with before
 there were tables of their own — and the face is named by
-`PresentationRenderer::unknownFonts()`, one entry for every slot it was named in. A caller
-that would rather have no file than a file whose text was measured with another face's
-widths asks for the strict renderer, and gets `UnknownFont` naming the faces there are
-tables for.
+`PresentationRenderer::unknownFonts()`, one entry for every place it was named: a slot of
+the theme, a text style of it, a box the deck placed itself, or an attribute a word carries.
+A caller that would rather have no file than a file whose text was measured with another
+face's widths asks for the strict renderer, and gets `UnknownFont` naming the faces there
+are tables for.
 
 A face a word writes for itself is reported the same way: `:style[Bakery]{font="Comic Sans
 MS"}` is drawn in that face and measured with the reference face's widths, and the report

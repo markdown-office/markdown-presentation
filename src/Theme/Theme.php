@@ -259,6 +259,43 @@ final class Theme
     }
 
     /**
+     * The face a name stands for: a slot of this theme's own, or the family as written.
+     *
+     * One place, because three things name a face the same way — a text style's `font`, a
+     * placed box's `font-family` and a style written on a word — and three copies of the
+     * rule are three answers to one question: a name that is a slot here and a literal
+     * there is a face in one deck and a missing table in the next.
+     */
+    public function face(string $written): string
+    {
+        return $this->font($written) ?? $written;
+    }
+
+    /**
+     * The faces the theme's text styles name, by the style that named them.
+     *
+     * A style's `font` is a name, and it is resolved here rather than where it is written:
+     * a style that says `font: heading` is drawn in the theme's heading face, and a style
+     * that says `font: Inter` is drawn in Inter whether or not the theme names it.
+     *
+     * @return array<string, string> The style's name and the face it draws in.
+     */
+    public function textStyleFaces(): array
+    {
+        $faces = [];
+
+        foreach ($this->textStyles->names() as $name) {
+            $style = $this->textStyles->get($name);
+
+            if ($style !== null && $style->font !== null) {
+                $faces[$name] = $this->face($style->font);
+            }
+        }
+
+        return $faces;
+    }
+
+    /**
      * The numbers this theme sets: its type scale, its spacing rhythm and how it treats a
      * heading.
      *
