@@ -40,4 +40,18 @@ final class MalformedFrontmatter extends InvalidInput
             $wanted,
         ));
     }
+
+    /**
+     * The name of a template, in the frontmatter of the slide that defines it.
+     *
+     * Without a slide number, because a template definition is not a slide of the deck and
+     * has no number: it is furniture, and the number a reader would look for is the number
+     * of the slide it is drawn on.
+     */
+    public static function notATemplateName(): self
+    {
+        return new self(sprintf(
+            'A template definition names the template it defines, and the name is a string: template: brand.',
+        ));
+    }
 }

@@ -7,6 +7,7 @@ namespace MarkdownPresentation\Document;
 use MarkdownPresentation\Exception\FencedFrontmatter;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownDirective;
+use MarkdownPresentation\Template\Definition;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -118,6 +119,7 @@ final class DeckParser
         $lines = explode("\n", str_replace("\r\n", "\n", $markdown));
         $last = count($lines) - 1;
         $slides = [];
+        $definitions = [];
         $start = 0;
         $inHtmlComment = false;
         $inNote = false;
@@ -151,7 +153,7 @@ final class DeckParser
             }
 
             if (str_starts_with($trimmed, '---')) {
-                $index = self::delimiter($lines, $trimmed, $index, $last, $start, $slides);
+                $index = self::delimiter($lines, $trimmed, $index, $last, $start, $slides, $definitions);
             } elseif (preg_match(self::FENCE_OPEN, $trimmed, $fence) === 1) {
                 $index = self::closingFence($lines, $index, $last, $fence[1]);
             } elseif (preg_match(self::OPENS_NOTE, $trimmed) === 1) {
@@ -165,10 +167,14 @@ final class DeckParser
 
         // A deck that ends on a delimiter has nothing after it to make a slide of.
         if ($start <= $last) {
-            $slides[] = self::slide($lines, $start, count($lines), count($slides));
+            self::add(
+                $slides,
+                $definitions,
+                self::slide($lines, $start, count($lines), count($slides)),
+            );
         }
 
-        return new Deck($markdown, $slides);
+        return new Deck($markdown, $slides, $definitions);
     }
 
     /**
@@ -184,14 +190,22 @@ final class DeckParser
      *
      * @param list<string> $lines
      * @param list<Slide>  $slides
+     * @param list<Definition> $definitions
      */
-    private static function delimiter(array $lines, string $trimmed, int $index, int $last, int &$start, array &$slides): int
-    {
+    private static function delimiter(
+        array $lines,
+        string $trimmed,
+        int $index,
+        int $last,
+        int &$start,
+        array &$slides,
+        array &$definitions,
+    ): int {
         // An empty block is not a slide: Slidev's `slice()` returns without
         // moving the start, and moving it would turn a deck written with a
         // leading `---` frontmatter block into an empty slide in front of it.
         if ($start !== $index) {
-            $slides[] = self::slide($lines, $start, $index, count($slides));
+            self::add($slides, $definitions, self::slide($lines, $start, $index, count($slides)));
             $start = $index + 1;
         }
 
@@ -207,6 +221,59 @@ final class DeckParser
         }
 
         return $index;
+    }
+
+    /**
+     * A slide of the deck, or a template definition.
+     *
+     * The two are told apart by the frontmatter, and the slide is added to the deck's
+     * slides only when it is one: a definition is furniture, it is not drawn on a slide
+     * of its own, and it does not have a number. The index the slide was given is the
+     * number of the deck's slides so far, so a definition takes none and the slide
+     * after it is numbered as though the definition were not there.
+     *
+     * @param list<Slide>      $slides
+     * @param list<Definition> $definitions
+     */
+    private static function add(array &$slides, array &$definitions, Slide $slide): void
+    {
+        $definition = self::definition($slide);
+
+        if ($definition === null) {
+            $slides[] = $slide;
+
+            return;
+        }
+
+        $definitions[] = $definition;
+    }
+
+    /**
+     * The template a slide defines, or null where the slide draws one rather than
+     * defines it.
+     *
+     * A slide whose frontmatter names a template and nothing else defines it; a slide
+     * that names a template along with anything else draws it. The name is what tells
+     * the two apart, because a definition is not a slide of the deck and has no layout
+     * to be drawn in.
+     *
+     * @throws MalformedFrontmatter
+     */
+    private static function definition(Slide $slide): ?Definition
+    {
+        $frontmatter = $slide->frontmatter();
+
+        if (!array_key_exists('template', $frontmatter) || count($frontmatter) > 1) {
+            return null;
+        }
+
+        $name = $frontmatter['template'];
+
+        if (!is_string($name) || trim($name) === '') {
+            throw MalformedFrontmatter::notATemplateName();
+        }
+
+        return new Definition(trim($name), $slide->content());
     }
 
     /**
