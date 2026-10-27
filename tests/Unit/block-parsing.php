@@ -82,7 +82,7 @@ function blocksOf(string $markdown): array
  */
 function inlineRuns(string $markdown): array
 {
-    return (new InlineTranslator(SlideEnvironment::build()))->runsIn($markdown);
+    return (new InlineTranslator(SlideEnvironment::build()))->runsIn($markdown, 1, Theme::defaults());
 }
 
 /**

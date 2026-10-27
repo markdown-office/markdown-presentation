@@ -27,8 +27,10 @@ use PhpOffice\PhpPresentation\Style\Font;
  * - **What kind of shape it is.** A text box is prose, a table is a table, a
  *   picture is a picture.
  * - **What it says.** A run's bold, italic and strike travel; its size, its
- *   colour and its face do not, because a deck has no way to say them and
- *   because the design of the new deck is not the design of the old one.
+ *   colour and its face do not, because the design of the new deck is not the
+ *   design of the old one — and because the label of a text style is plain
+ *   text with no escape in it, so a word whose text carries a bracket cannot be
+ *   written back as a style at all.
  */
 final class ShapeMapper
 {

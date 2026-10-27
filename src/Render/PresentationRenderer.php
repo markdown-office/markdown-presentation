@@ -148,6 +148,15 @@ final class PresentationRenderer
     private readonly ThemeResolver $themes;
 
     /**
+     * The theme of the deck being rendered.
+     *
+     * On the renderer rather than on {@see self::write()}, which already carries seven
+     * arguments, and because the title of a slide is read with the same theme the rest of
+     * it is drawn with.
+     */
+    private Theme $theme;
+
+    /**
      * @param string       $directory  The directory a relative image path in the deck
      *                                 resolves against, which is the directory the deck
      *                                 itself is in. It is also the first of the roots an
@@ -267,14 +276,15 @@ final class PresentationRenderer
             $this->check($slide);
         }
 
-        $theme = $this->theme($deck);
-        $roles = $this->roles($deck, $theme);
+        $loaded = $this->loaded($deck);
+        $roles = $this->roles($deck, $loaded);
+        $this->theme = $loaded->theme();
 
         // A theme naming a face there is no table for is measured with the reference face's
         // widths, and the strict renderer refuses the deck rather than measuring it with the
         // wrong face — so the faces are asked about before anything is built.
         $metric = new TextMetric();
-        $this->recordUnknownFaces($theme->theme(), $metric);
+        $this->recordUnknownFaces($this->theme, $metric);
 
         $presentation = new PhpPresentation();
 
@@ -285,12 +295,12 @@ final class PresentationRenderer
         // is PHP 8.4 syntax, and `composer.json` promises 8.2, where it does not parse. Written
         // without them this file cannot be loaded at all, so every test that renders a deck
         // fails on the 8.2 job and nothing local says why.
-        $geometry = (new SlideGeometry(style: $theme->theme()->style()))->with($this->template($theme, $used));
-        $layouts = MasterLayouts::build($presentation, $deck, $theme, $used, $this->blocks->inline());
+        $geometry = (new SlideGeometry(style: $this->theme->style()))->with($this->template($loaded, $used));
+        $layouts = MasterLayouts::build($presentation, $deck, $loaded, $used, $this->blocks->inline());
 
-        $writer = new ShapeWriter($theme->theme(), $geometry, $metric);
+        $writer = new ShapeWriter($this->theme, $geometry, $metric);
         $shapes = new SlideShapes($geometry, $this->overflows);
-        $blocks = $this->blocks($deck, $theme->theme());
+        $blocks = $this->blocks($deck, $this->theme);
         $builds = [];
 
         foreach ($deck->slides() as $slide) {
@@ -455,7 +465,7 @@ final class PresentationRenderer
      * @throws ThemeNotFound
      * @throws MalformedFrontmatter
     */
-    private function theme(Deck $deck): LoadedTheme
+    private function loaded(Deck $deck): LoadedTheme
     {
         $name = $deck->frontmatterValue('theme', self::DEFAULT_THEME);
 
@@ -615,7 +625,7 @@ final class PresentationRenderer
         if ($title !== null && $source->title() !== null) {
             $writer->title(
                 $slide,
-                $this->blocks->inline()->runsIn($source->title()),
+                $this->blocks->inline()->runsIn($source->title(), $source->index() + 1, $this->theme),
                 $title['box'],
                 $title['size'],
                 $title['alignment'],
@@ -661,10 +671,10 @@ final class PresentationRenderer
      * heading that became the title: `level: 1` is the top of what a body can draw and every
      * level below it is the size a heading of that depth is drawn at.
      */
-    private function titleHeading(string $title, ?int $depth): Heading
+    private function titleHeading(string $title, int $slide, ?int $depth): Heading
     {
         return new Heading(
-            $this->blocks->inline()->runsIn($title),
+            $this->blocks->inline()->runsIn($title, $slide, $this->theme),
             $depth === null ? 1 : max(1, $depth - 1),
             self::FIRST_STEP,
         );
@@ -728,7 +738,7 @@ final class PresentationRenderer
 
         if (
             $heading === null
-            || InlineTranslator::text($heading->runs) !== $this->blocks->inline()->plain($title)
+            || InlineTranslator::text($heading->runs) !== $this->blocks->inline()->plain($title, $source->index() + 1, $this->theme)
         ) {
             // A role with no title box has nothing but its body to draw a title in, and a
             // title it does not draw is the silence this library refuses everywhere else —
@@ -737,7 +747,7 @@ final class PresentationRenderer
             // blank slide's title already is.
             return $hasTitleBox
                 ? $content
-                : new SlideBlocks([$this->titleHeading($title, $depth), ...$blocks], [0, ...$columns], $markers, $shapes);
+                : new SlideBlocks([$this->titleHeading($title, $source->index() + 1, $depth), ...$blocks], [0, ...$columns], $markers, $shapes);
         }
 
         $drawn = $heading;

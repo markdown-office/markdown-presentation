@@ -48,7 +48,7 @@ final class PictureReader
         // bare space in a destination, so `my picture.png` is a paragraph and `my%20picture.png`
         // is the picture. league hands the target over encoded, and looking for the encoded
         // spelling on disk is looking for a file nobody has.
-        return $this->path(rawurldecode($node->getUrl()), InlineTranslator::text($inline->runs($node)), $state);
+        return $this->path(rawurldecode($node->getUrl()), InlineTranslator::text($inline->runs($node, $state->slide, $state->theme)), $state);
     }
 
     /**

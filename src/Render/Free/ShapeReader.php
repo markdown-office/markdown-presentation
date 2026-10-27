@@ -221,13 +221,13 @@ final class ShapeReader
                 $child instanceof LeagueTable => throw MalformedShape::body($state->slide, $written, 'table'),
                 $child instanceof ThematicBreak => throw MalformedShape::body($state->slide, $written, 'rule'),
                 $child instanceof LeagueHeading => new Heading(
-                    $this->inline->runs($child),
+                    $this->inline->runs($child, $state->slide, $state->theme),
                     $child->getLevel(),
                     $state->step,
                 ),
                 $child instanceof LeagueList => $this->frames->list($child, $state),
                 $child instanceof BlockQuote => new Quote(
-                    $this->inline->runsIn(implode("\n", $this->frames->quoted($child, $state))),
+                    $this->inline->runsIn(implode("\n", $this->frames->quoted($child, $state)), $state->slide, $state->theme),
                     $state->step,
                 ),
                 default => $this->paragraph($child, $written, $state),
@@ -264,12 +264,12 @@ final class ShapeReader
 
         if ($node instanceof HtmlBlock) {
             return new ParagraphBlock(
-                $this->inline->runsIn(implode("\n", array_map(trim(...), $state->lines($node)))),
+                $this->inline->runsIn(implode("\n", array_map(trim(...), $state->lines($node))), $state->slide, $state->theme),
                 $state->step,
             );
         }
 
-        return new ParagraphBlock($this->inline->runs($node), $state->step);
+        return new ParagraphBlock($this->inline->runs($node, $state->slide, $state->theme), $state->step);
     }
 
     /**

@@ -85,6 +85,18 @@ final class Colour
     }
 
     /**
+     * The colour a deck named, by role or by slot, or a hex value — or null where it named
+     * something that is not a colour at all.
+     *
+     * The resolution on its own, so that a caller with a failure of its own to report can
+     * ask the question without inheriting this one's message.
+     */
+    public static function resolve(string $written, Theme $theme): ?Color
+    {
+        return self::named($written, $theme) ?? self::hex($written);
+    }
+
+    /**
      * Whether what the deck wrote is one of the two spellings of "there is no colour here".
      *
      * Named rather than left to each caller to know, because {@see self::read()} answers null for

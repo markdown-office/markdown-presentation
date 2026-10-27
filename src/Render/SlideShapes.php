@@ -238,12 +238,16 @@ final class SlideShapes
             // drawn in, and {@see \MarkdownPresentation\Render\ShapeWriter::freeText()} is what
             // writes that inset. Measuring against the default instead is what made a wide
             // `padding` report a block as fitting when PowerPoint wraps it past its box.
+            // The face is passed for the same reason: a box with a `font-family` of its own is
+            // drawn in it, and a box measured in another face is a box measured for type it
+            // does not draw.
             $wanted = $writes->writer->sized(
                 $shape->frame,
                 $box,
                 $box->height,
                 $shape->style->size,
                 $shape->style->padding,
+                $shape->style->face,
             );
 
             if ($wanted > $height) {

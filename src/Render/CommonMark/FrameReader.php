@@ -153,7 +153,7 @@ final class FrameReader
             }
 
             if ($child instanceof Paragraph || $child instanceof \League\CommonMark\Extension\Table\Table) {
-                array_push($runs, ...$this->inline->runs($child, ' '));
+                array_push($runs, ...$this->inline->runs($child, $state->slide, $state->theme, ' '));
 
                 continue;
             }
@@ -164,7 +164,7 @@ final class FrameReader
             // allowed to offer.
             $lines = implode("\n", array_map(trim(...), $state->lines($child)));
 
-            array_push($runs, ...$this->inline->runsIn($lines, ' '));
+            array_push($runs, ...$this->inline->runsIn($lines, $state->slide, $state->theme, ' '));
         }
 
         return $runs;

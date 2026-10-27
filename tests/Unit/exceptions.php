@@ -12,6 +12,7 @@ use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\MalformedShape;
 use MarkdownPresentation\Exception\MalformedTemplate;
+use MarkdownPresentation\Exception\MalformedTextStyle;
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\NothingToConvert;
 use MarkdownPresentation\Exception\ThemeNotFound;
@@ -21,6 +22,7 @@ use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Exception\UnknownTextStyle;
 use MarkdownPresentation\Exception\UnreadableDeck;
 use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Exception\UnpatchedDependency;
@@ -95,6 +97,7 @@ it('reports what a deck author can fix under the class that says so', function (
         MalformedFrontmatter::class,
         MalformedShape::class,
         MalformedTemplate::class,
+        MalformedTextStyle::class,
         MalformedTheme::class,
         ThemeNotFound::class,
         TooManySlides::class,
@@ -103,6 +106,7 @@ it('reports what a deck author can fix under the class that says so', function (
         UnknownLayoutRole::class,
         UnknownMarker::class,
         UnknownStyleSlot::class,
+        UnknownTextStyle::class,
         UnsupportedColumn::class,
         UnsupportedImageFormat::class,
         UnsupportedLink::class,

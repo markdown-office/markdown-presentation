@@ -214,7 +214,7 @@ final class BlockTranslator
             // column: it goes on the state for {@see SlideBlocks} to carry beside the blocks,
             // and the walk moves on. {@see self::free()} is where it is read.
             $node instanceof DirectiveBlock => $this->shape($node, $state),
-            $node instanceof LeagueHeading => $this->placed(new Heading($this->inline->runs($node), $node->getLevel(), $state->step), $state),
+            $node instanceof LeagueHeading => $this->placed(new Heading($this->inline->runs($node, $state->slide, $state->theme), $node->getLevel(), $state->step), $state),
             $node instanceof ThematicBreak => $this->placed(new Rule($state->step), $state),
             $node instanceof FencedCode || $node instanceof IndentedCode => $this->placed($this->code($node, $state), $state),
             $node instanceof LeagueList => $this->placed($this->frames->list($node, $state), $state),
@@ -250,7 +250,7 @@ final class BlockTranslator
             return $this->placed($this->pictures->node($only, $state, $this->inline), $state);
         }
 
-        return $this->placed(new ParagraphBlock($this->inline->runs($node), $state->step), $state);
+        return $this->placed(new ParagraphBlock($this->inline->runs($node, $state->slide, $state->theme), $state->step), $state);
     }
 
     /**
@@ -406,7 +406,7 @@ final class BlockTranslator
         $lines = $state->lines($node);
         $quoted = $this->frames->quoted($node, $state);
 
-        $blocks = $this->placed(new Quote($this->inline->runsIn(implode("\n", $quoted)), $state->step), $state);
+        $blocks = $this->placed(new Quote($this->inline->runsIn(implode("\n", $quoted), $state->slide, $state->theme), $state->step), $state);
 
         return count($quoted) === count($lines)
             ? $blocks
@@ -429,7 +429,7 @@ final class BlockTranslator
             $header = $section instanceof TableSection && $section->isHead();
 
             foreach ($section->children() as $row) {
-                [$cells, $columns] = $this->row($row, $header);
+                [$cells, $columns] = $this->row($row, $header, $state);
 
                 $rows[] = $cells;
                 array_push($align, ...$columns);
@@ -446,13 +446,13 @@ final class BlockTranslator
      *
      * @return array{0: list<list<Run>>, 1: list<string>}
      */
-    private function row(Node $row, bool $header): array
+    private function row(Node $row, bool $header, SlideState $state): array
     {
         $cells = [];
         $align = [];
 
         foreach ($row->children() as $cell) {
-            $cells[] = $this->inline->runs($cell);
+            $cells[] = $this->inline->runs($cell, $state->slide, $state->theme);
 
             if ($header) {
                 $align[] = $cell instanceof TableCell && $cell->getAlign() !== null ? $cell->getAlign() : 'left';
@@ -474,7 +474,7 @@ final class BlockTranslator
     {
         $lines = implode("\n", array_map(trim(...), $state->lines($node)));
 
-        return new ParagraphBlock($this->inline->runsIn($lines), $state->step);
+        return new ParagraphBlock($this->inline->runsIn($lines, $state->slide, $state->theme), $state->step);
     }
 
     /**

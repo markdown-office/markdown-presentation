@@ -6,6 +6,67 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A word inside a box can be styled on its own.** A run carried text, bold, italic,
+  code, a link and a strike, and nothing else: the colour of a word was the colour of
+  the box it was in, so a wordmark in two colours was two boxes. A **text style** is a
+  name a theme gives to a set of a word's properties, and a word written in one is drawn
+  in it — `:brand[Bakery]` — so the wordmark is one box, two words and two colours.
+
+  Three forms, one grammar: `:accent[brand]` is a style the theme names, `:accent[brand]`
+  with attributes on it is that style with the attributes laid over it, and `:style[brand]`
+  with attributes on it is the attributes and nothing else. The attributes are a closed set
+  — `color`, `size`, `font`, `bold`, `italic`, `underline`, `strike` and `highlight` — and
+  an attribute overrides the style for the property it names and for that property only. A
+  property neither of them names is not set: the run takes it from the block it is in, and
+  nothing is reset to a default.
+
+  The named styles come from a theme's `text-styles.yml`, which is optional: a theme
+  without one has no named styles, and every named form in a deck drawn with it is then a
+  name the theme does not have. A style that sets an attribute nobody reads, a style that
+  sets nothing at all and a style called `style` — the word the raw form is written with —
+  are refused when the theme is read.
+
+- **A boolean set to `false` is not "off" but "not set".** `:brand[Bakery]{bold=false}`
+  takes the weight off a style that has it, and the word then takes the weight of the block
+  it is in. The Word half reads it the same way, because a run cannot be written with a
+  weight of none, and the two halves of the suite say the same thing about it.
+
+- **`highlight` is refused by name.** It is the one attribute of the set the slides half
+  does not draw: PHPPresentation's font has no setter for one, so a highlight would be an
+  element of the run's own properties in the file — a pass over the written package
+  rather than a property of a run. Accepting the attribute and dropping it would be a
+  deck that renders and shows something the author did not write.
+
+### Changed
+
+- **A label holding `__text__` is refused with the rest of the Markdown.** The shared
+  vocabulary named `**text**`, `*text*`, `_text_`, `` `code` `` and `[text](url)`; the
+  Word half found the sixth — `__text__` is strong emphasis in CommonMark — and the
+  slides half refuses it too. `~~struck~~` is not among them: it is GFM rather than
+  CommonMark, and a label is plain text, so the tildes are two characters in a word.
+
+- **An inline directive under a name that is not a style is refused.** `:foo[bar]` in a
+  slide was drawn as its own source text, which is the Word half's behaviour and the
+  opposite of this one's: this renderer refuses what it cannot draw and names the
+  alternative. The message names the styles the theme does have.
+
+- **A box's colour is the default for the words in it rather than an override of them.**
+  A run that carries a colour of its own keeps it; a run that carries none takes the box's.
+
+- **A word is measured in the face it is drawn in.** Text is measured with the advance
+  widths of the face that will draw it, and there are now three ways of naming that face:
+  the theme's own for a frame, the face a placed box names with `font-family`, and the
+  face a text style names for a word written in one. A box measured in another face is a
+  box measured for type it does not hold, so the words wrap where the other face wraps
+  them and the box comes out the wrong height.
+
+- **`ThemeMapping` names the spellings a colour may be written under.** The aliases were
+  a private constant, and a caller holding a table of them — the documentation's own
+  reference table — had no way to read them without reflection.
+
+
 ### Fixed
 
 - **A monospaced face is measured at its own advance.** Every character in a monospaced

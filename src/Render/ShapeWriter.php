@@ -29,8 +29,6 @@ use PhpOffice\PhpPresentation\Shape\Drawing\Base64;
 use PhpOffice\PhpPresentation\Shape\Drawing\File;
 use PhpOffice\PhpPresentation\Shape\RichText;
 use PhpOffice\PhpPresentation\Shape\RichText\Paragraph as TextParagraph;
-use PhpOffice\PhpPresentation\Shape\RichText\Run as TextRun;
-use PhpOffice\PhpPresentation\Shape\RichText\TextElementInterface;
 use PhpOffice\PhpPresentation\Shape\Table as TableShape;
 use PhpOffice\PhpPresentation\Slide;
 use PhpOffice\PhpPresentation\Style\Alignment;
@@ -60,10 +58,13 @@ use PhpOffice\PhpPresentation\Style\Font as StyleFont;
  * not the obvious place to put them instead. `filled()` is the one place a fill becomes
  * `FILL_SOLID` or `FILL_NONE`, read by an autoshape and by a placed text box alike, because
  * `Fill::FILL_UNSET` means *inherit* and a shape on a blank layout has nothing to inherit
- * from. `runs()` writes every run's size, face and colour and `restyled()` then overrides
- * all three in place, so the two have to agree on where a run's type lives. `textHeight()`
- * measures a frame once for a column and again through `sized()` for a text block the deck
- * sized itself, and `freeText()` draws what the second measured.
+ * from. `runs()` writes every run's size, face and colour, and `boxed()` fills in the ones a
+ * run says nothing about, so the two have to agree on where a run's type lives.
+ * `runFace()` is the same crossing for the face: the run that is measured and the run that
+ * is drawn are asked the same question, so a word cannot be measured in one face and drawn
+ * in another.
+ * `textHeight()` measures a frame once for a column and again through `sized()` for a text
+ * block the deck sized itself, and `freeText()` draws what the second measured.
  *
  * Each of those is a place a split would have to cut, and each is a place where the seam
  * runs through a fact two methods must agree on.
@@ -125,13 +126,24 @@ final class ShapeWriter
      *                             the one PHPPresentation writes. Only a placed text block has
      *                             one; every other block is laid out by a layout that sets no
      *                             inset of its own, which is why it has a default.
+     * @param string|null $face    The face to measure in, or null for the face of the block the
+     *                             frame holds. Only a placed text block names one: a box with
+     *                             a `font-family` of its own is drawn in it, and a box measured
+     *                             in another face is a box measured for type it does not draw.
      */
-    public function sized(Code|TextFrame|Image|Rule|Table $drawable, Box $box, int $room, ?int $size, ?float $padding = null): int
+    public function sized(
+        Code|TextFrame|Image|Rule|Table $drawable,
+        Box $box,
+        int $room,
+        ?int $size,
+        ?float $padding = null,
+        ?string $face = null,
+    ): int
     {
         $width = $this->textWidth($box, $padding);
 
         return (int) round(match (true) {
-            $drawable instanceof TextFrame => $this->textHeight($drawable, $width, $size),
+            $drawable instanceof TextFrame => $this->textHeight($drawable, $width, $size, $face),
             $drawable instanceof Table => $this->tableHeight($drawable, $box),
             $drawable instanceof Rule => SlideGeometry::RULE_HEIGHT,
             $drawable instanceof Code => $this->codeHeight($drawable, $width),
@@ -194,7 +206,7 @@ final class ShapeWriter
         int $width,
         int $size,
         bool $bold = false,
-        string $face = '',
+        ?string $face = null,
     ): int
     {
         return $this->metric->lines($this->pieces($runs, $size, $bold, $face), $width);
@@ -217,7 +229,7 @@ final class ShapeWriter
         array $runs,
         int $size,
         bool $bold = false,
-        string $face = '',
+        ?string $face = null,
     ): array
     {
         $pieces = [];
@@ -225,9 +237,9 @@ final class ShapeWriter
         foreach ($runs as $run) {
             $pieces[] = TextMetric::piece(
                 $run->text,
-                $run->code ? SlideGeometry::CODE_SIZE : $size,
+                $run->size ?? ($run->code ? SlideGeometry::CODE_SIZE : $size),
                 $run->bold || $bold,
-                $run->code ? $this->font('mono') : $face,
+                $this->runFace($run, $face),
             );
         }
 
@@ -275,14 +287,14 @@ final class ShapeWriter
      * which is why this sums a height per block rather than multiplying one line height by a
      * total line count.
      */
-    private function textHeight(TextFrame $frame, int $width, ?int $size): float
+    private function textHeight(TextFrame $frame, int $width, ?int $size, ?string $face): float
     {
         $blocks = $frame->blocks();
         $last = count($blocks) - 1;
         $height = 0.0;
 
         foreach ($blocks as $at => $block) {
-            $height += $this->inFrameHeight($block, $width, $size);
+            $height += $this->inFrameHeight($block, $width, $size, $face);
 
             if ($at < $last) {
                 $height += $this->gapBetween($block, $blocks[$at + 1]);
@@ -300,7 +312,7 @@ final class ShapeWriter
      * see {@see TextFrame::blocks()} — and because a list is several paragraphs of one block,
      * walked here as the items it is.
      */
-    private function inFrameHeight(Heading|Paragraph|Quote|ListBlock $block, int $width, ?int $at): float
+    private function inFrameHeight(Heading|Paragraph|Quote|ListBlock $block, int $width, ?int $at, ?string $face): float
     {
         $size = $at ?? $this->entrySize($block);
         $lines = 0;
@@ -313,7 +325,7 @@ final class ShapeWriter
                 $this->entryWidth($block, $entry, $width),
                 $size,
                 bold: $block instanceof Heading && $this->geometry->style()->headingIsBold(),
-                face: $this->faceOf($block),
+                face: $face ?? $this->faceOf($block),
             );
 
             foreach ($runs as $run) {
@@ -353,6 +365,9 @@ final class ShapeWriter
      * two are the same name in a theme whose faces are the same. Asked of the theme here for
      * the same reason the size is: the theme decides which face a block is drawn in, and the
      * measurement has to be of the face that will draw it.
+     *
+     * A placed text block names a face of its own and is drawn in it, so it is measured in
+     * it too — which is why {@see self::inFrameHeight()} asks for that face first.
      */
     private function faceOf(Heading|Paragraph|Quote|ListBlock $block): string
     {
@@ -689,7 +704,7 @@ final class ShapeWriter
      */
     private function freeText(Slide $slide, FreeText $shape, Box $box, int $height): RichText
     {
-        $written = $this->textFrame($slide, $shape->frame, $box, $height);
+        $written = $this->textFrame($slide, $shape->frame, $box, $height, $shape->style);
         $paint = $shape->paint;
         $style = $shape->style;
 
@@ -714,53 +729,55 @@ final class ShapeWriter
             $paragraph->getAlignment()->setHorizontal($style->align)->setVertical($style->verticalAlign);
         }
 
-        $this->restyled($written, $style);
         $written->setRotation($shape->placement->rotate);
 
         return $written;
     }
 
     /**
-     * The ink, the size and the face of every run of a placed text block, as its attributes
-     * named them.
+     * The runs of one paragraph of a frame, with the box's own type filled in where a run has
+     * none of its own.
      *
-     * The runs rather than the shape, because a paragraph carries the size its own runs are
-     * drawn at and a shape carries none — so this is the same set of paragraphs
-     * {@see self::runs()} wrote, one level down. A run with no colour of its own would take the
-     * paragraph's, and {@see self::runs()} gives every one of them a colour, so that is where
-     * a `color` has to go to be in the file.
+     * The box's colour, size and face are the defaults for the words inside it rather than an
+     * override of them: a run that carries a colour of its own keeps it, and one that does not
+     * takes the box's. That is what lets a word in a box be a different colour from the rest
+     * of the box.
+     *
+     * @param FrameParagraph $entry A paragraph, a heading, a quote, or one item of a list.
+     *
+     * @return FrameParagraph
      */
-    private function restyled(RichText $shape, TextStyle $style): void
+    private function boxed(Paragraph|Heading|Quote|array $entry, ?TextStyle $style): Paragraph|Heading|Quote|array
     {
-        // {@see TextFrame::blocks()} is the text vocabulary, every one of its paragraphs is
-        // written by {@see self::runs()}, and that gives each of their runs a face, a size and
-        // a colour of its own. So the runs are where the three are set, and the paragraph is
-        // not: a paragraph's font is the default its runs sit on top of, and nothing reads it.
-        foreach ($shape->getParagraphs() as $paragraph) {
-            // A paragraph holds runs, breaks and fields, and only a run carries a face, a size
-            // and a colour — so the filter is what says which. Nothing here writes a break or
-            // a field, so in practice every element is a run; the filter is there because the
-            // type is the format's and not ours, and a deck that reaches one should lose it
-            // quietly rather than fatal on a method the element does not have.
-            $runs = array_filter(
-                $paragraph->getRichTextElements(),
-                static fn (TextElementInterface $element): bool => $element instanceof TextRun,
-            );
-
-            foreach ($runs as $run) {
-                if ($style->colour !== null) {
-                    $run->getFont()->setColor($style->colour);
-                }
-
-                if ($style->size !== null) {
-                    $run->getFont()->setSize($style->size);
-                }
-
-                if ($style->face !== null) {
-                    $run->getFont()->setName($style->face);
-                }
-            }
+        if ($style === null) {
+            return $entry;
         }
+
+        $runs = [];
+
+        foreach ($this->entryRuns($entry) as $run) {
+            $runs[] = $run->filled([
+                'colour' => $style->colour === null ? null : '#' . $style->colour->getRGB(),
+                'size' => $style->size,
+                'font' => $style->face,
+            ]);
+        }
+
+        if (is_array($entry)) {
+            $entry['runs'] = $runs;
+
+            return $entry;
+        }
+
+        if ($entry instanceof Heading) {
+            return new Heading($runs, $entry->level, $entry->step);
+        }
+
+        if ($entry instanceof Quote) {
+            return new Quote($runs, $entry->step);
+        }
+
+        return new Paragraph($runs, $entry->step);
     }
 
 /**
@@ -794,7 +811,7 @@ final class ShapeWriter
      * written as says what the shape used to: the heading's size, weight, face and ink, the
      * quote's indent, italic and quiet ink.
      */
-    private function textFrame(Slide $slide, TextFrame $frame, Box $box, int $height): RichText
+    private function textFrame(Slide $slide, TextFrame $frame, Box $box, int $height, ?TextStyle $style = null): RichText
     {
         $shape = $this->textBox($slide);
         $this->place($shape, $box, $height);
@@ -812,7 +829,7 @@ final class ShapeWriter
                 // first would leave that empty one in the file as a blank line.
                 $paragraph = $first ? $shape->getActiveParagraph() : $shape->createParagraph();
                 $first = false;
-                $this->paragraph($paragraph, $entry);
+                $this->paragraph($paragraph, $entry, $style);
 
                 // `runs()` zeroes the spacing on every paragraph it fills, which is right for
                 // a shape of one paragraph and wrong for a frame of several. The air goes back
@@ -845,9 +862,13 @@ final class ShapeWriter
      * big this is.
      *
      * @param FrameParagraph $entry A paragraph, a heading, a quote, or one item of a list.
+     * @param ?TextStyle     $style The box the paragraph is drawn in, whose own type is the
+     *                              default for the words in it.
      */
-    private function paragraph(TextParagraph $paragraph, Paragraph|Heading|Quote|array $entry): void
+    private function paragraph(TextParagraph $paragraph, Paragraph|Heading|Quote|array $entry, ?TextStyle $style = null): void
     {
+        $entry = $this->boxed($entry, $style);
+
         match (true) {
             $entry instanceof Heading => $this->runs(
                 $paragraph,
@@ -1197,23 +1218,70 @@ final class ShapeWriter
         foreach ($runs as $run) {
             $element = $paragraph->createTextRun($run->text);
             $element->getFont()
-                ->setSize($run->code ? SlideGeometry::CODE_SIZE : $size)
-                ->setName($run->code ? $this->font('mono') : ($face ?? $this->font('body')))
+                ->setSize($run->size ?? ($run->code ? SlideGeometry::CODE_SIZE : $size))
+                ->setName($this->runFace($run, $face))
                 ->setBold($run->bold || $bold)
                 ->setItalic($run->italic || $italic)
                 ->setStrikethrough($run->strike ? StyleFont::STRIKE_SINGLE : StyleFont::STRIKE_NONE)
                 // The link branch is asked first: `$font ?? …` short-circuited it, so a link
                 // inside a heading or a quote was drawn in the heading's own colour and
                 // looked like ordinary text that happened to be clickable.
-                ->setColor($run->link === null ? $plain : $this->colour('hlink'));
+                ->setColor($this->runColour($run, $plain))
+                ->setUnderline($this->runUnderline($run));
 
             if ($run->link === null) {
                 continue;
             }
 
             $element->getHyperlink()->setUrl($run->link);
-            $element->getFont()->setUnderline(StyleFont::UNDERLINE_SINGLE);
         }
+    }
+
+    /**
+     * The face a run is drawn in, which is the face it is measured in.
+     *
+     * A run that names a face of its own is drawn in it — a text style may set one, and so
+     * may the box the run is in — and a code run is drawn in the theme's monospaced face.
+     * Everything else is drawn in the face of the block it is in, which is the theme's
+     * heading face for a heading and its body face for the rest.
+     *
+     * One method for both halves of the writer, because they have to answer the same
+     * question: a run measured in one face and drawn in another is a box that is the wrong
+     * height for the words in it.
+     */
+    private function runFace(Run $run, ?string $face): string
+    {
+        return $run->font
+            ?? ($run->code ? $this->font('mono') : ($face ?? $this->font('body')));
+    }
+
+    /**
+     * The ink a run is drawn in: its own, the link's, or the paragraph's.
+     *
+     * A run's own colour wins over the paragraph's, because a text style is the more
+     * particular of the two statements — and the paragraph's is the fallback for every run
+     * that says nothing about its colour.
+     */
+    private function runColour(Run $run, Color $plain): Color
+    {
+        if ($run->colour !== null) {
+            return new Color(ltrim($run->colour, '#'));
+        }
+
+        return $run->link === null ? $plain : $this->colour('hlink');
+    }
+
+    /**
+     * The underline a run is drawn with: its own, the link's, or none.
+     *
+     * A link is underlined because a reader has to see that it is one, and a run that says
+     * otherwise is a run that knows better.
+     */
+    private function runUnderline(Run $run): string
+    {
+        return $run->underline || $run->link !== null
+            ? StyleFont::UNDERLINE_SINGLE
+            : StyleFont::UNDERLINE_NONE;
     }
 
     /**
