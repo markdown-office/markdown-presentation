@@ -572,7 +572,9 @@ Slide 1 has the text style ":brand", which is not a style this theme has. The th
 something the author did not write. It is refused instead, and the message says the two
 ways out: give the style the weight, or write the emphasis in the paragraph around it. A
 bare `*` or `_` is a character and not an intent, so `2 * 3` and `snake_case` are drawn as
-they are.
+they are. So is a construct CommonMark does not call emphasis: `__ Bakery__` and
+`** text**` are text, because a delimiter that opens an emphasis may not be followed by a
+space and one that closes it may not be preceded by one.
 
 **`highlight` is not drawn by this half.** PHPPresentation's font has no setter for one,
 so a highlight would be an element of the run's own properties in the file — a pass over the

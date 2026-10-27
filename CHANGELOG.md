@@ -69,6 +69,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A label holds no Markdown that CommonMark does not call emphasis.** The rule refused
+  `__ Bakery__` and `** text**`, which are not emphasis: a delimiter run that opens an
+  emphasis may not be followed by whitespace, and one that closes it may not be preceded by
+  whitespace. A label holding one is drawn as it was written.
+
 - **A monospaced face is measured at its own advance.** Every character in a monospaced
   face advances by the same amount, and the model took that amount to be 600 units to the
   em whatever the face was: 600 is what JetBrains Mono advances by, Menlo advances by 602

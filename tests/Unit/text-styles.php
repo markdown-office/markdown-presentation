@@ -200,6 +200,25 @@ it('refuses a label holding a strong emphasis written with two underscores', fun
         ->toThrow(MalformedTextStyle::class, 'which is Markdown');
 });
 
+it('draws a label holding a strong emphasis CommonMark does not call one', function () {
+    // A delimiter run that opens an emphasis may not be followed by whitespace, and one that
+    // closes it may not be preceded by whitespace: `__ Bakery__` and `** text**` are text,
+    // and a label holding one is drawn as it was written.
+    [$deck, $directory] = wordmark(
+        "brand:\n  color: accent1\n",
+        ':brand[__ Bakery__] a :brand[** text**] b :brand[**Bakery **]',
+    );
+
+    expect(runColours(styledDeck($deck, $directory)))->toBe([
+        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
+        '__ Bakery__' => ['colour' => '00B4D8', 'size' => 11],
+        ' a ' => ['colour' => 'FFFFFF', 'size' => 11],
+        '** text**' => ['colour' => '00B4D8', 'size' => 11],
+        ' b ' => ['colour' => 'FFFFFF', 'size' => 11],
+        '**Bakery **' => ['colour' => '00B4D8', 'size' => 11],
+    ]);
+});
+
 it('draws a label holding a strikethrough, because the tildes are two characters', function () {
     // `~~struck~~` is GFM rather than CommonMark, and a label is plain text: the tildes are
     // characters in a word rather than an intent.

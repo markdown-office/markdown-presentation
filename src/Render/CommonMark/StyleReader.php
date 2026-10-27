@@ -34,16 +34,24 @@ final class StyleReader
      * intent, and `2 * 3`, `snake_case` and `a[b]` are ordinary text that a rule refusing
      * every marker would refuse all day.
      *
+     * What makes a construct complete is CommonMark's own rule: a delimiter run that opens
+     * an emphasis may not be followed by whitespace, and one that closes it may not be
+     * preceded by whitespace. So `__ Bakery__` and `** text**` are text rather than
+     * emphasis, and a label holding one is drawn as it was written.
+     *
+     * The underscore is the only one with a rule of its own: CommonMark does not open an
+     * emphasis inside a word with an underscore, so `snake_case_name` is text.
+     *
      * `~~struck~~` is not among them: it is GFM rather than CommonMark, and a label is
      * plain text, so the tildes are two characters in a word rather than an intent.
      *
      * @var list<string>
      */
     private const MARKDOWN = [
-        '/\*\*.+?\*\*/s',
-        '/__.+?__/s',
+        '/\*\*[^*\s](?:[^*]*[^*\s])?\*\*/',
+        '/(?<![\w])__[^_\s](?:[^_]*[^_\s])?__(?![\w])/',
         '/\*[^*\s](?:[^*]*[^*\s])?\*/',
-        '/(?<![\w_])_[^\s_](?:[^_]*[^\s_])?_(?![\w_])/',
+        '/(?<![\w])_[^\s_](?:[^_]*[^\s_])?_(?![\w])/',
         '/`[^`]+`/',
         '/\[[^\]]*\]\([^)]*\)/',
     ];
