@@ -137,6 +137,8 @@ final class PresentationRenderer
 
     private readonly PathScope $files;
 
+    private readonly ThemeResolver $themes;
+
     /**
      * @param string       $directory  The directory a relative image path in the deck
      *                                 resolves against, which is the directory the deck
@@ -156,11 +158,14 @@ final class PresentationRenderer
      */
     public function __construct(
         private readonly string $directory = '.',
-        private readonly ThemeResolver $themes = new ThemeResolver(),
+        ThemeResolver $themes = new ThemeResolver(),
         private readonly BlockTranslator $blocks = new BlockTranslator(),
         bool $strict = false,
         array $imageRoots = [],
     ) {
+        // The theme of a deck sits beside it, and a relative image path in the deck
+        // resolves against the same directory: a deck and its theme are one thing.
+        $this->themes = $themes->beside($this->directory);
         $this->files = new PathScope([$this->directory, ...$imageRoots]);
         $this->overflows = new Overflows($strict);
     }

@@ -4,6 +4,35 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A theme is found beside the deck.** The resolver looked for `./themes/<name>` under
+  the working directory and nowhere else, so a deck whose theme sits next to it only
+  rendered when the process happened to be running in the deck's own directory — which
+  is what a build script that renders a deck by its path does not do. The renderer's
+  directory, the one a relative image path in the deck resolves against, is the
+  resolver's deck directory too now, and a theme is looked for beside the deck first and
+  beside the working directory second. The renderer hands its directory to the resolver
+  it was given, so a caller that brings its own resolver keeps it and gains the deck's
+  directory with it. The failure for a name that resolves to nothing lists the themes of
+  every root, the deck's own among them.
+
+- **`theme:` may name the manifest.** A path with a `/` in it was read as a directory,
+  and the manifest was looked for inside it, so `theme: ./theme.yml` meant a directory
+  called `theme.yml` and failed. A path naming a file is read as the manifest itself
+  now, and the layouts, the styles and the template are read from the directory holding
+  it. A file that is not the manifest and a directory without one are two failures, and
+  each says which of them it is.
+
+### Changed
+
+- **The failure for a theme outside the roots names the path rather than a directory.**
+  A theme may be a manifest file as well as a directory now, and the message said what
+  had been found: "is a directory at". It says "is at", and names the roots the render
+  may read.
+
 ## [0.2.2] - 2026-10-26
 
 ### Changed

@@ -21,6 +21,7 @@ use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SvgRasteriser;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
+use MarkdownPresentation\Tests\Support\ThemeDirectory;
 
  /**
   * What a deck and a theme become on disk.
@@ -312,6 +313,20 @@ it('declares every slide in the content types', function () {
 
 it('writes one slide per slide of the deck', function () {
     expect(renderDeck("# One\n\n---\n\n# Two\n\n---\n\n# Three\n")->slideCount())->toBe(3);
+});
+
+it('renders a deck whose theme sits beside it', function () {
+    // The theme of a deck is in the deck's own directory, and the process rendering the
+    // deck is somewhere else: a deck rendered by its path finds its theme either way.
+    $directory = ThemeDirectory::create([
+        'themes/bakery/theme.yml' => "name: Bakery\n",
+        'themes/bakery/layouts.yml' => "layouts:\n  content: Title and Content\n",
+    ], 'deck');
+
+    $pptx = renderDeck("---\ntheme: bakery\n---\n\n# One\n", $directory);
+
+    expect($pptx->slideCount())->toBe(1)
+        ->and($pptx->slideText(1))->toBe('One');
 });
 
 it('writes the slides in the order the deck reads them', function () {

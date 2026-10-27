@@ -48,6 +48,33 @@ it('says a directory with no theme.yml is not a theme', function () use ($loader
     $loader->load(ThemeDirectory::create(['layouts.yml' => "title: Title Slide\n"], 'not-a-theme'));
 })->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
 
+it('reads a theme from the manifest file that describes it', function () use ($loader) {
+    // The manifest is the theme, and the rest of the theme is read from beside it: a
+    // theme is a directory, and the manifest is the one file that directory cannot do
+    // without.
+    $directory = ThemeDirectory::acme([
+        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+    ]);
+
+    $loaded = $loader->loadManifest($directory . '/theme.yml');
+
+    expect($loaded->theme()->name())->toBe('Acme')
+        ->and($loaded->directory())->toBe($directory)
+        ->and($loaded->layouts())->toBe(['content' => 'Title and Content']);
+});
+
+it('says a file that is not a theme manifest is not one', function () use ($loader) {
+    $directory = ThemeDirectory::create(['notes.txt' => 'not a theme'], 'not-a-manifest');
+
+    $loader->loadManifest($directory . '/notes.txt');
+})->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
+
+it('says a manifest file that is not there is not a theme', function () use ($loader) {
+    $directory = ThemeDirectory::create([], 'empty');
+
+    $loader->loadManifest($directory . '/theme.yml');
+})->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
+
 it('hands a style value back as it was written, tokens and all', function () use ($loader) {
     // A `styles.yml` may already reference a theme token. Resolving them is not
     // written yet, so the value passes through exactly as the file has it rather

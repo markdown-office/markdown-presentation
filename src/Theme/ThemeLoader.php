@@ -13,7 +13,7 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Reads a theme out of a directory.
+ * Reads a theme out of a directory, or out of the manifest that describes one.
  *
  * Only `theme.yml` is required. `styles.yml` and `layouts.yml` are read when they
  * are there, and `template.pptx` is only a path: nothing here opens a `.pptx`,
@@ -42,6 +42,37 @@ final class ThemeLoader
             throw ThemeNotFound::noManifest($directory);
         }
 
+        return $this->read($manifest, $directory);
+    }
+
+    /**
+     * Reads a theme out of the manifest that describes one, the rest of the theme read
+     * from the directory holding it.
+     *
+     * The file has to be the manifest the library knows by name: a theme is a directory
+     * holding a `theme.yml`, and a file beside one is not a theme whatever it holds.
+     *
+     * @throws ThemeNotFound  When the file is not a theme manifest.
+     * @throws MalformedTheme When the file does not describe a theme.
+     * @throws Exception     When a file of the theme cannot be read or parsed.
+     */
+    public function loadManifest(string $manifest): LoadedTheme
+    {
+        if (!is_file($manifest) || basename($manifest) !== self::THEME_FILE) {
+            throw ThemeNotFound::noManifest($manifest);
+        }
+
+        return $this->read($manifest, dirname($manifest));
+    }
+
+    /**
+     * The theme a manifest describes, with the rest of it read from beside the manifest.
+     *
+     * @throws MalformedTheme
+     * @throws Exception
+     */
+    private function read(string $manifest, string $directory): LoadedTheme
+    {
         return new LoadedTheme(
             $directory,
             Theme::fromArray($this->mapping($manifest, 'a theme'), $manifest),

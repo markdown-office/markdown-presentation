@@ -7,9 +7,10 @@ namespace MarkdownPresentation\Exception;
 /**
  * A theme name or path that does not resolve to a theme this render may read.
  *
- * Four of them, kept apart because the fix for each is a different thing: a name that is
- * not a theme, a path that is not a directory, one that resolves outside the directories the
- * caller allowed, and one that names a stream wrapper rather than a path.
+ * They are kept apart because the fix for each is a different thing: a name that is
+ * not a theme, a path that is not a directory, a path that is not a theme manifest, one
+ * that resolves outside the directories the caller allowed, and one that names a stream
+ * wrapper rather than a path.
  *
  * For a name the message always lists what *is* available. A deck author — human or model —
  * that guessed wrong gets the alternatives in the failure itself rather than by
@@ -44,8 +45,8 @@ final class ThemeNotFound extends InvalidInput
     public static function outside(string $name, string $found, array $roots): self
     {
         return new self(sprintf(
-            'The theme "%s" is a directory at "%s" rather than one this render may read (%s). Copy it under the '
-            . 'working directory, or give the ThemeResolver that directory as one of its additional roots.',
+            'The theme "%s" is at "%s" rather than one this render may read (%s). Copy it under one of '
+            . 'those directories, or give the ThemeResolver that directory as one of its additional roots.',
             $name,
             $found,
             implode(', ', $roots),

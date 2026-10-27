@@ -1934,8 +1934,14 @@ A deck names a theme, and the name is looked for in this order:
 
 1. an explicit path — anything with a `/` in it;
 2. `./themes/<name>` beside the deck;
-3. a theme that ships with the library;
-4. nothing, which is a failure listing every name that *did* resolve.
+3. `./themes/<name>` beside the working directory;
+4. a theme that ships with the library;
+5. nothing, which is a failure listing every name that *did* resolve.
+
+The deck's own directory comes before the working directory's because a deck and its
+theme are one thing: the theme sits in `themes/` under the directory the deck is in, and
+the program rendering the deck knows where that is. A deck rendered by its path finds its
+theme whichever directory the render runs in.
 
 ```php
 use MarkdownPresentation\Exception\Exception;
@@ -1980,16 +1986,36 @@ Minimal
 <root>/themes/minimal
 ```
 
-**A theme path has to land inside the working directory, the built-in themes, or another
-root the resolver was given.** A `theme:` is a path a deck writes, so the same rule as an
-image's applies, and the reason is more than tidiness: a deck naming no `author` of its own
-takes `dc:creator` from the theme it was rendered in, so `theme: ../../secrets/theme.yml`
-was a way to ask for an arbitrary file's `author:` line and be handed it in `docProps/core.xml`
-of the download. `../`, an absolute path elsewhere and a symlink out of the tree are all
-refused, and the failure names the directory it found and the roots it may read:
+A path may name the manifest itself rather than the directory holding it. The theme is
+then that file, and the layouts, the styles and the template beside it are the theme's
+own:
+
+```php
+use MarkdownPresentation\Theme\ThemeResolver;
+
+$root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
+$theme = (new ThemeResolver($root))->resolve($root . '/themes/minimal/theme.yml');
+
+echo $theme->theme()->name(), "\n";
+echo $theme->directory(), "\n";
+```
+
+```text
+Minimal
+<root>/themes/minimal
+```
+
+**A theme path has to land inside the deck's own directory, the working directory, the
+built-in themes, or another root the resolver was given.** A `theme:` is a path a deck
+writes, so the same rule as an image's applies, and the reason is more than tidiness: a
+deck naming no `author` of its own takes `dc:creator` from the theme it was rendered in,
+so `theme: ../../secrets/theme.yml` was a way to ask for an arbitrary file's `author:`
+line and be handed it in `docProps/core.xml` of the download. `../`, an absolute path
+elsewhere and a symlink out of the tree are all refused, and the failure names the path it
+found and the roots it may read:
 
 ```
-The theme "../secrets" is a directory at "/srv/decks/../secrets" rather than one this render may read (/srv/decks). Copy it under the working directory, or give the ThemeResolver that directory as one of its additional roots.
+The theme "../secrets" is at "/srv/decks/../secrets" rather than one this render may read (/srv/decks). Copy it under one of those directories, or give the ThemeResolver that directory as one of its additional roots.
 ```
 
 A shared library of themes beside the project is a real case and is reachable, as a
