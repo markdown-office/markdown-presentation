@@ -210,10 +210,9 @@ final class PresentationRenderer
      * A face with no table is measured with the reference face's widths — the widths every
      * face was measured with before there were tables of their own — so a deck naming one
      * still renders, and this is where it is said that the text was not measured with the
-     * face that will draw it.
-     *
-     * The monospaced face is not in this list: every character in a monospaced face advances
-     * by the same amount, so which face it is says nothing about how wide its text is.
+     * face that will draw it. A monospaced face with no advance of its own is measured the
+     * same way, which is the width of a proportional face's letters rather than the width
+     * of a code block.
      *
      * Emptied by {@see self::render()} rather than accumulated, because a layout belongs to
      * one deck: a caller converting several in a loop wants the last one's, not all of them.
@@ -466,12 +465,12 @@ final class PresentationRenderer
      * The heading and the body faces are the ones that decide how a line wraps, and a face
      * with no table of its own is measured with the reference face's widths — which is what
      * every face was measured with before there were tables of their own. The monospaced
-     * face is not asked about: every character in a monospaced face advances by the same
-     * amount, so which face it is says nothing about how wide its text is.
+     * face is asked about as well: it is measured by its own advance, and which face it is
+     * says exactly how wide its text is.
      */
     private function recordUnknownFaces(Theme $theme, TextMetric $metric): void
     {
-        foreach (['heading', 'body'] as $slot) {
+        foreach (Theme::FONTS as $slot) {
             $face = $theme->font($slot);
 
             if ($face !== null && !$metric->has($face)) {

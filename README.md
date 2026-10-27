@@ -414,8 +414,11 @@ Every block is measured before it is drawn: `Render\TextMetric` counts the lines
 wrap to, from the advance widths of the face the theme draws the text in. There is a table
 for every face the shipped themes name — Calibri, Cambria, Arial, Arial Narrow, Georgia,
 Inter and Roboto — and a bold run is measured with the widths of the bold face rather than
-with the upright ones made a little wider. It is an estimate and says so: kerning is not
-modelled, and a theme naming a face with no table of its own is measured with the
+with the upright ones made a little wider. The monospaced faces are measured by their
+advance rather than by a table, because every character in one advances by the same amount:
+Consolas advances by 550 units to the em, Menlo by 602 and JetBrains Mono by 600, so a code
+block is measured in the face that will draw it. It is an estimate and says so: kerning is
+not modelled, and a theme naming a face with no table of its own is measured with the
 reference face's widths — the ones every face was measured with before there were tables of
 their own — and the face is named by `unknownFonts()`. Which is why every text shape is
 written `a:normAutofit`. The box keeps the height the layout gave it and the reader scales
@@ -1604,9 +1607,11 @@ here.
 
 The faces a theme names are also the faces its text is measured with, and there is a table
 of advance widths for every face the shipped themes name: Calibri, Cambria, Arial, Arial
-Narrow, Georgia, Inter and Roboto. A theme naming a face with no table of its own is
-measured with the reference face's widths — the ones every face was measured with before
-there were tables of their own — and the face is named by
+Narrow, Georgia, Inter and Roboto. The monospaced faces have their advance rather than a
+table, because every character in one advances by the same amount: Consolas is measured at
+550 units to the em, Menlo at 602 and JetBrains Mono at 600. A theme naming a face with no
+table of its own is measured with the reference face's widths — the ones every face was
+measured with before there were tables of their own — and the face is named by
 `PresentationRenderer::unknownFonts()`, one entry for every slot it was named in. A caller
 that would rather have no file than a file whose text was measured with another face's
 widths asks for the strict renderer, and gets `UnknownFont` naming the faces there are

@@ -193,18 +193,21 @@ final class ShapeWriter
         array $runs,
         int $width,
         int $size,
-        bool $mono = false,
         bool $bold = false,
         string $face = '',
     ): int
     {
-        return $this->metric->lines($this->pieces($runs, $size, $mono, $bold, $face), $width);
+        return $this->metric->lines($this->pieces($runs, $size, $bold, $face), $width);
     }
 
     /**
      * These runs as the pieces {@see TextMetric} measures, each at its own size, face and
      * weight — which is why a code span in a paragraph is not measured at the paragraph's
      * size, and a header row is measured wider than it is drawn.
+     *
+     * A code span is drawn in the theme's monospaced face and is measured in that face
+     * too: the face is what decides how wide a character is, and a monospaced face is
+     * measured by its own advance rather than by the table of a proportional one.
      *
      * @param list<Run> $runs
      *
@@ -213,7 +216,6 @@ final class ShapeWriter
     private function pieces(
         array $runs,
         int $size,
-        bool $mono = false,
         bool $bold = false,
         string $face = '',
     ): array
@@ -224,9 +226,8 @@ final class ShapeWriter
             $pieces[] = TextMetric::piece(
                 $run->text,
                 $run->code ? SlideGeometry::CODE_SIZE : $size,
-                $run->code || $mono,
                 $run->bold || $bold,
-                $face,
+                $run->code ? $this->font('mono') : $face,
             );
         }
 
@@ -239,7 +240,7 @@ final class ShapeWriter
 
         foreach ($block->lines as $line) {
             $lines += $this->metric->lines(
-                [TextMetric::piece($line, SlideGeometry::CODE_SIZE, mono: true)],
+                [TextMetric::piece($line, SlideGeometry::CODE_SIZE, face: $this->font('mono'))],
                 $width,
             );
         }

@@ -22,6 +22,9 @@ namespace MarkdownPresentation\Render;
  * | Inter | Inter |
  * | Roboto | Roboto |
  *
+ * The monospaced faces are in {@see self::MONOSPACED}: one number each rather
+ * than a table, because every character in one advances by the same amount.
+ *
  * @phpstan-type Cuts array{regular: array<int|string, int>, bold: array<int|string, int>}
  */
 final class FontMetrics
@@ -245,6 +248,27 @@ final class FontMetrics
                 'x' => 509, 'y' => 502, 'z' => 509, '{' => 331, '|' => 253, '}' => 331, '~' => 649,
             ],
         ],
+    ];
+
+    /**
+     * The advance of every monospaced face, in units per em.
+     *
+     * A monospaced face needs one number rather than a table: every character in
+     * one advances by the same amount, so the face's advance is the width of all
+     * of them. The bold cut of one is the same amount again.
+     *
+     * | Face | Clone |
+     * | --- | --- |
+     * | Consolas | DMCA Sans Serif |
+     * | JetBrains Mono | JetBrains Mono |
+     * | Menlo | DejaVu Sans Mono |
+     *
+     * @var array<string, int>
+     */
+    public const MONOSPACED = [
+        'Consolas' => 550,
+        'JetBrains Mono' => 600,
+        'Menlo' => 602,
     ];
 
     /**

@@ -14,6 +14,13 @@ declare(strict_types=1);
  * Gelasio for Georgia. Inter and Roboto are their own clones of nothing and are
  * taken from the projects that make them.
  *
+ * The monospaced faces are measured the same way and need one number each rather than
+ * a table, because every character in one advances by the same amount. Menlo is
+ * measured through DejaVu Sans Mono, which Menlo is drawn from and whose advance is
+ * the same; Consolas through DMCA Sans Serif, a public-domain face built to Consolas's
+ * own metrics, whose advance is the same as Consolas's; and JetBrains Mono through
+ * itself, which is free.
+ *
  * The font files are fetched by checksum, the way `tools/install-phpstan.php` fetches
  * the analyser: the URL and the hash live in this script and nowhere else, so nothing
  * is downloaded without a recorded hash and a download that comes to different bytes
@@ -146,6 +153,69 @@ $faces = [
     ],
 ];
 
+/**
+ * The monospaced faces the shipped themes name, the clone each is measured through, and
+ * where the clone's two cuts come from.
+ *
+ * A monospaced face is measured by its advance rather than by a table of characters:
+ * every character in one advances by the same amount, so the face's advance is the
+ * width of all of them. The bold cut is measured as well and has to come to the same
+ * amount, because a face whose bold cut is wider is not monospaced and the number
+ * would be wrong for half of the text drawn in it.
+ *
+ * The order is alphabetical and the output follows it, so the file this writes is the
+ * same on every machine that runs it.
+ *
+ * @var array<string, array{clone: string, regular: array{url: string, sha256: string, kind: string, member: ?string}, bold: array{url: string, sha256: string, kind: string, member: ?string}}>
+ */
+$monospaced = [
+    'Consolas' => [
+        'clone' => 'DMCA Sans Serif',
+        'regular' => [
+            'url' => 'https://typedesign.replit.app/DMCAsansserif9.0-20252.zip',
+            'sha256' => 'ee9a205e84fd8913f53e6845cfdbe7a915104d7d1989761bd0e0cd43ca5d436d',
+            'kind' => 'zip',
+            'member' => 'DMCAsansserif-v0900-400.ttf',
+        ],
+        'bold' => [
+            'url' => 'https://typedesign.replit.app/DMCAsansserif9.0-20252.zip',
+            'sha256' => 'ee9a205e84fd8913f53e6845cfdbe7a915104d7d1989761bd0e0cd43ca5d436d',
+            'kind' => 'zip',
+            'member' => 'DMCAsansserif-v0900-700.ttf',
+        ],
+    ],
+    'JetBrains Mono' => [
+        'clone' => 'JetBrains Mono',
+        'regular' => [
+            'url' => 'https://github.com/JetBrains/JetBrainsMono/raw/02bb50b082dad9ef8a0f33ac393839202b760223/fonts/ttf/JetBrainsMono-Regular.ttf',
+            'sha256' => 'e6fd0d7e91550b3ed2b735d4312474362c4716edc4fc0577a0f61ed782d5aed1',
+            'kind' => 'file',
+            'member' => null,
+        ],
+        'bold' => [
+            'url' => 'https://github.com/JetBrains/JetBrainsMono/raw/02bb50b082dad9ef8a0f33ac393839202b760223/fonts/ttf/JetBrainsMono-Bold.ttf',
+            'sha256' => 'd22c4f3821d725eb01210d278d95dfcfcaadc34699a06658d47c8a5cc5830ada',
+            'kind' => 'file',
+            'member' => null,
+        ],
+    ],
+    'Menlo' => [
+        'clone' => 'DejaVu Sans Mono',
+        'regular' => [
+            'url' => 'https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip',
+            'sha256' => '7576310b219e04159d35ff61dd4a4ec4cdba4f35c00e002a136f00e96a908b0a',
+            'kind' => 'zip',
+            'member' => 'dejavu-fonts-ttf-2.37/ttf/DejaVuSansMono.ttf',
+        ],
+        'bold' => [
+            'url' => 'https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/dejavu-fonts-ttf-2.37.zip',
+            'sha256' => '7576310b219e04159d35ff61dd4a4ec4cdba4f35c00e002a136f00e96a908b0a',
+            'kind' => 'zip',
+            'member' => 'dejavu-fonts-ttf-2.37/ttf/DejaVuSansMono-Bold.ttf',
+        ],
+    ],
+];
+
 /** The characters a table carries: the printable ASCII. */
 const CHARACTERS = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
 
@@ -163,9 +233,26 @@ foreach ($faces as $face => $cuts) {
     ];
 }
 
-file_put_contents($target, generated($tables, $clones));
+$advances = [];
+$monospacedClones = [];
 
-printf("%d faces written to %s.\n", count($tables), $target);
+foreach ($monospaced as $face => $cuts) {
+    $monospacedClones[$face] = $cuts['clone'];
+    $regular = advanceOf(fontBytes($cuts['regular'], $cache));
+    $bold = advanceOf(fontBytes($cuts['bold'], $cache));
+
+    if ($regular !== $bold) {
+        fwrite(STDERR, sprintf("The bold cut of %s advances by %d and the upright one by %d.\n", $face, $bold, $regular));
+
+        exit(1);
+    }
+
+    $advances[$face] = $regular;
+}
+
+file_put_contents($target, generated($tables, $clones, $advances, $monospacedClones));
+
+printf("%d faces and %d monospaced faces written to %s.\n", count($tables), count($advances), $target);
 
 /**
  * The bytes of a font, fetched by checksum and taken out of its archive.
@@ -325,6 +412,46 @@ function widthsOf(string $font): array
     }
 
     return $widths;
+}
+
+/**
+ * The advance of a monospaced face, in units per em.
+ *
+ * Every character in one advances by the same amount, so the face's advance is one
+ * number rather than a table of them. A font whose characters do not all advance by the
+ * same amount is not monospaced, and measuring it as one would be measuring it as
+ * something it is not.
+ */
+function advanceOf(string $font): int
+{
+    $tables = tablesOf($font);
+    $units = unitsPerEm($font, $tables);
+    $advances = advancesOf($font, $tables);
+    $glyphs = glyphsOf($font, $tables);
+    $widths = [];
+
+    foreach (str_split(CHARACTERS) as $character) {
+        $glyph = $glyphs[ord($character)] ?? null;
+        $advance = $glyph === null ? null : ($advances[$glyph] ?? null);
+
+        if ($advance === null) {
+            fwrite(STDERR, sprintf("The font gives no advance width for %s.\n", $character));
+
+            exit(1);
+        }
+
+        $widths[] = $advance;
+    }
+
+    $distinct = array_unique($widths);
+
+    if (count($distinct) !== 1) {
+        fwrite(STDERR, sprintf("The font is not monospaced: %d different advances.\n", count($distinct)));
+
+        exit(1);
+    }
+
+    return (int) round($widths[0] * 1000 / $units);
 }
 
 /**
@@ -552,8 +679,10 @@ function u32(string $bytes, int $offset): int
  *
  * @param array<string, array{regular: array<int|string, int>, bold: array<int|string, int>}> $tables
  * @param array<string, string> $clones The clone each face is measured through.
+ * @param array<string, int> $advances The advance of each monospaced face.
+ * @param array<string, string> $monospacedClones The clone each monospaced face is measured through.
  */
-function generated(array $tables, array $clones): string
+function generated(array $tables, array $clones, array $advances, array $monospacedClones): string
 {
     $lines = [];
     $lines[] = '<?php';
@@ -577,6 +706,9 @@ function generated(array $tables, array $clones): string
         $lines[] = sprintf(' * | %s | %s |', $face, $clone);
     }
 
+    $lines[] = ' *';
+    $lines[] = ' * The monospaced faces are in {@see self::MONOSPACED}: one number each rather';
+    $lines[] = ' * than a table, because every character in one advances by the same amount.';
     $lines[] = ' *';
     $lines[] = ' * @phpstan-type Cuts array{regular: array<int|string, int>, bold: array<int|string, int>}';
     $lines[] = ' */';
@@ -602,6 +734,31 @@ function generated(array $tables, array $clones): string
         }
 
         $lines[] = '        ],';
+    }
+
+    $lines[] = '    ];';
+    $lines[] = '';
+    $lines[] = '    /**';
+    $lines[] = '     * The advance of every monospaced face, in units per em.';
+    $lines[] = '     *';
+    $lines[] = '     * A monospaced face needs one number rather than a table: every character in';
+    $lines[] = '     * one advances by the same amount, so the face\'s advance is the width of all';
+    $lines[] = '     * of them. The bold cut of one is the same amount again.';
+    $lines[] = '     *';
+    $lines[] = '     * | Face | Clone |';
+    $lines[] = '     * | --- | --- |';
+
+    foreach ($monospacedClones as $face => $clone) {
+        $lines[] = sprintf('     * | %s | %s |', $face, $clone);
+    }
+
+    $lines[] = '     *';
+    $lines[] = '     * @var array<string, int>';
+    $lines[] = '     */';
+    $lines[] = '    public const MONOSPACED = [';
+
+    foreach ($advances as $face => $advance) {
+        $lines[] = sprintf('        %s => %d,', quoted($face), $advance);
     }
 
     $lines[] = '    ];';

@@ -10,6 +10,7 @@ use MarkdownPresentation\Render\TextMetric;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
+use MarkdownPresentation\Theme\ThemeResolver;
 
 /**
  * A one-column table whose only cell is `$z` characters of `z`.
@@ -43,6 +44,37 @@ function measured(string $markdown): Pptx
     return Pptx::open($path);
 }
 
+/**
+ * Render a deck in a theme of its own and open what came out.
+ *
+ * The theme is named by a name that ships with the library or by the path of a
+ * directory, and the render is told that directory so it may read the theme there.
+ */
+function measuredIn(string $theme, string $markdown): Pptx
+{
+    $deck = (new DeckParser())->parse(sprintf("---\ntheme: %s\n---\n%s", $theme, $markdown));
+    $path = Scratch::file('deck.pptx', '');
+    $directory = dirname($theme);
+
+    (new PresentationRenderer($directory, new ThemeResolver($directory)))->render($deck, $path);
+
+    return Pptx::open($path);
+}
+
+/**
+ * A theme naming a monospaced face and nothing else of its own.
+ *
+ * Two of these differ in nothing but the face they name, so what a comparison between
+ * them shows is the face and nothing else.
+ */
+function themeNamingMono(string $face): string
+{
+    return ThemeDirectory::create([
+        'theme.yml' => sprintf("name: Mono\nfonts:\n  mono: \"%s\"\n", $face),
+        'layouts.yml' => "layouts:\n  title: Title Slide\n  content: Title and Content\n",
+    ]);
+}
+
 it('measures a run of narrow letters more narrowly than a run of wide ones', function () {
     // `i` is 222 units and `W` is 944, so four of each differ by a factor of four. A count
     // of characters cannot tell them apart, and `i` is the commonest letter in English.
@@ -55,13 +87,70 @@ it('measures a run of narrow letters more narrowly than a run of wide ones', fun
 });
 
 it('measures every character of a monospaced face the same', function () {
-    // Exact rather than approximate: Consolas, Menlo and JetBrains Mono all advance 600
-    // units, and a code block is the one kind of block always set in one.
+    // Exact rather than approximate: every character in a monospaced face advances by the
+    // same amount, and a code block is the one kind of block always set in one. Consolas
+    // advances by 550 units to the em, so every printable character is 550 wide.
+    $metric = new TextMetric();
+    $widths = [];
+
+    foreach (str_split(' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~') as $character) {
+        $widths[] = $metric->width([TextMetric::piece($character, 1000, face: 'Consolas')]);
+    }
+
+    expect(array_values(array_unique($widths)))->toBe([550])
+        ->and($metric->width([TextMetric::piece('iiii', 12, face: 'Consolas')]))
+        ->toBe($metric->width([TextMetric::piece('WWWW', 12, face: 'Consolas')]));
+});
+
+it('measures a monospaced run at the advance of the face it names', function () {
+    // The face is what says how wide a character is, and the three monospaced faces the
+    // shipped themes name advance by different amounts: Consolas by 550 units to the em,
+    // Menlo by 602 and JetBrains Mono by 600.
     $metric = new TextMetric();
 
-    expect($metric->width([TextMetric::piece('iiii', 12, mono: true)]))
-        ->toBe($metric->width([TextMetric::piece('WWWW', 12, mono: true)]))
+    expect($metric->width([TextMetric::piece('iiii', 12, face: 'Consolas')]))
+        ->toBe((int) round(4 * 550 * 12 / 1000))
+        ->and($metric->width([TextMetric::piece('iiii', 12, face: 'Menlo')]))
+        ->toBe((int) round(4 * 602 * 12 / 1000))
+        ->and($metric->width([TextMetric::piece('iiii', 12, face: 'JetBrains Mono')]))
         ->toBe((int) round(4 * 600 * 12 / 1000));
+});
+
+it('measures every shipped theme\'s monospaced face at its own advance', function () {
+    // Four of the five shipped themes name Consolas or Menlo, and neither advances by the
+    // 600 units a single number for a monospaced face would give them — Consolas by nine
+    // per cent less. A theme naming one of them is measured in that face.
+    $resolver = new ThemeResolver();
+    $metric = new TextMetric();
+    $faces = [];
+
+    foreach ($resolver->available() as $name) {
+        $face = $resolver->resolve($name)->theme()->font('mono');
+
+        expect($face)->not->toBeNull();
+
+        $faces[] = (string) $face;
+
+        expect($metric->width([TextMetric::piece('x', 1000, face: (string) $face)]))
+            ->toBe(FontMetrics::MONOSPACED[(string) $face]);
+    }
+
+    expect($faces)->toContain('Consolas', 'Menlo', 'JetBrains Mono')
+        ->and(FontMetrics::MONOSPACED['Consolas'])->not->toBe(600)
+        ->and(FontMetrics::MONOSPACED['Menlo'])->not->toBe(600)
+        ->and(FontMetrics::MONOSPACED['JetBrains Mono'])->toBe(600);
+});
+
+it('measures a code block in the monospaced face its theme names', function () {
+    // Consolas advances by 550 units to the em and JetBrains Mono by 600, so a line of
+    // 130 characters is one line in the first and two in the second. The two themes
+    // differ in nothing else, so what differs is the face the code is drawn in.
+    $code = "```\n" . str_repeat('x', 130) . "\n```\n";
+
+    expect(measuredIn(themeNamingMono('Consolas'), $code)->positionOf('code')['height'])
+        ->toBe(19 + 2 * 5.0)
+        ->and(measuredIn(themeNamingMono('JetBrains Mono'), $code)->positionOf('code')['height'])
+        ->toBe(2 * 19 + 2 * 5.0);
 });
 
 it('measures bold a little wider than the same character upright', function () {
@@ -110,17 +199,6 @@ it('measures a bold run with the widths of the bold face', function () {
         ->toBe(2 * 913);
 });
 
-it('measures a monospaced run at the width of a monospaced face whatever face it names', function () {
-    // A code block is the one kind of block that is always monospaced, and every character
-    // in a monospaced face advances by the same amount, so the face it names says nothing
-    // about how wide it is.
-    $metric = new TextMetric();
-
-    expect($metric->width([TextMetric::piece('iiii', 12, mono: true, face: 'Calibri')]))
-        ->toBe($metric->width([TextMetric::piece('WWWW', 12, mono: true, face: 'Arial')]))
-        ->toBe((int) round(4 * 600 * 12 / 1000));
-});
-
 it('derives the table for Arial from the widths every face used to be measured with', function () {
     // Liberation Sans is metrically identical to Arial and Arial to Helvetica, so the
     // table derived for Arial is the table this renderer used to measure every face
@@ -148,7 +226,7 @@ it('takes a character outside ASCII at a full em when it is three bytes or more'
 
     expect($metric->width([TextMetric::piece('漢', 1000)]))->toBe(1000)
         ->and($metric->width([TextMetric::piece('漢漢', 1000)]))->toBe(2000)
-        ->and($metric->width([TextMetric::piece('漢', 1000, mono: true)]))->toBe(600);
+        ->and($metric->width([TextMetric::piece('漢', 1000, face: 'Menlo')]))->toBe(602);
 });
 
 it('takes a character outside ASCII at the mean of the table when it is two bytes', function () {
@@ -189,8 +267,8 @@ it('counts the indentation of a line as part of it', function () {
     // indented code block depends on: five spaces in is five spaces of the first line.
     $metric = new TextMetric();
 
-    expect($metric->lines([TextMetric::piece('    x', 16, mono: true)], 48))->toBe(1)
-        ->and($metric->lines([TextMetric::piece('     x', 16, mono: true)], 48))->toBe(2);
+    expect($metric->lines([TextMetric::piece('    x', 16, face: 'Consolas')], 48))->toBe(1)
+        ->and($metric->lines([TextMetric::piece('     x', 16, face: 'Consolas')], 48))->toBe(2);
 });
 
 it('measures a box narrower than a pixel rather than looping on it', function () {
@@ -266,10 +344,12 @@ it('measures a list by the lines its items wrap to', function () {
 });
 
 it('measures a code line by its characters, so a long one wraps', function () {
-    // 600 units at 12pt is 7.2px a character, so the 860px of text width holds 119 of them
-    // and a 130-character line needs two rows. This was `lines × 18 + 24`: a sixty-line
+    // 550 units at 12pt is 6.6px a character, so the 860px of text width holds 130 of
+    // them and a 131-character line needs two rows. This was `lines × 18 + 24`: a sixty-line
     // block measured 1104px, on a slide 540 tall.
     expect(measured("```\n" . str_repeat('x', 130) . "\n```\n")->positionOf('code')['height'])
+        ->toBe(19 + 2 * 5.0)
+        ->and(measured("```\n" . str_repeat('x', 131) . "\n```\n")->positionOf('code')['height'])
         ->toBe(2 * 19 + 2 * 5.0);
 });
 

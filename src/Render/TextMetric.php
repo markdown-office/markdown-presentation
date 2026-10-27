@@ -38,30 +38,33 @@ namespace MarkdownPresentation\Render;
  * {@see \MarkdownPresentation\Render\PresentationRenderer::unknownFonts()}. Measuring it as
  * some other face without saying so would be the failure the tables of faces exist to end.
  *
- * The monospaced half is exact. Every character in a monospaced face advances by the same
- * amount and 600/1000 is what Consolas, Menlo and JetBrains Mono all use, so a code block —
- * the one kind of block that is always monospaced — is measured rather than guessed.
+ * A monospaced face is measured by its advance rather than by a table of characters:
+ * every character in one advances by the same amount, so the face's advance is the width
+ * of all of them. That amount is the face's own, and the faces the shipped themes name do
+ * not agree on it — see {@see FontMetrics::MONOSPACED} — so a code block, the one kind of
+ * block that is always monospaced, is measured in the face that will draw it. A character
+ * outside the printable ASCII is measured at that advance as well, which is one cell of the
+ * face rather than the two a full-width character takes in a real one.
  *
- * @phpstan-type Piece array{text: string, size: int, mono: bool, bold: bool, face: string}
+ * @phpstan-type Piece array{text: string, size: int, bold: bool, face: string}
  */
 final class TextMetric
 {
     /** Advance widths are per thousand of an em, which a size in points divides out of. */
     private const UNITS_PER_EM = 1000;
 
-    /** What every character in a monospaced face advances by, whatever the character. */
-    private const MONOSPACED = 600;
-
     /** A CJK ideograph, a Hangul syllable or an emoji: a full em in every face, so no table carries them. */
     private const FULL_EM = 1000;
 
     /**
-     * The tables of the faces this renderer knows, by the name a theme writes them under.
+     * The widths of the faces this renderer knows, by the name a theme writes them under.
      *
      * @param array<string, array{regular: array<int|string, int>, bold: array<int|string, int>}> $tables
+     * @param array<string, int> $monospaced The advance of each monospaced face.
      */
     public function __construct(
         private readonly array $tables = FontMetrics::TABLES,
+        private readonly array $monospaced = FontMetrics::MONOSPACED,
     ) {
     }
 
@@ -80,32 +83,31 @@ final class TextMetric
     public static function piece(
         string $text,
         int $size,
-        bool $mono = false,
         bool $bold = false,
         string $face = '',
     ): array {
-        return ['text' => $text, 'size' => $size, 'mono' => $mono, 'bold' => $bold, 'face' => $face];
+        return ['text' => $text, 'size' => $size, 'bold' => $bold, 'face' => $face];
     }
 
     /**
-     * Whether a face has a table of its own.
+     * Whether a face is measured with its own widths.
      *
-     * A face that has none is measured with the reference face's widths, and the renderer
+     * A face that is not is measured with the reference face's widths, and the renderer
      * reports it: see {@see \MarkdownPresentation\Render\PresentationRenderer::unknownFonts()}.
      */
     public function has(string $face): bool
     {
-        return isset($this->tables[$face]);
+        return isset($this->tables[$face]) || isset($this->monospaced[$face]);
     }
 
     /**
-     * The faces there are tables for, in alphabetical order.
+     * The faces there are widths for, in alphabetical order.
      *
      * @return list<string>
      */
     public function faces(): array
     {
-        $faces = array_keys($this->tables);
+        $faces = [...array_keys($this->tables), ...array_keys($this->monospaced)];
         sort($faces);
 
         return $faces;
@@ -241,8 +243,13 @@ final class TextMetric
      */
     private function units(string $character, array $piece): int
     {
-        if ($piece['mono']) {
-            return self::MONOSPACED;
+        // A monospaced face advances by the same amount whatever the character, so the
+        // face's own advance is the width of all of them — and the bold cut of one is
+        // the same amount again.
+        $advance = $this->monospaced[$piece['face']] ?? null;
+
+        if ($advance !== null) {
+            return $advance;
         }
 
         $table = $this->widths($piece['face'], $piece['bold']);

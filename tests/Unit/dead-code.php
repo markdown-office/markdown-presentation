@@ -394,6 +394,16 @@ it('does not claim again what the code does not do', function (string $claim) {
     'every piece of text is measured with one face\'s widths' => 'the widths are Helvetica\'s',
     'the wrapping is estimated from a table of one face\'s widths' => 'Helvetica\'s widths',
     'the table is one face\'s own advance widths' => 'Helvetica\'s own advance widths',
+
+    // The monospaced half of the measurement was one number for every face — 600 units to
+    // the em — and 600 is what JetBrains Mono advances by and nine per cent wider than
+    // Consolas. Every monospaced face is measured by its own advance now, so neither a
+    // page nor a comment may claim that the half is exact, that the three faces advance
+    // by the same amount, or that which face a monospaced one is says nothing about how
+    // wide its text is.
+    'the monospaced half is exact' => 'the monospaced half is exact',
+    'the three monospaced faces advance by the same amount' => 'which is what Consolas, Menlo and JetBrains Mono use',
+    'the face a monospaced one is says nothing about how wide its text is' => 'says nothing about how wide its text is',
 ]);
 
 it('has no decorative dividers in it', function () {
