@@ -530,6 +530,11 @@ takes the weight off a style that has it, and the word then takes the weight of 
 it is in — a paragraph's is none and a heading's is bold. The Word half reads it the same
 way, because a run cannot be written with a weight of none.
 
+**A link in a text style keeps the style's colour.** A link with no style of its own is
+drawn in the theme's `hlink`, and a link written in a text style is drawn in the style's
+colour instead: the style is the more particular of the two statements. It keeps its
+underline either way, so it still reads as a link.
+
 The named styles come from the theme's `text-styles.yml`, which is optional:
 
 ```yaml

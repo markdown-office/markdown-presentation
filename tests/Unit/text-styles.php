@@ -367,6 +367,27 @@ it('refuses a deck whose word names a face it cannot measure when the renderer i
         ->toThrow(UnknownFont::class, 'It is named by a font attribute on slide 1');
 });
 
+it('draws a link in a text style in the style\'s colour and keeps it underlined', function () {
+    // The style is the more particular statement, so the link takes the style's colour
+    // rather than the theme's hyperlink colour; the underline stays, so the word is still
+    // a link to a reader. The reference says so too, because a reader would otherwise take
+    // the theme's hyperlink colour for every link there is.
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", '[:brand[Bakery]](https://example.com)');
+
+    $run = runXml(styledDeck($deck, $directory), 'Bakery');
+
+    expect($run)->toMatch('#<a:srgbClr val="00B4D8">#')
+        ->and($run)->toMatch('#\bu="sng"#')
+        ->and($run)->toMatch('#<a:hlinkClick#');
+
+    $readme = (string) file_get_contents(dirname(__DIR__, 2) . '/README.md');
+
+    preg_match('/### Inline styles(.*?)^### /ms', $readme, $section);
+
+    expect($section[1] ?? '')->toContain("the style's colour")
+        ->and($section[1] ?? '')->toContain('underline');
+});
+
 it('says in the reference that the round trip does not keep a text style', function () {
     // The page is wrong the moment this lands unless it says so: a deck read back out has
     // neither the named style nor the colour, and a reader who is not told that reads the

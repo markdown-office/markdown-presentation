@@ -31,8 +31,9 @@ All notable changes to this project are documented here. The format follows
   The named styles come from a theme's `text-styles.yml`, which is optional: a theme
   without one has no named styles, and every named form in a deck drawn with it is then a
   name the theme does not have. A style that sets an attribute nobody reads, a style that
-  sets nothing at all and a style called `style` — the word the raw form is written with —
-  are refused when the theme is read.
+  sets nothing at all, a style called `style` — the word the raw form is written with — and
+  a style that sets a `highlight`, which this half does not draw, are refused when the
+  theme is read.
 
 - **A boolean set to `false` is not "off" but "not set".** `:brand[Bakery]{bold=false}`
   takes the weight off a style that has it, and the word then takes the weight of the block
@@ -46,6 +47,12 @@ All notable changes to this project are documented here. The format follows
   deck that renders and shows something the author did not write.
 
 ### Changed
+
+- **The page says what a link in a text style looks like.** A link with no style of its own
+  is drawn in the theme's `hlink`, and a link written in a text style is drawn in the
+  style's colour instead — the style is the more particular of the two statements — while
+  the underline stays either way. The page said nothing about it, so a reader would take
+  the theme's hyperlink colour for every link there is.
 
 - **A label holding `__text__` is refused with the rest of the Markdown.** The shared
   vocabulary named `**text**`, `*text*`, `_text_`, `` `code` `` and `[text](url)`; the
