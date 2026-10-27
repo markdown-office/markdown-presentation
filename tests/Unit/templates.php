@@ -7,6 +7,7 @@ use MarkdownPresentation\Document\Slide;
 use MarkdownPresentation\Exception\Exception as MarkdownException;
 use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
@@ -136,6 +137,20 @@ function templateFailure(string $markdown): string
     }
 
     return '';
+}
+
+/**
+ * A rendered deck and the renderer that rendered it.
+ *
+ * The renderer rather than the file, because the claims about the faces it could not
+ * measure are claims about its report.
+ */
+function templateRenderer(string $markdown, bool $strict = false): PresentationRenderer
+{
+    $renderer = new PresentationRenderer(directory: Scratch::directory(), strict: $strict);
+    $renderer->render((new DeckParser())->parse($markdown), Scratch::file('template.pptx', ''));
+
+    return $renderer;
 }
 
 it('draws the chrome of a template on every slide that names it', function () {
@@ -462,4 +477,71 @@ it('writes the number of the slide on a slide that carries the page number itsel
     expect($file->shapeNames(1))->toBe(['slide-number'])
         ->and($file->slideText(1))->toBe('1')
         ->and($file->slideText(2))->toBe('2');
+});
+
+/**
+ * A template whose chrome names a face there is no table for.
+ */
+const WORDMARK_IN_A_FACE = "---\ntemplate: brand\n---\n"
+    . ":::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=\"Comic Sans MS\" align=left vertical-align=middle}\n"
+    . "Resilience\n:::\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+it('reports a face the chrome of a template names that there is no table for', function () {
+    // The chrome of a template is held apart from the shapes of the slides: it is read
+    // once for the deck and drawn on every slide that names it. A face it names is drawn
+    // in that face and measured with the reference face's widths, and the report is where
+    // that is said.
+    expect(templateRenderer(WORDMARK_IN_A_FACE)->unknownFonts())->toBe([
+        ['face' => 'Comic Sans MS', 'where' => 'the "content" box of the template "brand"'],
+    ]);
+});
+
+it('reports a face the number of a slide names that there is no table for', function () {
+    // The page number carries a style of its own, and it is the only other shape that
+    // does: a walk that looked for the text a deck wrote would never see it.
+    $deck = "---\ntemplate: page\n---\n::slide-number{left=94% top=92% width=5% height=6% font-family=\"Comic Sans MS\"}\n\n---\nlayout: blank\ntemplate: page\n---\n";
+
+    expect(templateRenderer($deck)->unknownFonts())->toBe([
+        ['face' => 'Comic Sans MS', 'where' => 'the "slide-number" box of the template "page"'],
+    ]);
+});
+
+it('reports a face the number of a slide names on a slide of the deck', function () {
+    // The same shape on a slide of the deck rather than in the chrome of a template, and
+    // the place is the slide it is on.
+    $deck = "---\nlayout: blank\n---\n::slide-number{left=94% top=92% width=5% height=6% font-family=\"Comic Sans MS\"}\n";
+
+    expect(templateRenderer($deck)->unknownFonts())->toBe([
+        ['face' => 'Comic Sans MS', 'where' => 'the "slide-number" box on slide 1'],
+    ]);
+});
+
+it('reports the face a template names once, however many slides draw it', function () {
+    // The chrome is read once for the deck and drawn on every slide that names the
+    // template, so the face is named in one place: in the chrome. A report of one entry
+    // per slide would say the same thing twenty-eight times.
+    $deck = "---\ntemplate: brand\n---\n"
+        . ":::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=\"Comic Sans MS\" align=left vertical-align=middle}\n"
+        . "Resilience\n:::\n\n"
+        . "---\nlayout: blank\ntemplate: brand\n---\n\n"
+        . "---\nlayout: blank\ntemplate: brand\n---\n\n"
+        . "---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateRenderer($deck)->unknownFonts())->toHaveCount(1);
+});
+
+it('refuses a deck whose template names a face it cannot measure when the renderer is strict', function () {
+    // Strict is for a caller that would rather have no file than a file whose text was
+    // measured with another face's widths, and the message says where the face was named.
+    expect(fn () => templateRenderer(WORDMARK_IN_A_FACE, strict: true))
+        ->toThrow(UnknownFont::class, 'The face "Comic Sans MS" has no table of advance widths')
+        ->toThrow(UnknownFont::class, 'It is named by the "content" box of the template "brand"');
+});
+
+it('refuses a deck whose number of a slide names a face it cannot measure when the renderer is strict', function () {
+    $deck = "---\ntemplate: page\n---\n::slide-number{left=94% top=92% width=5% height=6% font-family=\"Comic Sans MS\"}\n\n---\nlayout: blank\ntemplate: page\n---\n";
+
+    expect(fn () => templateRenderer($deck, strict: true))
+        ->toThrow(UnknownFont::class, 'The face "Comic Sans MS" has no table of advance widths')
+        ->toThrow(UnknownFont::class, 'It is named by the "slide-number" box of the template "page"');
 });

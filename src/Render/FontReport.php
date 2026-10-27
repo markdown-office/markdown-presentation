@@ -43,7 +43,8 @@ final class FontReport
 
     /**
      * @param string      $where Where the face was named: a slot of the theme, a text style
-     *                           of it, a box of the deck, or an attribute of a word.
+     *                           of it, a box of the deck, a box of a template's chrome, the
+     *                           number of a slide, or an attribute of a word.
      * @param list<string> $known The faces there are tables for, which the refusal names.
      *
      * @throws UnknownFont

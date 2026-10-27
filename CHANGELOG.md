@@ -130,6 +130,20 @@ All notable changes to this project are documented here. The format follows
   chrome alike, because it is the one thing about a page number that is different on every
   slide and a shape carrying it cannot be drawn before the slide it is on is known.
 
+- **A face a template names is reported now.** The chrome of a template is held apart from
+  the shapes of the slides — it is read once for the deck and drawn on every slide that
+  names it — so the walk over the slides never saw it. A template naming a face there is
+  no table for was drawn in that face, measured with the reference face's widths and
+  reported nowhere, and the strict renderer accepted it.
+
+  The page number is the other half of it: it carries a style of its own, and it is the
+  only shape but a text box that does, so a walk that looked for the text a deck wrote
+  never saw it either.
+
+  One entry for a template however many slides draw it, because the face is named in one
+  place — in the chrome — and twenty-eight entries would say so twenty-eight times. The
+  place is named instead of the slide: `the "content" box of the template "brand"`.
+
 - **A face a word writes for itself is reported.** The faces a theme names are the faces its
   text is measured with, and a face with no table of advance widths is measured with the
   reference face's widths instead — which are not that face's. The report of that said so

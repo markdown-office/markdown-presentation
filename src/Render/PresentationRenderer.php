@@ -274,9 +274,9 @@ final class PresentationRenderer
      * of a code block.
      *
      * Every place a face is named is an entry: a slot of the theme, a text style of it, a
-     * box the deck placed itself, or an attribute a word carries. The place is what tells
-     * a reader where to change the name, which is the half of the answer the face alone
-     * does not give.
+     * box the deck placed itself, a box of a template's chrome, the number of a slide, or
+     * an attribute a word carries. The place is what tells a reader where to change the
+     * name, which is the half of the answer the face alone does not give.
      *
      * Emptied by {@see self::render()} rather than accumulated, because a layout belongs to
      * one deck: a caller converting several in a loop wants the last one's, not all of them.
@@ -365,6 +365,11 @@ final class PresentationRenderer
         // anything is built: a box with a `font-family` of its own is drawn in it, and a box
         // measured with another face's widths is a box measured for type it does not hold.
         $this->recordUnknownFacesOfTheDeck($blocks, $metric);
+
+        // The faces the chrome named, asked about on the same terms: the chrome of a
+        // template is drawn on the slides that name it, and the words in it are drawn in
+        // the face it names.
+        $this->recordUnknownFacesOfTheChrome($metric);
 
         $builds = [];
 
@@ -782,11 +787,7 @@ final class PresentationRenderer
     {
         foreach ($blocks as $index => $slide) {
             foreach ($slide->shapes() as $shape) {
-                if (!$shape instanceof FreeText) {
-                    continue;
-                }
-
-                $face = $shape->style->face;
+                $face = self::faceOf($shape);
 
                 if ($face !== null && !$metric->has($face)) {
                     $this->fonts->record(
@@ -797,6 +798,55 @@ final class PresentationRenderer
                 }
             }
         }
+    }
+
+    /**
+     * The faces the chrome of a template named that this renderer has no table of advance
+     * widths for, recorded.
+     *
+     * The chrome of a template is held apart from the shapes of the slides: it is read once
+     * for the deck and drawn on every slide that names the template, so a walk over the
+     * slides never sees it.
+     *
+     * One entry for the whole template rather than one for each of the slides that draw it,
+     * because the face is named in one place: in the chrome. Twenty-eight slides carrying
+     * one wordmark is one name to change, and a report of twenty-eight entries would say so
+     * twenty-eight times and hide the fact that there is one thing to do. The place is
+     * named instead of the slide, so the reader is sent to the template rather than to one
+     * of the slides that happens to draw it.
+     */
+    private function recordUnknownFacesOfTheChrome(TextMetric $metric): void
+    {
+        foreach ($this->furniture as $template => $shapes) {
+            foreach ($shapes as $shape) {
+                $face = self::faceOf($shape);
+
+                if ($face !== null && !$metric->has($face)) {
+                    $this->fonts->record(
+                        $face,
+                        sprintf('the "%s" box of the template "%s"', $shape->name(), $template),
+                        $metric->faces(),
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * The face a shape names for the type in it, or null where it names none.
+     *
+     * Two classes carry a {@see \MarkdownPresentation\Render\Free\TextStyle}: the text a
+     * deck wrote and the number the renderer writes. Both are drawn in the face their style
+     * names and measured in it, so both are a place a face is named — and a walk that
+     * looked at one of them would miss the other.
+     */
+    private static function faceOf(FreeShape $shape): ?string
+    {
+        return match (true) {
+            $shape instanceof FreeText => $shape->style->face,
+            $shape instanceof FreeSlideNumber => $shape->style->face,
+            default => null,
+        };
     }
 
     /**
