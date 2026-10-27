@@ -217,3 +217,27 @@ it('takes the files of a theme on trust when it has no scope', function () {
 
     expect($loader->load($directory)->styles())->toBe(['heading.1' => 'ReportTitle']);
 });
+
+it('reads a manifest the deck named, whatever the file it reached is called', function () use ($loader) {
+    // The resolver resolves a path before it hands it over, so the loader is given the
+    // file the path reached, whose name is the target's rather than the one the deck
+    // wrote. The name the deck wrote is what makes a file the manifest of a theme, so
+    // the file is read rather than refused for the name it happens to have.
+    $directory = ThemeDirectory::create(['other.yml' => "name: Linked\n"], 'manifest');
+    ThemeDirectory::link($directory . '/theme.yml', $directory . '/other.yml');
+
+    $loaded = $loader->loadManifest(realpath($directory . '/other.yml'), 'theme.yml', new PathScope([$directory]));
+
+    expect($loaded->theme()->name())->toBe('Linked');
+});
+
+it('refuses a manifest that resolves outside the scope', function () use ($loader) {
+    // The scope is about where the file is, not what it is called: a manifest reaching
+    // out of the scope is refused by the scope, whatever the deck called it.
+    $outside = ThemeDirectory::create(['other.yml' => "name: Stolen\n"], 'outside');
+    $directory = ThemeDirectory::create(['theme.yml' => "name: Acme\n"], 'theme');
+    ThemeDirectory::link($directory . '/theme.yml', $outside . '/other.yml');
+
+    expect(fn () => $loader->loadManifest($directory . '/theme.yml', 'theme.yml', new PathScope([$directory])))
+        ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/other.yml') . '" rather than one this render may read');
+});

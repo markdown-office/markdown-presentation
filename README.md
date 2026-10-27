@@ -2023,6 +2023,12 @@ Minimal
 <root>/themes/minimal
 ```
 
+Only a `theme.yml` is a manifest, so a `styles.yml` named as the theme is one of a theme's
+own files rather than the theme itself. The name the deck wrote is what decides that, not
+the name the file carries once it has been resolved — so a `theme.yml` that is a link to a
+file of another name is still the manifest, and the roots below still hold the file it
+reaches.
+
 **A theme path has to land inside the deck's own directory, the working directory, the
 built-in themes, or another root the resolver was given.** A `theme:` is a path a deck
 writes, so the same rule as an image's applies, and the reason is more than tidiness: a

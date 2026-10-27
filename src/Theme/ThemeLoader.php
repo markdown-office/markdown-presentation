@@ -66,8 +66,14 @@ final class ThemeLoader
      * Reads a theme out of the manifest that describes one, the rest of the theme read
      * from the directory holding it.
      *
-     * The file has to be the manifest the library knows by name: a theme is a directory
-     * holding a `theme.yml`, and a file beside one is not a theme whatever it holds.
+     * The name the deck wrote is what makes the file the manifest, not the name the file
+     * carries once it has been resolved: a `theme.yml` that is a link to a file of another
+     * name is the manifest the deck asked for, and the file it reaches is read. The scope
+     * still applies to that file, so a manifest reaching out of the roots is refused
+     * whatever the deck called it.
+     *
+     * The Word half's loader asks the same question the same way, and the two have to
+     * stay in step: a deck's theme resolves the same way whichever half renders it.
      *
      * @param string         $manifest The manifest itself.
      * @param string|null    $name     What the deck wrote, which is what a failure names.
@@ -80,12 +86,17 @@ final class ThemeLoader
      */
     public function loadManifest(string $manifest, ?string $name = null, ?PathScope $files = null): LoadedTheme
     {
-        if (!is_file($manifest) || basename($manifest) !== self::THEME_FILE) {
-            throw ThemeNotFound::noManifest($manifest);
+        $written = $name ?? $manifest;
+
+        if (basename($written) !== self::THEME_FILE) {
+            throw ThemeNotFound::noManifest($written);
         }
 
-        $written = $name ?? $manifest;
         $resolved = $this->contained($files, $manifest, $written);
+
+        if (!is_file($resolved)) {
+            throw ThemeNotFound::noManifest($written);
+        }
 
         // The directory the manifest is in, rather than the one the deck wrote: a
         // manifest reached through a symlink sits where its target is, and that is

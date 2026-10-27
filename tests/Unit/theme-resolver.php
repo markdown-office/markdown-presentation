@@ -87,6 +87,39 @@ it('says a file that is not a theme manifest is not one', function () {
     $resolver->resolve('./notes.txt');
 })->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
 
+it('reads a manifest that is a link to a file of another name', function () {
+    // The name the deck wrote is what makes a file the manifest of a theme, so a
+    // `theme.yml` that is a link to a file called something else is the manifest the
+    // deck asked for. The file it reaches is inside the roots, so it is read — and the
+    // rest of the theme is read from beside the file it reached.
+    $deck = ThemeDirectory::create([
+        'theme.yml' => "name: Manifest\n",
+        'other.yml' => "name: Linked\n",
+        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+    ], 'manifest');
+    ThemeDirectory::link($deck . '/theme.yml', $deck . '/other.yml');
+    $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
+
+    $theme = $resolver->resolve('./theme.yml');
+
+    expect($theme->theme()->name())->toBe('Linked')
+        ->and($theme->directory())->toBe(realpath($deck))
+        ->and($theme->layouts())->toBe(['content' => 'Title and Content']);
+});
+
+it('refuses a manifest that is a link to a file outside the roots', function () {
+    // The scope is about where the file is, not what it is called: a manifest that
+    // reaches out of the roots is refused whatever the deck called it, and the refusal
+    // names the file it found.
+    $outside = ThemeDirectory::create(['other.yml' => "name: Stolen\n"], 'outside');
+    $deck = ThemeDirectory::create(['theme.yml' => "name: Acme\n"], 'deck');
+    ThemeDirectory::link($deck . '/theme.yml', $outside . '/other.yml');
+    $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
+
+    expect(fn () => $resolver->resolve('./theme.yml'))
+        ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/other.yml') . '" rather than one this render may read');
+});
+
 it('refuses a theme file outside the directories the resolver was given', function () {
     // A manifest is a path a deck wrote, and it is held to the roots like any other one:
     // the `author:` of a theme file is copied into the deck it renders.

@@ -46,6 +46,14 @@ All notable changes to this project are documented here. The format follows
   it may read. A link that resolves *inside* the roots is a file like any other, so a
   theme laid out with links still reads.
 
+- **A manifest that is a link to a file of another name is read.** The name the deck
+  wrote is what makes a file the manifest of a theme, but the loader asked the file
+  itself, and the resolver had already resolved it — so a `theme.yml` that was a link to
+  a file called something else was refused for the name it had reached rather than for
+  the name it was given. The Word half already asked the name the document wrote, and the
+  two halves now agree. The roots are untouched: the file the link reaches is still held
+  to them, so a manifest reaching out of them is still refused.
+
 ### Changed
 
 - **`ThemeResolver` looks in the roots it is given.** They were read into the scope a
