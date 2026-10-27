@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A shipped theme brings named styles.** The five themes that ship carried no
+  `text-styles.yml`, so the named form of a text style could only be tried against a theme
+  of one's own. `corporate-dark` brings two now — a `brand` in the theme's own accent and a
+  `muted` in the quiet ink a caption is written in — which is what the Word half's corporate
+  theme does.
+
 - **A word inside a box can be styled on its own.** A run carried text, bold, italic,
   code, a link and a strike, and nothing else: the colour of a word was the colour of
   the box it was in, so a wordmark in two colours was two boxes. A **text style** is a

@@ -328,6 +328,20 @@ function styledRenderer(string $markdown, string $directory, bool $strict = fals
     return $renderer;
 }
 
+it('draws a word in a named style a shipped theme brings', function () {
+    // A shipped theme is the one a deck can name without carrying a theme of its own, and
+    // one of them brings the named styles, so the form can be tried without one.
+    $deck = sprintf(
+        "---\ntheme: corporate-dark\n---\n\n:::content{%s}\nResilience :brand[Bakery]\n:::\n",
+        WORDMARK_BOX,
+    );
+
+    expect(runColours(styledDeck($deck, Scratch::directory())))->toBe([
+        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Bakery' => ['colour' => '89B4FA', 'size' => 11],
+    ]);
+});
+
 it('reports a face a word names that there is no table for, and not one there is a table for', function () {
     // A face a word writes for itself is drawn in it and measured in it, and a face with
     // no table of advance widths is measured with the reference face's widths — which are

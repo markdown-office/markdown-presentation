@@ -2012,6 +2012,26 @@ style:
   heading-ink: accent
 ```
 
+**One of them brings the named styles.** `corporate-dark` carries a `text-styles.yml` with a
+`brand` and a `muted`, so a deck can write `:brand[Bakery]` against a theme that ships with
+the library rather than against one of its own:
+
+```yaml path=themes/corporate-dark/text-styles.yml
+# Named text styles: the words inside a box, written in a deck as `:brand[Bakery]`.
+# The properties are the same eight the inline style attributes have, and a size is in
+# points as it is everywhere else.
+#
+# The brand is the theme's own accent, which is what the headings are painted in, and the
+# muted style is the quiet ink a caption is written in — a step down from the body, which
+# is what a caption is on a slide rather than in a document.
+brand:
+  color: accent1
+  bold: true
+muted:
+  color: lt2
+  size: 14
+```
+
 The colours are DrawingML's twelve. The longer spellings an earlier draft of the
 concept used — `dark1`, `light1`, `dark2`, `light2`, `hyperlink`,
 `followedHyperlink` — are accepted on input and normalised to DrawingML's own names,
