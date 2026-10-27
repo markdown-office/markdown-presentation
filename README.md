@@ -2157,7 +2157,8 @@ The tools that come with the library are in `tools/`:
 | Tool | What it is |
 | --- | --- |
 | `tools/phpstan.sh` | Fetches the analyser by checksum and runs it at the level `phpstan.neon.dist` configures |
-| `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: nothing in the test suite needs it, because CI has no PowerPoint |
+| `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: only the question it asks about a finished PDF is in the test suite, because CI has no PowerPoint |
+| `tools/pdf-is-complete.sh` | Whether a PDF has been written whole, which is what the PowerPoint tool waits for before it copies one out. The one part of that tool the test suite can check, because it needs no PowerPoint to answer |
 | `tools/build-powerpoint-fixtures.sh` | Rebuilds the two decks in `tests/fixtures/powerpoint/`, which were authored in PowerPoint rather than written by hand |
 
 Five themes ship with the library, and they are five different decks rather than one deck in
