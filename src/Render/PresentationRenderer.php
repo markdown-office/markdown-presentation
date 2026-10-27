@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Document\Deck;
+use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Document\Slide as SourceSlide;
+use MarkdownPresentation\Exception\ChromeNotFound;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
+use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\MalformedTemplate;
 use MarkdownPresentation\Exception\ThemeNotFound;
@@ -16,6 +19,7 @@ use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
+use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
@@ -32,6 +36,9 @@ use MarkdownPresentation\Render\CommonMark\BlockTranslator;
 use MarkdownPresentation\Render\CommonMark\InlineTranslator;
 use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Render\Free\FreeText;
+use MarkdownPresentation\Template\ChromeFile;
+use MarkdownPresentation\Template\Definition;
+use MarkdownPresentation\Template\Templates;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
 use MarkdownPresentation\Theme\Theme;
@@ -88,10 +95,10 @@ final class PresentationRenderer
      * the whole of what makes it affordable is that {@see UnknownDirective} names this list
      * in the failure itself.
     */
-    public const DIRECTIVES = ['title', 'name', 'level', 'layout', 'theme', 'author', 'description'];
+    public const DIRECTIVES = ['title', 'name', 'level', 'layout', 'theme', 'author', 'description', 'template', 'chrome'];
 
     /** The keys that describe the deck rather than a slide, and so belong to slide 1's block. */
-    public const DECK_DIRECTIVES = ['theme', 'author', 'description'];
+    public const DECK_DIRECTIVES = ['theme', 'author', 'description', 'chrome'];
 
     /** The theme a deck that names none gets. */
     public const DEFAULT_THEME = 'default';
@@ -149,6 +156,31 @@ final class PresentationRenderer
     private readonly ThemeResolver $themes;
 
     /**
+     * The reader of the chrome file a deck names.
+     */
+    private readonly ChromeFile $chromeFiles;
+
+    /**
+     * The reader of a template's body.
+     */
+    private readonly Chrome $chrome;
+
+    /**
+     * The templates the deck being rendered has.
+     *
+     * On the renderer rather than on {@see self::write()}, which already carries seven
+     * arguments, and because a slide's own chrome is read from them.
+     */
+    private Templates $templates;
+
+    /**
+     * The chrome each template of the deck draws, by name.
+     *
+     * @var array<string, list<FreeShape>>
+     */
+    private array $furniture = [];
+
+    /**
      * The theme of the deck being rendered.
      *
      * On the renderer rather than on {@see self::write()}, which already carries seven
@@ -195,6 +227,8 @@ final class PresentationRenderer
         $this->files = new PathScope([$this->directory, ...$imageRoots]);
         $this->overflows = new Overflows($strict);
         $this->fonts = new FontReport($strict);
+        $this->chromeFiles = new ChromeFile($this->directory, $this->files);
+        $this->chrome = new Chrome($this->blocks, $this->directory, $this->files);
     }
 
     /**
@@ -292,6 +326,17 @@ final class PresentationRenderer
         // wrong face — so the faces are asked about before anything is built.
         $metric = new TextMetric();
         $this->recordUnknownFaces($this->theme, $metric);
+
+        // The templates before the slides are drawn, and the chrome before either: a slide
+        // that names a template that is not there, and a template that cannot be drawn, are
+        // both failures that happen with no file written behind them.
+        $this->templates = $this->templates($deck);
+
+        foreach ($deck->slides() as $slide) {
+            $this->checkTemplates($slide);
+        }
+
+        $this->furniture = $this->drawn($deck);
 
         $presentation = new PhpPresentation();
 
@@ -472,6 +517,170 @@ final class PresentationRenderer
                 throw UnknownDirective::misplaced($slide->index() + 1, $key);
             }
         }
+    }
+
+    /**
+     * The templates the deck has: the deck's own over the ones a chrome file holds.
+     */
+    private function templates(Deck $deck): Templates
+    {
+        return Templates::of($deck->definitions(), $this->imported($deck));
+    }
+
+    /**
+     * The templates a chrome file holds.
+     *
+     * A file beside the deck, named by the deck's frontmatter and resolved against the
+     * deck's own directory, so that a deck and the furniture it shares travel together.
+     *
+     * @return list<Definition>
+     *
+     * @throws ChromeNotFound
+     * @throws MalformedChrome
+     * @throws MalformedFrontmatter
+     */
+    private function imported(Deck $deck): array
+    {
+        $written = $deck->frontmatterValue('chrome');
+
+        if ($written === null) {
+            return [];
+        }
+
+        if (!is_string($written) || trim($written) === '') {
+            throw MalformedFrontmatter::wrongType(1, 'chrome', 'a path to a file of chrome');
+        }
+
+        $markdown = $this->chromeFiles->read(trim($written));
+        $chrome = (new DeckParser())->parse($markdown);
+
+        // A chrome file holds definitions and nothing else: a slide in it is a slide
+        // nobody asked for, and one that would be drawn on a deck it was not written for.
+        if ($chrome->slides() !== []) {
+            throw MalformedChrome::slide(trim($written));
+        }
+
+        return $chrome->definitions();
+    }
+
+    /**
+     * The templates a slide names, checked before anything is built.
+     *
+     * @throws UnknownTemplate
+     */
+    private function checkTemplates(SourceSlide $slide): void
+    {
+        $this->names($slide);
+    }
+
+    /**
+     * The templates a slide draws, and the refusal of a name there is no template under.
+     *
+     * A list, because a slide may want more than one piece of furniture: a cover wants the
+     * wordmark and a content slide wants the wordmark and the page number.
+     *
+     * @return list<string>
+     *
+     * @throws MalformedFrontmatter
+     * @throws UnknownTemplate
+     */
+    private function names(SourceSlide $slide): array
+    {
+        $named = $slide->frontmatterValue('template');
+
+        if ($named === null) {
+            return [];
+        }
+
+        $names = [];
+
+        foreach (is_array($named) ? $named : [$named] as $name) {
+            if (!is_string($name) || trim($name) === '') {
+                throw MalformedFrontmatter::wrongType(
+                    $slide->index() + 1,
+                    'template',
+                    'a template name or a list of them',
+                );
+            }
+
+            $names[] = trim($name);
+        }
+
+        foreach ($names as $name) {
+            if (!$this->templates->has($name)) {
+                throw UnknownTemplate::named($slide->index() + 1, $name, $this->templates->names());
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * The chrome every template of the deck draws, by name.
+     *
+     * Read once for the deck rather than once for every slide that names the template: a
+     * picture in a template is a picture the deck pays for once.
+     *
+     * @return array<string, list<FreeShape>>
+     *
+     * @throws MalformedChrome
+     */
+    private function drawn(Deck $deck): array
+    {
+        $furniture = [];
+
+        foreach ($this->templates->all() as $name => $definition) {
+            $furniture[$name] = $this->chrome->shapes($definition, $this->label($deck, $name), $this->theme);
+        }
+
+        return $furniture;
+    }
+
+    /**
+     * The slide a mistake in a template would first be seen on.
+     *
+     * The chrome of a template is read once, so the refusal in it has to name a slide a
+     * reader can look at, and the first slide that draws the template is the one they can.
+     * A template no slide draws is read against the first slide of the deck, because there
+     * is no other slide to name.
+     */
+    private function label(Deck $deck, string $name): int
+    {
+        foreach ($deck->slides() as $slide) {
+            if (in_array($name, $this->names($slide), true)) {
+                return $slide->index() + 1;
+            }
+        }
+
+        return 1;
+    }
+
+    /**
+     * The chrome of the templates a slide names, beside the shapes the slide placed itself.
+     *
+     * The chrome first, so that a shape the slide placed itself is drawn over the furniture
+     * and not under it: the furniture is the page, and what the slide says is on the page.
+     */
+    private function withChrome(SlideBlocks $content, SourceSlide $source): SlideBlocks
+    {
+        $shapes = [];
+
+        foreach ($this->names($source) as $name) {
+            foreach ($this->furniture[$name] as $shape) {
+                $shapes[] = $shape;
+            }
+        }
+
+        if ($shapes === []) {
+            return $content;
+        }
+
+        return new SlideBlocks(
+            $content->blocks(),
+            $content->columns(),
+            $content->columnMarkers(),
+            [...$shapes, ...$content->shapes()],
+        );
     }
 
     /**
@@ -675,6 +884,8 @@ final class PresentationRenderer
             $title !== null,
             $level,
         );
+
+        $content = $this->withChrome($content, $source);
 
         $slide = $presentation->createSlide();
         $slide->setSlideLayout($layouts[$role->value]);

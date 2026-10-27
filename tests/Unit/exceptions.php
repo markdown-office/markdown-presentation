@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\ChromeNotFound;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\FencedFrontmatter;
 use MarkdownPresentation\Exception\FileNotWritable;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
+use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\MalformedShape;
 use MarkdownPresentation\Exception\MalformedTemplate;
@@ -22,6 +24,7 @@ use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Exception\UnknownTextStyle;
 use MarkdownPresentation\Exception\UnreadableDeck;
 use MarkdownPresentation\Exception\UnreadablePackage;
@@ -91,9 +94,11 @@ it('reports what a deck author can fix under the class that says so', function (
     // The base is for everything; the one below it is for the failures a deck author
     // can fix by naming something else.
     $authorFixable = [
+        ChromeNotFound::class,
         ContentOverflow::class,
         FencedFrontmatter::class,
         ImageNotFound::class,
+        MalformedChrome::class,
         MalformedFrontmatter::class,
         MalformedShape::class,
         MalformedTemplate::class,
@@ -106,6 +111,7 @@ it('reports what a deck author can fix under the class that says so', function (
         UnknownLayoutRole::class,
         UnknownMarker::class,
         UnknownStyleSlot::class,
+        UnknownTemplate::class,
         UnknownTextStyle::class,
         UnsupportedColumn::class,
         UnsupportedImageFormat::class,

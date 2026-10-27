@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Document\Slide;
+use MarkdownPresentation\Exception\Exception as MarkdownException;
+use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\UnknownTemplate;
+use MarkdownPresentation\Render\PresentationRenderer;
+use MarkdownPresentation\Tests\Support\Pptx;
+use MarkdownPresentation\Tests\Support\Scratch;
 
 /**
  * Slide templates: a piece of furniture written once and drawn on every slide that names it.
@@ -83,4 +89,295 @@ it('reads the deck frontmatter out of the first slide that is one', function () 
 
     expect($deck->frontmatter())->toBe(['title' => 'Deck'])
         ->and($deck->count())->toBe(1);
+});
+
+/**
+ * A deck with a template that draws a wordmark and a rule, and two slides that name it.
+ */
+const WITH_CHROME = <<<'MARKDOWN'
+    ---
+    template: brand
+    ---
+    :::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+    Resilience
+    :::
+
+    ::line{left=5% top=72.889% width=30% height=0.185% stroke=00B4D8 stroke-width=1}
+
+    ---
+    layout: blank
+    template: brand
+    ---
+
+    ---
+    layout: blank
+    template: brand
+    ---
+    MARKDOWN;
+
+/** A rendered deck, opened for reading its parts. */
+function templateDeck(string $markdown): Pptx
+{
+    $path = Scratch::file('template.pptx', '');
+
+    (new PresentationRenderer(directory: Scratch::directory()))
+        ->render((new DeckParser())->parse($markdown), $path);
+
+    return Pptx::open($path);
+}
+
+/** A rendered deck that failed, and the message it failed with. */
+function templateFailure(string $markdown): string
+{
+    try {
+        templateDeck($markdown);
+    } catch (MarkdownException $failure) {
+        return $failure->getMessage();
+    }
+
+    return '';
+}
+
+it('draws the chrome of a template on every slide that names it', function () {
+    // The whole of what a template is: the wordmark and the rule are written once and are
+    // on every slide that names them.
+    $file = templateDeck(WITH_CHROME);
+
+    expect($file->shapeNames(1))->toBe(['content', 'line'])
+        ->and($file->shapeNames(2))->toBe(['content', 'line'])
+        ->and($file->slideText(1))->toContain('Resilience');
+});
+
+it('draws the chrome of two templates on a slide that names both', function () {
+    $deck = <<<'MARKDOWN'
+        ---
+        template: brand
+        ---
+        :::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+        Resilience
+        :::
+
+        ---
+        template: page
+        ---
+        ::line{left=5% top=72.889% width=30% height=0.185% stroke=00B4D8 stroke-width=1}
+
+        ---
+        layout: blank
+        template: [brand, page]
+        ---
+        MARKDOWN;
+
+    $file = templateDeck($deck);
+
+    expect($file->shapeNames(1))->toBe(['content', 'line']);
+});
+
+it('keeps the layout of a slide and the chrome of its template apart', function () {
+    // A blank layout draws no furniture of its own, so the furniture on the slide is the
+    // template's and the template's alone; a content layout draws its title as well, and
+    // the template is on top of it rather than instead of it.
+    $deck = <<<'MARKDOWN'
+        ---
+        template: brand
+        ---
+        :::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+        Resilience
+        :::
+
+        ---
+        layout: blank
+        template: brand
+        ---
+
+        ---
+        layout: content
+        template: brand
+        ---
+        # A title
+        MARKDOWN;
+
+    $file = templateDeck($deck);
+
+    expect($file->shapeNames(1))->toBe(['content'])
+        ->and($file->shapeNames(2))->toBe(['title', 'content']);
+});
+
+it('refuses a template whose body holds ordinary Markdown', function () {
+    // A template is drawn on every slide that names it, so the words of a slide written
+    // into one would be on every one of them.
+    $deck = "---\ntemplate: brand\n---\n# A heading\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('The template "brand" holds a heading')
+        ->toContain('A template holds chrome, not content');
+});
+
+it('refuses a template whose body holds ordinary Markdown, and says what it found', function (string $body, string $what) {
+    $deck = "---\ntemplate: brand\n---\n" . $body . "\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain(sprintf('The template "brand" holds %s', $what));
+})->with([
+    'a heading' => ["# A heading\n", 'a heading'],
+    'a paragraph' => ["A paragraph.\n", 'a paragraph'],
+    'a list' => ["- One\n- Two\n", 'a list'],
+    'a quotation' => ["> A quotation.\n", 'a quotation'],
+    'a code block' => ["```php\n\$a = 1;\n```\n", 'a code block'],
+    'a table' => ["| a | b |\n| --- | --- |\n| 1 | 2 |\n", 'a table'],
+    'a rule' => ["***\n", 'a rule'],
+]);
+
+it('refuses a template whose body holds a picture', function () {
+    // The picture is a file the deck names, so it has to be there before the refusal:
+    // a picture that is not a file is a different failure, and a louder one.
+    $picture = Scratch::file('logo.png', base64_decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    ));
+
+    $deck = sprintf(
+        "---\ntemplate: brand\n---\n![a picture](%s)\n\n---\nlayout: blank\ntemplate: brand\n---\n",
+        $picture,
+    );
+
+    expect(templateFailure($deck))->toContain('The template "brand" holds a picture');
+});
+
+it('refuses a template whose body holds a column marker', function () {
+    // A column is where a block of a slide is drawn, and a template draws no blocks.
+    $deck = "---\ntemplate: brand\n---\n::column\n::line{}\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('The template "brand" holds a column marker');
+});
+
+it('refuses a template that draws nothing', function () {
+    $deck = "---\ntemplate: brand\n---\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('The template "brand" draws nothing');
+});
+
+it('refuses a template that cannot be drawn, and names it', function () {
+    $deck = "---\ntemplate: brand\n---\n::rectangle{colour=red}\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('The template "brand" cannot be drawn')
+        ->toContain('which it does not read');
+});
+
+it('refuses a slide that names a template there is not, and names the templates there are', function () {
+    // The slide is the deck's first slide, because the definition above it is not one:
+    // the number in the message is the number the slide is drawn under.
+    $deck = "---\ntemplate: brand\n---\n::line{}\n\n---\nlayout: blank\ntemplate: wordmark\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('Slide 1 names the template "wordmark", which is not one')
+        ->toContain('The templates are: brand');
+});
+
+it('imports the templates of a chrome file beside the deck', function () {
+    $chrome = Scratch::file('chrome.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n");
+
+    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n\n---\nlayout: blank\ntemplate: brand\n---\n", $chrome);
+
+    $file = templateDeck($deck);
+
+    expect($file->shapeNames(2))->toBe(['line']);
+});
+
+it('lets the deck\'s own template override an imported one of the same name', function () {
+    // The same rule the theme resolver applies by search order: the deck's own wins.
+    $chrome = Scratch::file('chrome.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n");
+
+    $deck = sprintf(
+        "---\nchrome: %s\nlayout: blank\n---\n\n---\ntemplate: brand\n---\n:::content{left=5%% top=5%% width=30%% height=5%%}\nDeck\n:::\n\n---\nlayout: blank\ntemplate: brand\n---\n",
+        $chrome,
+    );
+
+    $file = templateDeck($deck);
+
+    expect($file->shapeNames(2))->toBe(['content']);
+});
+
+it('refuses a chrome file that is not there', function () {
+    $deck = "---\nchrome: ./nowhere.md\nlayout: blank\n---\n";
+
+    expect(templateFailure($deck))->toContain('There is no chrome file at');
+});
+
+it('refuses a chrome file that is a URL', function () {
+    $deck = "---\nchrome: phar://chrome.md\nlayout: blank\n---\n";
+
+    expect(templateFailure($deck))->toContain('is a URL rather than a path');
+});
+
+it('refuses a chrome file this render may not read', function () {
+    $chrome = Scratch::file('chrome.md', "---\ntemplate: brand\n---\n::line{}\n");
+    $outside = sys_get_temp_dir() . '/chrome-' . bin2hex(random_bytes(6)) . '.md';
+
+    file_put_contents($outside, "---\ntemplate: brand\n---\n::line{}\n");
+
+    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n", $outside);
+
+    expect(templateFailure($deck))->toContain('rather than one this render may read');
+
+    unlink($outside);
+});
+
+it('refuses a chrome file that holds a slide', function () {
+    $chrome = Scratch::file('chrome.md', "# A slide\n");
+
+    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n", $chrome);
+
+    expect(templateFailure($deck))->toContain('holds a slide that is not a template definition');
+});
+
+it('refuses a chrome file it cannot read', function () {
+    skipWithoutPermissions('The unreadable file');
+
+    $chrome = Scratch::file('chrome.md', "---\ntemplate: brand\n---\n::line{}\n");
+
+    chmod($chrome, 0o000);
+
+    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n", $chrome);
+
+    expect(templateFailure($deck))->toContain('There is no chrome file at');
+});
+
+it('refuses a chrome file named on a later slide', function () {
+    $deck = "---\nlayout: blank\n---\n\n---\nchrome: ./chrome.md\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('The frontmatter of slide 2 names "chrome", which is a deck directive');
+});
+
+it('refuses a chrome file that is not a path', function () {
+    $deck = "---\nchrome: 42\nlayout: blank\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('The frontmatter of slide 1 has a "chrome" that is not a path to a file of chrome');
+});
+
+it('refuses a template that is named by something other than a name', function () {
+    $deck = "---\nlayout: blank\ntemplate: 42\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('The frontmatter of slide 1 has a "template" that is not a template name or a list of them');
+});
+
+it('refuses a list of templates that names one that is not a name', function () {
+    $deck = "---\nlayout: blank\ntemplate: [brand, 42]\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('The frontmatter of slide 1 has a "template" that is not a template name or a list of them');
+});
+
+it('reads the chrome of a template no slide draws', function () {
+    // A template nothing draws is still a template, and a mistake in it is still a mistake:
+    // it is read against the first slide of the deck, because there is no other to name.
+    $deck = "---\ntemplate: brand\n---\n::rectangle{colour=red}\n\n---\nlayout: blank\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain('The template "brand" cannot be drawn');
 });
