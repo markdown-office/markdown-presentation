@@ -665,8 +665,9 @@ final class PresentationRenderer
     /**
      * The chrome of the templates a slide names, beside the shapes the slide placed itself.
      *
-     * The chrome first, so that a shape the slide placed itself is drawn over the furniture
-     * and not under it: the furniture is the page, and what the slide says is on the page.
+     * The chrome last, so that it is drawn over what the slide placed itself: a full-bleed
+     * picture is behind the wordmark and not over it, which is the order the deck wrote the
+     * wordmark in before the wordmark was a template.
      */
     private function withChrome(SlideBlocks $content, SourceSlide $source): SlideBlocks
     {
@@ -688,7 +689,7 @@ final class PresentationRenderer
             $content->blocks(),
             $content->columns(),
             $content->columnMarkers(),
-            [...$shapes, ...$content->shapes()],
+            [...$content->shapes(), ...$shapes],
         );
     }
 

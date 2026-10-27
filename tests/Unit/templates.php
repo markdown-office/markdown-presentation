@@ -266,6 +266,29 @@ it('refuses a template that cannot be drawn, and names it', function () {
         ->toContain('which it does not read');
 });
 
+it('draws the chrome of a template over the shapes the slide placed itself', function () {
+    // A full-bleed picture is behind the wordmark and not over it: the furniture belongs to
+    // the page, and a picture the deck placed is on the page.
+    $deck = <<<'MARKDOWN'
+        ---
+        template: brand
+        ---
+        :::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+        Resilience
+        :::
+
+        ---
+        layout: blank
+        template: brand
+        ---
+        ::rectangle{left=0% top=0% width=100% height=100% fill=panel}
+        MARKDOWN;
+
+    $file = templateDeck($deck);
+
+    expect($file->shapeNames(1))->toBe(['rectangle', 'content']);
+});
+
 it('refuses a slide that names a template there is not, and names the templates there are', function () {
     // The slide is the deck's first slide, because the definition above it is not one:
     // the number in the message is the number the slide is drawn under.
