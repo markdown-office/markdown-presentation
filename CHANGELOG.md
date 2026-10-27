@@ -30,6 +30,11 @@ All notable changes to this project are documented here. The format follows
   shares travel together. The deck's own templates override the imported ones of the same
   name, the way a deck's own theme overrides the shipped one.
 
+  `examples/markdown/16-templates.md` is the deck that shows it: a template defined in the
+  deck, slides that name one, two and three of them, a template imported from
+  `templates/chrome.md`, and a template of the deck's own of the same name as one the file
+  holds — the one that is drawn. The company is invented.
+
 - **The number of a slide is a shape.** A page number was the one piece of furniture a
   deck had to write out on every slide, because the number of a slide is not known until
   the deck is split.
@@ -58,6 +63,12 @@ All notable changes to this project are documented here. The format follows
   an attribute overrides the style for the property it names and for that property only. A
   property neither of them names is not set: the run takes it from the block it is in, and
   nothing is reset to a default.
+
+  `examples/markdown/15-inline-styles.md` is the deck that shows it: a word in a style of
+  the theme inside a box with a colour of its own, the raw form, an attribute laid over a
+  named style for one property only, the seven attributes this half draws, and the three it
+  refuses — a name the theme does not have, a label holding Markdown, and the `highlight`
+  it cannot write. The company is invented.
 
   The named styles come from a theme's `text-styles.yml`, which is optional: a theme
   without one has no named styles, and every named form in a deck drawn with it is then a
