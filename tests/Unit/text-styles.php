@@ -176,6 +176,32 @@ it('refuses a style the theme does not have, and names the styles it has', funct
         ->toThrow(UnknownTextStyle::class, 'The styles are: brand, muted.');
 });
 
+it('draws a style the theme spells with a capital letter, whichever case the deck writes it in', function () {
+    // A style's name is a word to a reader, and `:Brand[Bakery]` and `:brand[Bakery]` are
+    // the same word written twice — the directives package folds the names of the
+    // directives themselves the same way.
+    [$deck, $directory] = wordmark("Brand:\n  color: accent1\n", ':brand[Bakery]');
+
+    expect(runColours(styledDeck($deck, $directory)))->toBe([
+        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
+    ]);
+
+    [$deck, $directory] = wordmark("Brand:\n  color: accent1\n", ':Brand[Bakery]');
+
+    expect(runColours(styledDeck($deck, $directory)))->toBe([
+        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
+    ]);
+
+    // The refusal names the style as the theme spells it, because that is the spelling the
+    // author has to change.
+    [$deck, $directory] = wordmark("Brand:\n  color: accent1\nmuted:\n  color: lt2\n", ':nope[Bakery]');
+
+    expect(fn () => styledDeck($deck, $directory))
+        ->toThrow(UnknownTextStyle::class, 'The styles are: Brand, muted.');
+});
+
 it('refuses an attribute a text style does not read, and names the attributes it reads', function () {
     [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{colour=accent1}');
 

@@ -95,7 +95,7 @@ final class StyleReader
      */
     private function base(DirectiveInline $node, string $name, int $slide, Theme $theme): TextStyle
     {
-        if ($name === TextStyle::RESERVED) {
+        if (TextStyle::isReserved($name)) {
             if (count($node->getAttributes()) === 0) {
                 throw MalformedTextStyle::noAttributes($slide);
             }

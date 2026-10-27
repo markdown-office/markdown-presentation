@@ -113,4 +113,20 @@ final class MalformedTheme extends InvalidInput
             $attribute,
         )));
     }
+
+    /**
+     * Two text styles whose names are the same word.
+     *
+     * The names are folded, so `Brand` and `brand` are one name: a theme that carries both
+     * has two styles a deck cannot tell apart, and the one of them a deck reaches is the
+     * one that happens to be written last.
+     */
+    public static function duplicateStyle(string $file, string $style, string $other): self
+    {
+        return new self(self::in($file, sprintf(
+            'The style "%s" is the same style as "%s": a style\'s name is a word, and a theme names one style once.',
+            $style,
+            $other,
+        )));
+    }
 }

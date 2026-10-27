@@ -46,6 +46,30 @@ final class TextStyle
     public const RESERVED = 'style';
 
     /**
+     * A style's name as the suite folds it.
+     *
+     * Without regard to case and without the space around it: a style's name is a word to
+     * a reader, and `:Brand[Bakery]` and `:brand[Bakery]` are the same word written twice.
+     * The Word half folds its names the same way, and the directives package folds the
+     * names of the directives themselves.
+     */
+    public static function fold(string $name): string
+    {
+        return strtolower(trim($name));
+    }
+
+    /**
+     * Whether a name is the one a theme may not give a style of its own.
+     *
+     * Folded, because `Style` is the same word as `style` and a theme cannot be asked to
+     * care about case.
+     */
+    public static function isReserved(string $name): bool
+    {
+        return self::fold($name) === self::RESERVED;
+    }
+
+    /**
      * @param ?string $colour The ink, as written: a role, a theme slot or a hex value.
      * @param ?int    $size   The size of the type, in points.
      * @param ?string $font   The family, as written.

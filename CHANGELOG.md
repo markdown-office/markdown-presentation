@@ -69,6 +69,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A style's name is a word, and a word does not care about case.** A theme that spelled a
+  style `Brand` had it under `:Brand[…]` alone, so a deck writing `:brand[Bakery]` was
+  refused with a message naming styles the author could not have written. The names are
+  folded now, the way the directives package folds the names of the directives themselves,
+  and the refusal for a name the theme does not have spells the styles it does have the
+  way the theme wrote them — because that is the spelling the author has to change.
+
+  A theme that names one style twice, in two spellings, is refused rather than letting one
+  of the two be reached at random.
+
 - **A label holds no Markdown that CommonMark does not call emphasis.** The rule refused
   `__ Bakery__` and `** text**`, which are not emphasis: a delimiter run that opens an
   emphasis may not be followed by whitespace, and one that closes it may not be preceded by

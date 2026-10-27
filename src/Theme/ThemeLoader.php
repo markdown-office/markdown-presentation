@@ -315,13 +315,22 @@ final class ThemeLoader
         }
 
         $styles = [];
+        $seen = [];
 
         foreach ($this->mapping($file, 'a mapping of style names to text styles') as $style => $properties) {
             $style = (string) $style;
 
-            if ($style === TextStyle::RESERVED) {
+            if (TextStyle::isReserved($style)) {
                 throw MalformedTheme::reservedStyle($file, $style);
             }
+
+            $folded = TextStyle::fold($style);
+
+            if (isset($seen[$folded])) {
+                throw MalformedTheme::duplicateStyle($file, $style, $seen[$folded]);
+            }
+
+            $seen[$folded] = $style;
 
             if (!is_array($properties) || ($properties !== [] && array_is_list($properties))) {
                 throw MalformedTheme::wrongType($file, $style, 'a mapping of attributes to values');

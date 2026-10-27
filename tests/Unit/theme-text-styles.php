@@ -56,6 +56,33 @@ it('refuses a text style named with the word the raw form is written with', func
         ->toThrow(MalformedTheme::class, 'is named with a reserved word');
 });
 
+it('refuses a text style named with the reserved word in another case', function () {
+    // The reserved word is folded with the rest of the names, because `Style` is the same
+    // word as `style`.
+    $loader = new ThemeLoader();
+
+    expect(fn () => $loader->load(themeWithTextStyles("Style:\n  color: accent1\n")))
+        ->toThrow(MalformedTheme::class, 'is named with a reserved word');
+});
+
+it('refuses a theme that names one text style twice, in two spellings', function () {
+    // The names are folded, so `Brand` and `brand` are one name: a theme carrying both has
+    // two styles a deck cannot tell apart, and the one a deck reaches is the one written
+    // last.
+    $loader = new ThemeLoader();
+
+    expect(fn () => $loader->load(themeWithTextStyles("Brand:\n  color: accent1\nbrand:\n  color: accent2\n")))
+        ->toThrow(MalformedTheme::class, 'is the same style as');
+});
+
+it('reads a text style the theme spells with a capital letter, under the folded name', function () {
+    $loaded = (new ThemeLoader())->load(themeWithTextStyles("Brand:\n  color: accent1\n"));
+
+    expect($loaded->theme()->textStyles()->get('brand')?->colour)->toBe('accent1')
+        ->and($loaded->theme()->textStyles()->get('Brand')?->colour)->toBe('accent1')
+        ->and($loaded->theme()->textStyles()->names())->toBe(['Brand']);
+});
+
 it('refuses a text style that sets a highlight, which this half does not draw', function () {
     $loader = new ThemeLoader();
 
