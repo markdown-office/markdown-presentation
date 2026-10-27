@@ -785,21 +785,12 @@ final class ShapeWriter
             ]);
         }
 
-        if (is_array($entry)) {
-            $entry['runs'] = $runs;
-
-            return $entry;
-        }
-
-        if ($entry instanceof Heading) {
-            return new Heading($runs, $entry->level, $entry->step);
-        }
-
-        if ($entry instanceof Quote) {
-            return new Quote($runs, $entry->step);
-        }
-
-        return new Paragraph($runs, $entry->step);
+        return match (true) {
+            is_array($entry) => array_replace($entry, ['runs' => $runs]),
+            $entry instanceof Heading => new Heading($runs, $entry->level, $entry->step),
+            $entry instanceof Quote => new Quote($runs, $entry->step),
+            default => new Paragraph($runs, $entry->step),
+        };
     }
 
 /**

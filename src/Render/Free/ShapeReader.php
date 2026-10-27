@@ -84,7 +84,7 @@ final class ShapeReader
     }
 
     /**
-     * The shape, told apart by what it carries rather than by which of the twelve it is.
+     * The shape, told apart by what it carries rather than by which directive it was written as.
      *
      * @throws ImageNotFound
      * @throws MalformedShape
@@ -98,28 +98,28 @@ final class ShapeReader
         DirectiveAttributes $attributes,
         SlideState $state,
     ): FreeShape {
-        // Read before the branch, because every one of the twelve draws a box and can cast one,
-        // and `::image` is no exception: a `p:pic` carries an effect list of its own.
+        // Read before the branch, because every one of the free shapes draws a box and can
+        // cast one, and `::image` is no exception: a `p:pic` carries an effect list of its own.
         $shadow = Shadow::read($state->slide, $kind->value, $attributes, $state->theme);
 
-        if ($kind === ShapeKind::Image) {
-            return FreePicture::at(
+        // A picture takes no fill of its own: it is painted by its own bytes.
+        $paint = $kind === ShapeKind::Image
+            ? Paint::none()
+            : Paint::read($state->slide, $kind->value, $attributes, $state->theme);
+
+        return match (true) {
+            $kind === ShapeKind::Image => FreePicture::at(
                 $kind,
                 $placement,
                 $state->step,
-                Paint::none(),
+                $paint,
                 $this->picture($attributes, $state),
                 Pictures::fit($state->slide, $kind->value, $attributes),
                 $shadow,
-            );
-        }
-
-        $paint = Paint::read($state->slide, $kind->value, $attributes, $state->theme);
-
-        if ($kind === ShapeKind::SlideNumber) {
-            // Before the text block below, which is a box whose body the deck wrote: this
-            // one's body is the number, and the renderer writes it.
-            return FreeSlideNumber::at(
+            ),
+            // Before the text block, which is a box whose body the deck wrote: this one's body
+            // is the number, and the renderer writes it.
+            $kind === ShapeKind::SlideNumber => FreeSlideNumber::at(
                 $kind,
                 $placement,
                 $state->step,
@@ -127,11 +127,8 @@ final class ShapeReader
                 TextStyle::read($state->slide, $kind->value, $attributes, $state->theme),
                 $attributes->getBool('of'),
                 $shadow,
-            );
-        }
-
-        if ($kind->isContent()) {
-            return FreeText::at(
+            ),
+            $kind->isContent() => FreeText::at(
                 $kind,
                 $placement,
                 $state->step,
@@ -139,17 +136,16 @@ final class ShapeReader
                 $this->frame($node, $state),
                 TextStyle::read($state->slide, $kind->value, $attributes, $state->theme),
                 $shadow,
-            );
-        }
-
-        return FreeAutoShape::at(
-            $kind,
-            $placement,
-            $state->step,
-            $paint,
-            Length::written($state->slide, $kind->value, 'label', $attributes, ''),
-            $shadow,
-        );
+            ),
+            default => FreeAutoShape::at(
+                $kind,
+                $placement,
+                $state->step,
+                $paint,
+                Length::written($state->slide, $kind->value, 'label', $attributes, ''),
+                $shadow,
+            ),
+        };
     }
 
     /**
