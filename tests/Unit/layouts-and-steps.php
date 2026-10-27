@@ -470,15 +470,16 @@ it('divides an image-text layout into a picture column and a text column', funct
 
 it('leaves an image-text layout\'s text column wide enough for the estimate to be wrong', function () {
     // Both of a picture's columns are laid out from an estimate of how many lines its text wraps
-    // to, and the estimate reads a table of Helvetica's widths against a face that is usually
-    // wider. Where the estimate is short the two paragraphs are drawn on top of one another, and
-    // LibreOffice's preview does not show it — PowerPoint's own render does.
+    // to, and the estimate reads the advance widths of the face the text is drawn in. Where the
+    // estimate is short the two paragraphs are drawn on top of one another, and LibreOffice's
+    // preview does not show it — PowerPoint's own render does.
     [, $text] = (new SlideGeometry())->body(LayoutRole::ImageText);
 
     // The ratio is 5:4 rather than the 3:2 a picture would prefer, and this is what holds it
-    // there. {@see ShapeWriter} lays a column out from a table of Helvetica's widths and a
-    // theme's own face is wider than Helvetica, so the text column has to be wide enough that
-    // being wrong by a word does not put a paragraph on top of the one above it.
+    // there. {@see ShapeWriter} lays a column out from the widths of the face the theme draws
+    // the text in, and a table of advance widths says nothing about how far apart two
+    // characters will sit, so the text column has to be wide enough that being wrong by a word
+    // does not put a paragraph on top of the one above it.
     //
     // Five ninths of what the two columns share is a shade under half the body, and that is
     // the number: a 3:2 split would leave the text on two fifths, which is where the overlap

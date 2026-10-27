@@ -411,12 +411,16 @@ putting its second line on the first line of the body. The body is read in the s
 every slide, which is why the title gives way and not the body.
 
 Every block is measured before it is drawn: `Render\TextMetric` counts the lines it will
-wrap to, from an advance-width table bundled in the package. It is an estimate and says so
-— the widths are Helvetica's, kerning is not modelled, and a theme naming a face of a
-different width is not detected — which is why every text shape is written `a:normAutofit`.
-The box keeps the height the layout gave it and the reader scales the type down to fit, so
-an estimate that came out a line short costs a little whitespace instead of drawing one
-block over the next.
+wrap to, from the advance widths of the face the theme draws the text in. There is a table
+for every face the shipped themes name — Calibri, Cambria, Arial, Arial Narrow, Georgia,
+Inter and Roboto — and a bold run is measured with the widths of the bold face rather than
+with the upright ones made a little wider. It is an estimate and says so: kerning is not
+modelled, and a theme naming a face with no table of its own is measured with the
+reference face's widths — the ones every face was measured with before there were tables of
+their own — and the face is named by `unknownFonts()`. Which is why every text shape is
+written `a:normAutofit`. The box keeps the height the layout gave it and the reader scales
+the type down to fit, so an estimate that came out a line short costs a little whitespace
+instead of drawing one block over the next.
 
 ### Links
 
@@ -630,9 +634,9 @@ a template can supply the boxes for each, and *Reset* restores them:
 `image-text` divides at a `::column` exactly as `two-column` does, so the picture — everything
 above the marker — is the left column. Its two columns are separated by the same gutter a
 bullet is from its text, not by a gap of its own, and the text column is wider than a picture's
-share of the page would suggest: `ShapeWriter` estimates wrapping from a table of Helvetica's
-widths and a theme's own face is wider than that, so a column narrow enough to need the
-estimate to be exactly right is a column where two paragraphs are drawn on top of one another.
+share of the page would suggest: `ShapeWriter` estimates wrapping from the advance widths of
+the face the theme draws the text in, and a column narrow enough to need that estimate to be
+exactly right is a column where two paragraphs are drawn on top of one another.
 
 `image-title` gives its headline a band one line tall rather than the two a content slide's
 title box is given room for, because every pixel of that band is a pixel of picture.
@@ -1597,6 +1601,16 @@ theme's own swatches. The page behind every slide, the type on it and the panels
 follow `dark:` — see [Dark themes](#dark-themes). The `heading`, `body` and `mono` fonts are
 applied to the runs that use them, because a `.pptx`'s font scheme is not reachable from
 here.
+
+The faces a theme names are also the faces its text is measured with, and there is a table
+of advance widths for every face the shipped themes name: Calibri, Cambria, Arial, Arial
+Narrow, Georgia, Inter and Roboto. A theme naming a face with no table of its own is
+measured with the reference face's widths — the ones every face was measured with before
+there were tables of their own — and the face is named by
+`PresentationRenderer::unknownFonts()`, one entry for every slot it was named in. A caller
+that would rather have no file than a file whose text was measured with another face's
+widths asks for the strict renderer, and gets `UnknownFont` naming the faces there are
+tables for.
 
 Two limits worth knowing. All twelve slots are written whether a shape uses them or not:
 DrawingML's `CT_ColorScheme` is twelve required elements, so a scheme missing one is an

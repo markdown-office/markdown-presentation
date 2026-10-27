@@ -375,6 +375,18 @@ it('does not claim again what the code does not do', function (string $claim) {
     // offering it. The decision is pinned by the XML the README quotes instead — one run, no
     // `a:rPr`, `algn` and `anchor` written into the element — which cannot be edited into
     // meaning the opposite without also being visibly wrong.
+
+    // Every piece of text was measured with one face's advance widths whatever the theme
+    // named, so a deck set in a narrower face was laid out as if it were set in a wider one
+    // and a heading wrapped a word earlier than the original deck. There is a table for
+    // every face the shipped themes name now, and a face with no table is measured with the
+    // reference face's widths and reported. The phrases are what the pages said rather than
+    // the idea. `CHANGELOG.md` names the old reference in its own entry for the release that
+    // introduced it, so the phrases are the ones the pages used and not the one the history
+    // quotes.
+    'every piece of text is measured with one face\'s widths' => 'the widths are Helvetica\'s',
+    'the wrapping is estimated from a table of one face\'s widths' => 'Helvetica\'s widths',
+    'the table is one face\'s own advance widths' => 'Helvetica\'s own advance widths',
 ]);
 
 it('has no decorative dividers in it', function () {
