@@ -376,6 +376,10 @@ it('names the alternatives wherever a failure is a name the author can change', 
         MalformedShape::attributeValue(3, 'rectangle', 'left', 'blue', 'A length is a number.')->getMessage(),
         'a left of "blue". A length is a number.',
     ],
+    'an attribute value written with the wrong separator' => [
+        MalformedShape::attributeValue(3, 'rectangle', 'left', '10%,', 'A length is a number.')->getMessage(),
+        'Attributes are separated by a space, not a comma. A length is a number.',
+    ],
     'a box past the edge of the slide' => [
         MalformedShape::offSlide(3, 'rectangle', 'at left 900px, which reaches 1020px', 960, 'wide')->getMessage(),
         'within the 960px wide slide',

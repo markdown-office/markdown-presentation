@@ -374,6 +374,10 @@ it('does not claim again what the code does not do', function (string $claim) {
     // the author looking for a closer that was there. The phrase below is the old rule's
     // own wording, and no comment or page may say it now.
     'a note is taken off the content wherever it is written' => 'taken off the content wherever it is written',
+    // The attributes of a directive are separated by spaces, and a value with a comma in it
+    // is a list written with the wrong separator rather than a value of its own. The failure
+    // says so now; the phrase below is the old reading, and no comment or page may say it.
+    'the attributes of a directive may be separated by commas' => 'separated by commas',
 
     // A manifest was named by the file the path resolved to rather than by the name the deck
     // wrote, so a `theme.yml` that was a link to a file of another name was refused for the

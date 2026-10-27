@@ -109,6 +109,12 @@ All notable changes to this project are documented here. The format follows
   emphasis may not be followed by whitespace, and one that closes it may not be preceded by
   whitespace. A label holding one is drawn as it was written.
 
+- **A value with a comma in it names the separator.** The attributes of a directive are
+  separated by spaces, and a bare value runs to the next space, so `left=10%, top=20%` is
+  read as one value of `10%,` and one attribute nobody reads. The failure said the value
+  was wrong, which sent the author to change a number that was right; it names the
+  separator now, and still says what a length may be.
+
 - **A note that is closed and is not the last thing on the slide says so.** The note was
   closed and it was in the wrong place, and the failure said that nothing closed it —
   which sent the author looking for a closer that was there. A note has to be the last

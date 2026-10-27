@@ -984,7 +984,7 @@ loses its body box.
 
 Everything so far is laid out for you. A **free shape** is one you place yourself, in pixels or
 in fractions of the slide, and it is written in the body of a slide with the same two-colon
-directives the step markers use:
+directives the step markers use. **Its attributes are separated by a space**:
 
 ```markdown
 ---
@@ -1000,6 +1000,10 @@ layout: blank
 - 4,182 signups
 :::
 ```
+
+A comma is not a separator: a value runs to the next space, so `width=40%, height=20%` is one
+value of `40%,` and one attribute nobody reads. A failure about such a value says so, rather
+than leaving the author to change a number that was right.
 
 Twelve names are drawn, and nothing else — a name outside them is a failure that lists all
 twelve, so the vocabulary is in the error rather than in a place you have to find:
@@ -1373,6 +1377,7 @@ $decks = [
     "::rectangle{fill=chartreuse}\n",
     "::rectangle{rotate=22.5}\n",
     "::image{src=\"chart.png\" fill=accent1}\n",
+    "::rectangle{left=10%, top=20%}\n",
 ];
 
 foreach ($decks as $slide) {
@@ -1399,6 +1404,8 @@ Slide 1 gives "rectangle" a fill of "chartreuse". A colour is none, page, ink, s
 Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
 
 Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.
+
+Slide 1 gives "rectangle" a left of "10%,". Attributes are separated by a space, not a comma. A length is a number, a number of pixels, a number of points, or — for a position or a size — a percentage of the slide: left=40%, left=320, font-size=24pt.
 ```
 
 Two things are **not** offered and are refused rather than approximated: a dashed outline,

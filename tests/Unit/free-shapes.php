@@ -185,6 +185,33 @@ it('refuses a length that is not a number, and says the three spellings', functi
         ->toThrow(MalformedShape::class, 'left=40%, left=320, font-size=24pt');
 });
 
+it('names the separator where the attributes were written with commas', function () {
+    // A value runs to the next space, so `left=10%, top=20%` is one value of `10%,` and
+    // one attribute nobody reads. A message that blames the value sends the author to
+    // change a number that was right.
+    expect(fn () => placedShapes("::rectangle{left=10%, top=20%}\n"))
+        ->toThrow(MalformedShape::class, 'Attributes are separated by a space, not a comma');
+});
+
+it('names the separator where the attributes were written with commas and nothing else', function () {
+    // The other spelling of the same mistake: nothing separates the two attributes, so
+    // the first value swallows the second.
+    expect(fn () => placedShapes("::rectangle{fill=red,stroke=blue}\n"))
+        ->toThrow(MalformedShape::class, 'Attributes are separated by a space, not a comma');
+});
+
+it('still says what a length may be where the separator was wrong', function () {
+    // The separator is the mistake, and the value is what a length has to be as well: a
+    // message that named only one of them would leave the author with half the rule.
+    expect(fn () => placedShapes("::rectangle{left=10%, top=20%}\n"))
+        ->toThrow(MalformedShape::class, 'left=40%, left=320, font-size=24pt');
+});
+
+it('leaves a list of attributes separated by spaces alone', function () {
+    expect(placedShape("::rectangle{left=10% top=20% width=50% height=20%}\n")->kind)
+        ->toBe(ShapeKind::Rectangle);
+});
+
 it('refuses a negative length, because a free shape lies within the slide', function () {
     expect(fn () => placedShapes("::rectangle{left=-40}\n"))
         ->toThrow(MalformedShape::class, 'A length is not negative');

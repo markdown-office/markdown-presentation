@@ -52,8 +52,25 @@ final class MalformedShape extends InvalidInput
             $name,
             $attribute,
             $written,
-            $advice,
+            self::separator($written) . $advice,
         ));
+    }
+
+    /**
+     * The sentence that names the separator, where the value says the mistake was the
+     * separator rather than the value.
+     *
+     * A bare value runs to the next space, so a list written with commas is read as one
+     * value: `width=40%, height=20%` gives a width of `40%,` and `fill=red,stroke=blue` a
+     * fill of `red,stroke=blue`. A message that blames the value sends the author to change
+     * a number that was right, and every value this message is about is a length, a colour, a
+     * word or a number — none of which may hold a comma.
+     */
+    private static function separator(string $written): string
+    {
+        return str_contains($written, ',')
+            ? 'Attributes are separated by a space, not a comma. '
+            : '';
     }
 
     /**
