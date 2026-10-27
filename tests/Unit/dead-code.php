@@ -404,6 +404,10 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the monospaced half is exact' => 'the monospaced half is exact',
     'the three monospaced faces advance by the same amount' => 'which is what Consolas, Menlo and JetBrains Mono use',
     'the face a monospaced one is says nothing about how wide its text is' => 'says nothing about how wide its text is',
+    // The renderer copies the resolver it is given rather than changing it, so the
+    // resolver a caller keeps is not the one the renderer works with: the deck's
+    // directory goes to the copy.
+    'the resolver a caller keeps is the one the renderer works with' => 'keeps it and gains the deck\'s directory with it',
 ]);
 
 it('has no decorative dividers in it', function () {

@@ -152,6 +152,14 @@ final class PresentationRenderer
      *                                 resolves against, which is the directory the deck
      *                                 itself is in. It is also the first of the roots an
      *                                 image may be read from: see {@see self::$files}.
+     * @param ThemeResolver $themes    The resolver the themes are looked up in. It is
+     *                                 copied rather than used as it is: the renderer hands
+     *                                 it the deck's directory, and the copy is the one
+     *                                 that looks beside the deck. The caller keeps the
+     *                                 resolver it passed, with its loader and its roots,
+     *                                 and the renderer works with a copy of it — a
+     *                                 resolver handed to two renders is not changed by
+     *                                 either.
      * @param bool         $strict     Whether a block that does not fit is
      *                                 {@see ContentOverflow} rather than clamped and
      *                                 recorded. Strict is for a caller that would rather

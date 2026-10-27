@@ -37,9 +37,10 @@ All notable changes to this project are documented here. The format follows
   directory, the one a relative image path in the deck resolves against, is the
   resolver's deck directory too now, and a theme is looked for beside the deck first and
   beside the working directory second. The renderer hands its directory to the resolver
-  it was given, so a caller that brings its own resolver keeps it and gains the deck's
-  directory with it. The failure for a name that resolves to nothing lists the themes of
-  every root, the deck's own among them.
+  it was given, so a caller that brings its own resolver keeps its loader and its roots,
+  and the renderer works with a copy of it that looks beside the deck: a resolver handed
+  to two renders is not changed by either. The failure for a name that resolves to
+  nothing lists the themes of every root, the deck's own among them.
 
 - **`theme:` may name the manifest.** A path with a `/` in it was read as a directory,
   and the manifest was looked for inside it, so `theme: ./theme.yml` meant a directory
