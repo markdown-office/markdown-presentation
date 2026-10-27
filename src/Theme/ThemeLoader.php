@@ -122,7 +122,7 @@ final class ThemeLoader
             Theme::fromArray(
                 $this->mapping($manifest, 'a theme'),
                 $manifest,
-                new TextStyles($this->textStyles($directory, $files, $name)),
+                $this->textStyles($directory, $files, $name),
             ),
             $this->styles($directory, $files, $name),
             $this->layouts($directory, $files, $name),
@@ -301,21 +301,22 @@ final class ThemeLoader
      * in a deck drawn with it is then a name the theme does not have. It is held to the
      * scope like every other file of the theme, because it is one of them.
      *
-     * @return array<string, TextStyle>
+     * A style named twice is refused by {@see TextStyles} itself rather than here, because
+     * the styles may also be built in code and the rule belongs to them.
      *
      * @throws ThemeNotFound
      * @throws Exception
+     * @throws MalformedTheme
      */
-    private function textStyles(string $directory, ?PathScope $files, string $name): array
+    private function textStyles(string $directory, ?PathScope $files, string $name): TextStyles
     {
         $file = $this->contained($files, $directory . '/' . self::TEXT_STYLES_FILE, $name);
 
         if (!is_file($file)) {
-            return [];
+            return new TextStyles();
         }
 
         $styles = [];
-        $seen = [];
 
         foreach ($this->mapping($file, 'a mapping of style names to text styles') as $style => $properties) {
             $style = (string) $style;
@@ -323,14 +324,6 @@ final class ThemeLoader
             if (TextStyle::isReserved($style)) {
                 throw MalformedTheme::reservedStyle($file, $style);
             }
-
-            $folded = TextStyle::fold($style);
-
-            if (isset($seen[$folded])) {
-                throw MalformedTheme::duplicateStyle($file, $style, $seen[$folded]);
-            }
-
-            $seen[$folded] = $style;
 
             if (!is_array($properties) || ($properties !== [] && array_is_list($properties))) {
                 throw MalformedTheme::wrongType($file, $style, 'a mapping of attributes to values');
@@ -343,7 +336,7 @@ final class ThemeLoader
             $styles[$style] = $this->textStyle($file, $style, $properties);
         }
 
-        return $styles;
+        return new TextStyles($styles, $file);
     }
 
     /**

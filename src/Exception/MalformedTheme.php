@@ -136,13 +136,19 @@ final class MalformedTheme extends InvalidInput
      *
      * The names are folded, so `Brand` and `brand` are one name: a theme that carries both
      * has two styles a deck cannot tell apart.
+     *
+     * The file is optional, because the styles may be built in code rather than read out of
+     * a theme's file: a name written twice is a mistake whoever wrote it, and the file is
+     * only there to say where the author has to look.
      */
-    public static function duplicateStyle(string $file, string $style, string $other): self
+    public static function duplicateStyle(?string $file, string $style, string $other): self
     {
-        return new self(self::in($file, sprintf(
+        $problem = sprintf(
             'The style "%s" is the same style as "%s": a style\'s name is a word, and a theme names one style once.',
             $style,
             $other,
-        )));
+        );
+
+        return new self($file === null ? $problem : self::in($file, $problem));
     }
 }

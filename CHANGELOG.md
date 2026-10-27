@@ -224,6 +224,15 @@ All notable changes to this project are documented here. The format follows
   `Free\Colour::ADVICE` is gone, because a constant cannot be built from a list; the
   message is `Theme::colourAdvice()` now.
 
+- **A style named twice is refused by the styles themselves.** The check sat in the theme
+  loader, so a `TextStyles` built in code took the last of the two and said nothing about
+  it: a theme's file was checked and a `TextStyles` was not. The refusal is inside the
+  styles now, where the rule is, and it holds whoever made them.
+
+  The file the styles were read from is still named in the refusal, because that is where
+  the author has to look — and a `TextStyles` built in code has no file, so the message
+  says what is wrong without one.
+
 - **The advice about a colour reads as a sentence.** The advice names every colour that
   would have been right, and it began with the two spellings of no colour at all: the
   sentence read as though "none" were a role like the rest, and it is the absence of a

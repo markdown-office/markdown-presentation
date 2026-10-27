@@ -5,6 +5,7 @@ declare(strict_types=1);
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
 use MarkdownPresentation\Theme\TextStyle;
+use MarkdownPresentation\Theme\TextStyles;
 use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeLoader;
 
@@ -68,11 +69,18 @@ it('refuses a text style named with the reserved word in another case', function
 
 it('refuses a theme that names one text style twice, in two spellings', function () {
     // The names are folded, so `Brand` and `brand` are one name: a theme carrying both has
-    // two styles a deck cannot tell apart, and the one a deck reaches is the one written
-    // last.
+    // two styles a deck cannot tell apart, and neither of them is reached.
     $loader = new ThemeLoader();
 
     expect(fn () => $loader->load(themeWithTextStyles("Brand:\n  color: accent1\nbrand:\n  color: accent2\n")))
+        ->toThrow(MalformedTheme::class, 'is the same style as');
+});
+
+it('refuses styles built in code that carry one name twice', function () {
+    // The check sat in the loader, so a `TextStyles` built in code took the last of the
+    // two and said nothing about it. The refusal is inside the styles themselves now,
+    // where the rule is, and it holds whoever made them.
+    expect(fn () => new TextStyles(['Brand' => new TextStyle(), 'brand' => new TextStyle()]))
         ->toThrow(MalformedTheme::class, 'is the same style as');
 });
 

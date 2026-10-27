@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Theme;
 
+use MarkdownPresentation\Exception\MalformedTheme;
+
 /**
  * The named styles a theme carries.
  *
@@ -14,6 +16,10 @@ namespace MarkdownPresentation\Theme;
  * The names are folded, because a style's name is a word to a reader: `:Brand[Bakery]` and
  * `:brand[Bakery]` are the same word written twice. The theme's own spelling is kept
  * beside it, because that is the spelling the author has to change.
+ *
+ * A name written twice is refused here rather than where the styles are read from,
+ * because a theme's styles may also be built in code: the rule is in the styles
+ * themselves, so it holds whoever made them.
  */
 final class TextStyles
 {
@@ -34,11 +40,21 @@ final class TextStyles
     /**
      * @param array<string, TextStyle> $styles The styles, keyed by the name the theme
      *                                          wrote them under.
+     * @param ?string                $file   The file they were read from, or null where
+     *                                          they were built in code. A refusal names
+     *                                          it, because that is where the author has
+     *                                          to look.
+     *
+     * @throws MalformedTheme
      */
-    public function __construct(array $styles = [])
+    public function __construct(array $styles = [], ?string $file = null)
     {
         foreach ($styles as $name => $style) {
             $folded = TextStyle::fold((string) $name);
+
+            if (isset($this->written[$folded])) {
+                throw MalformedTheme::duplicateStyle($file, (string) $name, $this->written[$folded]);
+            }
 
             $this->styles[$folded] = $style;
             $this->written[$folded] = (string) $name;
