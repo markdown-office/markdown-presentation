@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\UnknownFont;
+use MarkdownPresentation\Render\FontMetrics;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\TextMetric;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
+use MarkdownPresentation\Tests\Support\ThemeDirectory;
 
 /**
  * A one-column table whose only cell is `$z` characters of `z`.
@@ -68,6 +71,76 @@ it('measures bold a little wider than the same character upright', function () {
         ->toBeGreaterThan($metric->width([TextMetric::piece('mm', 16)]));
 });
 
+it('measures a run with the face its theme names rather than with the reference face', function () {
+    // Calibri's `n` is 525 units to the em and Arial's is 556, so the same word is 5.6%
+    // narrower in the face the default theme draws it in. Which face a word is drawn in is
+    // what decides where a line breaks, so it is what the measurement has to use.
+    $metric = new TextMetric();
+
+    expect($metric->width([TextMetric::piece('nnn', 1000, face: 'Calibri')]))
+        ->toBe(3 * 525)
+        ->and($metric->width([TextMetric::piece('nnn', 1000, face: 'Arial')]))
+        ->toBe(3 * 556)
+        ->and($metric->width([TextMetric::piece('nnn', 1000)]))
+        ->toBe(3 * 556);
+});
+
+it('wraps a line where the face it is drawn in wraps it', function () {
+    // Twelve `n` at 16pt are 101px of Calibri and 107px of Arial, so a box 104px wide
+    // holds one line of the first and two of the second. Where a line breaks is the whole
+    // of what the measurement is for.
+    $metric = new TextMetric();
+    $word = str_repeat('n', 12);
+
+    expect($metric->lines([TextMetric::piece($word, 16, face: 'Calibri')], 104))->toBe(1)
+        ->and($metric->lines([TextMetric::piece($word, 16, face: 'Arial')], 104))->toBe(2);
+});
+
+it('measures a bold run with the widths of the bold face', function () {
+    // Arial's upright `m` is 833 units to the em and its bold one is 889; Inter's are 876
+    // and 913. The bold face is wider by its own amount, which is not the same amount in
+    // every face and is not the five per cent every bold run used to be made wider by.
+    $metric = new TextMetric();
+
+    expect($metric->width([TextMetric::piece('mm', 1000, bold: true, face: 'Arial')]))
+        ->toBe(2 * 889)
+        ->and($metric->width([TextMetric::piece('mm', 1000, face: 'Arial')]))
+        ->toBe(2 * 833)
+        ->and($metric->width([TextMetric::piece('mm', 1000, bold: true, face: 'Inter')]))
+        ->toBe(2 * 913);
+});
+
+it('measures a monospaced run at the width of a monospaced face whatever face it names', function () {
+    // A code block is the one kind of block that is always monospaced, and every character
+    // in a monospaced face advances by the same amount, so the face it names says nothing
+    // about how wide it is.
+    $metric = new TextMetric();
+
+    expect($metric->width([TextMetric::piece('iiii', 12, mono: true, face: 'Calibri')]))
+        ->toBe($metric->width([TextMetric::piece('WWWW', 12, mono: true, face: 'Arial')]))
+        ->toBe((int) round(4 * 600 * 12 / 1000));
+});
+
+it('derives the table for Arial from the widths every face used to be measured with', function () {
+    // Liberation Sans is metrically identical to Arial and Arial to Helvetica, so the
+    // table derived for Arial is the table this renderer used to measure every face
+    // with. If the two are not the same, the parser that read the font is wrong.
+    expect(FontMetrics::TABLES['Arial']['regular'])->toBe([
+        ' ' => 278, '!' => 278, '"' => 355, '#' => 556, '$' => 556, '%' => 889, '&' => 667, "'" => 191,
+        '(' => 333, ')' => 333, '*' => 389, '+' => 584, ',' => 278, '-' => 333, '.' => 278, '/' => 278,
+        '0' => 556, '1' => 556, '2' => 556, '3' => 556, '4' => 556, '5' => 556, '6' => 556, '7' => 556,
+        '8' => 556, '9' => 556, ':' => 278, ';' => 278, '<' => 584, '=' => 584, '>' => 584, '?' => 556,
+        '@' => 1015, 'A' => 667, 'B' => 667, 'C' => 722, 'D' => 722, 'E' => 667, 'F' => 611, 'G' => 778,
+        'H' => 722, 'I' => 278, 'J' => 500, 'K' => 667, 'L' => 556, 'M' => 833, 'N' => 722, 'O' => 778,
+        'P' => 667, 'Q' => 778, 'R' => 722, 'S' => 667, 'T' => 611, 'U' => 722, 'V' => 667, 'W' => 944,
+        'X' => 667, 'Y' => 667, 'Z' => 611, '[' => 278, '\\' => 278, ']' => 278, '^' => 469, '_' => 556,
+        '`' => 333, 'a' => 556, 'b' => 556, 'c' => 500, 'd' => 556, 'e' => 556, 'f' => 278, 'g' => 556,
+        'h' => 556, 'i' => 222, 'j' => 222, 'k' => 500, 'l' => 222, 'm' => 833, 'n' => 556, 'o' => 556,
+        'p' => 556, 'q' => 556, 'r' => 333, 's' => 500, 't' => 278, 'u' => 556, 'v' => 500, 'w' => 722,
+        'x' => 500, 'y' => 500, 'z' => 500, '{' => 334, '|' => 260, '}' => 334, '~' => 584,
+    ]);
+});
+
 it('takes a character outside ASCII at a full em when it is three bytes or more', function () {
     // A CJK ideograph or an emoji, which is a full em in every face the table covers — and
     // counted once, not once per byte, which is what a byte-at-a-time reader gets wrong.
@@ -83,8 +156,7 @@ it('takes a character outside ASCII at the mean of the table when it is two byte
     // takes the average of the printable ASCII rather than a per-character width nobody
     // has measured. `é` at a thousand points is that mean, exactly.
     $metric = new TextMetric();
-    /** @var array<string, int> $table */
-    $table = (new ReflectionClass(TextMetric::class))->getConstant('SANS');
+    $table = FontMetrics::TABLES[FontMetrics::REFERENCE]['regular'];
 
     expect($metric->width([TextMetric::piece('é', 1000)]))
         ->toBe(intdiv(array_sum($table), count($table)));
@@ -202,10 +274,11 @@ it('measures a code line by its characters, so a long one wraps', function () {
 });
 
 it('gives a table row the height of the lines its longest cell wraps to', function () {
-    // The header is one line and takes a 38px row; the body cell is 3000px of type in a
-    // column 880 wide, so four lines of 19px.
+    // The header is one line and takes a 38px row; the body cell is 2370px of type in a
+    // column 880 wide — Calibri's `z` is 395 units to the em, where the face every word
+    // used to be measured with has 500 — so three lines of 19px.
     expect(measured(oneColumnTable(500))->positionOf('table')['height'])
-        ->toBe(38 + 4 * 19.0);
+        ->toBe(38 + 3 * 19.0);
 });
 
 /**
@@ -275,9 +348,64 @@ it('keeps a table cell\'s text off its neighbour\'s', function () {
 it('measures a table cell against the width its padding leaves', function () {
     // The padding is not free: a cell measured against the whole column uses six pixels its
     // text does not have, and a cell whose last line is exactly that wide wraps — which is a
-    // row taller than the text in it needs. 292 `z` are 1752px of type in an 880px column:
+    // row taller than the text in it needs. 367 `z` are 1740px of type in an 880px column:
     // three lines once 12px of that column is padding, two without.
-    $markdown = oneColumnTable(292);
+    $markdown = oneColumnTable(367);
 
     expect(measured($markdown)->positionOf('table')['height'])->toBe(38.0 + 3 * 19.0);
 });
+
+/**
+ * Render a deck in a theme of its own, returning the renderer, because the report of the
+ * faces it could not measure is on the renderer.
+ */
+function renderedIn(string $theme, bool $strict = false): PresentationRenderer
+{
+    $renderer = new PresentationRenderer(strict: $strict);
+    $renderer->render(
+        (new DeckParser())->parse(sprintf("---\ntheme: %s\n---\n# One\n", $theme)),
+        Scratch::file('deck.pptx', ''),
+    );
+
+    return $renderer;
+}
+
+/**
+ * A theme naming a face there is no table for.
+ */
+function themeWithAnUnknownFace(): string
+{
+    return ThemeDirectory::create([
+        'theme.yml' => "name: Odd\nfonts:\n  heading: \"Comic Sans MS\"\n  body: \"Comic Sans MS\"\n",
+        'layouts.yml' => "layouts:\n  title: Title Slide\n  content: Title and Content\n",
+    ]);
+}
+
+it('reports a face a theme names that there is no table for', function () {
+    // A theme naming a face nobody has measured still renders: the text is measured with
+    // the reference face's widths, which are not that face's, and this is where that is
+    // said. A deck laid out with the wrong face and nothing to say so is the failure the
+    // tables of faces exist to end.
+    expect(renderedIn(themeWithAnUnknownFace())->unknownFonts())->toBe([
+        ['face' => 'Comic Sans MS', 'slot' => 'heading'],
+        ['face' => 'Comic Sans MS', 'slot' => 'body'],
+    ]);
+});
+
+it('reports no face for a theme whose faces are all ones there are tables for', function () {
+    // The default theme names Calibri and Consolas, and there is a table for the first and
+    // the second is monospaced, so there is nothing to say about it.
+    expect(renderedIn('default')->unknownFonts())->toBe([]);
+});
+
+it('refuses a deck whose theme names a face it cannot measure when the renderer is strict', function () {
+    // Strict is for a caller that would rather have no file than a file whose text was
+    // measured with another face's widths, and the message names the faces there are
+    // tables for.
+    expect(fn () => renderedIn(themeWithAnUnknownFace(), strict: true))
+        ->toThrow(
+            UnknownFont::class,
+            'The theme\'s heading face "Comic Sans MS" has no table of advance widths',
+        );
+});
+

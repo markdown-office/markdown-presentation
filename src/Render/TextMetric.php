@@ -14,20 +14,35 @@ namespace MarkdownPresentation\Render;
  * machine. Nothing guarantees Calibri, Inter, Roboto, Georgia, Consolas, JetBrains Mono or
  * Menlo is installed anywhere at all, and none of them could be shipped.
  *
- * What it is not: exact. The table is Helvetica's own advance widths, which are within a
- * few percent of Calibri, Inter and Roboto and are the widest of the faces the shipped
- * themes name — a face a theme picks that is much wider or narrower is not detected, and
- * kerning is not modelled. The bias is known and it is deliberate: over-estimating width
- * over-estimates the number of lines, and an over-estimated line count over-allocates
- * height. Too much height leaves a gap; too little puts one block on top of another.
- * {@see ShapeWriter} writes `normAutofit` on every text shape for the same reason: a box
- * the reader finds a line too tall is shrunk, not grown over its neighbour.
+ * The tables are the faces' own: {@see FontMetrics} carries one for every face the shipped
+ * themes name, and a piece of text is measured with the face its theme draws it in. Each
+ * table has a regular and a bold cut, so a bold run is measured with the widths of the
+ * bold face rather than with the upright ones made a little wider.
+ *
+ * What it is not: exact. Kerning is not modelled, so two letters that would sit closer
+ * together in the real face are measured as two letters set side by side, and a character
+ * outside the printable ASCII is measured at the mean of the face's own table rather than at
+ * its own width. The error is per face rather than a known constant: the tables say how
+ * wide each character is in the face that will draw it, and nothing says how far apart two
+ * characters will sit.
+ *
+ * Which way an estimate comes out is now a question about the face rather than about the
+ * model, and both ways have their own failure: too much height leaves a gap and too little
+ * puts one block on top of another. {@see ShapeWriter} writes `normAutofit` on every text
+ * shape for that reason — a box the reader finds a line too tall is shrunk, not grown over
+ * its neighbour.
+ *
+ * A face a theme names that has no table is measured with the reference face's widths —
+ * Arial's, which are the widths every face was measured with before there were tables of
+ * their own — and the renderer says which face it could not measure: see
+ * {@see \MarkdownPresentation\Render\PresentationRenderer::unknownFonts()}. Measuring it as
+ * some other face without saying so would be the failure the tables of faces exist to end.
  *
  * The monospaced half is exact. Every character in a monospaced face advances by the same
  * amount and 600/1000 is what Consolas, Menlo and JetBrains Mono all use, so a code block —
  * the one kind of block that is always monospaced — is measured rather than guessed.
  *
- * @phpstan-type Piece array{text: string, size: int, mono: bool, bold: bool}
+ * @phpstan-type Piece array{text: string, size: int, mono: bool, bold: bool, face: string}
  */
 final class TextMetric
 {
@@ -37,33 +52,18 @@ final class TextMetric
     /** What every character in a monospaced face advances by, whatever the character. */
     private const MONOSPACED = 600;
 
-    /** A CJK ideograph, a Hangul syllable or an emoji: a full em in every face above. */
+    /** A CJK ideograph, a Hangul syllable or an emoji: a full em in every face, so no table carries them. */
     private const FULL_EM = 1000;
 
-    /** Bold is a little wider than the same character upright. */
-    private const BOLD_FACTOR = 1.05;
-
     /**
-     * Helvetica's advance widths, in units per em, for the printable ASCII.
+     * The tables of the faces this renderer knows, by the name a theme writes them under.
      *
-     * The reference rather than any of the shipped themes' own faces because it is the one
-     * of the three that can be written down: it is metrically compatible with Arial,
-     * Liberation Sans and Nimbus Sans, and its widths are published.
+     * @param array<string, array{regular: array<int|string, int>, bold: array<int|string, int>}> $tables
      */
-    private const SANS = [
-        ' ' => 278, '!' => 278, '"' => 355, '#' => 556, '$' => 556, '%' => 889, '&' => 667, "'" => 191,
-        '(' => 333, ')' => 333, '*' => 389, '+' => 584, ',' => 278, '-' => 333, '.' => 278, '/' => 278,
-        '0' => 556, '1' => 556, '2' => 556, '3' => 556, '4' => 556, '5' => 556, '6' => 556, '7' => 556,
-        '8' => 556, '9' => 556, ':' => 278, ';' => 278, '<' => 584, '=' => 584, '>' => 584, '?' => 556,
-        '@' => 1015, 'A' => 667, 'B' => 667, 'C' => 722, 'D' => 722, 'E' => 667, 'F' => 611, 'G' => 778,
-        'H' => 722, 'I' => 278, 'J' => 500, 'K' => 667, 'L' => 556, 'M' => 833, 'N' => 722, 'O' => 778,
-        'P' => 667, 'Q' => 778, 'R' => 722, 'S' => 667, 'T' => 611, 'U' => 722, 'V' => 667, 'W' => 944,
-        'X' => 667, 'Y' => 667, 'Z' => 611, '[' => 278, '\\' => 278, ']' => 278, '^' => 469, '_' => 556,
-        '`' => 333, 'a' => 556, 'b' => 556, 'c' => 500, 'd' => 556, 'e' => 556, 'f' => 278, 'g' => 556,
-        'h' => 556, 'i' => 222, 'j' => 222, 'k' => 500, 'l' => 222, 'm' => 833, 'n' => 556, 'o' => 556,
-        'p' => 556, 'q' => 556, 'r' => 333, 's' => 500, 't' => 278, 'u' => 556, 'v' => 500, 'w' => 722,
-        'x' => 500, 'y' => 500, 'z' => 500, '{' => 334, '|' => 260, '}' => 334, '~' => 584,
-    ];
+    public function __construct(
+        private readonly array $tables = FontMetrics::TABLES,
+    ) {
+    }
 
     /**
      * A stretch of text measured at its own size, face and weight.
@@ -72,11 +72,43 @@ final class TextMetric
      * inside it is set at a different size in a different face, and measuring the lot at the
      * paragraph's own size is what made a code-heavy paragraph come out a line short.
      *
+     * The face is the one the theme draws the text in, and a piece with no face of its own
+     * is measured with the reference face's widths.
+     *
      * @return Piece
      */
-    public static function piece(string $text, int $size, bool $mono = false, bool $bold = false): array
+    public static function piece(
+        string $text,
+        int $size,
+        bool $mono = false,
+        bool $bold = false,
+        string $face = '',
+    ): array {
+        return ['text' => $text, 'size' => $size, 'mono' => $mono, 'bold' => $bold, 'face' => $face];
+    }
+
+    /**
+     * Whether a face has a table of its own.
+     *
+     * A face that has none is measured with the reference face's widths, and the renderer
+     * reports it: see {@see \MarkdownPresentation\Render\PresentationRenderer::unknownFonts()}.
+     */
+    public function has(string $face): bool
     {
-        return ['text' => $text, 'size' => $size, 'mono' => $mono, 'bold' => $bold];
+        return isset($this->tables[$face]);
+    }
+
+    /**
+     * The faces there are tables for, in alphabetical order.
+     *
+     * @return list<string>
+     */
+    public function faces(): array
+    {
+        $faces = array_keys($this->tables);
+        sort($faces);
+
+        return $faces;
     }
 
     /**
@@ -89,7 +121,7 @@ final class TextMetric
         $pixels = 0;
 
         foreach ($pieces as $piece) {
-            $pixels += $this->advance($piece['text'], $piece['size'], $piece['mono'], $piece['bold']);
+            $pixels += $this->advance($piece);
         }
 
         return $pixels;
@@ -153,7 +185,8 @@ final class TextMetric
         // The delimiters are captured rather than discarded so that indentation counts: a
         // code block indented four spaces starts four spaces in.
         foreach (preg_split('/(\s+)/', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $chunk) {
-            $advance = $this->advance($chunk, $piece['size'], $piece['mono'], $piece['bold']);
+            $piece['text'] = $chunk;
+            $advance = $this->advance($piece);
 
             if (trim($chunk) === '') {
                 $gap += $advance;
@@ -178,22 +211,66 @@ final class TextMetric
         return [$lines, $used, $gap];
     }
 
-    private function advance(string $text, int $size, bool $mono, bool $bold): int
+    /**
+     * How wide one piece of text is, in pixels.
+     *
+     * @param Piece $piece
+     */
+    private function advance(array $piece): int
     {
         $units = 0;
         $offset = 0;
-        $length = strlen($text);
+        $length = strlen($piece['text']);
 
         // A `while` rather than a `for` because how far the cursor moves is the answer
         // rather than a step: a character outside ASCII is more than one byte, and the
         // header of a `for` has nowhere to say so without reading as an afterthought.
         while ($offset < $length) {
-            $character = self::character($text, $offset);
+            $character = self::character($piece['text'], $offset);
             $offset += strlen($character);
-            $units += self::units($character, $mono);
+            $units += $this->units($character, $piece);
         }
 
-        return (int) round($units * ($bold ? self::BOLD_FACTOR : 1.0) * $size / self::UNITS_PER_EM);
+        return (int) round($units * $piece['size'] / self::UNITS_PER_EM);
+    }
+
+    /**
+     * How wide one character is, in units per em.
+     *
+     * @param Piece $piece The run the character is in, for its face and weight.
+     */
+    private function units(string $character, array $piece): int
+    {
+        if ($piece['mono']) {
+            return self::MONOSPACED;
+        }
+
+        $table = $this->widths($piece['face'], $piece['bold']);
+        $width = $table[$character] ?? null;
+
+        if ($width !== null) {
+            return $width;
+        }
+
+        // Three bytes or more is a CJK ideograph, a Hangul syllable or an emoji, and each is
+        // a full em wide in every face this model covers. Two bytes is an accented Latin
+        // letter, which is about as wide as the letter it accents, so it takes the mean of
+        // the face's own table rather than a mean of all of them.
+        return strlen($character) >= 3 ? self::FULL_EM : intdiv(array_sum($table), count($table));
+    }
+
+    /**
+     * The widths of a face, in units per em.
+     *
+     * A face with no table of its own is measured with the reference face's, which is what
+     * every face was measured with before there were tables of their own.
+     *
+     * @return array<int|string, int>
+     */
+    private function widths(string $face, bool $bold): array    {
+        $cut = $bold ? 'bold' : 'regular';
+
+        return $this->tables[$face][$cut] ?? $this->tables[FontMetrics::REFERENCE][$cut];
     }
 
     /**
@@ -211,21 +288,5 @@ final class TextMetric
             ord($text[$offset]) >= 0xC0 => 2,
             default => 1,
         });
-    }
-
-    private static function units(string $character, bool $mono): int
-    {
-        if ($mono) {
-            return self::MONOSPACED;
-        }
-
-        if (isset(self::SANS[$character])) {
-            return self::SANS[$character];
-        }
-
-        // Three bytes or more is a CJK ideograph, a Hangul syllable or an emoji, and each is
-        // a full em wide in every face this model covers. Two bytes is an accented Latin
-        // letter, which is about as wide as the letter it accents, so it takes the mean.
-        return strlen($character) >= 3 ? self::FULL_EM : intdiv(array_sum(self::SANS), count(self::SANS));
     }
 }

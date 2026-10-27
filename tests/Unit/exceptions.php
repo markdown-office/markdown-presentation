@@ -17,6 +17,7 @@ use MarkdownPresentation\Exception\NothingToConvert;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
+use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
@@ -98,6 +99,7 @@ it('reports what a deck author can fix under the class that says so', function (
         ThemeNotFound::class,
         TooManySlides::class,
         UnknownDirective::class,
+        UnknownFont::class,
         UnknownLayoutRole::class,
         UnknownMarker::class,
         UnknownStyleSlot::class,

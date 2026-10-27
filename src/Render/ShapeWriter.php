@@ -189,9 +189,16 @@ final class ShapeWriter
     /**
      * @param list<Run> $runs
     */
-    private function runLines(array $runs, int $width, int $size, bool $mono = false, bool $bold = false): int
+    private function runLines(
+        array $runs,
+        int $width,
+        int $size,
+        bool $mono = false,
+        bool $bold = false,
+        string $face = '',
+    ): int
     {
-        return $this->metric->lines($this->pieces($runs, $size, $mono, $bold), $width);
+        return $this->metric->lines($this->pieces($runs, $size, $mono, $bold, $face), $width);
     }
 
     /**
@@ -203,7 +210,13 @@ final class ShapeWriter
      *
      * @return list<Piece>
     */
-    private function pieces(array $runs, int $size, bool $mono = false, bool $bold = false): array
+    private function pieces(
+        array $runs,
+        int $size,
+        bool $mono = false,
+        bool $bold = false,
+        string $face = '',
+    ): array
     {
         $pieces = [];
 
@@ -213,6 +226,7 @@ final class ShapeWriter
                 $run->code ? SlideGeometry::CODE_SIZE : $size,
                 $run->code || $mono,
                 $run->bold || $bold,
+                $face,
             );
         }
 
@@ -298,6 +312,7 @@ final class ShapeWriter
                 $this->entryWidth($block, $entry, $width),
                 $size,
                 bold: $block instanceof Heading,
+                face: $this->faceOf($block),
             );
 
             foreach ($runs as $run) {
@@ -328,6 +343,19 @@ final class ShapeWriter
             $block instanceof Quote => SlideGeometry::QUOTE_SIZE,
             default => $this->bodySize(),
         };
+    }
+
+    /**
+     * The face a block of a frame is drawn in, which is the face it is measured with.
+     *
+     * A heading is drawn in the heading face and everything else in the body face, and the
+     * two are the same name in a theme whose faces are the same. Asked of the theme here for
+     * the same reason the size is: the theme decides which face a block is drawn in, and the
+     * measurement has to be of the face that will draw it.
+     */
+    private function faceOf(Heading|Paragraph|Quote|ListBlock $block): string
+    {
+        return $block instanceof Heading ? $this->font('heading') : $this->font('body');
     }
 
     /**
@@ -423,6 +451,7 @@ final class ShapeWriter
                     $width - 2 * SlideGeometry::TABLE_PADDING,
                     SlideGeometry::TABLE_SIZE,
                     bold: $number === self::HEADER_ROW,
+                    face: $this->font('body'),
                 ));
             }
 
@@ -451,7 +480,7 @@ final class ShapeWriter
 
             foreach ($block->cells as $row) {
                 $widest = max($widest, $this->metric->width(
-                    $this->pieces($row[$index] ?? [], SlideGeometry::TABLE_SIZE),
+                    $this->pieces($row[$index] ?? [], SlideGeometry::TABLE_SIZE, face: $this->font('body')),
                 ));
             }
 

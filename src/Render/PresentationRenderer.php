@@ -135,6 +135,14 @@ final class PresentationRenderer
      */
     private readonly Overflows $overflows;
 
+    /**
+     * Every face the theme named that this renderer has no table of advance widths for.
+     *
+     * See {@see FontReport}, which is the same trade {@see Overflows} makes: the report is
+     * where it is said, and strictness is a fact about the report rather than about the deck.
+     */
+    private readonly FontReport $fonts;
+
     private readonly PathScope $files;
 
     private readonly ThemeResolver $themes;
@@ -168,6 +176,7 @@ final class PresentationRenderer
         $this->themes = $themes->beside($this->directory);
         $this->files = new PathScope([$this->directory, ...$imageRoots]);
         $this->overflows = new Overflows($strict);
+        $this->fonts = new FontReport($strict);
     }
 
     /**
@@ -196,6 +205,27 @@ final class PresentationRenderer
     }
 
     /**
+     * Every face the theme named that this renderer has no table of advance widths for.
+     *
+     * A face with no table is measured with the reference face's widths — the widths every
+     * face was measured with before there were tables of their own — so a deck naming one
+     * still renders, and this is where it is said that the text was not measured with the
+     * face that will draw it.
+     *
+     * The monospaced face is not in this list: every character in a monospaced face advances
+     * by the same amount, so which face it is says nothing about how wide its text is.
+     *
+     * Emptied by {@see self::render()} rather than accumulated, because a layout belongs to
+     * one deck: a caller converting several in a loop wants the last one's, not all of them.
+     *
+     * @return list<array{face: string, slot: string}>
+     */
+    public function unknownFonts(): array
+    {
+        return $this->fonts->all();
+    }
+
+    /**
      * @throws InvalidInput     When a slide names something this library cannot render.
      * @throws ThemeNotFound    When the deck names a theme that does not resolve.
      * @throws ContentOverflow  When a block does not fit and the renderer is strict.
@@ -214,6 +244,7 @@ final class PresentationRenderer
     public function render(Deck $deck, string $path): string
     {
         $this->overflows->forget();
+        $this->fonts->forget();
 
         // Before anything is read rather than while the slides are being built, so a deck
         // over the ceiling is refused with no work done rather than after every one of them.
@@ -232,6 +263,12 @@ final class PresentationRenderer
         $theme = $this->theme($deck);
         $roles = $this->roles($deck, $theme);
 
+        // A theme naming a face there is no table for is measured with the reference face's
+        // widths, and the strict renderer refuses the deck rather than measuring it with the
+        // wrong face — so the faces are asked about before anything is built.
+        $metric = new TextMetric();
+        $this->recordUnknownFaces($theme->theme(), $metric);
+
         $presentation = new PhpPresentation();
 
         $used = $this->usedRoles($roles);
@@ -244,7 +281,7 @@ final class PresentationRenderer
         $geometry = (new SlideGeometry(style: $theme->theme()->style()))->with($this->template($theme, $used));
         $layouts = MasterLayouts::build($presentation, $deck, $theme, $used, $this->blocks->inline());
 
-        $writer = new ShapeWriter($theme->theme(), $geometry);
+        $writer = new ShapeWriter($theme->theme(), $geometry, $metric);
         $shapes = new SlideShapes($geometry, $this->overflows);
         $blocks = $this->blocks($deck, $theme->theme());
         $builds = [];
@@ -420,6 +457,27 @@ final class PresentationRenderer
         }
 
         return $this->themes->resolve(trim($name));
+    }
+
+    /**
+     * The faces the theme named that this renderer has no table of advance widths for,
+     * recorded.
+     *
+     * The heading and the body faces are the ones that decide how a line wraps, and a face
+     * with no table of its own is measured with the reference face's widths — which is what
+     * every face was measured with before there were tables of their own. The monospaced
+     * face is not asked about: every character in a monospaced face advances by the same
+     * amount, so which face it is says nothing about how wide its text is.
+     */
+    private function recordUnknownFaces(Theme $theme, TextMetric $metric): void
+    {
+        foreach (['heading', 'body'] as $slot) {
+            $face = $theme->font($slot);
+
+            if ($face !== null && !$metric->has($face)) {
+                $this->fonts->record($face, $slot, $metric->faces());
+            }
+        }
     }
 
     /**
