@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Document\Deck;
-use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Document\Slide as SourceSlide;
-use MarkdownPresentation\Exception\ChromeNotFound;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
-use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\MalformedTemplate;
 use MarkdownPresentation\Exception\ThemeNotFound;
@@ -19,7 +16,6 @@ use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
-use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Filesystem\PathScope;
@@ -38,7 +34,6 @@ use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Render\Free\FreeSlideNumber;
 use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Template\ChromeFile;
-use MarkdownPresentation\Template\Definition;
 use MarkdownPresentation\Template\Templates;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
@@ -79,14 +74,15 @@ use PhpOffice\PhpPresentation\Slide\SlideLayout;
  * A **free shape** is the other half of what a slide's body can carry, and this renderer is
  * where it is drawn: {@see \MarkdownPresentation\Render\Free\FreeShape} is placed rather than
  * laid out, so it takes no column and is not measured against the layout's box — see
- * {@see self::placed()}, which is the write order a `layer` decides.
+ * {@see SlideShapes}, which is the write order a `layer` decides.
  *
- * Two things it does not do are somebody else's job, and both classes that do them sit in
- * this directory rather than being reached through a caller: {@see MasterLayouts} writes the
- * master, the layouts and the document's metadata, and {@see DeckWriter} writes the file and
- * runs the passes over it. What is left here is the walk: a deck's blocks, and the shapes
- * they are drawn as.
-*/
+ * Three things it does not do are somebody else's job, and all three classes that do them sit
+ * in this directory rather than being reached through a caller: {@see MasterLayouts} writes
+ * the master, the layouts and the document's metadata, {@see DeckWriter} writes the file and
+ * runs the passes over it, and {@see Furniture} reads the templates of the deck and the
+ * chrome they draw. What is left here is the walk: a deck's blocks, and the shapes they are
+ * drawn as.
+ */
 final class PresentationRenderer
 {
     /**
@@ -175,16 +171,16 @@ final class PresentationRenderer
     private Templates $templates;
 
     /**
-     * The chrome each template of the deck draws, by name.
+     * The furniture of the deck being rendered: its templates and the chrome they draw.
+     */
+    private Furniture $furniture;
+
+    /**
+     * The chrome every template of the deck draws, by name.
      *
      * @var array<string, list<FreeShape>>
      */
-    private array $furniture = [];
-
-    /**
-     * How many slides the deck being rendered has, which is what a page number counts to.
-     */
-    private int $slides = 0;
+    private array $drawn = [];
 
     /**
      * The theme of the deck being rendered.
@@ -336,14 +332,14 @@ final class PresentationRenderer
         // The templates before the slides are drawn, and the chrome before either: a slide
         // that names a template that is not there, and a template that cannot be drawn, are
         // both failures that happen with no file written behind them.
-        $this->templates = $this->templates($deck);
-        $this->slides = $deck->count();
+        $this->furniture = new Furniture($deck, $this->chromeFiles, $this->chrome);
+        $this->templates = $this->furniture->templates();
 
         foreach ($deck->slides() as $slide) {
-            $this->checkTemplates($slide);
+            $this->furniture->check($this->templates, $slide);
         }
 
-        $this->furniture = $this->drawn($deck);
+        $this->drawn = $this->furniture->drawn($this->templates, $this->theme);
 
         $presentation = new PhpPresentation();
 
@@ -532,190 +528,6 @@ final class PresentationRenderer
     }
 
     /**
-     * The templates the deck has: the deck's own over the ones a chrome file holds.
-     */
-    private function templates(Deck $deck): Templates
-    {
-        return Templates::of($deck->definitions(), $this->imported($deck));
-    }
-
-    /**
-     * The templates a chrome file holds.
-     *
-     * A file beside the deck, named by the deck's frontmatter and resolved against the
-     * deck's own directory, so that a deck and the furniture it shares travel together.
-     *
-     * @return list<Definition>
-     *
-     * @throws ChromeNotFound
-     * @throws MalformedChrome
-     * @throws MalformedFrontmatter
-     */
-    private function imported(Deck $deck): array
-    {
-        $written = $deck->frontmatterValue('chrome');
-
-        if ($written === null) {
-            return [];
-        }
-
-        if (!is_string($written) || trim($written) === '') {
-            throw MalformedFrontmatter::wrongType(1, 'chrome', 'a path to a file of chrome');
-        }
-
-        $markdown = $this->chromeFiles->read(trim($written));
-        $chrome = (new DeckParser())->parse($markdown);
-
-        // A chrome file holds definitions and nothing else: a slide in it is a slide
-        // nobody asked for, and one that would be drawn on a deck it was not written for.
-        if ($chrome->slides() !== []) {
-            throw MalformedChrome::slide(trim($written));
-        }
-
-        return $chrome->definitions();
-    }
-
-    /**
-     * The templates a slide names, checked before anything is built.
-     *
-     * @throws UnknownTemplate
-     */
-    private function checkTemplates(SourceSlide $slide): void
-    {
-        $this->names($slide);
-    }
-
-    /**
-     * The templates a slide draws, and the refusal of a name there is no template under.
-     *
-     * A list, because a slide may want more than one piece of furniture: a cover wants the
-     * wordmark and a content slide wants the wordmark and the page number.
-     *
-     * @return list<string>
-     *
-     * @throws MalformedFrontmatter
-     * @throws UnknownTemplate
-     */
-    private function names(SourceSlide $slide): array
-    {
-        $named = $slide->frontmatterValue('template');
-
-        if ($named === null) {
-            return [];
-        }
-
-        $names = [];
-
-        foreach (is_array($named) ? $named : [$named] as $name) {
-            if (!is_string($name) || trim($name) === '') {
-                throw MalformedFrontmatter::wrongType(
-                    $slide->index() + 1,
-                    'template',
-                    'a template name or a list of them',
-                );
-            }
-
-            $names[] = trim($name);
-        }
-
-        foreach ($names as $name) {
-            if (!$this->templates->has($name)) {
-                throw UnknownTemplate::named($slide->index() + 1, $name, $this->templates->names());
-            }
-        }
-
-        return $names;
-    }
-
-    /**
-     * The chrome every template of the deck draws, by name.
-     *
-     * Read once for the deck rather than once for every slide that names the template: a
-     * picture in a template is a picture the deck pays for once.
-     *
-     * @return array<string, list<FreeShape>>
-     *
-     * @throws MalformedChrome
-     */
-    private function drawn(Deck $deck): array
-    {
-        $furniture = [];
-
-        foreach ($this->templates->all() as $name => $definition) {
-            $furniture[$name] = $this->chrome->shapes($definition, $this->label($deck, $name), $this->theme);
-        }
-
-        return $furniture;
-    }
-
-    /**
-     * The slide a mistake in a template would first be seen on.
-     *
-     * The chrome of a template is read once, so the refusal in it has to name a slide a
-     * reader can look at, and the first slide that draws the template is the one they can.
-     * A template no slide draws is read against the first slide of the deck, because there
-     * is no other slide to name.
-     */
-    private function label(Deck $deck, string $name): int
-    {
-        foreach ($deck->slides() as $slide) {
-            if (in_array($name, $this->names($slide), true)) {
-                return $slide->index() + 1;
-            }
-        }
-
-        return 1;
-    }
-
-    /**
-     * The chrome of the templates a slide names, beside the shapes the slide placed itself.
-     *
-     * The chrome last, so that it is drawn over what the slide placed itself: a full-bleed
-     * picture is behind the wordmark and not over it, which is the order the deck wrote the
-     * wordmark in before the wordmark was a template.
-     *
-     * The number of the slide is filled in on the way, in the slide's own shapes and in the
-     * chrome alike: it is the one thing about a page number that is different on every slide,
-     * and a shape carrying it cannot be drawn before the slide it is on is known.
-     */
-    private function withFurniture(SlideBlocks $content, SourceSlide $source): SlideBlocks
-    {
-        $shapes = [];
-
-        foreach ($content->shapes() as $shape) {
-            $shapes[] = $this->numbered($shape, $source->index() + 1);
-        }
-
-        foreach ($this->names($source) as $name) {
-            foreach ($this->furniture[$name] as $shape) {
-                $shapes[] = $this->numbered($shape, $source->index() + 1);
-            }
-        }
-
-        if ($shapes === []) {
-            return $content;
-        }
-
-        return new SlideBlocks(
-            $content->blocks(),
-            $content->columns(),
-            $content->columnMarkers(),
-            $shapes,
-        );
-    }
-
-    /**
-     * A shape with the number of the slide filled into it, or the shape itself where it
-     * carries no number.
-     */
-    private function numbered(FreeShape $shape, int $number): FreeShape
-    {
-        return $shape instanceof FreeSlideNumber
-            ? $shape->numbered($number, $this->slides)
-            : $shape;
-    }
-
-    /**
      * @throws ThemeNotFound
      * @throws MalformedFrontmatter
     */
@@ -817,7 +629,7 @@ final class PresentationRenderer
      */
     private function recordUnknownFacesOfTheChrome(TextMetric $metric): void
     {
-        foreach ($this->furniture as $template => $shapes) {
+        foreach ($this->drawn as $template => $shapes) {
             foreach ($shapes as $shape) {
                 $face = self::faceOf($shape);
 
@@ -962,7 +774,7 @@ final class PresentationRenderer
             $level,
         );
 
-        $content = $this->withFurniture($content, $source);
+        $content = $this->furniture->on($this->templates, $this->drawn, $content, $source);
 
         $slide = $presentation->createSlide();
         $slide->setSlideLayout($layouts[$role->value]);
