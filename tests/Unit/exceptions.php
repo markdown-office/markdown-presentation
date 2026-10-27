@@ -258,6 +258,7 @@ it('names a slide and a file in every failure, because the fix is in the message
         ->and(UnknownDirective::comment(5, '<!-- v-if -->')->getMessage())->toContain('Slide 5')
         ->and(UnknownDirective::element(6, '<v-click>')->getMessage())->toContain('Slide 6')
         ->and(UnknownDirective::container(7, ':::')->getMessage())->toContain('Slide 7')
+        ->and(UnknownDirective::misplacedNote(8)->getMessage())->toContain('Slide 8')
         ->and(MalformedTheme::unknownKey('themes/acme/theme.yml', 'colour', ['name'])->getMessage())
         ->toContain('themes/acme/theme.yml')
         ->and(ImageNotFound::at(2, 'logo.png', LOGO_PATH)->getMessage())
@@ -303,6 +304,10 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'a note nothing closes' => [
         UnknownDirective::unclosedNote(3)->getMessage(),
         'A note is "::note" on a line of its own',
+    ],
+    'a note that is closed and is not the last thing on the slide' => [
+        UnknownDirective::misplacedNote(3)->getMessage(),
+        'it has to come after all the content on the slide',
     ],
     'a region nothing closes' => [
         UnknownMarker::unclosed(2, ':::click')->getMessage(),

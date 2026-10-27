@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Document;
 
 use MarkdownPresentation\Exception\FencedFrontmatter;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\UnknownDirective;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -80,6 +81,16 @@ final class DeckParser
      * deck asking for something the format has one of.
      */
     private const NOTE = '/\A([\s\S]*?)^[ \t]*::note[ \t]*\n([\s\S]*?)^[ \t]*::[ \t]*\z/mi';
+
+    /**
+     * A note that was closed: an opener, and a `::` line after it.
+     *
+     * Any `::` line rather than the last one, because a note whose text holds a `::` line
+     * is one note rather than two: the whole of it is read as the note and the closer is
+     * the last `::` line in it.
+     */
+    private const CLOSED_NOTE = '/^[ \t]*::note[ \t]*\n[\s\S]*?^[ \t]*::[ \t]*$/mi';
+
     /**
      * The opening fence of a code block: three or more backticks or three or more
      * tildes, indented by no more than three spaces.
@@ -288,8 +299,11 @@ final class DeckParser
             step markers, not the splitter's.
 
             A speaker note is `::note` on a line of its own, its text, and a
-            closing `::`, in either case. A `::note` nothing closes is part of
-            the slide's text, and the renderer refuses it rather than drawing it.
+            closing `::`, in either case. It has to be the last thing on the
+            slide: the closer is anchored to the end of it, so a note with
+            anything after it is refused rather than read. A `::note` nothing
+            closes is part of the slide's text, and the renderer refuses it
+            rather than drawing it.
 
             Two shapes are refused rather than read:
 
@@ -323,7 +337,7 @@ final class DeckParser
             throw FencedFrontmatter::at($index + 1);
         }
 
-        [$content, $note] = self::takeNote($content);
+        [$content, $note] = self::takeNote($content, $index);
         [$title, $level] = self::title($frontmatter, $content, $index);
 
         return new Slide($index, $raw, $content, $frontmatter, $title, $level, $note, $start, $end);
@@ -360,11 +374,25 @@ final class DeckParser
      * nothing closing it is part of the slide's text, which is what
      * {@see \MarkdownPresentation\Render\CommonMark\BlockTranslator} refuses it for.
      *
+     * A note that was closed and is not the last thing on the slide is refused here rather
+     * than left for the renderer: it was closed, and the message that says nothing closed
+     * it sends the author looking for a closer that is there.
+     *
      * @return array{0: string, 1: ?string} The content without the note, and the note.
+     *
+     * @throws UnknownDirective
     */
-    private static function takeNote(string $content): array
+    private static function takeNote(string $content, int $index): array
     {
         if (preg_match(self::NOTE, $content, $match, PREG_OFFSET_CAPTURE) !== 1) {
+            // The code blocks are taken out first, because a `::note` in one is an example
+            // of a note rather than a note.
+            $outsideCode = preg_replace(self::CODE_BLOCK, '', $content) ?? $content;
+
+            if (preg_match(self::CLOSED_NOTE, $outsideCode) === 1) {
+                throw UnknownDirective::misplacedNote($index + 1);
+            }
+
             return [$content, null];
         }
 

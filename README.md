@@ -168,8 +168,11 @@ is one slide carrying both, and `Deck::frontmatter()` returns its keys.
 step markers, not the splitter's.
 
 A speaker note is `::note` on a line of its own, its text, and a
-closing `::`, in either case. A `::note` nothing closes is part of
-the slide's text, and the renderer refuses it rather than drawing it.
+closing `::`, in either case. It has to be the last thing on the
+slide: the closer is anchored to the end of it, so a note with
+anything after it is refused rather than read. A `::note` nothing
+closes is part of the slide's text, and the renderer refuses it
+rather than drawing it.
 
 Two shapes are refused rather than read:
 
@@ -239,6 +242,26 @@ echo $deck->slides()[0]->content(), "\n";
 ```text
 Read this out loud.
 # One
+```
+
+A note has to be the last thing on the slide: the closer is anchored to the end of
+it, so a note with anything after it is refused rather than read. The refusal says
+which rule was broken, because the note was closed and a message about a missing
+closer would send the author looking for one that is there:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+
+try {
+    (new DeckParser())->parse("# One\n\n::note\nRead this out loud.\n::\n\n## After\n");
+} catch (Exception $failure) {
+    echo $failure->getMessage(), "\n";
+}
+```
+
+```text
+Slide 1 opens a "::note" that is not the last thing on the slide. A note is "::note" on a line of its own, its text, and a closing "::" on a line of its own, and it has to come after all the content on the slide.
 ```
 
 ## Rendering

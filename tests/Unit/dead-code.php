@@ -368,6 +368,13 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a theme in a root is named by its path rather than by its name' => 'the roots widen what a deck may reach',
     'a theme path is loaded from wherever the resolver was given' => 'A theme named by path is loaded from wherever it is',
     'a relative path is resolved against the working directory' => 'resolves a relative path against the working directory, not against the process',
+    // A note is the last thing on a slide: the closer is anchored to the end of it, so a
+    // note with anything after it is refused rather than read. A note that was closed and
+    // written in the wrong place used to be refused as one that nothing closed, which sent
+    // the author looking for a closer that was there. The phrase below is the old rule's
+    // own wording, and no comment or page may say it now.
+    'a note is taken off the content wherever it is written' => 'taken off the content wherever it is written',
+
     // A manifest was named by the file the path resolved to rather than by the name the deck
     // wrote, so a `theme.yml` that was a link to a file of another name was refused for the
     // name it had reached. The name the deck wrote is what makes a file the manifest — the

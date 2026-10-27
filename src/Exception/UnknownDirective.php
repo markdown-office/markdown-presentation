@@ -113,9 +113,10 @@ final class UnknownDirective extends InvalidInput
      * A `::note` whose closing `::` is not on the slide.
      *
      * A note is taken off the content by {@see \MarkdownPresentation\Document\DeckParser}
-     * before it gets here, so the one reaching the renderer is one nothing closed. Reading
-     * the rest of the slide as its note would put text in the notes pane that the deck
-     * wrote as prose.
+     * before it gets here, so the one reaching the renderer is one nothing closed — the
+     * parser refuses the note that was closed and is not the last thing on the slide.
+     * Reading the rest of the slide as its note would put text in the notes pane that the
+     * deck wrote as prose.
      */
     public static function unclosedNote(int $slide): self
     {
@@ -125,6 +126,23 @@ final class UnknownDirective extends InvalidInput
             $slide,
         ));
     }
+
+    /**
+     * A `::note` that was closed but is not the last thing on the slide.
+     *
+     * The note was closed and it was in the wrong place, and the message about a closer
+     * that is missing sends the author looking for one that is there. The rule is the one
+     * the note is read with: the closer is anchored to the end of the slide.
+     */
+    public static function misplacedNote(int $slide): self
+    {
+        return new self(sprintf(
+            'Slide %d opens a "::note" that is not the last thing on the slide. A note is "::note" on a line of its own, '
+            . 'its text, and a closing "::" on a line of its own, and it has to come after all the content on the slide.',
+            $slide,
+        ));
+    }
+
     /**
      * A `::name` leaf under a name this format does not read.
  *

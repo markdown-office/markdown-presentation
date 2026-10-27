@@ -109,6 +109,13 @@ All notable changes to this project are documented here. The format follows
   emphasis may not be followed by whitespace, and one that closes it may not be preceded by
   whitespace. A label holding one is drawn as it was written.
 
+- **A note that is closed and is not the last thing on the slide says so.** The note was
+  closed and it was in the wrong place, and the failure said that nothing closed it —
+  which sent the author looking for a closer that was there. A note has to be the last
+  thing on the slide: the closer is anchored to the end of it, so a note with anything
+  after it is refused when the deck is read, with the rule it broke rather than with the
+  syntax of a note.
+
 - **A monospaced face is measured at its own advance.** Every character in a monospaced
   face advances by the same amount, and the model took that amount to be 600 units to the
   em whatever the face was: 600 is what JetBrains Mono advances by, Menlo advances by 602
