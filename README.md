@@ -1525,6 +1525,10 @@ the layer order with them. The renderer fills in the number of the slide it is d
 "3 / 28" is the third slide of a deck of twenty-eight, and the twenty-eight is the number of
 the slides: a template definition is not one of them.
 
+The page number is furniture, so it is written in a template and drawn on every slide that
+names it. A slide may write one itself as well, and the number it carries is the number of
+the slide it is on.
+
 #### The chrome file
 
 A deck may keep its templates in a file beside it and name it in the deck's frontmatter:

@@ -668,16 +668,22 @@ final class PresentationRenderer
      * The chrome last, so that it is drawn over what the slide placed itself: a full-bleed
      * picture is behind the wordmark and not over it, which is the order the deck wrote the
      * wordmark in before the wordmark was a template.
+     *
+     * The number of the slide is filled in on the way, in the slide's own shapes and in the
+     * chrome alike: it is the one thing about a page number that is different on every slide,
+     * and a shape carrying it cannot be drawn before the slide it is on is known.
      */
-    private function withChrome(SlideBlocks $content, SourceSlide $source): SlideBlocks
+    private function withFurniture(SlideBlocks $content, SourceSlide $source): SlideBlocks
     {
         $shapes = [];
 
+        foreach ($content->shapes() as $shape) {
+            $shapes[] = $this->numbered($shape, $source->index() + 1);
+        }
+
         foreach ($this->names($source) as $name) {
             foreach ($this->furniture[$name] as $shape) {
-                $shapes[] = $shape instanceof FreeSlideNumber
-                    ? $shape->numbered($source->index() + 1, $this->slides)
-                    : $shape;
+                $shapes[] = $this->numbered($shape, $source->index() + 1);
             }
         }
 
@@ -689,8 +695,19 @@ final class PresentationRenderer
             $content->blocks(),
             $content->columns(),
             $content->columnMarkers(),
-            [...$content->shapes(), ...$shapes],
+            $shapes,
         );
+    }
+
+    /**
+     * A shape with the number of the slide filled into it, or the shape itself where it
+     * carries no number.
+     */
+    private function numbered(FreeShape $shape, int $number): FreeShape
+    {
+        return $shape instanceof FreeSlideNumber
+            ? $shape->numbered($number, $this->slides)
+            : $shape;
     }
 
     /**
@@ -895,7 +912,7 @@ final class PresentationRenderer
             $level,
         );
 
-        $content = $this->withChrome($content, $source);
+        $content = $this->withFurniture($content, $source);
 
         $slide = $presentation->createSlide();
         $slide->setSlideLayout($layouts[$role->value]);

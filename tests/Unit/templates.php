@@ -450,3 +450,16 @@ it('agrees about which slides are slides, between the count, the report and the 
         ->and($texts[count($texts) - 1])->toBe('2')
         ->and($file->slideText(3))->toBe('3');
 });
+
+it('writes the number of the slide on a slide that carries the page number itself', function () {
+    // The page number is a shape like any other, and a slide that writes one gets it: the
+    // number is filled in when the slide is drawn, so the shape a slide carries and the
+    // shape a template carries are drawn the same way.
+    $deck = "---\nlayout: blank\n---\n" . PAGE_NUMBER . "\n\n---\nlayout: blank\n---\n" . PAGE_NUMBER . "\n";
+
+    $file = templateDeck($deck);
+
+    expect($file->shapeNames(1))->toBe(['slide-number'])
+        ->and($file->slideText(1))->toBe('1')
+        ->and($file->slideText(2))->toBe('2');
+});

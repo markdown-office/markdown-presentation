@@ -120,6 +120,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A page number written on a slide is drawn on it.** The page number became a shape, and
+  the number was filled into it for the chrome of a template — where the shape is read once
+  for the deck and drawn on every slide that names it. A slide that wrote one itself drew an
+  empty box: the shape was read, the number was never put into it, and the slide carried a
+  rectangle where the author had written a page number.
+
+  The number is filled in on the way to the slide now, in the slide's own shapes and in the
+  chrome alike, because it is the one thing about a page number that is different on every
+  slide and a shape carrying it cannot be drawn before the slide it is on is known.
+
 - **A face a word writes for itself is reported.** The faces a theme names are the faces its
   text is measured with, and a face with no table of advance widths is measured with the
   reference face's widths instead — which are not that face's. The report of that said so
