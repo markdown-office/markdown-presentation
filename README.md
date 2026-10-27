@@ -552,9 +552,8 @@ package folds the names of the directives themselves. The refusal for a name the
 not have spells the styles it does have the way the theme wrote them, because that is the
 spelling the author has to change.
 
-Six things about the shape of a style are refused when the theme is read, because each of
-them is a mistake that would otherwise reach the slide looking as though the line had
-never been written:
+Six mistakes in a `text-styles.yml` are refused when the theme is read rather than
+reaching the slide:
 
 | Refused | Why |
 | --- | --- |
