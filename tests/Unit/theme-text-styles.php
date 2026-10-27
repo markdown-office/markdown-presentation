@@ -5,6 +5,7 @@ declare(strict_types=1);
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
 use MarkdownPresentation\Theme\TextStyle;
+use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeLoader;
 
 /**
@@ -94,7 +95,42 @@ it('refuses a text style whose colour is not a colour', function () {
     $loader = new ThemeLoader();
 
     expect(fn () => $loader->load(themeWithTextStyles("brand:\n  color: chartreuse\n")))
-        ->toThrow(MalformedTheme::class, 'is not a colour: none, a role, a theme slot, or a hex value');
+        ->toThrow(MalformedTheme::class, '"brand.color" is "chartreuse", which is not a colour')
+        ->toThrow(MalformedTheme::class, 'A colour is none or transparent, page, ink, subtle, panel');
+});
+
+it('accepts a colour written as one of the names the concept draft used', function () {
+    // `dark1` is the concept draft's name for `dk1`, and a theme that names a colour the
+    // old way means the same colour: the spelling is not the thing being refused.
+    $loaded = (new ThemeLoader())->load(themeWithTextStyles("brand:\n  color: dark1\n"));
+
+    expect($loaded->theme()->textStyles()->get('brand')?->colour)->toBe('dark1');
+});
+
+it('accepts a colour written in capitals, as a deck may write one', function () {
+    // A deck's own colour is lowercased before it is resolved, so `DK1` and `dk1` are one
+    // name there; a theme's file is written against the same vocabulary as a deck's
+    // attribute, so it is one name here too.
+    $loaded = (new ThemeLoader())->load(themeWithTextStyles("brand:\n  color: DK1\n"));
+
+    expect($loaded->theme()->textStyles()->get('brand')?->colour)->toBe('DK1');
+});
+
+it('names the names the concept draft used in the advice', function () {
+    // The advice is what a reader is shown when they get a colour wrong, and it has to name
+    // every colour that would have been right — including the six the concept draft used,
+    // which are names like any other.
+    expect(Theme::colourAdvice())
+        ->toContain('dark1, light1, dark2, light2, hyperlink, followedHyperlink');
+});
+
+it('refuses a text style whose colour is not a name at all', function () {
+    // A number is not a spelling of a colour, so it is refused as what it is rather than as
+    // a name nobody has heard of: the advice would not help.
+    $loader = new ThemeLoader();
+
+    expect(fn () => $loader->load(themeWithTextStyles("brand:\n  color: 123\n")))
+        ->toThrow(MalformedTheme::class, '"brand.color" is not a colour');
 });
 
 it('refuses a text style whose size is not a size', function () {

@@ -541,6 +541,20 @@ it('reports a face a placed box names that there is no table for', function () {
     ]);
 });
 
+it('reports a face two boxes of the same kind name once', function () {
+    // Two boxes of the same kind on one slide are two boxes and one place — the place being
+    // where to go and change it — so the report names the face once rather than twice.
+    $directory = textStyleTheme(null);
+
+    $deck = sprintf(
+        "---\ntheme: ./theme.yml\n---\n\n:::content{left=10%% top=10%% width=30%% height=10%% font-size=11 font-family=\"Comic Sans MS\"}\nOne\n:::\n\n:::content{left=50%% top=10%% width=30%% height=10%% font-size=11 font-family=\"Comic Sans MS\"}\nTwo\n:::\n",
+    );
+
+    expect(styledRenderer($deck, $directory)->unknownFonts())->toBe([
+        ['face' => 'Comic Sans MS', 'where' => 'the "content" box on slide 1'],
+    ]);
+});
+
 it('reports no face for a text style and a box that name faces there are tables for', function () {
     // A face there is a table for is not a finding, and neither is one the theme names by
     // its own slot: a style that says `font: heading` is the theme's heading face, which the
@@ -600,7 +614,7 @@ it('refuses a colour that is not a colour', function () {
     [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{color=chartreuse}');
 
     expect(fn () => styledDeck($deck, $directory))
-        ->toThrow(MalformedTextStyle::class, 'A colour is none, page, ink, subtle, panel');
+        ->toThrow(MalformedTextStyle::class, 'A colour is none or transparent, page, ink, subtle, panel');
 });
 
 it('refuses a size that is not a size', function () {

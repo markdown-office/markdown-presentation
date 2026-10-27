@@ -345,8 +345,22 @@ it('has no fill or stroke where the deck named none', function () {
 
 it('refuses a colour name nothing is', function (string $attribute) {
     expect(fn () => placedShapes(sprintf("::rectangle{%s=chartreuse}\n", $attribute)))
-        ->toThrow(MalformedShape::class, 'A colour is none, page, ink, subtle, panel, a theme slot');
+        ->toThrow(MalformedShape::class, 'A colour is none or transparent, page, ink, subtle, panel, a theme slot');
 })->with([['fill'], ['stroke']]);
+
+it('accepts a colour written as one of the names the concept draft used', function () {
+    // `dark1` is the concept draft's name for `dk1`, and a deck that names a colour the old
+    // way means the same colour: the spelling is not the thing being refused.
+    expect(placedShape("::rectangle{fill=dark1}\n")->paint->fill)->not->toBeNull();
+});
+
+it('names the names the concept draft used in the advice for a colour nothing is', function () {
+    // The advice is what a reader is shown when they get a colour wrong, and it has to name
+    // every colour that would have been right — including the six the concept draft used,
+    // which are names like any other.
+    expect(fn () => placedShapes("::rectangle{fill=chartreuse}\n"))
+        ->toThrow(MalformedShape::class, 'dark1, light1, dark2, light2, hyperlink, followedHyperlink');
+});
 
 it('leaves a colour whole where the deck named no alpha', function () {
     // Null rather than 100, so that an opaque shape is written with the six characters of

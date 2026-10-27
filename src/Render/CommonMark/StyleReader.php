@@ -248,7 +248,7 @@ final class StyleReader
         $colour = Colour::resolve($written, $theme);
 
         if ($colour === null) {
-            throw MalformedTextStyle::value($slide, $name, $attribute, $written, Colour::ADVICE);
+            throw MalformedTextStyle::value($slide, $name, $attribute, $written, Theme::colourAdvice());
         }
 
         return '#' . $colour->getRGB();

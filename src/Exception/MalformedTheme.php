@@ -61,6 +61,23 @@ final class MalformedTheme extends InvalidInput
     }
 
     /**
+     * A colour a theme's file named that is not one.
+     *
+     * The advice is the theme's own, built from the names a colour may be written under, so
+     * that a failure in a theme's file and a failure in a deck's attribute name the same
+     * list — they are one question and two vocabularies would be two answers to it.
+     */
+    public static function wrongColour(string $file, string $key, string $written, string $advice): self
+    {
+        return new self(self::in($file, sprintf(
+            '"%s" is "%s", which is not a colour. %s',
+            $key,
+            $written,
+            $advice,
+        )));
+    }
+
+    /**
      * A text style that sets an attribute that is not one.
      *
      * The attributes are named rather than the keys of a theme, because a text style is

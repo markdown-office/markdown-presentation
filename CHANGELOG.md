@@ -109,6 +109,28 @@ All notable changes to this project are documented here. The format follows
   emphasis may not be followed by whitespace, and one that closes it may not be preceded by
   whitespace. A label holding one is drawn as it was written.
 
+- **The advice about a colour names every colour that would have been right.** The advice
+  is what a reader is shown when they get a colour wrong, and it named the theme's twelve
+  slots and nothing else — while the code accepted the six names an earlier draft of the
+  concept used as well, so a deck or a theme written with `dark1` was told, in the very
+  message that refused it, that a colour is none, a role, a theme slot or a hex value.
+  The six are named now, and so is `transparent`, which means no colour at all and was
+  accepted without being named.
+
+  The advice is built from the list the colours are accepted under rather than written
+  out, so the two cannot drift: `Theme::colourNames()` is what `Theme::hasColour()` asks
+  and what the message is made of. The two spellings of no colour at all live with it too,
+  because a theme's own text style and a deck's attribute are written against the same
+  vocabulary — a theme that says `color: transparent` means what a deck's `color=transparent`
+  means.
+
+  A failure in a theme's file names the same list as a failure in a deck's attribute, and
+  says what was written: the two are one question and two answers to it would be two
+  vocabularies.
+
+  `Free\Colour::ADVICE` is gone, because a constant cannot be built from a list; the
+  message is `Theme::colourAdvice()` now.
+
 - **A face named in a way nothing reported is reported now.** The faces a theme names are
   measured with the advance widths of the face that will draw them, and a face with no
   table of its own is measured with the reference face's widths instead — which are not

@@ -384,7 +384,9 @@ final class ThemeLoader
      * The ink a style is drawn in, as it was written.
      *
      * A role, a theme slot or a hex value — the same vocabulary a shape's own colour is
-     * written in, because a run's ink and a shape's fill are the same question.
+     * written in, because a run's ink and a shape's fill are the same question. The
+     * failure names the same list the shape's own colour names, because the two are one
+     * question and two answers to it would be two vocabularies.
      */
     private static function colour(string $file, string $name, mixed $written): ?string
     {
@@ -392,8 +394,14 @@ final class ThemeLoader
             return null;
         }
 
-        if (!is_string($written) || !Theme::hasColour($written)) {
-            throw MalformedTheme::wrongType($file, $name . '.color', 'a colour: none, a role, a theme slot, or a hex value');
+        // A number is not a spelling of a colour, so it is refused as what it is rather
+        // than as a name nobody has heard of: the advice would not help.
+        if (!is_string($written)) {
+            throw MalformedTheme::wrongType($file, $name . '.color', 'a colour');
+        }
+
+        if (!Theme::hasColour($written)) {
+            throw MalformedTheme::wrongColour($file, $name . '.color', $written, Theme::colourAdvice());
         }
 
         return $written;

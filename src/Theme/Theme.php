@@ -84,20 +84,71 @@ final class Theme
     public const NONE = 'none';
 
     /**
+     * Every spelling of "there is no colour here".
+     *
+     * Two, and they are the same thing: `none` is the theme's own word and `transparent` is
+     * the one a deck reaches for. A colour that may be absent is written as one of them
+     * wherever it is written — a theme's own text style and a deck's attribute alike — so
+     * the two lists are one list.
+     *
+     * @var list<string>
+     */
+    public const NO_COLOUR = [self::NONE, 'transparent'];
+
+    /**
+     * Every name a colour may be written under, other than a hex value and the two
+     * spellings of no colour at all.
+     *
+     * One list, because the names a colour is accepted under and the names a failure names
+     * are the same list: a message that left one out would send an author to change a name
+     * that was right.
+     *
+     * @return list<string>
+     */
+    public static function colourNames(): array
+    {
+        return [...self::ROLES, ...self::COLOURS, ...array_keys(ThemeMapping::aliases())];
+    }
+
+    /**
      * Whether a colour may be written this way: a role, a theme slot, one of the spellings
-     * the concept draft used, `none` for no colour at all, or a hex value.
+     * the concept draft used, one of the two spellings of no colour at all, or a hex value.
      *
      * Asked of the theme rather than of the renderer that draws with the colour, because
      * the names are the theme's own and a theme file is checked against them when it is
      * read rather than when a deck happens to use the style that carries the mistake.
+     *
+     * Case is not a thing: a deck's own colour is lowercased before it is resolved, so
+     * `DK1` and `dk1` are one name there, and a theme's file is written against the same
+     * vocabulary as a deck's attribute.
      */
     public static function hasColour(string $written): bool
     {
-        return in_array($written, self::ROLES, true)
-            || in_array($written, self::COLOURS, true)
-            || in_array($written, array_keys(ThemeMapping::aliases()), true)
-            || $written === self::NONE
+        $written = strtolower($written);
+
+        return in_array($written, self::colourNames(), true)
+            || in_array($written, self::NO_COLOUR, true)
             || preg_match('/\A#?[0-9A-Fa-f]{6}\z/', $written) === 1;
+    }
+
+    /**
+     * What a colour may be written as, for a message that says so.
+     *
+     * Built from the names a colour is accepted under rather than written out here, because
+     * a message that left one out would send an author to change a name that was right —
+     * and the spellings the concept draft used are names like any other, so they belong in
+     * the list the message is built from.
+     */
+    public static function colourAdvice(): string
+    {
+        return sprintf(
+            'A colour is %s, %s, a theme slot (%s) or a name the concept draft used (%s), '
+            . 'or a hex value such as #4C1D95.',
+            implode(' or ', self::NO_COLOUR),
+            implode(', ', self::ROLES),
+            implode(', ', self::COLOURS),
+            implode(', ', array_keys(ThemeMapping::aliases())),
+        );
     }
 
     /**

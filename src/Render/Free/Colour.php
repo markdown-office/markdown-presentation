@@ -34,17 +34,6 @@ final class Colour
     public const NONE = Theme::NONE;
 
     /**
-     * What a colour may be written as, for a message that says so.
-     *
-     * One home for it, because the slides half writes colours in three places — a shape's
-     * fill, a text style's ink and the ink of a word inside a paragraph — and three
-     * messages that said it three ways would be three answers to one question.
-     */
-    public const ADVICE = 'A colour is none, page, ink, subtle, panel, a theme slot '
-        . '(dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), '
-        . 'or a hex value such as #4C1D95.';
-
-    /**
      * A colour as the deck wrote it, or null where it wrote that there is none.
      *
      * `none` is a value rather than a missing attribute because a shape with no fill is not the
@@ -77,7 +66,7 @@ final class Colour
                 $name,
                 $attribute,
                 $written,
-                self::ADVICE,
+                Theme::colourAdvice(),
             );
         }
 
@@ -103,12 +92,14 @@ final class Colour
      * exactly these two and nothing else — an unknown slot is refused rather than read as an
      * absent colour — so a caller that wants to refuse them has to be able to recognise them,
      * and a second list of spellings is a list that drifts from the first.
+     *
+     * The spellings are the theme's, because a theme's own text style is written against the
+     * same vocabulary as a deck's attribute: a style that says `color: transparent` means no
+     * colour of its own, exactly as an attribute that says so does.
      */
     public static function isNone(string $written): bool
     {
-        $written = strtolower($written);
-
-        return $written === self::NONE || $written === 'transparent';
+        return in_array(strtolower($written), Theme::NO_COLOUR, true);
     }
 
     /**

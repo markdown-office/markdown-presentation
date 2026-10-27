@@ -1399,7 +1399,7 @@ Slide 1 places "rectangle" at left 900px with a width of 120px, which reaches 10
 
 Slide 1 gives a "::circle" a width of 120 and a height of 80. A circle is as wide as it is tall; give one size or the other.
 
-Slide 1 gives "rectangle" a fill of "chartreuse". A colour is none, page, ink, subtle, panel, a theme slot (dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), or a hex value such as #4C1D95.
+Slide 1 gives "rectangle" a fill of "chartreuse". A colour is none or transparent, page, ink, subtle, panel, a theme slot (dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink) or a name the concept draft used (dark1, light1, dark2, light2, hyperlink, followedHyperlink), or a hex value such as #4C1D95.
 
 Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
 
