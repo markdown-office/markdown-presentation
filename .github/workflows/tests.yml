@@ -136,6 +136,11 @@ jobs:
       # no `ignoreErrors`, no baseline and no suppression comment anywhere in the
       # repository. The script checks the hash, so the analyser is the same one the
       # level was chosen against rather than whatever is newest that morning.
+      #
+      # The script gives the analyser its own memory limit rather than the one in the
+      # runner's `php.ini`, because the two are not the same and the run is not the
+      # same either: the analyser needs more memory than a stock limit gives once the
+      # branches here are stacked, and a cold cache is when it is asked for.
       - name: Analyse
         run: composer analyse
 
