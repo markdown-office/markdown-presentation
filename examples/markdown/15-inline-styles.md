@@ -81,7 +81,8 @@ layout: blank
 :::
 
 ---
-layout: blank
+layout: two-column
+level: 2
 ---
 
 # What this half refuses
@@ -93,6 +94,8 @@ Written `:brands[Barge]`, it says:
 ```text
 Slide 5 has the text style ":brands", which is not a style this theme has. The styles are: brand, muted.
 ```
+
+::column
 
 A style's text is plain text, so `:brand[**Barge**]` is refused.
 It is not drawn as the asterisks the author wrote:

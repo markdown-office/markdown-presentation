@@ -76,6 +76,7 @@ template: [wordmark, page]
 
 # The deck's own template wins
 
+:::content{left=6.7% top=20% width=86.7% height=70% font-size=17}
 `templates/chrome.md` holds a template called `page` too, and it puts a bare number at
 the foot of the slide.
 This deck defines its own `page` above, and the deck's own one is the one that is drawn:
@@ -85,6 +86,7 @@ than ten, and it carries the number of the deck after it.
 That is the rule the theme resolver follows by search order, and it is what lets a deck
 change one word of a house style without changing the house style.
 `04-frontmatter.md` draws the file's `page` — the same name, the other version of it.
+:::
 
 ---
 layout: blank

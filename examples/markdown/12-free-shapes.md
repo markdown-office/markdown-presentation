@@ -37,7 +37,7 @@ One of these shapes is behind the text and two are over it, and none of them is 
 ## Fill, stroke, alpha
 :::
 
-:::content{left=8% top=47% width=52% height=42% font-size=15}
+:::content{left=8% top=47% width=52% height=45% font-size=15}
 The panel is `layer=back`, so it is written before the layout's own shapes and the text is drawn
 over it. The badge and the chevron have no layer, so they are written after everything else.
 
