@@ -174,12 +174,8 @@ final class ShapeReader
 
         $lower = strtolower(trim($written));
 
-        if ($lower === 'true') {
-            return true;
-        }
-
-        if ($lower === 'false') {
-            return false;
+        if ($lower === 'true' || $lower === 'false') {
+            return $lower === 'true';
         }
 
         throw MalformedShape::flag($slide, ShapeKind::SlideNumber->value, 'of', $written);
