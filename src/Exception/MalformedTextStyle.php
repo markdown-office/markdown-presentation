@@ -64,16 +64,21 @@ final class MalformedTextStyle extends InvalidInput
      * The label of an inline directive is a string rather than Markdown, so a word that
      * came out as `**Bakery**` would be a deck that renders and shows something the author
      * did not write.
+     *
+     * `$wayOut` is a sentence rather than a noun phrase, because the way out is in a file and
+     * which file depends on the form the style was written in: a named style is given its
+     * weight in the theme's own `text-styles.yml`, and the raw form carries it as an
+     * attribute.
      */
-    public static function label(int $slide, string $name, string $label): self
+    public static function label(int $slide, string $name, string $label, string $wayOut): self
     {
         return new self(sprintf(
-            'Slide %d writes the text style ":%s" around "%s", which is Markdown. A style\'s text is plain text: give '
-            . 'the style the weight ("%s: { bold: true }") or write the emphasis in the paragraph around it.',
+            'Slide %d writes the text style ":%s" around "%s", which is Markdown. A style\'s text is plain text: %s '
+            . 'or write the emphasis in the paragraph around it.',
             $slide,
             $name,
             $label,
-            $name,
+            $wayOut,
         ));
     }
 

@@ -436,6 +436,11 @@ it('does not claim again what the code does not do', function (string $claim) {
     // A count in a docblock is wrong the moment a shape is added, and nothing reads prose
     // to say so.
     'a label has nowhere to go on two of the twelve shapes' => 'two of the twelve have nowhere to put it',
+    // The advice for a label that holds Markdown named the theme's file, which the raw
+    // form cannot have: `style` is the one name a theme may not give a style of its own.
+    // The phrase is the advice as it was, because it is the advice that cannot be given
+    // again.
+    'the advice for a label that holds Markdown names a style a theme may not have' => 'give the style the weight ("style: { bold: true }")',
 ]);
 
 it('has no decorative dividers in it', function () {

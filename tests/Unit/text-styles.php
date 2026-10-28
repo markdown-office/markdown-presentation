@@ -256,6 +256,20 @@ it('refuses a label holding a strong emphasis written with two underscores', fun
         ->toThrow(MalformedTextStyle::class, 'which is Markdown');
 });
 
+it('names the way out of a label that holds Markdown, and it depends on the form', function () {
+    // Two ways out of it, and they are in two different files: a named style is given its
+    // weight in the theme's own `text-styles.yml`, and the raw form carries it as an
+    // attribute. The raw form has no theme file to be given a weight in, because `style` is
+    // the one name a theme may not give a style of its own.
+    [$named, $namedDirectory] = wordmark("brand:\n  color: accent1\n", ':brand[**Bakery**]');
+    [$raw, $rawDirectory] = wordmark("brand:\n  color: accent1\n", ':style[**Bakery**]{bold=true}');
+
+    expect(fn () => styledDeck($named, $namedDirectory))
+        ->toThrow(MalformedTextStyle::class, 'give the style the weight in the theme\'s "text-styles.yml" ("brand: { bold: true }")')
+        ->and(fn () => styledDeck($raw, $rawDirectory))
+        ->toThrow(MalformedTextStyle::class, 'give the style the weight as an attribute ("bold=true")');
+});
+
 it('draws a label holding a strong emphasis CommonMark does not call one', function () {
     // A delimiter run that opens an emphasis may not be followed by whitespace, and one that
     // closes it may not be preceded by whitespace: `__ Bakery__` and `** text**` are text,

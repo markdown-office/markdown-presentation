@@ -199,9 +199,24 @@ final class StyleReader
 
         foreach (self::MARKDOWN as $pattern) {
             if (preg_match($pattern, $label) === 1) {
-                throw MalformedTextStyle::label($slide, $name, $label);
+                throw MalformedTextStyle::label($slide, $name, $label, self::wayOut($name));
             }
         }
+    }
+
+    /**
+     * The way out of a label that holds Markdown.
+     *
+     * Two, and they are in two different files: a named style is given its weight in the
+     * theme's own `text-styles.yml`, and the raw form carries it as an attribute. The raw
+     * form has no theme file to be given a weight in, because `style` is the one name a
+     * theme may not give a style of its own.
+     */
+    private static function wayOut(string $name): string
+    {
+        return TextStyle::isReserved($name)
+            ? 'give the style the weight as an attribute ("bold=true")'
+            : sprintf('give the style the weight in the theme\'s "text-styles.yml" ("%s: { bold: true }")', $name);
     }
 
     /**

@@ -101,7 +101,7 @@ A style's text is plain text, so `:brand[**Barge**]` is refused.
 It is not drawn as the asterisks the author wrote:
 
 ```text
-Slide 5 writes the text style ":brand" around "**Barge**", which is Markdown. A style's text is plain text: give the style the weight ("brand: { bold: true }") or write the emphasis in the paragraph around it.
+Slide 5 writes the text style ":brand" around "**Barge**", which is Markdown. A style's text is plain text: give the style the weight in the theme's "text-styles.yml" ("brand: { bold: true }") or write the emphasis in the paragraph around it.
 ```
 
 ---

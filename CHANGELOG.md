@@ -208,6 +208,13 @@ All notable changes to this project are documented here. The format follows
   it by the renderer. The shapes that have nowhere to put a label each have their own reason
   now.
 
+- **The advice for a label that holds Markdown names the file it is given in.** A style's
+  text is plain text, so `:style[**Bakery**]` is refused — and the advice was to give the
+  style the weight in the theme's file, under the name `style`, which is the one name a theme
+  may not give a style of its own. A named style is given its weight in the theme's
+  `text-styles.yml` and the raw form carries it as an attribute, and the message says which
+  of the two is which.
+
 - **A line of text is measured in the face it is drawn in, and in the units a box is.**
   The advance widths of a face are in units per em and the size of the type is in points,
   so the width they make is in points — and a box is measured in pixels. The two were

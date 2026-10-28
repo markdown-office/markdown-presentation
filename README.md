@@ -619,7 +619,8 @@ Slide 1 has the text style ":brand", which is not a style this theme has. The th
 **The label is plain text.** The label of a directive is a string rather than Markdown, so
 `:brand[**Bakery**]` would be drawn as `**Bakery**` — a deck that renders and shows
 something the author did not write. It is refused instead, and the message says the two
-ways out: give the style the weight, or write the emphasis in the paragraph around it. A
+ways out: give the style the weight — in the theme's own `text-styles.yml` for a named
+style, as an attribute for the raw form — or write the emphasis in the paragraph around it. A
 bare `*` or `_` is a character and not an intent, so `2 * 3` and `snake_case` are drawn as
 they are. So is a construct CommonMark does not call emphasis: `__ Bakery__` and
 `** text**` are text, because a delimiter that opens an emphasis may not be followed by a
