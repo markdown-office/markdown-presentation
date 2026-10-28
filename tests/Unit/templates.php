@@ -9,8 +9,8 @@ use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownTemplate;
-use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\Furniture;
+use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Template\ChromeFile;
@@ -334,7 +334,7 @@ it('refuses a slide that carries more shapes than one may', function () {
 
 it('draws a slide that carries as many shapes as one may', function () {
     // The other side of the ceiling: a slide at it is drawn rather than refused, because a
-    // ceiling that refused the shape it allowed would be a ceiling nobody could reach.
+    // ceiling that refused the shapes it allows is a ceiling nobody could reach.
     $chrome = str_repeat("::line{left=5% top=10% width=30% height=1%}\n", Furniture::MAX_SHAPES);
 
     $deck = "---\ntemplate: brand\n---\n" . $chrome . "\n---\nlayout: blank\ntemplate: brand\n---\n";
@@ -368,17 +368,17 @@ it('pays for a picture in a template once, however many slides draw it', functio
         ->and($file->shapeNames(2))->toBe(['image']);
 });
 
-it('draws a picture a deck placed on two slides as two pictures', function () {
+it('draws a picture the deck placed on two slides as two pictures', function () {
     // The picture of a template's chrome is the same shape on every slide that names the
     // template; a picture the deck placed is a shape of its own, and two of them are two
-    // pictures in the package.
+    // pictures in the package — each of them in the box it was given.
     $picture = Scratch::file('logo.png', base64_decode(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
     ));
 
     $deck = sprintf(
         "---\nlayout: blank\n---\n::image{src=\"%s\" left=0 top=0 width=10%% height=10%%}\n\n"
-        . "---\nlayout: blank\n---\n::image{src=\"%s\" left=0 top=0 width=10%% height=10%%}\n",
+        . "---\nlayout: blank\n---\n::image{src=\"%s\" left=50%% top=50%% width=20%% height=20%%}\n",
         basename($picture),
         basename($picture),
     );
@@ -390,7 +390,8 @@ it('draws a picture a deck placed on two slides as two pictures', function () {
         static fn (string $part): bool => str_starts_with($part, 'ppt/media/'),
     ));
 
-    expect($media)->toHaveCount(2);
+    expect($media)->toHaveCount(2)
+        ->and($file->positionOf('image', 1))->not->toBe($file->positionOf('image', 2));
 });
 
 it('imports the templates of a chrome file beside the deck', function () {

@@ -155,7 +155,7 @@ it('refuses a container fence it cannot draw, and names the one container it can
         ->toThrow(UnknownDirective::class, 'opens the container "::: {.panel}"');
 });
 
-it('writes the number of the deck after the number of the slide', function () {
+it('carries the flag that writes the number of the deck after the number of the slide', function () {
     // The one attribute of the page number that is not a placement: it says whether the
     // number of the deck follows the number of the slide.
     $shape = placedShape("::slide-number{of=true}\n");
