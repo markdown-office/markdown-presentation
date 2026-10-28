@@ -215,6 +215,12 @@ All notable changes to this project are documented here. The format follows
   `text-styles.yml` and the raw form carries it as an attribute, and the message says which
   of the two is which.
 
+- **An attribute a text style does not read is refused rather than applied as a strike.**
+  The reader's match ended in a catch-all that set the strike, so an attribute added to the
+  vocabulary of a theme's `text-styles.yml` and not to the reader would have been drawn as a
+  struck-through word rather than refused. The arms of the match are the vocabulary now, and
+  an attribute they do not know is refused by name.
+
 - **A line of text is measured in the face it is drawn in, and in the units a box is.**
   The advance widths of a face are in units per em and the size of the type is in points,
   so the width they make is in points — and a box is measured in pixels. The two were

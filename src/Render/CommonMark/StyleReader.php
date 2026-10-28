@@ -160,24 +160,22 @@ final class StyleReader
         foreach ($node->getAttributes()->toArray() as $attribute => $value) {
             $attribute = (string) $attribute;
 
-            if (!in_array($attribute, TextStyle::ATTRIBUTES, true)) {
-                throw MalformedTextStyle::attribute($slide, $name, $attribute, TextStyle::ATTRIBUTES);
-            }
-
-            if ($attribute === TextStyle::UNSUPPORTED) {
-                throw MalformedTextStyle::highlight($slide, $name);
-            }
-
-            $written = $this->written($slide, $name, $attribute, $value);
-
+            // The arms are the vocabulary, and an attribute they do not know is refused
+            // rather than applied as the last one they do: a property nobody read is a deck
+            // that renders and shows something the author did not write.
+            //
+            // The value is read inside the arms for the same reason: an attribute nobody
+            // reads is refused by name rather than by the advice a bare attribute gets.
             match ($attribute) {
-                'color' => $over['colour'] = $this->colour($slide, $name, 'color', $written, $theme),
-                'size' => $over['size'] = $this->size($slide, $name, $written),
-                'font' => $over['font'] = $this->font($slide, $name, 'font', $written, $theme),
-                'bold' => $over['bold'] = $this->flag($slide, $name, 'bold', $written),
-                'italic' => $over['italic'] = $this->flag($slide, $name, 'italic', $written),
-                'underline' => $over['underline'] = $this->flag($slide, $name, 'underline', $written),
-                default => $over['strike'] = $this->flag($slide, $name, 'strike', $written),
+                'color' => $over['colour'] = $this->colour($slide, $name, 'color', $this->written($slide, $name, $attribute, $value), $theme),
+                'size' => $over['size'] = $this->size($slide, $name, $this->written($slide, $name, $attribute, $value)),
+                'font' => $over['font'] = $this->font($slide, $name, 'font', $this->written($slide, $name, $attribute, $value), $theme),
+                'bold' => $over['bold'] = $this->flag($slide, $name, $attribute, $value),
+                'italic' => $over['italic'] = $this->flag($slide, $name, $attribute, $value),
+                'underline' => $over['underline'] = $this->flag($slide, $name, $attribute, $value),
+                'strike' => $over['strike'] = $this->flag($slide, $name, $attribute, $value),
+                TextStyle::UNSUPPORTED => throw MalformedTextStyle::highlight($slide, $name),
+                default => throw MalformedTextStyle::attribute($slide, $name, $attribute, TextStyle::ATTRIBUTES),
             };
         }
 
@@ -223,8 +221,8 @@ final class StyleReader
      * The value an attribute carries, as a string.
      *
      * A bare attribute asks for the attribute rather than for its value, which is a thing
-     * only a flag can be: `{bold}` is a word set in bold, and `{size}` is a size with
-     * nothing in it.
+     * only a flag can be: `{bold}` is a word set in bold. So a bare attribute here is a
+     * mistake, and {@see self::flag()} is where a bare flag is read.
      *
      * @param string|true $value
      *
@@ -234,10 +232,6 @@ final class StyleReader
     {
         if ($value !== true) {
             return $value;
-        }
-
-        if (in_array($attribute, ['bold', 'italic', 'underline', 'strike'], true)) {
-            return 'true';
         }
 
         throw MalformedTextStyle::value(
@@ -350,10 +344,20 @@ final class StyleReader
     /**
      * A flag, which is either set or not.
      *
+     * A bare attribute asks for the attribute rather than for its value, and a flag is the
+     * one thing in this vocabulary that can be asked for that way: `{bold}` is a word set in
+     * bold.
+     *
+     * @param string|true $written
+     *
      * @throws MalformedTextStyle
      */
-    private function flag(int $slide, string $name, string $attribute, string $written): bool
+    private function flag(int $slide, string $name, string $attribute, string|true $written): bool
     {
+        if ($written === true) {
+            return true;
+        }
+
         $lower = strtolower(trim($written));
 
         if ($lower === 'true') {

@@ -12,6 +12,7 @@ use MarkdownPresentation\Tests\Support\Doctest;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
+use MarkdownPresentation\Theme\TextStyle;
 use MarkdownPresentation\Theme\ThemeLoader;
 
 /**
@@ -240,6 +241,56 @@ it('refuses an attribute a text style does not read, and names the attributes it
             MalformedTextStyle::class,
             'The attributes are: color, size, font, bold, italic, underline, strike, highlight.',
         );
+});
+
+it('reads every attribute the vocabulary names', function () {
+    // The theme file's vocabulary and the reader's are two lists, and an attribute in the
+    // first and not in the second is one the reader refuses — or, worse, applies as the
+    // last property it knows. The reader is asked about every name the vocabulary has, and
+    // each of them has to set the property it names and no other.
+    $values = [
+        'color' => 'accent1',
+        'size' => '18',
+        'font' => 'Inter',
+        'bold' => 'true',
+        'italic' => 'true',
+        'underline' => 'true',
+        'strike' => 'true',
+    ];
+
+    $properties = [
+        'color' => '#<a:srgbClr val="00B4D8"#',
+        'size' => '#\bsz="1800"#',
+        'font' => '#<a:latin typeface="Inter"#',
+        'bold' => '#\bb="1"#',
+        'italic' => '#\bi="1"#',
+        'underline' => '#\bu="sng"#',
+        'strike' => '#\bstrike="sngStrike"#',
+    ];
+
+    foreach (TextStyle::ATTRIBUTES as $attribute) {
+        if ($attribute === TextStyle::UNSUPPORTED) {
+            continue;
+        }
+
+        expect($values)->toHaveKey($attribute)
+            ->and($properties)->toHaveKey($attribute);
+
+        [$deck, $directory] = wordmark(
+            "brand:\n  color: accent1\n",
+            sprintf(':brand[Bakery]{%s=%s}', $attribute, $values[$attribute]),
+        );
+
+        $run = runXml(styledDeck($deck, $directory), 'Bakery');
+
+        expect($run)->toMatch($properties[$attribute]);
+
+        // The strike is the one an attribute nobody reads would be applied as, so it is the
+        // one to look at: an attribute that is not a strike must not set one.
+        if ($attribute !== 'strike') {
+            expect($run)->not->toMatch('#\bstrike="sngStrike"#');
+        }
+    }
 });
 
 it('refuses a label that holds Markdown, because a style\'s text is plain text', function () {
