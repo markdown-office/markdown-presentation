@@ -16,6 +16,7 @@ use MarkdownPresentation\Render\Free\FreeAutoShape;
 use MarkdownPresentation\Render\Free\FreePicture;
 use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Render\Free\FreeShapes;
+use MarkdownPresentation\Render\Free\FreeSlideNumber;
 use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Render\Free\ShapeKind;
 use MarkdownPresentation\Render\PresentationRenderer;
@@ -130,7 +131,7 @@ it('reads every name in the vocabulary', function (string $name) {
         ->and($shape->name())->toBe($name);
 })->with([
     'rectangle', 'roundrect', 'ellipse', 'circle', 'triangle',
-    'diamond', 'chevron', 'hexagon', 'arrow', 'line', 'content',
+    'diamond', 'chevron', 'hexagon', 'arrow', 'line', 'content', 'slide-number',
 ]);
 
 it('names a directive it does not draw, and every name it does', function () {
@@ -140,7 +141,7 @@ it('names a directive it does not draw, and every name it does', function () {
         ->toThrow(
             UnknownDirective::class,
             'The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, '
-            . 'image, line, rectangle, roundrect, triangle.',
+            . 'image, line, rectangle, roundrect, slide-number, triangle.',
         );
 });
 
@@ -152,6 +153,26 @@ it('refuses a container fence it cannot draw, and names the one container it can
         ->toThrow(UnknownDirective::class, 'a placed text block is ":::content" with its Markdown')
         ->and(fn () => placedShapes("::: {.panel}\nSomething.\n:::\n"))
         ->toThrow(UnknownDirective::class, 'opens the container "::: {.panel}"');
+});
+
+it('carries the flag that writes the number of the deck after the number of the slide', function () {
+    $shape = placedShape("::slide-number{of=true}\n");
+
+    expect($shape)->toBeInstanceOf(FreeSlideNumber::class)
+        ->and($shape->of)->toBeTrue();
+});
+
+it('refuses an `of` that is neither true nor false', function () {
+    // This one was the exception: `getBool()` answers false for a word it does not know, so
+    // `of=maybe` was a page number with no deck count on it and nothing said so.
+    expect(fn () => placedShapes("::slide-number{of=maybe}\n"))
+        ->toThrow(MalformedShape::class, 'A flag is true or false: of=true, of=false.');
+});
+
+it('reads a bare `of` as the flag it asks for', function () {
+    expect(placedShape("::slide-number{of}\n")->of)->toBeTrue()
+        ->and(placedShape("::slide-number{of=false}\n")->of)->toBeFalse()
+        ->and(placedShape("::slide-number{}\n")->of)->toBeFalse();
 });
 
 it('places a size as a fraction of the slide on each of its axes', function () {
@@ -183,6 +204,33 @@ it('converts a percentage of nothing into a refusal rather than a number', funct
 it('refuses a length that is not a number, and says the three spellings', function () {
     expect(fn () => placedShapes("::rectangle{left=blue}\n"))
         ->toThrow(MalformedShape::class, 'left=40%, left=320, font-size=24pt');
+});
+
+it('names the separator where the attributes were written with commas', function () {
+    // A value runs to the next space, so `left=10%, top=20%` is one value of `10%,` and
+    // one attribute nobody reads. A message that blames the value sends the author to
+    // change a number that was right.
+    expect(fn () => placedShapes("::rectangle{left=10%, top=20%}\n"))
+        ->toThrow(MalformedShape::class, 'Attributes are separated by a space, not a comma');
+});
+
+it('names the separator where the attributes were written with commas and nothing else', function () {
+    // The other spelling of the same mistake: nothing separates the two attributes, so
+    // the first value swallows the second.
+    expect(fn () => placedShapes("::rectangle{fill=red,stroke=blue}\n"))
+        ->toThrow(MalformedShape::class, 'Attributes are separated by a space, not a comma');
+});
+
+it('still says what a length may be where the separator was wrong', function () {
+    // The separator is the mistake, and the value is what a length has to be as well: a
+    // message that named only one of them would leave the author with half the rule.
+    expect(fn () => placedShapes("::rectangle{left=10%, top=20%}\n"))
+        ->toThrow(MalformedShape::class, 'left=40%, left=320, font-size=24pt');
+});
+
+it('leaves a list of attributes separated by spaces alone', function () {
+    expect(placedShape("::rectangle{left=10% top=20% width=50% height=20%}\n")->kind)
+        ->toBe(ShapeKind::Rectangle);
 });
 
 it('refuses a negative length, because a free shape lies within the slide', function () {
@@ -318,8 +366,22 @@ it('has no fill or stroke where the deck named none', function () {
 
 it('refuses a colour name nothing is', function (string $attribute) {
     expect(fn () => placedShapes(sprintf("::rectangle{%s=chartreuse}\n", $attribute)))
-        ->toThrow(MalformedShape::class, 'A colour is none, page, ink, subtle, panel, a theme slot');
+        ->toThrow(MalformedShape::class, 'A colour is either no colour at all (none or transparent), a role (page, ink, subtle, panel), a theme slot');
 })->with([['fill'], ['stroke']]);
+
+it('accepts a colour written as one of the names the concept draft used', function () {
+    // `dark1` is the concept draft's name for `dk1`, and a deck that names a colour the old
+    // way means the same colour: the spelling is not the thing being refused.
+    expect(placedShape("::rectangle{fill=dark1}\n")->paint->fill)->not->toBeNull();
+});
+
+it('names the names the concept draft used in the advice for a colour nothing is', function () {
+    // The advice is what a reader is shown when they get a colour wrong, and it has to name
+    // every colour that would have been right — including the six the concept draft used,
+    // which are names like any other.
+    expect(fn () => placedShapes("::rectangle{fill=chartreuse}\n"))
+        ->toThrow(MalformedShape::class, 'dark1, light1, dark2, light2, hyperlink, followedHyperlink');
+});
 
 it('leaves a colour whole where the deck named no alpha', function () {
     // Null rather than 100, so that an opaque shape is written with the six characters of
@@ -1093,6 +1155,25 @@ it('refuses a label on a placed text block, whose body is already its text', fun
     // about: a picture has no body to hold one and a text block already has one full.
     expect(fn () => placedShapes(":::content{label=\"Hi\"}\nWords.\n:::\n"))
         ->toThrow(MalformedShape::class, 'the body between the fences is already its text');
+});
+
+it('gives the page number its own reason for having nowhere to put a label', function () {
+    // The page number has no body at all, so a message describing the body between the
+    // fences sends the author looking for a fence it has not got.
+    $message = function (string $markdown): string {
+        try {
+            placedShapes($markdown);
+        } catch (MalformedShape $refusal) {
+            return $refusal->getMessage();
+        }
+
+        return '';
+    };
+
+    expect($message("::slide-number{label=\"Hi\"}\n"))
+        ->toContain('the number of the slide is written into it by the renderer')
+        ->and($message("::slide-number{label=\"Hi\"}\n"))
+        ->not->toBe($message(":::content{label=\"Hi\"}\nWords.\n:::\n"));
 });
 
 it('refuses a bare label, which asks for the attribute rather than for its value', function () {

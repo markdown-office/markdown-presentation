@@ -52,7 +52,40 @@ final class MalformedShape extends InvalidInput
             $name,
             $attribute,
             $written,
-            $advice,
+            self::separator($written) . $advice,
+        ));
+    }
+
+    /**
+     * The sentence that names the separator, where the value says the mistake was the
+     * separator rather than the value.
+     *
+     * A bare value runs to the next space, so a list written with commas is read as one
+     * value: `width=40%, height=20%` gives a width of `40%,` and `fill=red,stroke=blue` a
+     * fill of `red,stroke=blue`. A message that blames the value sends the author to change
+     * a number that was right, and every value this message is about is a length, a colour, a
+     * word or a number — none of which may hold a comma.
+     */
+    private static function separator(string $written): string
+    {
+        return str_contains($written, ',')
+            ? 'Attributes are separated by a space, not a comma. '
+            : '';
+    }
+
+    /**
+     * A flag whose value is neither true nor false.
+     */
+    public static function flag(int $slide, string $name, string $attribute, string $written): self
+    {
+        return new self(sprintf(
+            'Slide %d gives "%s" an "%s" of "%s". A flag is true or false: %s=true, %s=false.',
+            $slide,
+            $name,
+            $attribute,
+            $written,
+            $attribute,
+            $attribute,
         ));
     }
 
@@ -185,9 +218,10 @@ private const BODY_NOUNS = [
     /**
      * A label on a directive that has no shape to hold one in, or no body to put one in.
      *
-     * The two are one failure with two reasons, and both are the same mistake: putting the same
-     * words on the same thing twice. A picture is a `p:pic` with no text body at all, and a
-     * placed text block's body *is* its text.
+     * One failure, with a reason for each shape that has nowhere to put a label, and they are
+     * all the same mistake: putting the same words in the same place twice. A picture is a
+     * `p:pic` with no text body at all, a placed text block's body *is* its text, and the
+     * number of a slide is written into the shape by the renderer.
      *
      * @param string $why The reason this directive has nowhere to put one.
      */
@@ -195,7 +229,7 @@ private const BODY_NOUNS = [
     {
         return new self(sprintf(
             'Slide %d gives "%s" a label, which it has nowhere to put: %s. A label goes on one of the ten ink '
-            . 'shapes, and a ":::content" box already has a body to write in.',
+            . 'shapes.',
             $slide,
             $name,
             $why,

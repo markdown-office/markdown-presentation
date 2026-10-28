@@ -177,6 +177,32 @@ function holdsClaim(string $text, string $claim): bool
 }
 
 /**
+ * Every page under a directory, as paths relative to the project root.
+ *
+ * Recursive because a page is a page wherever it is: the example deck of a company has a
+ * directory of its own.
+ *
+ * @return list<string>
+ */
+function pagesUnder(string $directory): array
+{
+    $pages = [];
+    $root = Doctest::root() . '/' . $directory;
+
+    foreach (new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+    ) as $file) {
+        if ($file->isFile() && $file->getExtension() === 'md') {
+            $pages[] = $directory . '/' . substr($file->getPathname(), strlen($root) + 1);
+        }
+    }
+
+    sort($pages);
+
+    return $pages;
+}
+
+/**
  * The pages and the decks, which are read by people rather than executed.
  *
  * The gallery and the decks beside it are here because a deck that describes what it
@@ -196,14 +222,9 @@ function pagesWithClaim(string $claim): array
         }
     }
 
-    foreach ([
-        'examples/' => glob($root . '/examples/README.md') ?: [],
-        'examples/markdown/' => glob($root . '/examples/markdown/*.md') ?: [],
-    ] as $prefix => $pages) {
-        foreach ($pages as $page) {
-            if (holdsClaim((string) file_get_contents($page), $claim)) {
-                $found[] = $prefix . basename($page);
-            }
+    foreach (['examples/README.md', ...pagesUnder('examples/markdown')] as $page) {
+        if (holdsClaim((string) file_get_contents($root . '/' . $page), $claim)) {
+            $found[] = $page;
         }
     }
 
@@ -359,6 +380,33 @@ it('does not claim again what the code does not do', function (string $claim) {
     // without firing on either.
     'a shape label is drawn in the reader default text colour' => 'whatever the reader defaults text to',
     'a shape label is unreadable on a filled shape' => 'unreadable on a filled shape or a dark one',
+    // A theme is looked for in a different order now, and the two halves of the suite
+    // had to be made to say the same thing: a path is written from the deck's own
+    // directory rather than from the working directory, and the roots the resolver is
+    // given are looked in rather than only held to. The claims below were all made
+    // about the old order, and each of them is false of the library now.
+    'a theme path is written from the working directory' => 'an explicit path — anything with a `/` in it, resolved against the working',
+    'a theme in a root is named by its path rather than by its name' => 'the roots widen what a deck may reach',
+    'a theme path is loaded from wherever the resolver was given' => 'A theme named by path is loaded from wherever it is',
+    'a relative path is resolved against the working directory' => 'resolves a relative path against the working directory, not against the process',
+    // A note is the last thing on a slide: the closer is anchored to the end of it, so a
+    // note with anything after it is refused rather than read. A note that was closed and
+    // written in the wrong place used to be refused as one that nothing closed, which sent
+    // the author looking for a closer that was there. The phrase below is the old rule's
+    // own wording, and no comment or page may say it now.
+    'a note is taken off the content wherever it is written' => 'taken off the content wherever it is written',
+    // The attributes of a directive are separated by spaces, and a value with a comma in it
+    // is a list written with the wrong separator rather than a value of its own. The failure
+    // says so now; the phrase below is the old reading, and no comment or page may say it.
+    'the attributes of a directive may be separated by commas' => 'separated by commas',
+
+    // A manifest was named by the file the path resolved to rather than by the name the deck
+    // wrote, so a `theme.yml` that was a link to a file of another name was refused for the
+    // name it had reached. The name the deck wrote is what makes a file the manifest — the
+    // rule the Word half already followed — and the roots still hold the file the link
+    // reaches. The phrase is the one the loader's own docblock gave, so a docblock may not
+    // state that rule again.
+    'a manifest is named by the file the path resolved to' => 'the file has to be the manifest the library knows by name',
     // There is no `text` attribute on a free shape, and the reason is that `:::content` over
     // the shape can be styled and this could not. There is no guard for it, and the reason is
     // the one above: the README has to be able to name `::arrow{text="…"}` in the sentence
@@ -366,6 +414,78 @@ it('does not claim again what the code does not do', function (string $claim) {
     // offering it. The decision is pinned by the XML the README quotes instead — one run, no
     // `a:rPr`, `algn` and `anchor` written into the element — which cannot be edited into
     // meaning the opposite without also being visibly wrong.
+
+    // Every piece of text was measured with one face's advance widths whatever the theme
+    // named, so a deck set in a narrower face was laid out as if it were set in a wider one
+    // and a heading wrapped a word earlier than the original deck. There is a table for
+    // every face the shipped themes name now, and a face with no table is measured with the
+    // reference face's widths and reported. The phrases are what the pages said rather than
+    // the idea. `CHANGELOG.md` names the old reference in its own entry for the release that
+    // introduced it, so the phrases are the ones the pages used and not the one the history
+    // quotes.
+    'every piece of text is measured with one face\'s widths' => 'the widths are Helvetica\'s',
+    'the wrapping is estimated from a table of one face\'s widths' => 'Helvetica\'s widths',
+    'the table is one face\'s own advance widths' => 'Helvetica\'s own advance widths',
+
+    // The monospaced half of the measurement was one number for every face — 600 units to
+    // the em — and 600 is what JetBrains Mono advances by and nine per cent wider than
+    // Consolas. Every monospaced face is measured by its own advance now, so neither a
+    // page nor a comment may claim that the half is exact, that the three faces advance
+    // by the same amount, or that which face a monospaced one is says nothing about how
+    // wide its text is.
+    'the monospaced half is exact' => 'the monospaced half is exact',
+    'the three monospaced faces advance by the same amount' => 'which is what Consolas, Menlo and JetBrains Mono use',
+    'the face a monospaced one is says nothing about how wide its text is' => 'says nothing about how wide its text is',
+    // The renderer copies the resolver it is given rather than changing it, so the
+    // resolver a caller keeps is not the one the renderer works with: the deck's
+    // directory goes to the copy.
+    'the resolver a caller keeps is the one the renderer works with' => 'keeps it and gains the deck\'s directory with it',
+
+    // The advice about a colour began with the two spellings of no colour at all and went
+    // on to the roles, so the sentence read as though "none" were a role like the rest. The
+    // advice names them apart from the colours now, and the phrase below is the shape it
+    // had — a page quoting it, or a test asserting on it, is quoting a message this
+    // library does not send.
+    'the advice about a colour lists the absence of a colour among the colours' => 'is none or transparent, page',
+
+    // A `::slide-number` has no body between fences, and the refusal for a label on one
+    // described the body between the fences — which is the body of a `:::content`, a shape
+    // that has one. The phrase is the two together, because the half of it that is still
+    // true of a text block has to stay.
+    'a page number is refused for the body of a text block' => 'gives "slide-number" a label, which it has nowhere to put: the body between the fences is already its text',
+    // The shapes a label has nowhere to go were counted, and the count was two of twelve.
+    // A count in a docblock is wrong the moment a shape is added, and nothing reads prose
+    // to say so.
+    'a label has nowhere to go on two of the twelve shapes' => 'two of the twelve have nowhere to put it',
+    // The advice for a label that holds Markdown named the theme's file, which the raw
+    // form cannot have: `style` is the one name a theme may not give a style of its own.
+    // The phrase is the advice as it was, because it is the advice that cannot be given
+    // again.
+    'the advice for a label that holds Markdown names a style a theme may not have' => 'give the style the weight ("style: { bold: true }")',
+    // The kinds of free shape were counted, and the count was three subclasses when the
+    // page number made four. A count in a docblock is wrong the moment a kind is added,
+    // and nothing reads prose to say so.
+    'the kinds of free shape are counted in the writer' => 'three subclasses',
+    // The ink shapes were counted, and the count was nine when the page number made ten.
+    'the ink shapes are counted in the writer' => 'nine ink-only shapes',
+    // The free shapes were counted on the page, and the count was twelve when the page
+    // number made thirteen. The phrases are the sentences the page and the example deck
+    // gave, and the CHANGELOG has to be able to name what the vocabulary was.
+    'the free shapes are counted on the page' => 'twelve names are drawn',
+    'the failure for a name nobody draws lists twelve' => 'lists all twelve',
+    'the shadow attributes are counted on the page' => 'five attributes, on all twelve directives',
+    'the shadow attributes are counted in the table' => 'shadow-alpha` | all twelve',
+    'the free shapes are counted in the example deck' => 'twelve directives in the body of a slide',
+    // The docblock of the colour lookup called it one list of names rather than two, above a
+    // method that consults two: the aliases are the concept draft's spellings and the slots
+    // are DrawingML's own, and each of them is looked through in turn. The phrase is the
+    // claim as it was made, so that a comment may not make it again.
+    'the colour lookup is one list of names rather than two' => 'One list of names rather than two',
+    // The label refusal was described as the shapes that have no body of their own, which
+    // leaves out the placed text block: its body is the deck's own words and is already its
+    // text, so it is refused as well. The phrase is the claim as it was made, so that a
+    // comment may not make it again.
+    'a label is refused on the shapes with no body of their own' => 'the shapes with no body of their own have nowhere to put it',
 ]);
 
 it('has no decorative dividers in it', function () {

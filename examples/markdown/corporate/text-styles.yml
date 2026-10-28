@@ -1,0 +1,21 @@
+# The named text styles: the words inside a box, written in a deck as `:brand[...]`.
+#
+# The properties are the same eight the inline style attributes have, and a size is
+# in points as it is everywhere else.
+#
+# These are the four a corporate deck uses most. The wordmark is the company's own
+# name, the brand is the primary colour, the eyebrow is the small line above a
+# title, and the muted style is what a caption is written in.
+wordmark:
+  color: dk1
+  bold: true
+brand:
+  color: accent1
+  bold: true
+eyebrow:
+  color: accent1
+  bold: true
+  size: 11
+muted:
+  color: lt2
+  size: 12

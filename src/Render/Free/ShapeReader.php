@@ -84,7 +84,7 @@ final class ShapeReader
     }
 
     /**
-     * The shape, told apart by what it carries rather than by which of the twelve it is.
+     * The shape, told apart by what it carries rather than by which directive it was written as.
      *
      * @throws ImageNotFound
      * @throws MalformedShape
@@ -98,26 +98,37 @@ final class ShapeReader
         DirectiveAttributes $attributes,
         SlideState $state,
     ): FreeShape {
-        // Read before the branch, because every one of the twelve draws a box and can cast one,
-        // and `::image` is no exception: a `p:pic` carries an effect list of its own.
+        // Read before the branch, because every one of the free shapes draws a box and can
+        // cast one, and `::image` is no exception: a `p:pic` carries an effect list of its own.
         $shadow = Shadow::read($state->slide, $kind->value, $attributes, $state->theme);
 
-        if ($kind === ShapeKind::Image) {
-            return FreePicture::at(
+        // A picture takes no fill of its own: it is painted by its own bytes.
+        $paint = $kind === ShapeKind::Image
+            ? Paint::none()
+            : Paint::read($state->slide, $kind->value, $attributes, $state->theme);
+
+        return match (true) {
+            $kind === ShapeKind::Image => FreePicture::at(
                 $kind,
                 $placement,
                 $state->step,
-                Paint::none(),
+                $paint,
                 $this->picture($attributes, $state),
                 Pictures::fit($state->slide, $kind->value, $attributes),
                 $shadow,
-            );
-        }
-
-        $paint = Paint::read($state->slide, $kind->value, $attributes, $state->theme);
-
-        if ($kind->isContent()) {
-            return FreeText::at(
+            ),
+            // Before the text block, which is a box whose body the deck wrote: this one's body
+            // is the number, and the renderer writes it.
+            $kind === ShapeKind::SlideNumber => FreeSlideNumber::at(
+                $kind,
+                $placement,
+                $state->step,
+                $paint,
+                TextStyle::read($state->slide, $kind->value, $attributes, $state->theme),
+                self::of($state->slide, $attributes),
+                $shadow,
+            ),
+            $kind->isContent() => FreeText::at(
                 $kind,
                 $placement,
                 $state->step,
@@ -125,17 +136,49 @@ final class ShapeReader
                 $this->frame($node, $state),
                 TextStyle::read($state->slide, $kind->value, $attributes, $state->theme),
                 $shadow,
-            );
+            ),
+            default => FreeAutoShape::at(
+                $kind,
+                $placement,
+                $state->step,
+                $paint,
+                Length::written($state->slide, $kind->value, 'label', $attributes, ''),
+                $shadow,
+            ),
+        };
+    }
+
+    /**
+     * Whether the number of the deck is written after the number of the slide.
+     *
+     * A flag, and read as one: `getBool()` answers false for a word it does not know, so
+     * `of=maybe` was a page number with no deck count on it and nothing said so. Every other
+     * value in this vocabulary is refused with a sentence, and this one is refused with one
+     * too.
+     *
+     * A bare `of` asks for the attribute rather than for its value, so it means true.
+     *
+     * @throws MalformedShape
+     */
+    private static function of(int $slide, DirectiveAttributes $attributes): bool
+    {
+        $written = $attributes->get('of');
+
+        if ($written === null) {
+            return false;
         }
 
-        return FreeAutoShape::at(
-            $kind,
-            $placement,
-            $state->step,
-            $paint,
-            Length::written($state->slide, $kind->value, 'label', $attributes, ''),
-            $shadow,
-        );
+        if ($written === true) {
+            return true;
+        }
+
+        $lower = strtolower(trim($written));
+
+        if ($lower === 'true' || $lower === 'false') {
+            return $lower === 'true';
+        }
+
+        throw MalformedShape::flag($slide, ShapeKind::SlideNumber->value, 'of', $written);
     }
 
     /**
@@ -143,8 +186,8 @@ final class ShapeReader
      *
      * Three come before the generic refusal, because each says more than "not an attribute"
      * would: a `border-radius` is a real attribute of this vocabulary and only one shape has the
-     * corners for it; a `label` is a real one and two of the twelve have nowhere to put it; and
-     * a label in brackets has nowhere on any of them.
+     * corners for it; a `label` is a real one and each shape it is refused on has a reason of
+     * its own; and a label in brackets has nowhere on any of them.
      *
      * @throws MalformedShape
      */
@@ -163,9 +206,11 @@ final class ShapeReader
             throw MalformedShape::noLabel(
                 $slide,
                 $kind->value,
-                $kind === ShapeKind::Image
-                    ? 'a picture is a `p:pic`, which carries no text of its own'
-                    : 'the body between the fences is already its text',
+                match (true) {
+                    $kind === ShapeKind::Image => 'a picture is a `p:pic`, which carries no text of its own',
+                    $kind === ShapeKind::SlideNumber => 'the number of the slide is written into it by the renderer',
+                    default => 'the body between the fences is already its text',
+                },
             );
         }
 
@@ -221,13 +266,13 @@ final class ShapeReader
                 $child instanceof LeagueTable => throw MalformedShape::body($state->slide, $written, 'table'),
                 $child instanceof ThematicBreak => throw MalformedShape::body($state->slide, $written, 'rule'),
                 $child instanceof LeagueHeading => new Heading(
-                    $this->inline->runs($child),
+                    $this->inline->runs($child, $state->slide, $state->theme),
                     $child->getLevel(),
                     $state->step,
                 ),
                 $child instanceof LeagueList => $this->frames->list($child, $state),
                 $child instanceof BlockQuote => new Quote(
-                    $this->inline->runsIn(implode("\n", $this->frames->quoted($child, $state))),
+                    $this->inline->runsIn(implode("\n", $this->frames->quoted($child, $state)), $state->slide, $state->theme),
                     $state->step,
                 ),
                 default => $this->paragraph($child, $written, $state),
@@ -264,12 +309,12 @@ final class ShapeReader
 
         if ($node instanceof HtmlBlock) {
             return new ParagraphBlock(
-                $this->inline->runsIn(implode("\n", array_map(trim(...), $state->lines($node)))),
+                $this->inline->runsIn(implode("\n", array_map(trim(...), $state->lines($node))), $state->slide, $state->theme),
                 $state->step,
             );
         }
 
-        return new ParagraphBlock($this->inline->runs($node), $state->step);
+        return new ParagraphBlock($this->inline->runs($node, $state->slide, $state->theme), $state->step);
     }
 
     /**

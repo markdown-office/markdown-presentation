@@ -9,6 +9,7 @@ use MarkdownPresentation\Render\SlideGeometry;
 use MarkdownPresentation\Theme\Style;
 use MarkdownPresentation\Theme\StyleMapping;
 use MarkdownPresentation\Theme\Theme;
+use MarkdownPresentation\Theme\ThemeMapping;
 use MarkdownPresentation\Theme\ThemeResolver;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Tests\Support\Pptx;
@@ -49,7 +50,7 @@ function styledTheme(array $style, array $colors = []): Theme
 function themedDeck(Theme $theme, string $markdown = "---\ntheme: %s\n---\n\n# T\n\n## Sub\n\nBody.\n\n***\n"): Pptx
 {
     $directory = Scratch::directoryPath('theme');
-    file_put_contents($directory . '/theme.yml', (string) json_encode($theme->toArray()));
+    file_put_contents($directory . '/theme.yml', (string) json_encode(ThemeMapping::write($theme)));
 
     // A theme with no `layouts.yml` maps no role at all, and a deck is written in the
     // `content` role whether it says so or not — so the mappings a deck needs are the ones
@@ -304,6 +305,21 @@ it('draws a heading in its face\'s own weight when the theme says so', function 
 
     expect(headingIsBold($regular))->toBeFalse()
         ->and(headingIsBold($bold))->toBeTrue();
+});
+
+it('measures a heading in the weight it is drawn in', function () {
+    // The other half of the one above: a heading in a theme that says `regular` is drawn in
+    // the face's reading weight, so measuring it in the bold cut is measuring a face that is
+    // not there — and a heading measured a line too tall is a gap under it.
+    //
+    // 60 `h` at 20pt are 851px in Calibri's regular cut and 870px in its bold one — 20pt is
+    // 27px, and a width is measured in pixels because a box is — and the body box leaves
+    // 860px for the text, so the first takes one line and the second two.
+    $heading = "---\ntheme: %s\n---\n\n# T\n\nBody.\n\n## " . str_repeat('h', 60) . "\n";
+    $regular = themedDeck(styledTheme(['heading-weight' => 'regular']), $heading);
+    $bold = themedDeck(styledTheme(['heading-weight' => 'bold']), $heading);
+
+    expect($regular->positionOf('text')['height'])->toBeLessThan($bold->positionOf('text')['height']);
 });
 
 it('draws a heading in the accent rather than the body ink when the theme says so', function () {

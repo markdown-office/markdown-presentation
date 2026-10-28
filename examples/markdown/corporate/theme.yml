@@ -1,0 +1,42 @@
+# The design of a corporate deck.
+#
+# A theme is the design: the colours, the faces, the type scale and the rhythm.
+# Everything the deck draws that is not a picture comes from here.
+#
+# The colours are the twelve slots the format has. `lt1` and `dk1` are the page and
+# the ink on a light theme; `lt2` is the quiet ink a caption is written in, and
+# `dk2` is the panel a dark slide is painted with.
+name: Halden Instruments
+description: A light corporate deck with a deep blue primary and a muted gold accent.
+author: Halden Instruments
+dark: false
+colors:
+  lt1: "#FFFFFF"
+  dk1: "#15243B"
+  lt2: "#5A6B80"
+  dk2: "#0E1A2B"
+  accent1: "#1F5FA8"
+  accent2: "#3E8E7E"
+  accent3: "#C8A15A"
+  accent4: "#B4472F"
+  accent5: "#E8EEF6"
+  accent6: "#DDE4EC"
+  hlink: "#1F5FA8"
+  folHlink: "#7A8CA3"
+fonts:
+  heading: Georgia
+  body: Arial
+  mono: Consolas
+style:
+  margin: 60
+  gutter: 24
+  block: 16
+  rule: 2
+  body: 16
+  title: 34
+  cover: 52
+  section: 44
+  headings: [26, 22, 19, 17, 15]
+  leading: 1.4
+  heading-weight: bold
+  heading-ink: ink

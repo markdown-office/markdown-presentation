@@ -59,4 +59,96 @@ final class MalformedTheme extends InvalidInput
             $value,
         )));
     }
+
+    /**
+     * A colour a theme's file named that is not one.
+     *
+     * The advice is the theme's own, built from the names a colour may be written under, so
+     * that a failure in a theme's file and a failure in a deck's attribute name the same
+     * list — they are one question and two vocabularies would be two answers to it.
+     */
+    public static function wrongColour(string $file, string $key, string $written, string $advice): self
+    {
+        return new self(self::in($file, sprintf(
+            '"%s" is "%s", which is not a colour. %s',
+            $key,
+            $written,
+            $advice,
+        )));
+    }
+
+    /**
+     * A text style that sets an attribute that is not one.
+     *
+     * The attributes are named rather than the keys of a theme, because a text style is
+     * not a theme: it carries the properties of a run and nothing else.
+     *
+     * @param list<string> $attributes
+     */
+    public static function unknownAttribute(string $file, string $style, string $attribute, array $attributes): self
+    {
+        return new self(self::in($file, sprintf(
+            'The style "%s" sets "%s", which is not an attribute of a text style. The attributes are: %s.',
+            $style,
+            $attribute,
+            implode(', ', $attributes),
+        )));
+    }
+
+    /**
+     * A text style that styles nothing.
+     */
+    public static function emptyStyle(string $file, string $style): self
+    {
+        return new self(self::in($file, sprintf(
+            'The style "%s" sets nothing. A style that styles nothing is a mistake.',
+            $style,
+        )));
+    }
+
+    /**
+     * A text style named with the word the raw form is written with.
+     */
+    public static function reservedStyle(string $file, string $style): self
+    {
+        return new self(self::in($file, sprintf(
+            'The style "%s" is named with a reserved word: "style" is how the raw form of a text style is written, '
+            . 'as in ":style[Bakery]{color=00B4D8}".',
+            $style,
+        )));
+    }
+
+    /**
+     * A text style that sets an attribute this half does not draw.
+     */
+    public static function unsupportedAttribute(string $file, string $style, string $attribute): self
+    {
+        return new self(self::in($file, sprintf(
+            'The style "%s" sets a "%s", which the slides half does not draw: a highlight is a colour behind the '
+            . 'word, and this library has no way to write one.',
+            $style,
+            $attribute,
+        )));
+    }
+
+    /**
+     * Two text styles whose names are the same word.
+     *
+     * The names are folded, so `Brand` and `brand` are one name: a theme that carries both
+     * has two styles a deck cannot tell apart.
+     *
+     * The file is optional, because the styles may be built in code rather than read out of
+     * a theme's file: a name written twice is a mistake whoever wrote it, and the file is
+     * only there to say where the author has to look.
+     */
+    public static function duplicateStyle(?string $file, string $style, string $other): self
+    {
+        $problem = sprintf(
+            'The style "%s" is the same style as "%s": a style\'s name is a word, and a theme names one style once.',
+            $style,
+            $other,
+        );
+
+        return new self($file === null ? $problem : self::in($file, $problem));
+    }
 }

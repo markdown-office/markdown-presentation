@@ -1,0 +1,15 @@
+# Which layout each of the eight roles gets.
+#
+# A theme that ships no `template.pptx` has no layouts of its own, so these names
+# are labels: the boxes behind them are the ones the theme computes from its own
+# margins and type scale. A company that has a PowerPoint template of its own
+# drops the file in beside this one and the names become real.
+layouts:
+  title: Title Slide
+  content: Title and Content
+  two-column: Two Content
+  section: Section Header
+  blank: Blank
+  image-text: Picture Left
+  image-title: Picture with Caption
+  image-slide: Full Bleed Picture

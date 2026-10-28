@@ -168,8 +168,11 @@ is one slide carrying both, and `Deck::frontmatter()` returns its keys.
 step markers, not the splitter's.
 
 A speaker note is `::note` on a line of its own, its text, and a
-closing `::`, in either case. A `::note` nothing closes is part of
-the slide's text, and the renderer refuses it rather than drawing it.
+closing `::`, in either case. It has to be the last thing on the
+slide: the closer is anchored to the end of it, so a note with
+anything after it is refused rather than read. A `::note` nothing
+closes is part of the slide's text, and the renderer refuses it
+rather than drawing it.
 
 Two shapes are refused rather than read:
 
@@ -239,6 +242,26 @@ echo $deck->slides()[0]->content(), "\n";
 ```text
 Read this out loud.
 # One
+```
+
+A note has to be the last thing on the slide: the closer is anchored to the end of
+it, so a note with anything after it is refused rather than read. The refusal says
+which rule was broken, because the note was closed and a message about a missing
+closer would send the author looking for one that is there:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+
+try {
+    (new DeckParser())->parse("# One\n\n::note\nRead this out loud.\n::\n\n## After\n");
+} catch (Exception $failure) {
+    echo $failure->getMessage(), "\n";
+}
+```
+
+```text
+Slide 1 opens a "::note" that is not the last thing on the slide. A note is "::note" on a line of its own, its text, and a closing "::" on a line of its own, and it has to come after all the content on the slide.
 ```
 
 ## Rendering
@@ -411,12 +434,19 @@ putting its second line on the first line of the body. The body is read in the s
 every slide, which is why the title gives way and not the body.
 
 Every block is measured before it is drawn: `Render\TextMetric` counts the lines it will
-wrap to, from an advance-width table bundled in the package. It is an estimate and says so
-— the widths are Helvetica's, kerning is not modelled, and a theme naming a face of a
-different width is not detected — which is why every text shape is written `a:normAutofit`.
-The box keeps the height the layout gave it and the reader scales the type down to fit, so
-an estimate that came out a line short costs a little whitespace instead of drawing one
-block over the next.
+wrap to, from the advance widths of the face the theme draws the text in. There is a table
+for every face the shipped themes name — Calibri, Cambria, Arial, Arial Narrow, Georgia,
+Inter and Roboto — and a bold run is measured with the widths of the bold face rather than
+with the upright ones made a little wider. The monospaced faces are measured by their
+advance rather than by a table, because every character in one advances by the same amount:
+Consolas advances by 550 units to the em, Menlo by 602 and JetBrains Mono by 600, so a code
+block is measured in the face that will draw it. It is an estimate and says so: kerning is
+not modelled, and a face with no table of its own is measured with the
+reference face's widths — the ones every face was measured with before there were tables of
+their own — and the face is named by `unknownFonts()`. Which is why every text shape is
+written `a:normAutofit`. The box keeps the height the layout gave it and the reader scales
+the type down to fit, so an estimate that came out a line short costs a little whitespace
+instead of drawing one block over the next.
 
 ### Links
 
@@ -470,6 +500,152 @@ and backticks inside a code span are characters, so `` `**not bold**` `` is a co
 
 Code blocks are not coloured. Nothing here lexes a language, and the fence's info string
 is kept only so a reader unzipping the file can see which blocks named which language.
+
+### Inline styles
+
+A box carries one colour, one size and one face, and every word in it takes them or does
+not. A **text style** is a name a theme gives to a set of those, and a word written in one
+is drawn in it:
+
+```markdown
+:::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri}
+Resilience :brand[Bakery]
+:::
+```
+
+That is one box, two words and two colours — which is the whole of what a wordmark is, and
+what a box could not say before.
+
+Three forms, one grammar:
+
+| Written | Means |
+| --- | --- |
+| `:accent[brand]` | the word "brand" in the style the theme names `accent` |
+| `:accent[brand]{color=FF0000}` | the same, with the attributes laid over the style's |
+| `:style[brand]{color=FF0000}` | the word "brand" in the attributes, with no style involved |
+
+The attributes are a closed set:
+
+| Attribute | Carries |
+| --- | --- |
+| `color` | the ink: a role, a theme slot or a hex value — the same vocabulary [a shape's fill](#colour) is written in |
+| `size` | the size of the type, in points |
+| `font` | the family: one of the theme's own font slots or a literal |
+| `bold` | the weight: `true` or `false` |
+| `italic` | the slant: `true` or `false` |
+| `underline` | the underline: `true` or `false` |
+| `strike` | the strike: `true` or `false` |
+| `highlight` | a colour behind the word — **not drawn by this half**, see below |
+
+An attribute overrides the style for the property it names, and for that property only. A
+property neither of them names is not set: the run takes it from the block it is in — the
+`:::content` box's colour, the paragraph's size. Nothing is reset to a default, so a style
+that sets a colour and nothing else changes the colour of a word and leaves the rest of it
+alone.
+
+A face is drawn *and* measured. The words in a box are measured with the advance widths of
+the face they will be drawn in — the theme's own for a frame, the `font-family` of the box
+for a placed one, and the `font` of the style for a word written in one — so a word in a
+narrower face takes fewer lines and the box around it is the height it needs.
+
+**A boolean set to `false` is not "off" but "not set".** `:brand[Bakery]{bold=false}`
+takes the weight off a style that has it, and the word then takes the weight of the block
+it is in — a paragraph's is none and a heading's is bold. The Word half reads it the same
+way, because a run cannot be written with a weight of none.
+
+**A link in a text style keeps the style's colour.** A link with no style of its own is
+drawn in the theme's `hlink`, and a link written in a text style is drawn in the style's
+colour instead: the style is the more particular of the two statements. It keeps its
+underline either way, so it still reads as a link.
+
+The named styles come from the theme's `text-styles.yml`, which is optional:
+
+```yaml
+# themes/resilience-bakery/text-styles.yml
+brand:
+  color: accent1
+  bold: true
+muted:
+  color: lt2
+```
+
+**A style's name is a word, and a word does not care about case.** A theme that spells a
+style `Brand` has it under `:brand[…]` and `:Brand[…]` alike, the way the directives
+package folds the names of the directives themselves. The refusal for a name the theme does
+not have spells the styles it does have the way the theme wrote them, because that is the
+spelling the author has to change.
+
+Ten mistakes in a `text-styles.yml` are refused when the theme is read rather than
+reaching the slide:
+
+| Refused | Why |
+| --- | --- |
+| a style that sets an attribute that does not exist | the attributes are a closed set |
+| a style that sets nothing at all | a style that styles nothing is a mistake |
+| a style that is not a mapping of attributes | a style carries one attribute per line |
+| a style called `style` | that word is how the raw form is written |
+| a style that sets a `highlight` | **not drawn by this half**, see below |
+| a style that names another one in a different case | `Brand` and `brand` are one word |
+| a colour that is not a colour | the message names every colour that would have been right |
+| a size that is not a number of points | the message says what a size may be |
+| a font that is not a name | a font is a family name |
+| a flag that is not `true` or `false` | `yes` is a YAML truthy string rather than the flag |
+
+Every one of them names what would have worked instead, so a mistake in a
+`text-styles.yml` is never rendered as silence.
+
+A name the theme does not have is refused when the deck is read, and the message names the
+styles the theme does have:
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+try {
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse("Resilience :brand[Bakery]\n"),
+        sys_get_temp_dir() . '/deck.pptx',
+    );
+} catch (Exception $failure) {
+    echo $failure->getMessage(), "\n";
+}
+```
+
+```text
+Slide 1 has the text style ":brand", which is not a style this theme has. The theme has no text styles; a theme names them in its "text-styles.yml".
+```
+
+**The label is plain text.** The label of a directive is a string rather than Markdown, so
+`:brand[**Bakery**]` would be drawn as `**Bakery**` — a deck that renders and shows
+something the author did not write. It is refused instead, and the message says the two
+ways out: give the style the weight — in the theme's own `text-styles.yml` for a named
+style, as an attribute for the raw form — or write the emphasis in the paragraph around it. A
+bare `*` or `_` is a character and not an intent, so `2 * 3` and `snake_case` are drawn as
+they are. So is a construct CommonMark does not call emphasis: `__ Bakery__` and
+`** text**` are text, because a delimiter that opens an emphasis may not be followed by a
+space and one that closes it may not be preceded by one.
+
+**The two halves keep the same rules, and CommonMark does not.** The corpus of the labels
+a style may be given, and of what CommonMark makes of each one, is
+`tests/fixtures/labels.txt`; `tools/compare-label-patterns.php` runs it through both
+halves' rules and through the reference parser. The halves agree with each other on every
+label in it, and they differ from CommonMark in five of them, which the corpus records
+rather than leaves to be found again:
+
+| Label | CommonMark | Here |
+| --- | --- | --- |
+| `___Bakery___`, `_Bakery__`, `__Bakery_ __` | emphasis | text, so the label is drawn as it was written |
+| `a *Bakery**a`, `a *Bakery_*a` | text | a construct, so the label is refused |
+
+**`highlight` is not drawn by this half.** PHPPresentation's font has no setter for one,
+so a highlight would be an element of the run's own properties in the file — a pass over the
+written package rather than a property of a run. Until there is one, the attribute is
+refused by name rather than accepted and quietly dropped.
+
+**Breaking**: a deck carrying an inline directive under a name that is not a style is one
+this renderer now stops on. An unknown inline directive used to be drawn as its own source
+text, which is the Word half's behaviour and the opposite of this one's.
 
 ### When a slide is too full
 
@@ -630,9 +806,9 @@ a template can supply the boxes for each, and *Reset* restores them:
 `image-text` divides at a `::column` exactly as `two-column` does, so the picture — everything
 above the marker — is the left column. Its two columns are separated by the same gutter a
 bullet is from its text, not by a gap of its own, and the text column is wider than a picture's
-share of the page would suggest: `ShapeWriter` estimates wrapping from a table of Helvetica's
-widths and a theme's own face is wider than that, so a column narrow enough to need the
-estimate to be exactly right is a column where two paragraphs are drawn on top of one another.
+share of the page would suggest: `ShapeWriter` estimates wrapping from the advance widths of
+the face the theme draws the text in, and a column narrow enough to need that estimate to be
+exactly right is a column where two paragraphs are drawn on top of one another.
 
 `image-title` gives its headline a band one line tall rather than the two a content slide's
 title box is given room for, because every pixel of that band is a pixel of picture.
@@ -824,7 +1000,7 @@ loses its body box.
 
 Everything so far is laid out for you. A **free shape** is one you place yourself, in pixels or
 in fractions of the slide, and it is written in the body of a slide with the same two-colon
-directives the step markers use:
+directives the step markers use. **Its attributes are separated by a space**:
 
 ```markdown
 ---
@@ -841,8 +1017,12 @@ layout: blank
 :::
 ```
 
-Twelve names are drawn, and nothing else — a name outside them is a failure that lists all
-twelve, so the vocabulary is in the error rather than in a place you have to find:
+A comma is not a separator: a value runs to the next space, so `width=40%, height=20%` is one
+value of `40%,` and one attribute nobody reads. A failure about such a value says so, rather
+than leaving the author to change a number that was right.
+
+A closed set of names is drawn, and nothing else — a name outside it is a failure that lists
+them all, so the vocabulary is in the error rather than in a place you have to find:
 
 | Directive | Draws |
 | --- | --- |
@@ -857,6 +1037,7 @@ twelve, so the vocabulary is in the error rather than in a place you have to fin
 | `::arrow` | a right-pointing arrow |
 | `::line` | a hairline rule as thick as its `stroke-width` |
 | `::image` | a picture |
+| `::slide-number` | the number of the slide, and with `of=true` the number of the deck after it |
 | `:::content` … `:::` | Markdown, in a box you sized |
 
 `layout: blank` is what most of these want: a slide whose whole content is free shapes has no
@@ -1021,14 +1202,15 @@ Slide 1 gives a "::circle" a width of 120 and a height of 80. A circle is as wid
 
 #### Colour
 
-A colour is `none`, one of the four names a shape *plays*, one of the twelve theme *slots*, or
-a hex value:
+A colour is `none` or `transparent`, one of the four names a shape *plays*, one of the twelve
+theme *slots* under either of their two spellings, or a hex value:
 
 | Written | Means |
 | --- | --- |
-| `none` | nothing — written `a:noFill`, not inherited |
+| `none` `transparent` | nothing — written `a:noFill`, not inherited |
 | `page` `ink` `subtle` `panel` | what the page behind the slide, the body text, a quote and a code block's panel are each drawn in |
 | `accent1`–`accent6`, `dk1` `lt1` `dk2` `lt2`, `hlink` `folHlink` | the theme's own slots |
+| `dark1` `light1` `dark2` `light2` `hyperlink` `followedHyperlink` | the same slots, under the names an earlier draft of the concept used |
 | `#4C1D95` | that hex, with or without the `#` |
 
 The four role names come first because they are what the rest of the library paints with: a
@@ -1064,14 +1246,15 @@ An unrecognised name is refused, never quietly black.
 
 | Attribute | On | |
 | --- | --- | --- |
-| `fill`, `stroke` | the shapes, `::content` | |
-| `alpha` | the shapes, `::content` | 0–100 for the whole shape; one percentage, written on every colour it has |
-| `stroke-width` | the shapes, `::content` | in points; `0` is a hairline |
+| `fill`, `stroke` | the ten ink shapes, `::content`, `::slide-number` | |
+| `alpha` | the ten ink shapes, `::content`, `::slide-number` | 0–100 for the whole shape; one percentage, written on every colour it has |
+| `stroke-width` | the ten ink shapes, `::content`, `::slide-number` | in points; `0` is a hairline |
 | `border-radius` | `::roundrect` only | in pixels |
 | `label` | the ten ink shapes | the shape's own text — see [Text inside a shape](#text-inside-a-shape) |
 | `src`, `alt`, `fit` | `::image` | |
-| `color`, `font-size`, `font-family`, `align`, `vertical-align`, `padding` | `::content` only | |
-| `shadow-color`, `shadow-distance`, `shadow-blur`, `shadow-direction`, `shadow-alpha` | all twelve | see [A shadow](#a-shadow) |
+| `color`, `font-size`, `font-family`, `align`, `vertical-align`, `padding` | `::content`, `::slide-number` | |
+| `of` | `::slide-number` only | the number of the deck after the number of the slide |
+| `shadow-color`, `shadow-distance`, `shadow-blur`, `shadow-direction`, `shadow-alpha` | all thirteen | see [A shadow](#a-shadow) |
 
 `fit` is `contain` (keep the ratio, fit inside, centred) or `stretch` (take the box exactly).
 `fit=cover` is refused by name: it is a crop rather than a fit, PHPPresentation writes a picture
@@ -1147,13 +1330,14 @@ can double-click and drag, with words you cannot style; `:::content` is words yo
 an object that does not move when the shape moves. PowerPoint edits them as two things, because
 they are two things.
 
-A `label` is refused on `::image`, which is a `p:pic` with no text body at all, and on
-`:::content`, whose body is already its text — putting the same words in the same place twice is
-the mistake both refusals are about.
+A `label` is refused on `::image`, which is a `p:pic` with no text body at all, on
+`:::content`, whose body is already its text, and on `::slide-number`, whose text is the number
+of the slide — putting the same words in the same place twice is the mistake all three
+refusals are about.
 
 #### A shadow
 
-Five attributes, on all twelve directives:
+Five attributes, on all thirteen directives:
 
 | Attribute | | |
 | --- | --- | --- |
@@ -1213,6 +1397,7 @@ $decks = [
     "::rectangle{fill=chartreuse}\n",
     "::rectangle{rotate=22.5}\n",
     "::image{src=\"chart.png\" fill=accent1}\n",
+    "::rectangle{left=10%, top=20%}\n",
 ];
 
 foreach ($decks as $slide) {
@@ -1228,22 +1413,161 @@ foreach ($decks as $slide) {
 ```
 
 ```text
-Slide 1 opens the directive "::rect{a=1}", which is not something a slide draws. The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, line, rectangle, roundrect, triangle. Two colons mark a step as "::click" or a column as "::column" and three open a step region as ":::click"; a placed text block is ":::content" with its Markdown between the fences.
+Slide 1 opens the directive "::rect{a=1}", which is not something a slide draws. The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, line, rectangle, roundrect, slide-number, triangle. Two colons mark a step as "::click" or a column as "::column" and three open a step region as ":::click"; a placed text block is ":::content" with its Markdown between the fences.
 
 Slide 1 places "rectangle" at left 900px with a width of 120px, which reaches 1020px. A free shape lies within the 960px wide slide: write left=0 width=100% for one that reaches the edge.
 
 Slide 1 gives a "::circle" a width of 120 and a height of 80. A circle is as wide as it is tall; give one size or the other.
 
-Slide 1 gives "rectangle" a fill of "chartreuse". A colour is none, page, ink, subtle, panel, a theme slot (dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), or a hex value such as #4C1D95.
+Slide 1 gives "rectangle" a fill of "chartreuse". A colour is either no colour at all (none or transparent), a role (page, ink, subtle, panel), a theme slot (dk1, lt1, dk2, lt2, accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), a name the concept draft used (dark1, light1, dark2, light2, hyperlink, followedHyperlink), or a hex value such as #4C1D95.
 
 Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
 
 Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.
+
+Slide 1 gives "rectangle" a left of "10%,". Attributes are separated by a space, not a comma. A length is a number, a number of pixels, a number of points, or — for a position or a size — a percentage of the slide: left=40%, left=320, font-size=24pt.
 ```
 
 Two things are **not** offered and are refused rather than approximated: a dashed outline,
 because PHPPresentation writes an autoshape's stroke as one colour and one width; and a label
 in brackets, because a free shape has nowhere to put one.
+
+### Slide templates
+
+The furniture of a deck — the wordmark, the rule, the page number — is the same on every
+slide, and writing it out on every slide means changing it on every slide. A **template** is
+that furniture written once: a slide of the deck's own Markdown that names a template, and
+every slide that names it is drawn with it.
+
+```markdown
+---
+template: brand
+---
+:::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+Resilience
+:::
+
+::line{left=5% top=72.889% width=30% height=0.185% stroke=00B4D8 stroke-width=1}
+```
+
+and every slide that wants that furniture says so:
+
+```markdown
+---
+layout: blank
+template: brand
+---
+```
+
+A template's frontmatter names the template and **nothing else**, and that is what tells a
+definition from a slide that draws one: a definition has no `layout:`, because it is not
+drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
+and it does not count towards the number of slides — which is what makes one definition and
+many slides add up to one slide each.
+
+A slide may name several templates, and the chrome of each of them is drawn on it:
+
+```markdown
+---
+layout: blank
+template: [brand, page-number]
+---
+```
+
+`layout:` and `template:` are independent. `layout:` chooses the geometry — the role the
+theme's `layouts.yml` maps onto a box on the page — and `template:` adds furniture on top of
+it. `layout: blank` with `template: brand` is therefore a slide with no furniture of its own
+and the wordmark and the rule drawn where the template puts them.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+$deck = (new DeckParser())->parse(
+    "---\ntemplate: page\n---\n::slide-number{left=94% top=92% width=5% height=6%}\n\n"
+    . "---\nlayout: blank\ntemplate: page\n---\n\n"
+    . "---\nlayout: blank\ntemplate: page\n---\n",
+);
+$path = sys_get_temp_dir() . '/deck.pptx';
+(new PresentationRenderer())->render($deck, $path);
+
+$zip = new ZipArchive();
+$zip->open($path);
+
+for ($slide = 1; $slide <= 2; $slide++) {
+    $xml = $zip->getFromName("ppt/slides/slide{$slide}.xml");
+    preg_match('#<a:t>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</a:t>#s', $xml, $number);
+    echo $number[1], "\n";
+}
+```
+
+```text
+1
+2
+```
+
+#### What a template may hold
+
+Chrome, and nothing else: the free shapes — `::image`, `:::content`, `::line`,
+`::slide-number` — and the words a `:::content` block carries. Ordinary Markdown in a
+template is refused by name, because a template is drawn on every slide that names it and the
+words of a slide written into one would be on every one of them.
+
+```php
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Render\PresentationRenderer;
+
+try {
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse("---\ntemplate: brand\n---\n# A heading\n"),
+        sys_get_temp_dir() . '/deck.pptx',
+    );
+} catch (Exception $failure) {
+    echo $failure->getMessage(), "\n";
+}
+```
+
+```text
+The template "brand" holds a heading. A template holds chrome, not content: the free shapes it draws, and the words a ":::content" block carries.
+```
+
+#### The page number
+
+`::slide-number` is a shape like any other: it takes the same placement attributes and is in
+the layer order with them. The renderer fills in the number of the slide it is drawn on, and
+`of=true` writes the number of the deck after it.
+
+```markdown
+::slide-number{left=94% top=92% width=5% height=6% color=94A3B8 font-size=10 font-family=Calibri align=right vertical-align=middle}
+```
+
+"3 / 28" is the third slide of a deck of twenty-eight, and the twenty-eight is the number of
+the slides: a template definition is not one of them.
+
+The page number is furniture, so it is written in a template and drawn on every slide that
+names it. A slide may write one itself as well, and the number it carries is the number of
+the slide it is on.
+
+#### The chrome file
+
+A deck may keep its templates in a file beside it and name it in the deck's frontmatter:
+
+```markdown
+---
+theme: ./theme.yml
+chrome: ./chrome.md
+---
+```
+
+`chrome.md` is a Markdown file of template definitions in the same syntax as a deck, and it is
+resolved against the deck's own directory — so a deck and the furniture it shares travel
+together. A file that is not there is a failure, and so is a file outside the directories the
+render may read: a path a deck wrote is held to the same scope as a picture in it.
+
+**The deck's own templates override the imported ones of the same name** — the same rule the
+theme resolver applies by search order, and the reason a deck can change one word of a house
+style without changing the house style.
 
 ### Steps
 
@@ -1387,6 +1711,20 @@ each writes forty slides rather than eight hundred, and the 500 steps that one s
 cost the renderer nothing at all. The numbers are the same because they were chosen for how long
 a build-up a person writes, not for how long one takes — a build-up of 500 clicks is not a slide
 anybody gives, and a talk of 1000 slides does not exist.
+
+### The ceilings of the furniture
+
+The furniture of a deck is bounded too, because the chrome of a template is drawn on every
+slide that names it:
+
+| Ceiling | Value | Bounds |
+| --- | --- | --- |
+| `Render\Furniture::MAX_SHAPES` | 100 | the shapes one slide may carry, the chrome of a template included |
+| `Template\ChromeFile::MAX_BYTES` | one megabyte | the chrome file a deck may name in its frontmatter |
+
+Both are refused with the number and the ceiling in the message, and the shape count is the
+other half of the slide count: a hundred shapes on a slide is a hundred shapes on each of the
+slides that draw them.
 
 ### Images
 
@@ -1598,6 +1936,25 @@ follow `dark:` — see [Dark themes](#dark-themes). The `heading`, `body` and `m
 applied to the runs that use them, because a `.pptx`'s font scheme is not reachable from
 here.
 
+The faces a theme names are also the faces its text is measured with, and there is a table
+of advance widths for every face the shipped themes name: Calibri, Cambria, Arial, Arial
+Narrow, Georgia, Inter and Roboto. The monospaced faces have their advance rather than a
+table, because every character in one advances by the same amount: Consolas is measured at
+550 units to the em, Menlo at 602 and JetBrains Mono at 600. A face with no table of its own
+is measured with the reference face's widths — the ones every face was measured with before
+there were tables of their own — and the face is named by
+`PresentationRenderer::unknownFonts()`, one entry for every place it was named: a slot of
+the theme, a text style of it, a box the deck placed itself, a box of a template's chrome,
+the number of a slide, or an attribute a word carries.
+A caller that would rather have no file than a file whose text was measured with another
+face's widths asks for the strict renderer, and gets `UnknownFont` naming the faces there
+are tables for.
+
+A face a word writes for itself is reported the same way: `:style[Bakery]{font="Comic Sans
+MS"}` is drawn in that face and measured with the reference face's widths, and the report
+names the place it was written in — `a font attribute on slide 1` — because the face alone
+does not say where to change the name.
+
 Two limits worth knowing. All twelve slots are written whether a shape uses them or not:
 DrawingML's `CT_ColorScheme` is twelve required elements, so a scheme missing one is an
 invalid theme part, and `accent2`–`accent6` and `folHlink` are written because the format
@@ -1614,6 +1971,11 @@ resolved here and written out as hex, and the map is never consulted for it agai
 write `.docx` style ids, which a `.pptx` has no use for; mapping them onto shapes would be
 inventing a vocabulary nobody wrote down. A slot that does not exist still fails when the
 theme is loaded, so a typo in a `styles.yml` is never rendered as silence.
+
+`text-styles.yml` **is** read, and it is the one file of a theme that says something about
+the words inside a box rather than about the box — see [Inline styles](#inline-styles). A
+style that sets an attribute nobody reads still fails when the theme is loaded, so a typo in
+a `text-styles.yml` is never rendered as silence either.
 
 ### Frontmatter
 
@@ -1635,7 +1997,7 @@ try {
 ```
 
 ```text
-The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description.
+The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, chrome.
 ```
 
 Slidev accepts dozens of directives this library does not read, so a deck written for it will
@@ -1666,6 +2028,11 @@ refused too, because a step is `::click` here and a comment is a deck written fo
 whose step marker this one does not read. A plain HTML tag is none of those and is still
 text: `<b>` is not a directive, and this library has no opinion about what a deck says about
 HTML.
+
+An **inline** directive — `:name[text]` — is a [text style](#inline-styles), and one under a
+name the theme does not have is refused the same way: it is a name somebody has to change,
+and the message names the styles the theme does have. It used to be drawn as its own source
+text, which is the Word half's behaviour and the opposite of this one's.
 
 ### What Slidev writes and this does not read
 
@@ -1778,20 +2145,26 @@ These are the distinctions a `.pptx` does not record, and what comes back in the
 - **the underline.** PowerPoint has it and Markdown has no way to say it, so a deck whose
   emphasis is underlined comes back with the emphasis gone. Bold, italic and strike-through
   come back as themselves.
+- **a text style.** A word drawn in a [named style](#inline-styles) comes back as the word,
+  without the style and without the colour it was drawn in. The label of a style is plain
+  text and its syntax has no escape, so a word whose text carries a bracket cannot be
+  written back as a style at all; a round trip that drew the colour of some words and not
+  others would be a deck whose design depended on the text in it.
 - **a link inside a run.** A shape whose text is a link comes back as a link; a word inside
   a paragraph that is a link does not.
 - **a chart.** A chart is a drawing, not prose. It is left out rather than half-read.
 
 ## Themes
 
-A theme is a **directory**, and only `theme.yml` is required. Nothing is compiled
-and nothing is a PHP class:
+A theme is a **directory**, and only `theme.yml` is required — a path may name that file
+instead of the directory holding it. Nothing is compiled and nothing is a PHP class:
 
 ```
 themes/corporate-dark/
 ├── theme.yml        required   colours, fonts, type scale, metadata
 ├── styles.yml       optional   Word style-slot overrides
 ├── layouts.yml      optional   semantic role → template layout name
+├── text-styles.yml  optional   named text styles: the words inside a box
 ├── template.pptx    optional   PowerPoint template: where the layouts put their boxes
 ├── README.md        optional   attribution
 └── LICENSE          optional
@@ -1802,7 +2175,8 @@ The tools that come with the library are in `tools/`:
 | Tool | What it is |
 | --- | --- |
 | `tools/phpstan.sh` | Fetches the analyser by checksum and runs it at the level `phpstan.neon.dist` configures |
-| `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: nothing in the test suite needs it, because CI has no PowerPoint |
+| `tools/render-with-powerpoint.applescript` | Opens each built deck in Microsoft PowerPoint and exports a PDF. A developer tool: only the question it asks about a finished PDF is in the test suite, because CI has no PowerPoint |
+| `tools/pdf-is-complete.sh` | Whether a PDF has been written whole, which is what the PowerPoint tool waits for before it copies one out. The one part of that tool the test suite can check, because it needs no PowerPoint to answer |
 | `tools/build-powerpoint-fixtures.sh` | Rebuilds the two decks in `tests/fixtures/powerpoint/`, which were authored in PowerPoint rather than written by hand |
 
 Five themes ship with the library, and they are five different decks rather than one deck in
@@ -1848,6 +2222,26 @@ style:
   leading: 1.32
   heading-weight: bold
   heading-ink: accent
+```
+
+**One of them brings the named styles.** `corporate-dark` carries a `text-styles.yml` with a
+`brand` and a `muted`, so a deck can write `:brand[Bakery]` against a theme that ships with
+the library rather than against one of its own:
+
+```yaml path=themes/corporate-dark/text-styles.yml
+# Named text styles: the words inside a box, written in a deck as `:brand[Bakery]`.
+# The properties are the same eight the inline style attributes have, and a size is in
+# points as it is everywhere else.
+#
+# The brand is the theme's own accent, which is what the headings are painted in, and the
+# muted style is the quiet ink a caption is written in — a step down from the body, which
+# is what a caption is on a slide rather than in a document.
+brand:
+  color: accent1
+  bold: true
+muted:
+  color: lt2
+  size: 14
 ```
 
 The colours are DrawingML's twelve. The longer spellings an earlier draft of the
@@ -1932,10 +2326,18 @@ In "theme.yml": "dark" is not true or false.
 
 A deck names a theme, and the name is looked for in this order:
 
-1. an explicit path — anything with a `/` in it;
+1. an explicit path — anything with a `/` in it, written from the deck's own directory —
+   or the working directory, where the deck has none — unless it names an absolute one;
 2. `./themes/<name>` beside the deck;
-3. a theme that ships with the library;
-4. nothing, which is a failure listing every name that *did* resolve.
+3. `./themes/<name>` beside the working directory;
+4. a theme in a root the calling program allowed;
+5. a theme that ships with the library;
+6. nothing, which is a failure listing every name that *did* resolve.
+
+The deck's own directory comes before the working directory's because a deck and its
+theme are one thing: the theme sits in `themes/` under the directory the deck is in, and
+the program rendering the deck knows where that is. A deck rendered by its path finds its
+theme whichever directory the render runs in.
 
 ```php
 use MarkdownPresentation\Exception\Exception;
@@ -1962,14 +2364,16 @@ Falling back to the default theme instead would produce a deck in the wrong colo
 with nothing in the output to say so, which is the failure mode this whole library is
 built to avoid.
 
-A theme named by path is loaded from wherever it is — under the directory the resolver was
-given:
+A theme named by a path — anything with a `/` in it — is loaded from wherever it is. The
+path is written from the deck's own directory, the way a relative image path is, and
+`beside()` is how the resolver is told where the deck is: the renderer hands it its own
+directory, which is the directory a relative image path in the deck resolves against.
 
 ```php
 use MarkdownPresentation\Theme\ThemeResolver;
 
 $root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
-$theme = (new ThemeResolver($root))->resolve($root . '/themes/minimal');
+$theme = (new ThemeResolver())->beside($root)->resolve('./themes/minimal');
 
 echo $theme->theme()->name(), "\n";
 echo $theme->directory(), "\n";
@@ -1980,21 +2384,56 @@ Minimal
 <root>/themes/minimal
 ```
 
-**A theme path has to land inside the working directory, the built-in themes, or another
-root the resolver was given.** A `theme:` is a path a deck writes, so the same rule as an
-image's applies, and the reason is more than tidiness: a deck naming no `author` of its own
-takes `dc:creator` from the theme it was rendered in, so `theme: ../../secrets/theme.yml`
-was a way to ask for an arbitrary file's `author:` line and be handed it in `docProps/core.xml`
-of the download. `../`, an absolute path elsewhere and a symlink out of the tree are all
-refused, and the failure names the directory it found and the roots it may read:
+A path that names an absolute one is read as it stands, and a path may name the manifest
+itself rather than the directory holding it. The theme is then that file, and the layouts,
+the styles and the template beside it are the theme's own:
+
+```php
+use MarkdownPresentation\Theme\ThemeResolver;
+
+$root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
+$theme = (new ThemeResolver())->beside($root)->resolve('./themes/minimal/theme.yml');
+
+echo $theme->theme()->name(), "\n";
+echo $theme->directory(), "\n";
+```
+
+```text
+Minimal
+<root>/themes/minimal
+```
+
+Only a `theme.yml` is a manifest, so a `styles.yml` named as the theme is one of a theme's
+own files rather than the theme itself. The name the deck wrote is what decides that, not
+the name the file carries once it has been resolved — so a `theme.yml` that is a link to a
+file of another name is still the manifest, and the roots below still hold the file it
+reaches.
+
+**A theme path has to land inside the deck's own directory, the working directory, the
+built-in themes, or another root the resolver was given.** A `theme:` is a path a deck
+writes, so the same rule as an image's applies, and the reason is more than tidiness: a
+deck naming no `author` of its own takes `dc:creator` from the theme it was rendered in,
+so `theme: ../../secrets/theme.yml` was a way to ask for an arbitrary file's `author:`
+line and be handed it in `docProps/core.xml` of the download. `../`, an absolute path
+elsewhere and a symlink out of the tree are all refused, and the failure names the path it
+found and the roots it may read:
 
 ```
-The theme "../secrets" is a directory at "/srv/decks/../secrets" rather than one this render may read (/srv/decks). Copy it under the working directory, or give the ThemeResolver that directory as one of its additional roots.
+The theme "../secrets" is at "/srv/decks/../secrets" rather than one this render may read (/srv/decks). Copy it under one of those directories, or give the ThemeResolver that directory as one of its additional roots.
 ```
+
+**The files inside a theme are held to the same roots.** A directory that is inside them
+may hold a `theme.yml` that is a link out of them, and the file the link reaches is read
+as readily as one beside it — the `theme.yml`, the `styles.yml`, the `layouts.yml` and the
+`template.pptx` are each resolved and held before they are used, and the refusal names the
+file it found and the roots it may read. A link that resolves *inside* the roots is a file
+like any other, so a theme laid out with links still reads.
 
 A shared library of themes beside the project is a real case and is reachable, as a
 constructor argument — `new ThemeResolver($root, roots: ['/srv/themes'])` — because that is
-the program's decision and never the deck's.
+the program's decision and never the deck's. A root is a directory of themes, the way the
+themes that ship with the library are one: a name is looked for in it directly, and the
+themes in it are named in the list of the themes that resolve.
 
 ### Layout roles
 

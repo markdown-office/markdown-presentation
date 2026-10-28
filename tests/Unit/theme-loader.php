@@ -7,6 +7,7 @@ use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
 use MarkdownPresentation\Theme\ThemeLoader;
 
@@ -46,6 +47,33 @@ it('reads a layouts file whose mappings stand on their own', function () use ($l
 
 it('says a directory with no theme.yml is not a theme', function () use ($loader) {
     $loader->load(ThemeDirectory::create(['layouts.yml' => "title: Title Slide\n"], 'not-a-theme'));
+})->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
+
+it('reads a theme from the manifest file that describes it', function () use ($loader) {
+    // The manifest is the theme, and the rest of the theme is read from beside it: a
+    // theme is a directory, and the manifest is the one file that directory cannot do
+    // without.
+    $directory = ThemeDirectory::acme([
+        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+    ]);
+
+    $loaded = $loader->loadManifest($directory . '/theme.yml');
+
+    expect($loaded->theme()->name())->toBe('Acme')
+        ->and($loaded->directory())->toBe($directory)
+        ->and($loaded->layouts())->toBe(['content' => 'Title and Content']);
+});
+
+it('says a file that is not a theme manifest is not one', function () use ($loader) {
+    $directory = ThemeDirectory::create(['notes.txt' => 'not a theme'], 'not-a-manifest');
+
+    $loader->loadManifest($directory . '/notes.txt');
+})->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
+
+it('says a manifest file that is not there is not a theme', function () use ($loader) {
+    $directory = ThemeDirectory::create([], 'empty');
+
+    $loader->loadManifest($directory . '/theme.yml');
 })->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
 
 it('hands a style value back as it was written, tokens and all', function () use ($loader) {
@@ -163,4 +191,53 @@ it('turns a role into the layout name of the theme\'s own template', function ()
 
     expect($loaded->layout('two-column'))->toBe('Two Content')
         ->and($loaded->template())->toBe($loaded->directory() . '/template.pptx');
+});
+
+it('refuses a file of a theme that resolves outside the scope', function () use ($loader) {
+    // The loader's own scope, for a caller that reads a theme without the resolver.
+    // The file is resolved and held, and one that reaches out of the scope is
+    // refused by name.
+    $outside = ThemeDirectory::create(['styles.yml' => "heading.1: ReportTitle\n"], 'outside');
+    $directory = ThemeDirectory::acme();
+    ThemeDirectory::link($directory . '/styles.yml', $outside . '/styles.yml');
+    $scope = new PathScope([$directory]);
+
+    expect(fn () => $loader->load($directory, 'acme', $scope))
+        ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/styles.yml') . '" rather than one this render may read');
+});
+
+it('takes the files of a theme on trust when it has no scope', function () {
+    // The scope is what makes the check; without one the loader reads what it is
+    // given, which is what a theme this library ships is and what a caller naming a
+    // directory of its own is asking for.
+    $loader = new ThemeLoader();
+    $outside = ThemeDirectory::create(['styles.yml' => "heading.1: ReportTitle\n"], 'outside');
+    $directory = ThemeDirectory::acme();
+    ThemeDirectory::link($directory . '/styles.yml', $outside . '/styles.yml');
+
+    expect($loader->load($directory)->styles())->toBe(['heading.1' => 'ReportTitle']);
+});
+
+it('reads a manifest the deck named, whatever the file it reached is called', function () use ($loader) {
+    // The resolver resolves a path before it hands it over, so the loader is given the
+    // file the path reached, whose name is the target's rather than the one the deck
+    // wrote. The name the deck wrote is what makes a file the manifest of a theme, so
+    // the file is read rather than refused for the name it happens to have.
+    $directory = ThemeDirectory::create(['other.yml' => "name: Linked\n"], 'manifest');
+    ThemeDirectory::link($directory . '/theme.yml', $directory . '/other.yml');
+
+    $loaded = $loader->loadManifest(realpath($directory . '/other.yml'), 'theme.yml', new PathScope([$directory]));
+
+    expect($loaded->theme()->name())->toBe('Linked');
+});
+
+it('refuses a manifest that resolves outside the scope', function () use ($loader) {
+    // The scope is about where the file is, not what it is called: a manifest reaching
+    // out of the scope is refused by the scope, whatever the deck called it.
+    $outside = ThemeDirectory::create(['other.yml' => "name: Stolen\n"], 'outside');
+    $directory = ThemeDirectory::create(['theme.yml' => "name: Acme\n"], 'theme');
+    ThemeDirectory::link($directory . '/theme.yml', $outside . '/other.yml');
+
+    expect(fn () => $loader->loadManifest($directory . '/theme.yml', 'theme.yml', new PathScope([$directory])))
+        ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/other.yml') . '" rather than one this render may read');
 });

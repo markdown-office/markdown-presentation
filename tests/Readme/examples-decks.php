@@ -67,6 +67,51 @@ function builtDeck(string $name): array
     return [Pptx::open($path), $source];
 }
 
+/**
+ * The runs of a shape on a slide, with the colour, the size and the weight of each.
+ *
+ * Read off the file rather than off the writer, because the claim is about what a reader
+ * sees: the colour of a word and the size of a word are two facts about the run, and the
+ * run is what the file holds.
+ *
+ * Named and numbered rather than named alone, because a deck may write two shapes of one
+ * kind — the wordmark and the prose under it are both `content` — and asking about "the"
+ * shape of that name would answer about the first of them.
+ *
+ * @return list<array{text: string, colour: ?string, size: ?int, bold: bool}>
+ */
+function runsOfShape(Pptx $pptx, string $name, int $slide = 1, int $index = 0): array
+{
+    $shapes = array_values(array_filter(
+        preg_split('#(?=<p:sp>|<p:graphicFrame>|<p:pic>)#', $pptx->part("ppt/slides/slide{$slide}.xml")) ?: [],
+        static fn (string $chunk): bool => preg_match(
+            '#<p:cNvPr id="\d+" name="' . preg_quote($name, '#') . '"#',
+            $chunk,
+        ) === 1,
+    ));
+
+    $runs = [];
+
+    foreach (preg_split('#(?=<a:r>)#', $shapes[$index] ?? '') ?: [] as $chunk) {
+        if (preg_match('#<a:t>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</a:t>#s', $chunk, $text) !== 1) {
+            continue;
+        }
+
+        preg_match('#<a:srgbClr val="([0-9A-Fa-f]{6})"#', $chunk, $colour);
+        preg_match('#<a:rPr[^>]*\ssz="(\d+)"#', $chunk, $size);
+        preg_match('#<a:rPr[^>]*\bb="1"#', $chunk, $bold);
+
+        $runs[] = [
+            'text' => $text[1],
+            'colour' => $colour[1] ?? null,
+            'size' => isset($size[1]) ? (int) $size[1] / 100 : null,
+            'bold' => ($bold[0] ?? '') !== '',
+        ];
+    }
+
+    return $runs;
+}
+
 /** The deck that carries the three picture roles, and the layout part its full-bleed one is called. */
 const PICTURE_DECK = '07-images.md';
 const FULL_BLEED_LAYOUT = 'Full Bleed Picture';
@@ -141,6 +186,9 @@ it('converts each deck that is not the rejected one', function (string $name) {
     '12-free-shapes.md',
     '13-placed-deck.md',
     '14-shadows.md',
+    '15-inline-styles.md',
+    '16-templates.md',
+    '17-corporate-template.md',
 ]);
 
 it('refuses the deck whose conversion is the failure it exists to demonstrate', function () use ($root) {
@@ -565,3 +613,178 @@ it('carries no contact detail the placed deck could belong to a real company for
         ->and(preg_match_all('/\+[\d][\d ().-]{7,}/', $text, $numbers) === 0 ? [] : $numbers[0])
         ->each->toStartWith('+1 555 ');
 });
+
+it('draws a word in a style of the theme in the colour that style names', function () {
+    [$pptx] = builtDeck('15-inline-styles.md');
+
+    // "Three words and three colours in one box": the word that says nothing about itself
+    // takes the colour of the box it is in, the word in the theme's `brand` style takes
+    // the theme's `accent1` and is bold, and the word in `muted` takes the quiet ink at
+    // fourteen points against the box's twenty-six.
+    expect(runsOfShape($pptx, 'content', 2))->toBe([
+        ['text' => 'Sextant ', 'colour' => 'F9E2AF', 'size' => 26, 'bold' => false],
+        ['text' => 'Instrument Works', 'colour' => '89B4FA', 'size' => 26, 'bold' => true],
+        ['text' => ' — ', 'colour' => 'F9E2AF', 'size' => 26, 'bold' => false],
+        ['text' => 'est. 1934', 'colour' => 'BAC2DE', 'size' => 14, 'bold' => false],
+    ]);
+});
+
+it('lays one property over a named style and leaves the rest of it alone', function () {
+    [$pptx] = builtDeck('15-inline-styles.md');
+
+    // "The raw form" needs no style of the theme's, and the word after it is in `brand`
+    // with its colour replaced: it is still bold, because the attribute named no weight,
+    // and it is still the size of the box, because the attribute named no size.
+    expect(runsOfShape($pptx, 'content', 3, 0))->toBe([
+        ['text' => 'Barge', 'colour' => 'A6E3A1', 'size' => 18, 'bold' => false],
+        ['text' => ' · ', 'colour' => 'BAC2DE', 'size' => 20, 'bold' => false],
+        ['text' => 'No. 4', 'colour' => 'A6E3A1', 'size' => 20, 'bold' => true],
+    ]);
+});
+
+it('carries the messages the three refusals write', function () {
+    [$pptx] = builtDeck('15-inline-styles.md');
+
+    // A refusal cannot be shown by being refused — the deck would not build — so the deck
+    // carries the syntax and the message beside it. The messages are the library's own:
+    // the styles the theme does have, the two ways out of a label that holds Markdown, and
+    // the reason a highlight cannot be written.
+    expect($pptx->slideText(5))->toContain('The styles are: brand, muted.')
+        ->and($pptx->slideText(5))->toContain('which is Markdown')
+        ->and($pptx->slideText(6))->toContain('which the slides half does not draw');
+});
+
+it('counts the slides of the templates deck and not its definitions', function () {
+    [$pptx] = builtDeck('16-templates.md');
+
+    // "A definition is not a slide of the deck": the file has five slides and two
+    // definitions, and the number at the foot of the last slide is the fifth of five.
+    expect($pptx->slideCount())->toBe(5)
+        ->and(runsOfShape($pptx, 'slide-number', 2)[0]['text'])->toBe('2 / 5')
+        ->and(runsOfShape($pptx, 'slide-number', 5)[0]['text'])->toBe('5 / 5');
+});
+
+it('draws the deck own page number rather than the one the file holds', function () {
+    [$pptx] = builtDeck('16-templates.md');
+    [$other] = builtDeck('04-frontmatter.md');
+
+    // The file's `page` is a bare number in `subtle` at ten points, and the deck's own is
+    // `accent1` at twelve and carries the number of the deck after it. Two decks name the
+    // same file and the same template, and the difference between them is the deck's own
+    // definition of that name winning.
+    $mine = runsOfShape($pptx, 'slide-number', 4)[0];
+    $theirs = runsOfShape($other, 'slide-number', 5)[0];
+
+    expect($mine['text'])->toBe('4 / 5')
+        ->and($mine['colour'])->toBe('333333')
+        ->and($mine['size'])->toBe(12)
+        ->and($theirs['text'])->toBe('5')
+        ->and($theirs['colour'])->toBe('4A4A4A')
+        ->and($theirs['size'])->toBe(10);
+});
+
+it('draws the imported template on the slide that names it, and on no other', function () {
+    [$pptx] = builtDeck('16-templates.md');
+
+    // The band is the one piece of furniture that came out of `templates/chrome.md` and
+    // was not overridden, so it is on the slide that names it and nowhere else — and it is
+    // across the head of the slide, which is where the file puts it.
+    foreach (range(1, $pptx->slideCount()) as $slide) {
+        $bands = array_values(array_filter(
+            $pptx->positions($slide),
+            static fn (array $shape): bool => $shape['name'] === 'rectangle',
+        ));
+
+        expect($bands)->toHaveCount($slide === 3 ? 1 : 0);
+
+        if ($slide !== 3) {
+            continue;
+        }
+
+        expect($bands[0]['x'])->toBe(0.0)
+            ->and($bands[0]['y'])->toBe(0.0)
+            ->and($bands[0]['width'])->toBe(960.0);
+    }
+});
+
+it('draws the furniture of the corporate template on every slide that names it', function () {
+    [$pptx] = builtDeck('17-corporate-template.md');
+
+    // The wordmark, the rule and the footer are three templates of the deck's own chrome
+    // file, and a slide names the ones it wants. The five light slides name all three; the
+    // cover and the two dark slides name the light wordmark and nothing else — a cover has
+    // no page number, and a dark slide has no footer on it.
+    foreach (range(1, $pptx->slideCount()) as $slide) {
+        $names = $pptx->shapeNames($slide);
+
+        expect($names)->toContain('image');
+
+        if (in_array($slide, [1, 7, 8], true)) {
+            expect($names)->not->toContain('slide-number');
+
+            continue;
+        }
+
+        expect($names)->toContain('slide-number')
+            ->and($names)->toContain('rectangle');
+    }
+});
+
+it('writes the corporate template own name on the light slides and the light one on the dark', function () {
+    [$pptx] = builtDeck('17-corporate-template.md');
+
+    // The name is ink on a light page and white on a dark one, and the two are the same
+    // named style with the colour laid over it — a deck cannot carry one colour on both
+    // kinds of slide, and a chrome file cannot decide for itself.
+    $light = runOfText($pptx, 'Halden Instruments', 2);
+    $dark = runOfText($pptx, 'Halden Instruments', 7);
+
+    expect($light['colour'])->toBe('15243B')
+        ->and($light['size'])->toBe(15)
+        ->and($dark['colour'])->toBe('FFFFFF')
+        ->and($dark['size'])->toBe(15);
+});
+
+it('numbers the light slides of the corporate template and not its cover', function () {
+    [$pptx] = builtDeck('17-corporate-template.md');
+
+    // The number is the deck's own, and a cover carries none: the template that draws it
+    // names the footer, and the cover does not name the footer.
+    expect(runsOfShape($pptx, 'slide-number', 2)[0]['text'])->toBe('2')
+        ->and(runsOfShape($pptx, 'slide-number', 6)[0]['text'])->toBe('6');
+});
+
+/**
+ * The run of the text shape that holds the given text, on the given slide.
+ *
+ * A slide may hold a dozen text shapes and the one that matters is named by what it says
+ * rather than by where it is: the wordmark of the corporate template is drawn over what
+ * the slide placed itself, so its place in the order is the end of the slide and not a
+ * number anybody would want to write down.
+ *
+ * @return array{text: string, colour: string|null, size: float|null, bold: bool}
+ */
+function runOfText(Pptx $pptx, string $text, int $slide): array
+{
+    $shapes = preg_split('#(?=<p:sp>|<p:graphicFrame>|<p:pic>)#', $pptx->part("ppt/slides/slide{$slide}.xml")) ?: [];
+
+    foreach ($shapes as $shape) {
+        // A text shape and not a picture: the logo carries the company's name as its
+        // alternative text, and a picture has no colour of its own to read.
+        if (preg_match('#<p:cNvPr id="\d+" name="content"#', $shape) !== 1 || !str_contains($shape, $text)) {
+            continue;
+        }
+
+        preg_match('#<a:srgbClr val="([0-9A-Fa-f]{6})"#', $shape, $colour);
+        preg_match('#<a:rPr[^>]*\ssz="(\d+)"#', $shape, $size);
+
+        return [
+            'text' => $text,
+            'colour' => $colour[1] ?? null,
+            'size' => isset($size[1]) ? (int) $size[1] / 100 : null,
+            'bold' => preg_match('#<a:rPr[^>]*\bb="1"#', $shape) === 1,
+        ];
+    }
+
+    return ['text' => '', 'colour' => null, 'size' => null, 'bold' => false];
+}

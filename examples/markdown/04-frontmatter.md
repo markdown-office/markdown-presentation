@@ -3,13 +3,14 @@ title: Every frontmatter key
 description: One slide per key, and what each one reaches.
 theme: minimal
 author: markdown-office
+chrome: ./templates/chrome.md
 ---
 
 # Every frontmatter key
 
-Seven keys: `title`, `name`, `level`, `layout`, `theme`, `author` and
-`description`. A block naming an eighth is a failure that names these seven, and
-this slide carries the first four.
+Nine keys: `title`, `name`, `level`, `layout`, `theme`, `author`, `description`,
+`template` and `chrome`. A block naming a tenth is a failure that names these
+nine, and this slide carries the first four.
 
 ---
 name: A title that is not a heading
@@ -44,3 +45,26 @@ level: 1
 as instead. `level: 2` would have made it the size a `##` is drawn at.
 
 ## And a body heading keeps its own depth
+
+---
+template: wordmark
+---
+
+:::content{left=4% top=3% width=40% height=6% fill=none padding=0 color=accent1 font-size=12 font-family=Calibri align=left vertical-align=middle}
+**markdown**-office
+:::
+
+---
+layout: blank
+name: A slide drawn with a template
+template: [wordmark, page]
+---
+
+This slide names two templates. `wordmark` is the one this deck defines below,
+and `page` is the one `templates/chrome.md` — the file this deck's frontmatter
+names — holds.
+
+A template's frontmatter names the template and nothing else, which is what
+tells a definition from a slide that draws one, and a definition is not a slide
+of the deck: it is not drawn, it has no number, and it does not count towards
+the number of slides.

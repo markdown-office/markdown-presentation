@@ -3,23 +3,31 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\ChromeNotFound;
+use MarkdownPresentation\Exception\ChromeTooLarge;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\FencedFrontmatter;
 use MarkdownPresentation\Exception\FileNotWritable;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
+use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\MalformedShape;
 use MarkdownPresentation\Exception\MalformedTemplate;
+use MarkdownPresentation\Exception\MalformedTextStyle;
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\NothingToConvert;
 use MarkdownPresentation\Exception\ThemeNotFound;
+use MarkdownPresentation\Exception\TooManyShapes;
 use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
+use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Exception\UnknownTemplate;
+use MarkdownPresentation\Exception\UnknownTextStyle;
 use MarkdownPresentation\Exception\UnreadableDeck;
 use MarkdownPresentation\Exception\UnreadablePackage;
 use MarkdownPresentation\Exception\UnpatchedDependency;
@@ -88,19 +96,27 @@ it('reports what a deck author can fix under the class that says so', function (
     // The base is for everything; the one below it is for the failures a deck author
     // can fix by naming something else.
     $authorFixable = [
+        ChromeNotFound::class,
+        ChromeTooLarge::class,
         ContentOverflow::class,
         FencedFrontmatter::class,
         ImageNotFound::class,
+        MalformedChrome::class,
         MalformedFrontmatter::class,
         MalformedShape::class,
         MalformedTemplate::class,
+        MalformedTextStyle::class,
         MalformedTheme::class,
         ThemeNotFound::class,
+        TooManyShapes::class,
         TooManySlides::class,
         UnknownDirective::class,
+        UnknownFont::class,
         UnknownLayoutRole::class,
         UnknownMarker::class,
         UnknownStyleSlot::class,
+        UnknownTemplate::class,
+        UnknownTextStyle::class,
         UnsupportedColumn::class,
         UnsupportedImageFormat::class,
         UnsupportedLink::class,
@@ -252,6 +268,7 @@ it('names a slide and a file in every failure, because the fix is in the message
         ->and(UnknownDirective::comment(5, '<!-- v-if -->')->getMessage())->toContain('Slide 5')
         ->and(UnknownDirective::element(6, '<v-click>')->getMessage())->toContain('Slide 6')
         ->and(UnknownDirective::container(7, ':::')->getMessage())->toContain('Slide 7')
+        ->and(UnknownDirective::misplacedNote(8)->getMessage())->toContain('Slide 8')
         ->and(MalformedTheme::unknownKey('themes/acme/theme.yml', 'colour', ['name'])->getMessage())
         ->toContain('themes/acme/theme.yml')
         ->and(ImageNotFound::at(2, 'logo.png', LOGO_PATH)->getMessage())
@@ -297,6 +314,10 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'a note nothing closes' => [
         UnknownDirective::unclosedNote(3)->getMessage(),
         'A note is "::note" on a line of its own',
+    ],
+    'a note that is closed and is not the last thing on the slide' => [
+        UnknownDirective::misplacedNote(3)->getMessage(),
+        'it has to come after all the content on the slide',
     ],
     'a region nothing closes' => [
         UnknownMarker::unclosed(2, ':::click')->getMessage(),
@@ -355,7 +376,7 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'a free shape under a name that is not one' => [
         UnknownDirective::leaf(3, '::rect')->getMessage(),
         'The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, '
-        . 'line, rectangle, roundrect, triangle.',
+        . 'line, rectangle, roundrect, slide-number, triangle.',
     ],
     'an attribute a free shape does not read' => [
         MalformedShape::unknownAttribute(3, 'image', 'fill', ['alt', 'fit', 'height', 'left', 'src', 'top', 'width'])->getMessage(),
@@ -364,6 +385,10 @@ it('names the alternatives wherever a failure is a name the author can change', 
     'an attribute value nothing can be' => [
         MalformedShape::attributeValue(3, 'rectangle', 'left', 'blue', 'A length is a number.')->getMessage(),
         'a left of "blue". A length is a number.',
+    ],
+    'an attribute value written with the wrong separator' => [
+        MalformedShape::attributeValue(3, 'rectangle', 'left', '10%,', 'A length is a number.')->getMessage(),
+        'Attributes are separated by a space, not a comma. A length is a number.',
     ],
     'a box past the edge of the slide' => [
         MalformedShape::offSlide(3, 'rectangle', 'at left 900px, which reaches 1020px', 960, 'wide')->getMessage(),

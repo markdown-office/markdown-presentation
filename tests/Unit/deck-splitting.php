@@ -7,6 +7,7 @@ use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Document\Slide;
 use MarkdownPresentation\Exception\FencedFrontmatter;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\UnknownDirective;
 
 function split(string $markdown): array
 {
@@ -228,6 +229,25 @@ it('reads no note from a ::note that nothing closes', function () {
     expect(split("# One\n\n::note\nnote\n")[0])
         ->toMatchArray(['note' => null, 'content' => "# One\n\n::note\nnote"]);
 });
+
+it('reads no note from a ::note written in a code block', function () {
+    // A `::note` in a fence is an example of a note rather than a note, and a deck that
+    // shows the syntax is not a deck with a note in the wrong place.
+    expect(split("# One\n\n```markdown\n::note\n```\n\n::\n\nText.\n")[0]['note'])->toBeNull();
+});
+
+it('refuses a note that is closed and is not the last thing on the slide', function () {
+    // The note was closed and it was in the wrong place, and the message that says
+    // nothing closed it sends the author looking for a closer that is there. The rule the
+    // note is read with is the one the refusal names.
+    split("# One\n\n::note\nthe note\n::\n\n## After\n");
+})->throws(UnknownDirective::class, 'Slide 1 opens a "::note" that is not the last thing on the slide');
+
+it('refuses a note that is closed and is not the last thing on the slide on the slide it is on', function () {
+    // The number is the slide's own, so an author with a deck of thirty knows which one
+    // to move the note in.
+    split("# One\n\n---\n\n# Two\n\n::note\nthe note\n::\n\n## After\n");
+})->throws(UnknownDirective::class, 'Slide 2 opens a "::note" that is not the last thing on the slide');
 
 it('reads no note from a closing :: with nothing opening it, in the middle of a slide', function () {
     expect(split("# One\n\nBody\n\n::\n\nMore\n")[0]['note'])->toBeNull();

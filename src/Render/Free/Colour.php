@@ -31,15 +31,7 @@ final class Colour
     private const HEX = '/\A#?([0-9A-Fa-f]{6})\z/';
 
     /** How a colour is written when there is none: an unfilled shape, not an unpainted one. */
-    public const NONE = 'none';
-
-    /**
-     * The four names a shape plays rather than a slot it fills, in the order a message names
-     * them.
-     *
-     * @var list<string>
-     */
-    private const ROLES = ['page', 'ink', 'subtle', 'panel'];
+    public const NONE = Theme::NONE;
 
     /**
      * A colour as the deck wrote it, or null where it wrote that there is none.
@@ -74,15 +66,23 @@ final class Colour
                 $name,
                 $attribute,
                 $written,
-                sprintf(
-                    'A colour is none, %s, a theme slot (%s), or a hex value such as #4C1D95.',
-                    implode(', ', self::ROLES),
-                    implode(', ', Theme::COLOURS),
-                ),
+                Theme::colourAdvice(),
             );
         }
 
         return $colour;
+    }
+
+    /**
+     * The colour a deck named, by role or by slot, or a hex value — or null where it named
+     * something that is not a colour at all.
+     *
+     * The resolution on its own, so that a caller with a failure of its own to report can
+     * ask the question without inheriting this one's message.
+     */
+    public static function resolve(string $written, Theme $theme): ?Color
+    {
+        return self::named($written, $theme) ?? self::hex($written);
     }
 
     /**
@@ -92,12 +92,14 @@ final class Colour
      * exactly these two and nothing else — an unknown slot is refused rather than read as an
      * absent colour — so a caller that wants to refuse them has to be able to recognise them,
      * and a second list of spellings is a list that drifts from the first.
+     *
+     * The spellings are the theme's, because a theme's own text style is written against the
+     * same vocabulary as a deck's attribute: a style that says `color: transparent` means no
+     * colour of its own, exactly as an attribute that says so does.
      */
     public static function isNone(string $written): bool
     {
-        $written = strtolower($written);
-
-        return $written === self::NONE || $written === 'transparent';
+        return in_array(strtolower($written), Theme::NO_COLOUR, true);
     }
 
     /**

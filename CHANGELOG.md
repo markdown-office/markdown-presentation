@@ -4,6 +4,496 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **The furniture of a deck can be written once.** A wordmark, a rule and a page number
+  were the same on every slide of a deck, and writing them out on every slide meant
+  changing them on every slide: twenty-eight slides to find and twenty-eight edits to
+  make.
+
+  A **template** is that furniture written once — a slide of the deck's own Markdown that
+  names a template and nothing else, and every slide that names it is drawn with it. A
+  definition is not a slide of the deck: it is not drawn, it has no number, and it does
+  not count towards the number of slides, which is what makes the slide count, the slide
+  numbers, the overflow report and the page number agree about which slides are slides.
+
+  A template holds chrome and nothing else — the free shapes it draws, and the words a
+  `:::content` block carries — because it is drawn on every slide that names it and the
+  words of a slide written into one would be on every one of them. The chrome is drawn
+  over what the slide placed itself, so a full-bleed picture is behind the wordmark and
+  not over it.
+
+  The templates may also live in a file beside the deck, named by the deck's frontmatter
+  and resolved against the deck's own directory, so that a deck and the furniture it
+  shares travel together. The deck's own templates override the imported ones of the same
+  name, the way a deck's own theme overrides the shipped one.
+
+  `examples/markdown/16-templates.md` is the deck that shows it: a template defined in the
+  deck, slides that name one, two and three of them, a template imported from
+  `templates/chrome.md`, and a template of the deck's own of the same name as one the file
+  holds — the one that is drawn. The company is invented.
+
+- **A whole corporate template, as the files a company has.** A theme, a brand mark and
+  the furniture of a deck are three separate things, and a company that has all three has
+  to keep them in step with each other.
+
+  `examples/markdown/17-corporate-template.md` is a deck that has them: a theme of its own
+  in `examples/markdown/corporate/theme.yml`, a mark in two colours — one for a light page
+  and one for a dark one, with the crosshair knocked out of it rather than painted on it,
+  so the page shows through it either way — and a chrome file holding the wordmark, the
+  rule and the footer.
+
+  **A dark slide and a light one are the same deck, and the furniture on them cannot be
+  the same furniture**: the name is ink on a light page and white on a dark one, so the
+  dark wordmark is the same named style with the colour laid over it. That is the one
+  thing a chrome file cannot decide for itself, and it is why there are two of them.
+
+  The company is invented, and so is every figure in the deck.
+
+- **The number of a slide is a shape.** A page number was the one piece of furniture a
+  deck had to write out on every slide, because the number of a slide is not known until
+  the deck is split.
+
+  `::slide-number` takes the same placement attributes as every other shape and is in the
+  layer order with them, and `of=true` writes the number of the deck after the number of
+  the slide — "3 / 28", where the 28 is the number of the slides of the deck and a
+  template definition is not one of them.
+
+- **A shipped theme brings named styles.** The five themes that ship carried no
+  `text-styles.yml`, so the named form of a text style could only be tried against a theme
+  of one's own. `corporate-dark` brings two now — a `brand` in the theme's own accent and a
+  `muted` in the quiet ink a caption is written in — which is what the Word half's corporate
+  theme does.
+
+- **A word inside a box can be styled on its own.** A run carried text, bold, italic,
+  code, a link and a strike, and nothing else: the colour of a word was the colour of
+  the box it was in, so a wordmark in two colours was two boxes. A **text style** is a
+  name a theme gives to a set of a word's properties, and a word written in one is drawn
+  in it — `:brand[Bakery]` — so the wordmark is one box, two words and two colours.
+
+  Three forms, one grammar: `:accent[brand]` is a style the theme names, `:accent[brand]`
+  with attributes on it is that style with the attributes laid over it, and `:style[brand]`
+  with attributes on it is the attributes and nothing else. The attributes are a closed set
+  — `color`, `size`, `font`, `bold`, `italic`, `underline`, `strike` and `highlight` — and
+  an attribute overrides the style for the property it names and for that property only. A
+  property neither of them names is not set: the run takes it from the block it is in, and
+  nothing is reset to a default.
+
+  `examples/markdown/15-inline-styles.md` is the deck that shows it: a word in a style of
+  the theme inside a box with a colour of its own, the raw form, an attribute laid over a
+  named style for one property only, the seven attributes this half draws, and the three it
+  refuses — a name the theme does not have, a label holding Markdown, and the `highlight`
+  it cannot write. The company is invented.
+
+  The named styles come from a theme's `text-styles.yml`, which is optional: a theme
+  without one has no named styles, and every named form in a deck drawn with it is then a
+  name the theme does not have. A style that sets an attribute nobody reads, a style that
+  sets nothing at all, a style that is not a mapping of attributes, a style called `style`
+  — the word the raw form is written with — and a style that sets a `highlight`, which this
+  half does not draw, are refused when the theme is read.
+
+- **A boolean set to `false` is not "off" but "not set".** `:brand[Bakery]{bold=false}`
+  takes the weight off a style that has it, and the word then takes the weight of the block
+  it is in. The Word half reads it the same way, because a run cannot be written with a
+  weight of none, and the two halves of the suite say the same thing about it.
+
+- **`highlight` is refused by name.** It is the one attribute of the set the slides half
+  does not draw: PHPPresentation's font has no setter for one, so a highlight would be an
+  element of the run's own properties in the file — a pass over the written package
+  rather than a property of a run. Accepting the attribute and dropping it would be a
+  deck that renders and shows something the author did not write.
+
+### Changed
+
+- **The inline translator is told which slide and which theme it reads for.** `runs()`,
+  `runsIn()` and `plain()` each take an `$slide` and a `$theme` now: a word in a text style
+  is drawn in the face and the colour the theme names, and a mistake in one is a mistake on
+  a slide — so the reader is given both rather than left to find them. The three signatures
+  are `runs(Node $container, int $slide, Theme $theme, string $break = "\n")`,
+  `runsIn(string $markdown, int $slide, Theme $theme, string $break = "\n")` and
+  `plain(string $text, int $slide, Theme $theme)`.
+
+- **The page says what a link in a text style looks like.** A link with no style of its own
+  is drawn in the theme's `hlink`, and a link written in a text style is drawn in the
+  style's colour instead — the style is the more particular of the two statements — while
+  the underline stays either way. The page said nothing about it, so a reader would take
+  the theme's hyperlink colour for every link there is.
+
+- **A label holding `__text__` is refused with the rest of the Markdown.** The shared
+  vocabulary named `**text**`, `*text*`, `_text_`, `` `code` `` and `[text](url)`; the
+  Word half found the sixth — `__text__` is strong emphasis in CommonMark — and the
+  slides half refuses it too. `~~struck~~` is not among them: it is GFM rather than
+  CommonMark, and a label is plain text, so the tildes are two characters in a word.
+
+- **An inline directive under a name that is not a style is refused.** `:foo[bar]` in a
+  slide was drawn as its own source text, which is the Word half's behaviour and the
+  opposite of this one's: this renderer refuses what it cannot draw and names the
+  alternative. The message names the styles the theme does have.
+
+- **A box's colour is the default for the words in it rather than an override of them.**
+  A run that carries a colour of its own keeps it; a run that carries none takes the box's.
+
+- **A word is measured in the face it is drawn in.** Text is measured with the advance
+  widths of the face that will draw it, and there are now three ways of naming that face:
+  the theme's own for a frame, the face a placed box names with `font-family`, and the
+  face a text style names for a word written in one. A box measured in another face is a
+  box measured for type it does not hold, so the words wrap where the other face wraps
+  them and the box comes out the wrong height.
+
+- **`ThemeMapping` names the spellings a colour may be written under.** The aliases were
+  a private constant, and a caller holding a table of them — the documentation's own
+  reference table — had no way to read them without reflection.
+
+- **The faces a theme draws its words in are a thing of their own.** `Theme::font()` is
+  gone: the three faces a theme names are now a `Fonts`, and the theme hands it out as
+  `Theme::fonts()` — the shape `Theme::style()` and `Theme::textStyles()` already had,
+  because the type scale and the named styles are parts of a theme too. A theme written back
+  out as an array is `ThemeMapping::write()` now, on the same seam `StyleMapping::write()`
+  is on: the file and the value it holds are read and written in one place.
+
+- **`ThemeResolver` looks in the roots it is given.** They were read into the scope a
+  deck-written path is held to and never looked in, so a shared library of themes beside
+  the project had to be named by its full path. A name is now looked for in each of them
+  directly, the way it is in the themes that ship with this library, and they are named
+  in the list of the themes that resolve — so a failure names them too. A root is a
+  directory of themes, the way the themes that ship with the library are one, and the
+  containment is unchanged: a theme in one that resolves outside every root is still
+  refused.
+
+- **The failure for a theme outside the roots names the path rather than a directory.**
+  A theme may be a manifest file as well as a directory now, and the message said what
+  had been found: "is a directory at". It says "is at", and names the roots the render
+  may read.
+
+- **Text is measured with the face the theme draws it in.** Every piece of text was measured
+  with one face's advance widths whatever the theme named, so a deck set in Calibri was laid
+  out as if it were set in a wider face: a heading wrapped a word earlier than the original
+  deck, and because the type is shrunk to fit rather than the box grown, every deck in a
+  face other than that one needed a calibration loop — a render, a reading of the overflow
+  report, and a render again.
+
+  There is now a table for every face the shipped themes name — Calibri, Cambria, Arial,
+  Arial Narrow, Georgia, Inter and Roboto — and a piece of text is measured with the face
+  its theme draws it in. Each table is derived from a metric-compatible clone of the face
+  under a free licence, because the faces themselves cannot be shipped, and each carries a
+  regular and a bold cut, so a bold run is measured with the widths of the bold face rather
+  than with the upright ones made a little wider.
+
+  The tables are generated by `tools/generate-font-metrics.php`, which fetches every font by
+  checksum and reads the TrueType tables itself, so the package still depends on nothing for
+  this. The width the old table gave for every face is the width the new one gives for
+  Arial, which is what a metric-compatible clone is for, and a test says so.
+
+  Kerning is still not modelled, so the estimate is still an estimate. A theme naming a face
+  with no table is measured with the reference face's widths and named by
+  `PresentationRenderer::unknownFonts()`; a caller that would rather have no file than a file
+  whose text was measured with another face's widths asks for the strict renderer and gets
+  `UnknownFont`.
+
+### Fixed
+
+- **A colour named in either case is the colour it names.** Two of the library's own colour
+  names are written in mixed case — `folHlink`, which is DrawingML's own spelling, and
+  `followedHyperlink`, the concept draft's — and the gate that refuses a colour folded the
+  name it was given and then compared it with the names as they are written. A theme whose
+  `text-styles.yml` said `color: folHlink` was refused by a message that named `folHlink` as
+  a colour that would have been right.
+
+  The names are folded on both sides now, and a colour resolves to the same slot whichever
+  case it is written in — which is what the vocabulary has said all along.
+
+- **The `of` of a page number is checked like every other value.** `of=maybe` was read as
+  false, because `getBool()` answers false for a word it does not know: the page number was
+  drawn without the number of the deck and nothing said so. Every other value in the
+  free-shape vocabulary is refused with a sentence, and this one is refused with one too.
+
+- **A page number has its own reason for having nowhere to put a label.** The refusal for a
+  `label` on a `::slide-number` described the body between the fences, which is the body of a
+  `:::content`: a page number has no body at all, and the number of the slide is written into
+  it by the renderer. The shapes that have nowhere to put a label each have their own reason
+  now.
+
+- **The advice for a label that holds Markdown names the file it is given in.** A style's
+  text is plain text, so `:style[**Bakery**]` is refused — and the advice was to give the
+  style the weight in the theme's file, under the name `style`, which is the one name a theme
+  may not give a style of its own. A named style is given its weight in the theme's
+  `text-styles.yml` and the raw form carries it as an attribute, and the message says which
+  of the two is which.
+
+- **An attribute a text style does not read is refused rather than applied as a strike.**
+  The reader's match ended in a catch-all that set the strike, so an attribute added to the
+  vocabulary of a theme's `text-styles.yml` and not to the reader would have been drawn as a
+  struck-through word rather than refused. The arms of the match are the vocabulary now, and
+  an attribute they do not know is refused by name.
+
+- **A chrome file is read with a ceiling.** The chrome file is the one file this library
+  reads whole, and it is the one a deck names in its frontmatter: a picture is bounded by
+  the pixels of its raster and a part of a template by the bytes it inflates to, and the
+  chrome file was bounded by nothing at all. It is read with a ceiling of a megabyte now, and
+  a file over it is refused with its size and the ceiling in the message. The ceiling is an
+  argument of `ChromeFile`, so a caller can hold a deck to a smaller one.
+
+- **A slide carries at most a hundred shapes.** The chrome of a template is read once and
+  drawn on every slide that names it, so the shapes of a template are multiplied by the
+  slides that draw them: two hundred shapes in a chrome file named by sixty slides is twelve
+  thousand shapes and ten megabytes of slide XML, and neither factor was bounded. The slide
+  count is bounded by `PresentationRenderer::MAX_SLIDES`, and `Furniture::MAX_SHAPES` is the
+  other half of that bound — a slide that carries more than a hundred shapes, the chrome of
+  a template included, is refused with the number and the ceiling in the message.
+
+- **A picture in a template is paid for once.** The chrome of a template is drawn on every
+  slide that names it, and each of those slides had a picture of its own in the package: a
+  mark on sixty slides was sixty media parts and sixty times the bytes of the mark. The
+  drawing a picture is written as is made once now, and every slide that draws that picture
+  points at it — which is what the two docblocks beside the chrome have said.
+
+- **A line of text is measured in the face it is drawn in, and in the units a box is.**
+  The advance widths of a face are in units per em and the size of the type is in points,
+  so the width they make is in points — and a box is measured in pixels. The two were
+  compared against each other, so every line of text was measured a quarter narrower than
+  it is drawn.
+
+  The consequence is a deck that looks right in the renderer and wrong in PowerPoint: a
+  paragraph is laid out on fewer lines than it takes, the box is written too short for the
+  text, and the text runs over whatever is under it. Nothing said so, because the
+  measurement that would have said so was measuring the wrong thing — and `--strict`,
+  which refuses a deck that does not fit, could not refuse one that did not.
+
+  The size of the type is converted where the two meet, and the tables of advance widths
+  are the faces' own: Georgia measured against the real Georgia is within a fifteenth of
+  a percent, which is as close as a table of integers gets.
+
+- **The PowerPoint tool renders the deck it was asked for.** PowerPoint knows a presentation
+  by the name of its file, so a deck staged under the name of a presentation that was already
+  open *was* that presentation: the export was the one that was open before, the deck that
+  was asked for was nowhere, and the tool reported success. Every deck is staged under a name
+  of the run's own now, which no open presentation can have.
+
+  A PDF is written lazily, so a file that exists is a file that may still be being written,
+  and the tool copied one that was still being written. The export is finished when the file
+  has stopped growing and carries the end-of-file marker every PDF ends with, and only then
+  is it copied out. The deck's document is closed after that rather than before it, which is
+  what the comment above that wait had always said.
+
+  The question has an answer of its own in `tools/pdf-is-complete.sh`, so that the test suite
+  can check it: the tool itself needs PowerPoint and the answer does not.
+
+- **A page number written on a slide is drawn on it.** The page number became a shape, and
+  the number was filled into it for the chrome of a template — where the shape is read once
+  for the deck and drawn on every slide that names it. A slide that wrote one itself drew an
+  empty box: the shape was read, the number was never put into it, and the slide carried a
+  rectangle where the author had written a page number.
+
+  The number is filled in on the way to the slide now, in the slide's own shapes and in the
+  chrome alike, because it is the one thing about a page number that is different on every
+  slide and a shape carrying it cannot be drawn before the slide it is on is known.
+
+- **A face a template names is reported now.** The chrome of a template is held apart from
+  the shapes of the slides — it is read once for the deck and drawn on every slide that
+  names it — so the walk over the slides never saw it. A template naming a face there is
+  no table for was drawn in that face, measured with the reference face's widths and
+  reported nowhere, and the strict renderer accepted it.
+
+  The page number is the other half of it: it carries a style of its own, and it is the
+  only shape but a text box that does, so a walk that looked for the text a deck wrote
+  never saw it either.
+
+  One entry for a template however many slides draw it, because the face is named in one
+  place — in the chrome — and twenty-eight entries would say so twenty-eight times. The
+  place is named instead of the slide: `the "content" box of the template "brand"`.
+
+- **A face a word writes for itself is reported.** The faces a theme names are the faces its
+  text is measured with, and a face with no table of advance widths is measured with the
+  reference face's widths instead — which are not that face's. The report of that said so
+  for the theme's slots and for nothing else, so a word naming a face of its own
+  (`:style[Bakery]{font="Comic Sans MS"}`) was measured with another face's widths and
+  nothing said so, and the strict renderer accepted it.
+
+  The report's second field was `slot` and is `where` now, because a text style, a box and
+  a word's own attribute are not slots. It names the place the face was written in, because
+  the face alone does not say where to change it: `a font attribute on slide 1` for a word,
+  the theme's `heading` slot for the theme.
+
+- **A style's name is a word, and a word does not care about case.** A theme that spelled a
+  style `Brand` had it under `:Brand[…]` alone, so a deck writing `:brand[Bakery]` was
+  refused with a message naming styles the author could not have written. The names are
+  folded now, the way the directives package folds the names of the directives themselves,
+  and the refusal for a name the theme does not have spells the styles it does have the
+  way the theme wrote them — because that is the spelling the author has to change.
+
+  A theme that names one style twice, in two spellings, is refused rather than letting one
+  of the two be reached at random.
+
+- **A label holds no Markdown that CommonMark does not call emphasis.** The rule refused
+  `__ Bakery__` and `** text**`, which are not emphasis: a delimiter run that opens an
+  emphasis may not be followed by whitespace, and one that closes it may not be preceded by
+  whitespace. A label holding one is drawn as it was written.
+
+- **The advice about a colour names every colour that would have been right.** The advice
+  is what a reader is shown when they get a colour wrong, and it named the theme's twelve
+  slots and nothing else — while the code accepted the six names an earlier draft of the
+  concept used as well, so a deck or a theme written with `dark1` was told, in the very
+  message that refused it, that a colour is none, a role, a theme slot or a hex value.
+  The six are named now, and so is `transparent`, which means no colour at all and was
+  accepted without being named.
+
+  The advice is built from the list the colours are accepted under rather than written
+  out, so the two cannot drift: `Theme::colourNames()` is what `Theme::hasColour()` asks
+  and what the message is made of. The two spellings of no colour at all live with it too,
+  because a theme's own text style and a deck's attribute are written against the same
+  vocabulary — a theme that says `color: transparent` means what a deck's `color=transparent`
+  means.
+
+  A failure in a theme's file names the same list as a failure in a deck's attribute, and
+  says what was written: the two are one question and two answers to it would be two
+  vocabularies.
+
+  `Free\Colour::ADVICE` is gone, because a constant cannot be built from a list; the
+  message is `Theme::colourAdvice()` now.
+
+- **The two halves keep the same rules for a label, and CommonMark does not.** A label is
+  plain text, so a label holding a complete Markdown construct cannot have it honoured.
+  What counts as a construct is CommonMark's own question, and the two halves of the suite
+  answer it the same way — which was the point of the corpus the Word half brought.
+
+  The corpus is here now as well: `tests/fixtures/labels.txt` names every label a style
+  may be given and what CommonMark makes of each one, and
+  `tools/compare-label-patterns.php` runs it through both halves' rules and through the
+  reference parser. The halves agree with each other on every label in it, and they
+  differ from CommonMark in five of them, which the corpus records rather than leaves to
+  be found again: a run of three or more underscores (`___Bakery___`, `_Bakery__`,
+  `__Bakery_ __`) is emphasis to CommonMark and text to both halves, and a run of one
+  asterisk beside a run of two (`a *Bakery**a`, `a *Bakery_*a`) is text to CommonMark and
+  Markdown to both.
+
+  The docblock beside the rules says so, and the test beside it says which labels the
+  docblock has to name — so a change to either half's rules has to say what it does
+  about them.
+
+- **A style named twice is refused by the styles themselves.** The check sat in the theme
+  loader, so a `TextStyles` built in code took the last of the two and said nothing about
+  it: a theme's file was checked and a `TextStyles` was not. The refusal is inside the
+  styles now, where the rule is, and it holds whoever made them.
+
+  The file the styles were read from is still named in the refusal, because that is where
+  the author has to look — and a `TextStyles` built in code has no file, so the message
+  says what is wrong without one.
+
+- **The advice about a colour reads as a sentence.** The advice names every colour that
+  would have been right, and it began with the two spellings of no colour at all: the
+  sentence read as though "none" were a role like the rest, and it is the absence of a
+  colour rather than one.
+
+  The two are named apart from the colours now: "a colour is either no colour at all (none
+  or transparent), a role (page, ink, subtle, panel), a theme slot (dk1, lt1, dk2, lt2,
+  accent1, accent2, accent3, accent4, accent5, accent6, hlink, folHlink), a name the
+  concept draft used (dark1, light1, dark2, light2, hyperlink, followedHyperlink), or a
+  hex value such as #4C1D95." The list is still built from the list the colours are
+  accepted under, so the two cannot drift, and a failure in a theme's file names the same
+  list as a failure in a deck's attribute.
+
+  The page's own list of the colours a shape may be written in left out the six names an
+  earlier draft of the concept used and the second spelling of no colour at all, and said
+  a colour is none, a role, a slot or a hex value — which is not every colour that would
+  have been right.
+
+- **A face named in a way nothing reported is reported now.** The faces a theme names are
+  measured with the advance widths of the face that will draw them, and a face with no
+  table of its own is measured with the reference face's widths instead — which are not
+  that face's. The report of that said so for the theme's `heading`, `body` and `mono`
+  slots, and for nothing else: a text style naming a face in the theme's `text-styles.yml`
+  and a box naming one with `font-family` were measured with another face's widths and
+  nothing said so, and the strict renderer accepted them. A face with no table is a
+  finding wherever it is named now, and the strict renderer refuses it.
+
+  The report names the place as well as the face, because the face alone does not say
+  where to change it: a slot of the theme, a text style of it, or a box of the deck, and
+  the refusal says which of them named the face.
+
+- **A value with a comma in it names the separator.** The attributes of a directive are
+  separated by spaces, and a bare value runs to the next space, so `left=10%, top=20%` is
+  read as one value of `10%,` and one attribute nobody reads. The failure said the value
+  was wrong, which sent the author to change a number that was right; it names the
+  separator now, and still says what a length may be.
+
+- **A note that is closed and is not the last thing on the slide says so.** The note was
+  closed and it was in the wrong place, and the failure said that nothing closed it —
+  which sent the author looking for a closer that was there. A note has to be the last
+  thing on the slide: the closer is anchored to the end of it, so a note with anything
+  after it is refused when the deck is read, with the rule it broke rather than with the
+  syntax of a note.
+
+- **A monospaced face is measured at its own advance.** Every character in a monospaced
+  face advances by the same amount, and the model took that amount to be 600 units to the
+  em whatever the face was: 600 is what JetBrains Mono advances by, Menlo advances by 602
+  and Consolas by 550, so a code block in the default theme was measured nine per cent
+  wider than it is drawn, and four of the five shipped themes named a face that was
+  mis-measured.
+
+  Each monospaced face is measured now, by its own advance, the way the proportional ones
+  are: Menlo through DejaVu Sans Mono, which Menlo is drawn from and whose advance is the
+  same; Consolas through DMCA Sans Serif, a public-domain face built to Consolas's own
+  metrics; and JetBrains Mono through itself. The tables are generated by
+  `tools/generate-font-metrics.php`, which fetches every font by checksum and reads the
+  TrueType tables itself, and a bold cut of a monospaced face is measured as well and has
+  to come to the same advance.
+
+  A theme naming a monospaced face with no advance of its own is reported by
+  `PresentationRenderer::unknownFonts()` now, and the strict renderer refuses it: which
+  face it is says how wide a code block is, so a face that was not measured says nothing.
+
+  `TextMetric::piece()` has no `$mono` argument any more: a piece is
+  `{text, size, bold, face}` and the face says whether it is monospaced.
+
+- **A theme is found beside the deck.** The resolver looked for `./themes/<name>` under
+  the working directory and nowhere else, so a deck whose theme sits next to it only
+  rendered when the process happened to be running in the deck's own directory — which
+  is what a build script that renders a deck by its path does not do. The renderer's
+  directory, the one a relative image path in the deck resolves against, is the
+  resolver's deck directory too now, and a theme is looked for beside the deck first and
+  beside the working directory second. The renderer hands its directory to the resolver
+  it was given, so a caller that brings its own resolver keeps its loader and its roots,
+  and the renderer works with a copy of it that looks beside the deck: a resolver handed
+  to two renders is not changed by either. The failure for a name that resolves to
+  nothing lists the themes of every root, the deck's own among them.
+
+- **`theme:` may name the manifest.** A path with a `/` in it was read as a directory,
+  and the manifest was looked for inside it, so `theme: ./theme.yml` meant a directory
+  called `theme.yml` and failed. A path naming a file is read as the manifest itself
+  now, and the layouts, the styles and the template are read from the directory holding
+  it. A file that is not the manifest and a directory without one are two failures, and
+  each says which of them it is.
+
+- **A theme path is written from the deck's own directory.** A `theme:` naming a path
+  was written from the *process's* working directory, so `theme: ./theme.yml` — a
+  manifest beside the deck — was found only when the run happened to start in the deck's
+  own directory, and a build script that renders a deck by its path got an error naming
+  a theme the author had written next to it. A path a deck writes is written from beside
+  the deck, which is where a relative image path resolves from too, and the other half of
+  the suite already writes a document's theme path from the document's own directory. A
+  deck read from a pipe has no directory of its own, and the working directory stands in
+  for it.
+
+- **A theme's own files are held to the directories the render may read.** The resolver
+  held the theme's *directory* to the roots, and the loader read whatever was inside it,
+  so a `theme.yml`, a `styles.yml`, a `layouts.yml` or a `template.pptx` that was a
+  symlink out of the tree was read as readily as one beside it: the `author:` of a linked
+  `theme.yml` reached `docProps/core.xml` of the deck, and a linked `template.pptx` was
+  opened at render time — the way out of the roots that the path itself used to be. Each
+  of them is resolved and held now, and the refusal names the file it found and the roots
+  it may read. A link that resolves *inside* the roots is a file like any other, so a
+  theme laid out with links still reads.
+
+- **A manifest that is a link to a file of another name is read.** The name the deck
+  wrote is what makes a file the manifest of a theme, but the loader asked the file
+  itself, and the resolver had already resolved it — so a `theme.yml` that was a link to
+  a file called something else was refused for the name it had reached rather than for
+  the name it was given. The Word half already asked the name the document wrote, and the
+  two halves now agree. The roots are untouched: the file the link reaches is still held
+  to them, so a manifest reaching out of them is still refused.
+
 ## [0.2.2] - 2026-10-26
 
 ### Changed
@@ -1577,9 +2067,9 @@ measured; and places where what the deck said did not survive into the file.
   the same deck would lay out differently on two machines and the output would be
   a property of the machine. The reference is Helvetica's own widths, within a
   few percent of Calibri, Inter and Roboto and on the wide side, so the estimate
-  over-allocates height rather than under-allocating it. The monospaced half is
-  exact: every character advances 600/1000 of an em, which is what Consolas,
-  Menlo and JetBrains Mono use.
+  over-allocates height rather than under-allocating it. The monospaced half was
+  measured at one number for every face — 600/1000 of an em — which is what
+  JetBrains Mono advances by and is nine per cent wider than Consolas.
 
 - **A text box shrinks rather than grows.** PHPPresentation's default is
 

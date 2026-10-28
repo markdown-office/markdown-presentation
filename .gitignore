@@ -30,6 +30,9 @@
 # The OOXML schemas `tools/install-ooxml-schemas.php` fetches and checksums.
 /tools/ooxml-schemas/
 
+# The fonts `tools/generate-font-metrics.php` fetches and checksums.
+/tools/fonts/
+
 # A local override; the committed configuration is phpunit.xml.dist.
 /phpunit.xml
 

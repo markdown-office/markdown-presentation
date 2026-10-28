@@ -20,7 +20,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `01-kitchen-sink.md` | `01-kitchen-sink.pptx` | Every construct at once: emphasis, `code`, strikethrough, links, nested lists, an ordered list starting at 7, an aligned table with markup in its cells, a two-line quote, code, a rule, and a `::note` becoming a speaker note |
 | `02-layout-roles.md` | `02-layout-roles.pptx` | Every layout role, one per slide |
 | `03-themes.md` | three files | The same deck in `default`, `corporate-dark` and `minimal`, changed by nothing but the `theme:` line — so the three can be put side by side and compared. They differ in type scale, margins, rule weight and heading treatment, not only in palette |
-| `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does |
+| `04-frontmatter.md` | `04-frontmatter.pptx` | Every frontmatter key and what each one does, and a slide drawn with two templates — one the deck defines and one `templates/chrome.md` holds |
 | `05-steps.md` | `05-steps.pptx` | `::click` steps as click animations on one slide, a `:::click` region that is a step of its own, a build-up across two columns, a `::column` written inside a region, a picture held back for its own click, and a `::note` |
 | `06-tables.md` | `06-tables.pptx` | Table alignment, a bold filled header, widths from content |
 | `07-images.md` | `07-images.pptx` | A picture fitted to the room left in its column, a WebP converted to PNG, an SVG drawn to PNG, and the three layouts built around one: `image-text`, `image-title` and `image-slide` |
@@ -31,6 +31,9 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `12-free-shapes.md` | `12-free-shapes.pptx` | Shapes placed by the deck rather than by the layout: a panel behind the text, a badge and a chevron, tilted arrows whose labels turn with them, text blocks in boxes of their own, a circle and an ellipse sharing a centre, and all ten ink shapes with a picture on one page |
 | `13-placed-deck.md` | `13-placed-deck.pptx` | A whole business pitch built out of free shapes and nothing else — a dark cover and a dark sign-off, an agenda of numbered circles, a card grid, a hand-built pricing table with zebra rows and a right-aligned column, a four-pillar comparison, a quarterly roadmap with arrows between phases, and translucent decoration over both dark slides. The company is invented |
 | `14-shadows.md` | `14-shadows.pptx` | Five shadow types on five different kinds of object — a soft shadow straight down, a hard-edged one with no blur at all, a glow with no offset, one cast down and to the right, and one thrown upward at 40% — plus a shadow on a `:::content` block and on a `::image` |
+| `15-inline-styles.md` | `15-inline-styles.pptx` | A word in a style of the theme inside a box with a colour of its own, the raw form that needs no style of the theme's, an attribute laid over a named style for one property only, the seven attributes this half draws, and the three it refuses — a name the theme does not have, a label holding Markdown, and the `highlight` it cannot write. The company is invented |
+| `16-templates.md` | `16-templates.pptx` | The furniture of a deck, written once: a template defined in the deck, a slide that names one, a slide that names two, a slide that names three, a template imported from `templates/chrome.md`, and a template of the deck's own of the same name as one the file holds — the one that is drawn. The company is invented |
+| `17-corporate-template.md` | `17-corporate-template.pptx` | A whole corporate template: a theme of the company's own, a brand mark in two colours — one for a light page and one for a dark one — and the furniture of a deck written once and named by every slide that wants it. Eight slides of the kinds a company deck is made of: a cover, an agenda, a headline, two columns with a chart, a quote, a table, a divider and a closing. The company is invented |
 
 ## The deck that is not anybody's business
 
@@ -47,6 +50,10 @@ Rebuilding that deck from another tool is what turned up both defects in [PR #11
 `10-rejected.md` names a directive this library does not have. Converting it is
 the failure it exists to demonstrate, so `build.php` leaves it alone and says
 which file and why.
+
+`templates/chrome.md` is not a deck either: it is a file of templates, and
+`04-frontmatter.md` and `16-templates.md` are the decks that name it. It is in a
+directory of its own because every `.md` file beside the decks is one.
 
 ## The one that needs a rasteriser
 
@@ -107,8 +114,9 @@ A few of these are here because the render is the only honest evidence:
   writes them with no `a:rPr` at all. Look at the third one — `**Churn**` in a
   label is six literal asterisks, where the first arrow's is real bold.
 - **`12`, the fifth slide.** Ten ink shapes on one slide, each its own
-  `<p:sp>`. The rule is a rectangle a pixel tall rather than a connector,
-  which is what a `---` has always been.
+  `<p:sp>`. The rule is a rectangle rather than a connector, which is what a
+  `---` has always been: it is `height=1%`, so it is five pixels of the
+  slide's five hundred and forty.
 - **`13`, the cover and the sign-off.** Neither dark slide is a layout: each
   is a full-bleed `::rectangle{fill=dk1 layer=back}` with everything else drawn
   over it. The background is set once on the master, so a slide wanting its own
@@ -122,6 +130,50 @@ A few of these are here because the render is the only honest evidence:
   degrees, one thrown upward at 40%, and shadows on a `:::content` block and on
   the picture. The caption boxes have none — a shape that names none of the five
   attributes is written with no `<a:effectLst>` at all.
+- **`15`, the second slide.** Three words and three colours in one box. `Sextant`
+  says nothing about itself, so it takes the box's own `accent3`; `Instrument
+  Works` is in the theme's `brand` style, which is `accent1` and bold; and
+  `est. 1934` is in `muted`, which is the quiet ink at fourteen points against the
+  box's twenty-six.
+- **`15`, the third slide.** `Barge` is the raw form and needs no style of the
+  theme's at all: `:style[Barge]{color=accent2 size=18}`.
+  `No. 4` is in `brand` with one property laid over it: it is `accent2` rather
+  than `accent1`, and it is still bold, because a property the attributes do not
+  name is not reset.
+- **`15`, the fourth slide.** The seven attributes this half draws, one after
+  another, in two columns: the colour, the size, the face, the weight, the slant,
+  the underline and the strike. The eighth has no example beside it, because there
+  is no way to write one.
+- **`15`, the fifth and sixth slides.** The three refusals, each with the message
+  the library writes beside it: the two styles the theme does have, the two ways
+  out of a label that holds Markdown, and the reason a highlight cannot be
+  written.
+- **`16`, the second slide.** The number at the foot reads `2 / 5` on the second
+  of five slides, and two definitions stand between the cover and this slide in
+  the file: a definition is not drawn, it has no number, and it does not count.
+- **`16`, the third slide.** The band across the head came out of
+  `templates/chrome.md`, which the deck's frontmatter names, and the deck says
+  nothing about where it is or how thick it is. Three templates are named on this
+  slide and the chrome of each of them is drawn on it.
+- **`16`, the fourth slide.** The number is `accent1` at twelve points and reads
+  `4 / 5`, where the file's `page` is `subtle` at ten and reads `4` —
+  `04-frontmatter.md` draws the file's, on its fifth slide.
+- **`16`, the last slide.** `5 / 5` rather than `5 / 7`: the file has five slides
+  and two definitions, and the count is of the slides.
+- **`17`, the second slide.** One box, three words and three colours is `15`; what is
+  new here is the furniture around them. The wordmark is the company's own mark beside
+  the company's own name, the rule is a hairline under the header, and the footer is the
+  confidential mark and the page number. All three are templates of `corporate/chrome.md`
+  and every slide that names them is drawn with them.
+- **`17`, the seventh slide.** The divider is a dark panel with a gold number on it, and
+  the wordmark on it is the light one: the same named style with the colour laid over it,
+  because a deck cannot carry one colour on a light page and on a dark one at the same
+  time. The mark is the same shape in both, with the crosshair knocked out of it rather
+  than painted on it, so the panel shows through it.
+- **`17`, the third slide.** The title is one line and the rule under it is clear of it.
+  That is not luck: a line of text is measured in the face that will draw it, and the
+  measurement is in pixels because a box is — so a title that would wrap is a title that
+  is reported, not one that is discovered in PowerPoint.
 - **`03`, the same slide in each of the three themed decks.** The difference is not
   the palette. `default` is Office's colours at the library's own scale with a
   40px margin and a 2px rule; `minimal` is a serif deck with 64px margins, a

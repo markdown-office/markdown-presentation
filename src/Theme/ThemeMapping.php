@@ -7,7 +7,7 @@ namespace MarkdownPresentation\Theme;
 use MarkdownPresentation\Exception\MalformedTheme;
 
 /**
- * A `theme.yml`, and the {@see Theme} it turns into.
+ * A `theme.yml`, and the {@see Theme} it turns into and back into.
  *
  * The seam is the same one {@see Style} draws from {@see StyleMapping}: the spellings and the
  * bounds below belong to the file, and {@see Theme} never sees one, so a theme built in code is
@@ -50,7 +50,7 @@ final class ThemeMapping
      *
      * @throws MalformedTheme
      */
-    public static function read(array $data, string $file = 'theme.yml'): Theme
+    public static function read(array $data, string $file = 'theme.yml', ?TextStyles $styles = null): Theme
     {
         foreach (array_keys($data) as $key) {
             if (!in_array($key, self::KEYS, true)) {
@@ -72,9 +72,31 @@ final class ThemeMapping
             self::text($data, 'author', $file),
             self::readDark($data, $file),
             self::readColours($data['colors'] ?? null, $file) ?? $defaults->colours(),
-            self::readFonts($data['fonts'] ?? null, $file) ?? $defaults->fonts(),
+            new Fonts(self::readFonts($data['fonts'] ?? null, $file) ?? $defaults->fonts()->all()),
             StyleMapping::read(self::mapping($data, 'style', $file), $file),
+            $styles ?? new TextStyles(),
         );
+    }
+
+    /**
+     * The theme's `theme.yml` as an array, in DrawingML's spellings.
+     *
+     * The named text styles are not in here: they are read from a file of their own, and a
+     * `theme.yml` that carried them would be a theme with two places to say the same thing.
+     *
+     * @return array{name: string, description: ?string, author: ?string, dark: bool, colors: array<string, string>, fonts: array<string, string>, style: array<string, mixed>}
+     */
+    public static function write(Theme $theme): array
+    {
+        return [
+            'name' => $theme->name(),
+            'description' => $theme->description(),
+            'author' => $theme->author(),
+            'dark' => $theme->isDark(),
+            'colors' => $theme->colours(),
+            'fonts' => $theme->fonts()->all(),
+            'style' => StyleMapping::write($theme->style()),
+        ];
     }
 
     /**
@@ -83,10 +105,55 @@ final class ThemeMapping
      * Asked by {@see Theme::colour()} rather than duplicated there, because the two spellings
      * are a fact about the file and a value object must not carry a second copy of a map that
      * {@see self::readColours()} also consults.
+     *
+     * The name is folded before it is looked up: `folHlink` is DrawingML's own spelling and
+     * `folhlink` is the same name in lower case, and a colour a theme's file names and a
+     * colour a deck names are one vocabulary.
      */
     public static function slot(string $written): string
     {
-        return self::ALIASES[$written] ?? $written;
+        return self::canonical($written) ?? $written;
+    }
+
+    /**
+     * The slot a colour name stands for, whatever it is written as, or null where it names
+     * no colour at all.
+     *
+     * The aliases are the concept draft's spellings and the slots are DrawingML's own, and a
+     * name in either of them stands for the same slot.
+     */
+    private static function canonical(string $written): ?string
+    {
+        $folded = strtolower($written);
+
+        foreach (self::ALIASES as $alias => $slot) {
+            if (strtolower($alias) === $folded) {
+                return $slot;
+            }
+        }
+
+        foreach (Theme::COLOURS as $slot) {
+            if (strtolower($slot) === $folded) {
+                return $slot;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The spellings a colour may be written under besides DrawingML's own, and the slot each
+     * of them stands for.
+     *
+     * Public because the spellings are a fact about the vocabulary rather than about the
+     * file, and a caller holding a table of them — the documentation's own reference table,
+     * for one — has no business reading a private constant to find out what they are.
+     *
+     * @return array<string, string>
+     */
+    public static function aliases(): array
+    {
+        return self::ALIASES;
     }
 
     /**
@@ -148,21 +215,22 @@ final class ThemeMapping
         $named = [];
 
         foreach ($data as $key => $value) {
-            $slot = (string) $key;
+            $written = (string) $key;
+            $slot = self::canonical($written);
 
-            if (!in_array($slot, self::colourNames(), true)) {
-                throw MalformedTheme::unknownKey($file, $slot, self::colourNames());
+            if ($slot === null) {
+                throw MalformedTheme::unknownKey($file, $written, self::colourNames());
             }
 
             if (!is_string($value)) {
-                throw MalformedTheme::wrongType($file, $slot, 'a colour such as "#1E1E2E"');
+                throw MalformedTheme::wrongType($file, $written, 'a colour such as "#1E1E2E"');
             }
 
             if (preg_match(self::HEX, $value) !== 1) {
-                throw MalformedTheme::notHexColour($file, $slot, $value);
+                throw MalformedTheme::notHexColour($file, $written, $value);
             }
 
-            $named[self::ALIASES[$slot] ?? $slot] = strtoupper($value);
+            $named[$slot] = strtoupper($value);
         }
 
         $colours = [];
@@ -187,7 +255,7 @@ final class ThemeMapping
             throw MalformedTheme::wrongType($file, 'fonts', 'a mapping of font slots to font names');
         }
 
-        $defaults = Theme::defaults()->fonts();
+        $defaults = Theme::defaults()->fonts()->all();
         $named = [];
 
         foreach ($data as $key => $value) {

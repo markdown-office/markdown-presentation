@@ -66,8 +66,102 @@ final class Theme
     public const FONTS = ['heading', 'body', 'mono'];
 
     /**
+     * The four names a colour plays rather than the slot it fills, in the order a message
+     * names them.
+     *
+     * `page` is the colour behind every slide, `ink` the colour body text is drawn in,
+     * `subtle` the colour a quote is drawn in and `panel` the colour a code block's own
+     * background is filled with. They are here rather than in the renderer because they
+     * are the theme's own four parts under other names.
+     *
+     * @var list<string>
+     */
+    public const ROLES = ['page', 'ink', 'subtle', 'panel'];
+
+    /**
+     * The word a colour is written as when there is none of it.
+     */
+    public const NONE = 'none';
+
+    /**
+     * Every spelling of "there is no colour here".
+     *
+     * Two, and they are the same thing: `none` is the theme's own word and `transparent` is
+     * the one a deck reaches for. A colour that may be absent is written as one of them
+     * wherever it is written — a theme's own text style and a deck's attribute alike — so
+     * the two lists are one list.
+     *
+     * @var list<string>
+     */
+    public const NO_COLOUR = [self::NONE, 'transparent'];
+
+    /**
+     * Every name a colour may be written under, other than a hex value and the two
+     * spellings of no colour at all.
+     *
+     * One list, because the names a colour is accepted under and the names a failure names
+     * are the same list: a message that left one out would send an author to change a name
+     * that was right.
+     *
+     * @return list<string>
+     */
+    public static function colourNames(): array
+    {
+        return [...self::ROLES, ...self::COLOURS, ...array_keys(ThemeMapping::aliases())];
+    }
+
+    /**
+     * Whether a colour may be written this way: a role, a theme slot, one of the spellings
+     * the concept draft used, one of the two spellings of no colour at all, or a hex value.
+     *
+     * Asked of the theme rather than of the renderer that draws with the colour, because
+     * the names are the theme's own and a theme file is checked against them when it is
+     * read rather than when a deck happens to use the style that carries the mistake.
+     *
+     * Case is not a thing: a deck's own colour is lowercased before it is resolved, so
+     * `DK1` and `dk1` are one name there, and a theme's file is written against the same
+     * vocabulary as a deck's attribute.
+     */
+    public static function hasColour(string $written): bool
+    {
+        $written = strtolower($written);
+
+        foreach (self::colourNames() as $name) {
+            if (strtolower($name) === $written) {
+                return true;
+            }
+        }
+
+        return in_array($written, self::NO_COLOUR, true)
+            || preg_match('/\A#?[0-9A-Fa-f]{6}\z/', $written) === 1;
+    }
+
+    /**
+     * What a colour may be written as, for a message that says so.
+     *
+     * Built from the names a colour is accepted under rather than written out here, because
+     * a message that left one out would send an author to change a name that was right —
+     * and the spellings the concept draft used are names like any other, so they belong in
+     * the list the message is built from.
+     *
+     * The two spellings of no colour at all are named apart from the colours rather than
+     * beside them: they are the absence of one, and a list that began with them read as
+     * though "none" were a colour like the rest.
+     */
+    public static function colourAdvice(): string
+    {
+        return sprintf(
+            'A colour is either no colour at all (%s), a role (%s), a theme slot (%s), '
+            . 'a name the concept draft used (%s), or a hex value such as #4C1D95.',
+            implode(' or ', self::NO_COLOUR),
+            implode(', ', self::ROLES),
+            implode(', ', self::COLOURS),
+            implode(', ', array_keys(ThemeMapping::aliases())),
+        );
+    }
+
+    /**
      * @param array<string, string> $colours Canonical colour slot to `#rrggbb`.
-     * @param array<string, string> $fonts   Font slot to family name.
      */
     public function __construct(
         private readonly string $name,
@@ -75,8 +169,9 @@ final class Theme
         private readonly ?string $author,
         private readonly bool $dark,
         private readonly array $colours,
-        private readonly array $fonts,
+        private readonly Fonts $fonts,
         private readonly Style $style,
+        private readonly TextStyles $textStyles = new TextStyles(),
     ) {
     }
 
@@ -105,11 +200,11 @@ final class Theme
                 self::HLINK => '#0563C1',
                 self::FOL_HLINK => '#954F72',
             ],
-            [
+            new Fonts([
                 'heading' => 'Calibri',
                 'body' => 'Calibri',
                 'mono' => 'Consolas',
-            ],
+            ]),
             Style::defaults(),
         );
     }
@@ -121,9 +216,9 @@ final class Theme
      *
      * @throws MalformedTheme
      */
-    public static function fromArray(array $data, string $file = 'theme.yml'): self
+    public static function fromArray(array $data, string $file = 'theme.yml', ?TextStyles $styles = null): self
     {
-        return ThemeMapping::read($data, $file);
+        return ThemeMapping::read($data, $file, $styles);
     }
 
     public function name(): string
@@ -207,19 +302,35 @@ final class Theme
     }
 
     /**
-     * Every font, keyed by its slot.
-     *
-     * @return array<string, string>
+     * The faces this theme draws its words in.
      */
-    public function fonts(): array
+    public function fonts(): Fonts
     {
         return $this->fonts;
     }
 
-    /** One font, or null when the theme does not set the slot. */
-    public function font(string $slot): ?string
+    /**
+     * The faces the theme's text styles name, by the style that named them.
+     *
+     * A style's `font` is a name, and it is resolved here rather than where it is written:
+     * a style that says `font: heading` is drawn in the theme's heading face, and a style
+     * that says `font: Inter` is drawn in Inter whether or not the theme names it.
+     *
+     * @return array<string, string> The style's name and the face it draws in.
+     */
+    public function textStyleFaces(): array
     {
-        return $this->fonts[$slot] ?? null;
+        $faces = [];
+
+        foreach ($this->textStyles->names() as $name) {
+            $style = $this->textStyles->get($name);
+
+            if ($style !== null && $style->font !== null) {
+                $faces[$name] = $this->fonts->face($style->font);
+            }
+        }
+
+        return $faces;
     }
 
     /**
@@ -236,20 +347,14 @@ final class Theme
     }
 
     /**
-     * The theme as the array it was read from, in DrawingML's spellings.
+     * The named text styles this theme carries.
      *
-     * @return array{name: string, description: ?string, author: ?string, dark: bool, colors: array<string, string>, fonts: array<string, string>, style: array<string, mixed>}
+     * Empty for a theme without a `text-styles.yml`, which is most of them: a style is
+     * something a deck names, and a deck that names none has said nothing about the words
+     * it draws.
      */
-    public function toArray(): array
+    public function textStyles(): TextStyles
     {
-        return [
-            'name' => $this->name,
-            'description' => $this->description,
-            'author' => $this->author,
-            'dark' => $this->dark,
-            'colors' => $this->colours,
-            'fonts' => $this->fonts,
-            'style' => StyleMapping::write($this->style),
-        ];
+        return $this->textStyles;
     }
 }

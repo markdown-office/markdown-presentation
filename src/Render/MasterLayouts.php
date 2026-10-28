@@ -171,7 +171,7 @@ final class MasterLayouts
             // Stripped, because this part is a string in a metadata field: there is nothing
             // on the other end to interpret `**`, and a title of `Ops **runbook**` is a
             // title of "Ops runbook" to every reader of the file.
-            $properties->setTitle($inline->plain(self::text($title, 'title')));
+            $properties->setTitle($inline->plain(self::text($title, 'title'), 1, $theme->theme()));
         }
 
         $description = $deck->frontmatterValue('description');

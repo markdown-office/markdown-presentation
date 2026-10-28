@@ -129,7 +129,7 @@ final class TextStyle
 
         $literal = trim($written, "\"'");
 
-        return $theme->font($literal) ?? $literal;
+        return $theme->fonts()->face($literal);
     }
 
     /**

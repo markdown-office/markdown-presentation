@@ -31,7 +31,10 @@ use MarkdownPresentation\Render\Block\Table;
 use MarkdownPresentation\Render\CommonMark\BlockTranslator;
 use MarkdownPresentation\Render\CommonMark\InlineTranslator;
 use MarkdownPresentation\Render\Free\FreeShape;
+use MarkdownPresentation\Render\Free\FreeSlideNumber;
 use MarkdownPresentation\Render\Free\FreeText;
+use MarkdownPresentation\Template\ChromeFile;
+use MarkdownPresentation\Template\Templates;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
 use MarkdownPresentation\Theme\Theme;
@@ -71,14 +74,15 @@ use PhpOffice\PhpPresentation\Slide\SlideLayout;
  * A **free shape** is the other half of what a slide's body can carry, and this renderer is
  * where it is drawn: {@see \MarkdownPresentation\Render\Free\FreeShape} is placed rather than
  * laid out, so it takes no column and is not measured against the layout's box — see
- * {@see self::placed()}, which is the write order a `layer` decides.
+ * {@see SlideShapes}, which is the write order a `layer` decides.
  *
- * Two things it does not do are somebody else's job, and both classes that do them sit in
- * this directory rather than being reached through a caller: {@see MasterLayouts} writes the
- * master, the layouts and the document's metadata, and {@see DeckWriter} writes the file and
- * runs the passes over it. What is left here is the walk: a deck's blocks, and the shapes
- * they are drawn as.
-*/
+ * Three things it does not do are somebody else's job, and all three classes that do them sit
+ * in this directory rather than being reached through a caller: {@see MasterLayouts} writes
+ * the master, the layouts and the document's metadata, {@see DeckWriter} writes the file and
+ * runs the passes over it, and {@see Furniture} reads the templates of the deck and the
+ * chrome they draw. What is left here is the walk: a deck's blocks, and the shapes they are
+ * drawn as.
+ */
 final class PresentationRenderer
 {
     /**
@@ -88,10 +92,10 @@ final class PresentationRenderer
      * the whole of what makes it affordable is that {@see UnknownDirective} names this list
      * in the failure itself.
     */
-    public const DIRECTIVES = ['title', 'name', 'level', 'layout', 'theme', 'author', 'description'];
+    public const DIRECTIVES = ['title', 'name', 'level', 'layout', 'theme', 'author', 'description', 'template', 'chrome'];
 
     /** The keys that describe the deck rather than a slide, and so belong to slide 1's block. */
-    public const DECK_DIRECTIVES = ['theme', 'author', 'description'];
+    public const DECK_DIRECTIVES = ['theme', 'author', 'description', 'chrome'];
 
     /** The theme a deck that names none gets. */
     public const DEFAULT_THEME = 'default';
@@ -135,13 +139,71 @@ final class PresentationRenderer
      */
     private readonly Overflows $overflows;
 
+    /**
+     * Every face the theme or the deck named that this renderer has no table of advance
+     * widths for.
+     *
+     * See {@see FontReport}, which is the same trade {@see Overflows} makes: the report is
+     * where it is said, and strictness is a fact about the report rather than about the deck.
+     */
+    private readonly FontReport $fonts;
+
     private readonly PathScope $files;
+
+    private readonly ThemeResolver $themes;
+
+    /**
+     * The reader of the chrome file a deck names.
+     */
+    private readonly ChromeFile $chromeFiles;
+
+    /**
+     * The reader of a template's body.
+     */
+    private readonly Chrome $chrome;
+
+    /**
+     * The templates the deck being rendered has.
+     *
+     * On the renderer rather than on {@see self::write()}, which already carries seven
+     * arguments, and because a slide's own chrome is read from them.
+     */
+    private Templates $templates;
+
+    /**
+     * The furniture of the deck being rendered: its templates and the chrome they draw.
+     */
+    private Furniture $furniture;
+
+    /**
+     * The chrome every template of the deck draws, by name.
+     *
+     * @var array<string, list<FreeShape>>
+     */
+    private array $drawn = [];
+
+    /**
+     * The theme of the deck being rendered.
+     *
+     * On the renderer rather than on {@see self::write()}, which already carries seven
+     * arguments, and because the title of a slide is read with the same theme the rest of
+     * it is drawn with.
+     */
+    private Theme $theme;
 
     /**
      * @param string       $directory  The directory a relative image path in the deck
      *                                 resolves against, which is the directory the deck
      *                                 itself is in. It is also the first of the roots an
      *                                 image may be read from: see {@see self::$files}.
+     * @param ThemeResolver $themes    The resolver the themes are looked up in. It is
+     *                                 copied rather than used as it is: the renderer hands
+     *                                 it the deck's directory, and the copy is the one
+     *                                 that looks beside the deck. The caller keeps the
+     *                                 resolver it passed, with its loader and its roots,
+     *                                 and the renderer works with a copy of it — a
+     *                                 resolver handed to two renders is not changed by
+     *                                 either.
      * @param bool         $strict     Whether a block that does not fit is
      *                                 {@see ContentOverflow} rather than clamped and
      *                                 recorded. Strict is for a caller that would rather
@@ -156,13 +218,19 @@ final class PresentationRenderer
      */
     public function __construct(
         private readonly string $directory = '.',
-        private readonly ThemeResolver $themes = new ThemeResolver(),
+        ThemeResolver $themes = new ThemeResolver(),
         private readonly BlockTranslator $blocks = new BlockTranslator(),
         bool $strict = false,
         array $imageRoots = [],
     ) {
+        // The theme of a deck sits beside it, and a relative image path in the deck
+        // resolves against the same directory: a deck and its theme are one thing.
+        $this->themes = $themes->beside($this->directory);
         $this->files = new PathScope([$this->directory, ...$imageRoots]);
         $this->overflows = new Overflows($strict);
+        $this->fonts = new FontReport($strict);
+        $this->chromeFiles = new ChromeFile($this->directory, $this->files);
+        $this->chrome = new Chrome($this->blocks, $this->directory, $this->files);
     }
 
     /**
@@ -191,6 +259,32 @@ final class PresentationRenderer
     }
 
     /**
+     * Every face the theme or the deck named that this renderer has no table of advance
+     * widths for.
+     *
+     * A face with no table is measured with the reference face's widths — the widths every
+     * face was measured with before there were tables of their own — so a deck naming one
+     * still renders, and this is where it is said that the text was not measured with the
+     * face that will draw it. A monospaced face with no advance of its own is measured the
+     * same way, which is the width of a proportional face's letters rather than the width
+     * of a code block.
+     *
+     * Every place a face is named is an entry: a slot of the theme, a text style of it, a
+     * box the deck placed itself, a box of a template's chrome, the number of a slide, or
+     * an attribute a word carries. The place is what tells a reader where to change the
+     * name, which is the half of the answer the face alone does not give.
+     *
+     * Emptied by {@see self::render()} rather than accumulated, because a layout belongs to
+     * one deck: a caller converting several in a loop wants the last one's, not all of them.
+     *
+     * @return list<array{face: string, where: string}>
+     */
+    public function unknownFonts(): array
+    {
+        return $this->fonts->all();
+    }
+
+    /**
      * @throws InvalidInput     When a slide names something this library cannot render.
      * @throws ThemeNotFound    When the deck names a theme that does not resolve.
      * @throws ContentOverflow  When a block does not fit and the renderer is strict.
@@ -209,6 +303,7 @@ final class PresentationRenderer
     public function render(Deck $deck, string $path): string
     {
         $this->overflows->forget();
+        $this->fonts->forget();
 
         // Before anything is read rather than while the slides are being built, so a deck
         // over the ceiling is refused with no work done rather than after every one of them.
@@ -224,8 +319,27 @@ final class PresentationRenderer
             $this->check($slide);
         }
 
-        $theme = $this->theme($deck);
-        $roles = $this->roles($deck, $theme);
+        $loaded = $this->loaded($deck);
+        $roles = $this->roles($deck, $loaded);
+        $this->theme = $loaded->theme();
+
+        // A theme naming a face there is no table for is measured with the reference face's
+        // widths, and the strict renderer refuses the deck rather than measuring it with the
+        // wrong face — so the faces are asked about before anything is built.
+        $metric = new TextMetric();
+        $this->recordUnknownFaces($this->theme, $metric);
+
+        // The templates before the slides are drawn, and the chrome before either: a slide
+        // that names a template that is not there, and a template that cannot be drawn, are
+        // both failures that happen with no file written behind them.
+        $this->furniture = new Furniture($deck, $this->chromeFiles, $this->chrome);
+        $this->templates = $this->furniture->templates();
+
+        foreach ($deck->slides() as $slide) {
+            $this->furniture->check($this->templates, $slide);
+        }
+
+        $this->drawn = $this->furniture->drawn($this->templates, $this->theme);
 
         $presentation = new PhpPresentation();
 
@@ -236,12 +350,23 @@ final class PresentationRenderer
         // is PHP 8.4 syntax, and `composer.json` promises 8.2, where it does not parse. Written
         // without them this file cannot be loaded at all, so every test that renders a deck
         // fails on the 8.2 job and nothing local says why.
-        $geometry = (new SlideGeometry(style: $theme->theme()->style()))->with($this->template($theme, $used));
-        $layouts = MasterLayouts::build($presentation, $deck, $theme, $used, $this->blocks->inline());
+        $geometry = (new SlideGeometry(style: $this->theme->style()))->with($this->template($loaded, $used));
+        $layouts = MasterLayouts::build($presentation, $deck, $loaded, $used, $this->blocks->inline());
 
-        $writer = new ShapeWriter($theme->theme(), $geometry);
+        $writer = new ShapeWriter($this->theme, $geometry, $metric, $this->fonts);
         $shapes = new SlideShapes($geometry, $this->overflows);
-        $blocks = $this->blocks($deck, $theme->theme());
+        $blocks = $this->blocks($deck, $this->theme);
+
+        // The faces the deck named, asked about once the deck has been read and before
+        // anything is built: a box with a `font-family` of its own is drawn in it, and a box
+        // measured with another face's widths is a box measured for type it does not hold.
+        $this->recordUnknownFacesOfTheDeck($blocks, $metric);
+
+        // The faces the chrome named, asked about on the same terms: the chrome of a
+        // template is drawn on the slides that name it, and the words in it are drawn in
+        // the face it names.
+        $this->recordUnknownFacesOfTheChrome($metric);
+
         $builds = [];
 
         foreach ($deck->slides() as $slide) {
@@ -406,7 +531,7 @@ final class PresentationRenderer
      * @throws ThemeNotFound
      * @throws MalformedFrontmatter
     */
-    private function theme(Deck $deck): LoadedTheme
+    private function loaded(Deck $deck): LoadedTheme
     {
         $name = $deck->frontmatterValue('theme', self::DEFAULT_THEME);
 
@@ -415,6 +540,125 @@ final class PresentationRenderer
         }
 
         return $this->themes->resolve(trim($name));
+    }
+
+    /**
+     * The faces the theme named that this renderer has no table of advance widths for,
+     * recorded.
+     *
+     * The heading and the body faces are the ones that decide how a line wraps, and a face
+     * with no table of its own is measured with the reference face's widths — which is what
+     * every face was measured with before there were tables of their own. The monospaced
+     * face is asked about as well: it is measured by its own advance, and which face it is
+     * says exactly how wide its text is.
+     *
+     * The slot is named rather than the face alone, because the face alone does not say
+     * where to change it.
+     *
+     * The faces the theme's text styles name are asked about here too, because
+     * `text-styles.yml` is a file of the theme and a style in it is a face the theme
+     * names — a face a word written in that style is drawn in, and therefore measured in.
+     * A style that names one of the theme's own slots is that slot's face and is not a
+     * finding: the theme has already said it.
+     */
+    private function recordUnknownFaces(Theme $theme, TextMetric $metric): void
+    {
+        foreach (Theme::FONTS as $slot) {
+            $face = $theme->fonts()->get($slot);
+
+            if ($face !== null && !$metric->has($face)) {
+                $this->fonts->record($face, sprintf("the theme's %s slot", $slot), $metric->faces());
+            }
+        }
+
+        foreach ($theme->textStyleFaces() as $name => $face) {
+            if (!$metric->has($face)) {
+                $this->fonts->record($face, sprintf('the text style "%s"', $name), $metric->faces());
+            }
+        }
+    }
+
+    /**
+     * The faces the deck named that this renderer has no table of advance widths for,
+     * recorded.
+     *
+     * A box the deck placed itself may name a face of its own with `font-family`, and that
+     * face is the one its words are drawn in and measured in. It is in the deck rather than
+     * in the theme, so it does not exist when the theme is resolved — it exists once the
+     * deck has been read, which is before anything is built and therefore before a byte
+     * reaches the disk.
+     *
+     * The box is named rather than the slide it is on, because a deck that writes two boxes
+     * of the same kind is two boxes and a reader who is told which one to change can find
+     * it; the slide is named as well, because two boxes of the same kind on two slides are
+     * two places and one of them is not the one meant.
+     *
+     * @param array<int, SlideBlocks> $blocks The deck's slides, as they were read.
+     */
+    private function recordUnknownFacesOfTheDeck(array $blocks, TextMetric $metric): void
+    {
+        foreach ($blocks as $index => $slide) {
+            foreach ($slide->shapes() as $shape) {
+                $face = self::faceOf($shape);
+
+                if ($face !== null && !$metric->has($face)) {
+                    $this->fonts->record(
+                        $face,
+                        sprintf('the "%s" box on slide %d', $shape->name(), $index + 1),
+                        $metric->faces(),
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * The faces the chrome of a template named that this renderer has no table of advance
+     * widths for, recorded.
+     *
+     * The chrome of a template is held apart from the shapes of the slides: it is read once
+     * for the deck and drawn on every slide that names the template, so a walk over the
+     * slides never sees it.
+     *
+     * One entry for the whole template rather than one for each of the slides that draw it,
+     * because the face is named in one place: in the chrome. Twenty-eight slides carrying
+     * one wordmark is one name to change, and a report of twenty-eight entries would say so
+     * twenty-eight times and hide the fact that there is one thing to do. The place is
+     * named instead of the slide, so the reader is sent to the template rather than to one
+     * of the slides that happens to draw it.
+     */
+    private function recordUnknownFacesOfTheChrome(TextMetric $metric): void
+    {
+        foreach ($this->drawn as $template => $shapes) {
+            foreach ($shapes as $shape) {
+                $face = self::faceOf($shape);
+
+                if ($face !== null && !$metric->has($face)) {
+                    $this->fonts->record(
+                        $face,
+                        sprintf('the "%s" box of the template "%s"', $shape->name(), $template),
+                        $metric->faces(),
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * The face a shape names for the type in it, or null where it names none.
+     *
+     * Two classes carry a {@see \MarkdownPresentation\Render\Free\TextStyle}: the text a
+     * deck wrote and the number the renderer writes. Both are drawn in the face their style
+     * names and measured in it, so both are a place a face is named — and a walk that
+     * looked at one of them would miss the other.
+     */
+    private static function faceOf(FreeShape $shape): ?string
+    {
+        return match (true) {
+            $shape instanceof FreeText => $shape->style->face,
+            $shape instanceof FreeSlideNumber => $shape->style->face,
+            default => null,
+        };
     }
 
     /**
@@ -530,6 +774,8 @@ final class PresentationRenderer
             $level,
         );
 
+        $content = $this->furniture->on($this->templates, $this->drawn, $content, $source);
+
         $slide = $presentation->createSlide();
         $slide->setSlideLayout($layouts[$role->value]);
         $slide->setName($source->title() === null ? null : sprintf('slide %d', $source->index() + 1));
@@ -545,7 +791,7 @@ final class PresentationRenderer
         if ($title !== null && $source->title() !== null) {
             $writer->title(
                 $slide,
-                $this->blocks->inline()->runsIn($source->title()),
+                $this->blocks->inline()->runsIn($source->title(), $source->index() + 1, $this->theme),
                 $title['box'],
                 $title['size'],
                 $title['alignment'],
@@ -591,10 +837,10 @@ final class PresentationRenderer
      * heading that became the title: `level: 1` is the top of what a body can draw and every
      * level below it is the size a heading of that depth is drawn at.
      */
-    private function titleHeading(string $title, ?int $depth): Heading
+    private function titleHeading(string $title, int $slide, ?int $depth): Heading
     {
         return new Heading(
-            $this->blocks->inline()->runsIn($title),
+            $this->blocks->inline()->runsIn($title, $slide, $this->theme),
             $depth === null ? 1 : max(1, $depth - 1),
             self::FIRST_STEP,
         );
@@ -658,7 +904,7 @@ final class PresentationRenderer
 
         if (
             $heading === null
-            || InlineTranslator::text($heading->runs) !== $this->blocks->inline()->plain($title)
+            || InlineTranslator::text($heading->runs) !== $this->blocks->inline()->plain($title, $source->index() + 1, $this->theme)
         ) {
             // A role with no title box has nothing but its body to draw a title in, and a
             // title it does not draw is the silence this library refuses everywhere else —
@@ -667,7 +913,7 @@ final class PresentationRenderer
             // blank slide's title already is.
             return $hasTitleBox
                 ? $content
-                : new SlideBlocks([$this->titleHeading($title, $depth), ...$blocks], [0, ...$columns], $markers, $shapes);
+                : new SlideBlocks([$this->titleHeading($title, $source->index() + 1, $depth), ...$blocks], [0, ...$columns], $markers, $shapes);
         }
 
         $drawn = $heading;

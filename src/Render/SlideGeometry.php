@@ -402,8 +402,8 @@ final class SlideGeometry
             // beside it is text beside a picture rather than a picture beside text.
             //
             // Even rather than the 3:2 a picture would like, though: {@see ShapeWriter} estimates
-            // wrapping from a table of Helvetica's widths and a theme's own face is wider, so a
-            // column narrow enough to need the estimate to be exactly right is a column where
+            // wrapping from the advance widths of the face the theme draws the text in, and a
+            // column narrow enough to need that estimate to be exactly right is a column where
             // two paragraphs are drawn on top of each other. 5:4 leaves the estimate slack.
             LayoutRole::ImageText => $this->columns($top, 5, 4),
             LayoutRole::Title => [new Box($margin, $this->band(8), $width, $this->band(4.5))],

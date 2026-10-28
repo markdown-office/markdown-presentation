@@ -18,8 +18,11 @@ use League\CommonMark\Node\Node;
 use League\CommonMark\Parser\InlineParserEngine;
 use League\CommonMark\Reference\ReferenceMap;
 use MarkdownOffice\CommonMark\Directive\Node\DirectiveInline;
+use MarkdownPresentation\Exception\MalformedTextStyle;
+use MarkdownPresentation\Exception\UnknownTextStyle;
 use MarkdownPresentation\Exception\UnsupportedLink;
 use MarkdownPresentation\Render\Run;
+use MarkdownPresentation\Theme\Theme;
 
 /**
  * league/commonmark's inline nodes as the runs a slide draws.
@@ -35,6 +38,9 @@ use MarkdownPresentation\Render\Run;
  * A link's target is checked here rather than left to the reader. A target in a `.pptx` is
  * followed when a reader clicks it, so `javascript:` and a UNC share are refused at parse
  * time rather than written into a file somebody opens.
+ *
+ * @phpstan-import-type Properties from StyleReader
+ * @phpstan-type Style array{bold: ?bool, italic: ?bool, code: bool, strike: ?bool, link: ?string, colour: ?string, size: ?int, font: ?string, fontWhere: ?string, underline: ?bool}
  */
 final class InlineTranslator
 {
@@ -73,14 +79,31 @@ final class InlineTranslator
      * The style a run is written in before anything has emphasised it.
      *
      * An array rather than a `Run`, because a run carries text and this carries none: it is
-     * the four flags and the target, handed down the tree and read off at the leaves.
+     * the flags and the target, handed down the tree and read off at the leaves.
      *
-     * @var array{bold: bool, italic: bool, code: bool, strike: bool, link: string|null}
+     * A property that is null is one nothing has said anything about yet, and the run takes
+     * whatever the block it is in gave it.
+     *
+     * @var Style
      */
-    private const PLAIN = ['bold' => false, 'italic' => false, 'code' => false, 'strike' => false, 'link' => null];
+    private const PLAIN = [
+        'bold' => null,
+        'italic' => null,
+        'code' => false,
+        'strike' => null,
+        'link' => null,
+        'colour' => null,
+        'size' => null,
+        'font' => null,
+        'fontWhere' => null,
+        'underline' => null,
+    ];
+
+    private readonly StyleReader $styles;
 
     public function __construct(private readonly EnvironmentInterface $environment)
     {
+        $this->styles = new StyleReader();
     }
 
     /**
@@ -93,13 +116,15 @@ final class InlineTranslator
      *
      * @return list<Run>
      *
+     * @throws MalformedTextStyle
+     * @throws UnknownTextStyle
      * @throws UnsupportedLink
      */
-    public function runs(Node $container, string $break = "\n"): array
+    public function runs(Node $container, int $slide, Theme $theme, string $break = "\n"): array
     {
         $runs = [];
 
-        $this->walk($container->children(), $runs, self::PLAIN, $break);
+        $this->walk($container->children(), $runs, self::PLAIN, $slide, $theme, $break);
 
         return $runs;
     }
@@ -112,15 +137,17 @@ final class InlineTranslator
      *
      * @return list<Run>
      *
+     * @throws MalformedTextStyle
+     * @throws UnknownTextStyle
      * @throws UnsupportedLink
      */
-    public function runsIn(string $markdown, string $break = "\n"): array
+    public function runsIn(string $markdown, int $slide, Theme $theme, string $break = "\n"): array
     {
         $paragraph = new Paragraph();
 
         (new InlineParserEngine($this->environment, new ReferenceMap()))->parse($markdown, $paragraph);
 
-        return $this->runs($paragraph, $break);
+        return $this->runs($paragraph, $slide, $theme, $break);
     }
 
     /**
@@ -144,70 +171,117 @@ final class InlineTranslator
      * title and a heading normalised by two translators are two strings that agree only
      * while the two translators do.
      *
+     * @throws MalformedTextStyle
+     * @throws UnknownTextStyle
      * @throws UnsupportedLink
      */
-    public function plain(string $text): string
+    public function plain(string $text, int $slide, Theme $theme): string
     {
-        return self::text($this->runsIn($text));
+        return self::text($this->runsIn($text, $slide, $theme));
     }
 
     /**
-     * @param iterable<Node>                                                               $nodes
-     * @param list<Run>                                                                    $runs
-     * @param array{bold: bool, italic: bool, code: bool, strike: bool, link: string|null} $style
+     * @param iterable<Node> $nodes
+     * @param list<Run>      $runs
+     * @param Style          $style
+     * @param int            $slide
+     * @param Theme          $theme
+     * @param string         $break
      *
+     * @throws MalformedTextStyle
+     * @throws UnknownTextStyle
      * @throws UnsupportedLink
      */
-    private function walk(iterable $nodes, array &$runs, array $style, string $break = "\n"): void
+    private function walk(iterable $nodes, array &$runs, array $style, int $slide, Theme $theme, string $break = "\n"): void
     {
         foreach ($nodes as $node) {
             if ($node instanceof Link) {
-                array_push($runs, ...$this->linked($node, $style));
+                array_push($runs, ...$this->linked($node, $style, $slide, $theme));
 
                 continue;
             }
 
             if ($node instanceof Image) {
-                $this->picture($node, $runs);
+                $this->picture($node, $runs, $slide, $theme);
 
                 continue;
             }
 
             if ($node instanceof Emphasis) {
-                $this->walk($node->children(), $runs, ['italic' => true] + $style);
+                $this->walk($node->children(), $runs, ['italic' => true] + $style, $slide, $theme, $break);
 
                 continue;
             }
 
             if ($node instanceof Strong) {
-                $this->walk($node->children(), $runs, ['bold' => true] + $style);
+                $this->walk($node->children(), $runs, ['bold' => true] + $style, $slide, $theme, $break);
 
                 continue;
             }
 
             if ($node instanceof Strikethrough) {
-                $this->walk($node->children(), $runs, ['strike' => true] + $style);
+                $this->walk($node->children(), $runs, ['strike' => true] + $style, $slide, $theme, $break);
+
+                continue;
+            }
+
+            if ($node instanceof DirectiveInline) {
+                $this->styled($node, $runs, $style, $slide, $theme);
 
                 continue;
             }
 
             // Everything else in a paragraph is text as far as a slide is concerned: a text
-            // node, an HTML tag this library draws literally, a line break, and a directive
-            // written in a sentence, which is not one this library draws and so is its own
-            // spelling rather than its label.
+            // node, an HTML tag this library draws literally, and a line break.
             $this->append($runs, new Run(
                 match (true) {
                     $node instanceof Newline => $break,
-                    $node instanceof DirectiveInline => (string) $node,
                     default => self::words($node),
                 },
-                bold: $style['bold'],
-                italic: $style['italic'],
+                bold: $style['bold'] === true,
+                italic: $style['italic'] === true,
                 code: $node instanceof Code || $style['code'],
                 link: $style['link'],
-                strike: $style['strike'],
+                strike: $style['strike'] === true,
+                colour: $style['colour'],
+                size: $style['size'],
+                font: $style['font'],
+                underline: $style['underline'] === true,
+                fontWhere: $style['fontWhere'],
             ));
         }
+    }
+
+    /**
+     * The run a text style draws, in the style the words around it were written in.
+     *
+     * The style's own properties win over the ones the words around it carry, because the
+     * style is the more particular of the two statements: a word written in bold by the
+     * paragraph and in a style that says not bold is not bold.
+     *
+     * @param Style     $style
+     * @param list<Run> $runs
+     *
+     * @throws MalformedTextStyle
+     * @throws UnknownTextStyle
+     */
+    private function styled(DirectiveInline $node, array &$runs, array $style, int $slide, Theme $theme): void
+    {
+        $style = self::merged($style, $this->styles->read($node, $slide, $theme));
+
+        $this->append($runs, new Run(
+            (string) $node->getLabel(),
+            bold: $style['bold'] === true,
+            italic: $style['italic'] === true,
+            code: $style['code'],
+            link: $style['link'],
+            strike: $style['strike'] === true,
+            colour: $style['colour'],
+            size: $style['size'],
+            font: $style['font'],
+            underline: $style['underline'] === true,
+            fontWhere: $style['fontWhere'],
+        ));
     }
 
     /**
@@ -217,18 +291,20 @@ final class InlineTranslator
      * this library can emphasise: a link written `[**docs**](…)` is a bold link, and a single
      * run for the label would have to carry the markup inside it as text.
      *
-     * @param array{bold: bool, italic: bool, code: bool, strike: bool, link: string|null} $style
+     * @param Style $style
      *
      * @return list<Run>
      *
+     * @throws MalformedTextStyle
+     * @throws UnknownTextStyle
      * @throws UnsupportedLink
      */
-    private function linked(Link $node, array $style): array
+    private function linked(Link $node, array $style, int $slide, Theme $theme): array
     {
         $style['link'] = self::target($node->getUrl());
 
         $runs = [];
-        $this->walk($node->children(), $runs, $style);
+        $this->walk($node->children(), $runs, $style, $slide, $theme);
 
         return $runs;
     }
@@ -243,16 +319,18 @@ final class InlineTranslator
      *
      * @param list<Run> $runs
      *
+     * @throws MalformedTextStyle
+     * @throws UnknownTextStyle
      * @throws UnsupportedLink
      */
-    private function picture(Image $node, array &$runs): void
+    private function picture(Image $node, array &$runs, int $slide, Theme $theme): void
     {
         $this->append($runs, new Run('!'));
 
         $style = self::PLAIN;
         $style['link'] = self::source($node->getUrl());
 
-        $this->walk($node->children(), $runs, $style);
+        $this->walk($node->children(), $runs, $style, $slide, $theme);
     }
 
     /**
@@ -303,7 +381,7 @@ final class InlineTranslator
         // The check reads the decoded form and the link keeps what league handed over. That is
         // not a convenience: league percent-encodes a target on the way in, so `\\host\share`
         // arrives as `%5Chost%5Cshare` and a check written against the raw string sees a path
-        // rather than the share it is — the one refusal here that a reader would have acted on.
+        // rather than the share it was — the one refusal here that a reader would have acted on.
         // Decoding for the check also catches an encoded scheme, which is the same trick the
         // refusal exists for.
         $read = rawurldecode($target);
@@ -349,7 +427,35 @@ final class InlineTranslator
             code: $run->code,
             link: $run->link,
             strike: $run->strike,
+            colour: $run->colour,
+            size: $run->size,
+            font: $run->font,
+            underline: $run->underline,
+            fontWhere: $run->fontWhere,
         );
+    }
+
+    /**
+     * One style laid over another, property by property.
+     *
+     * A property the other does not set is left as this one had it, which is what "the
+     * attributes override the named style" means: an attribute says nothing about the
+     * properties it does not name.
+     *
+     * @param Style          $style
+     * @param Properties     $over
+     *
+     * @return Style
+     */
+    private static function merged(array $style, array $over): array
+    {
+        foreach ($over as $property => $value) {
+            if ($value !== null) {
+                $style[$property] = $value;
+            }
+        }
+
+        return $style;
     }
 
     /**
@@ -361,6 +467,10 @@ final class InlineTranslator
             && $one->italic === $two->italic
             && $one->code === $two->code
             && $one->strike === $two->strike
-            && $one->link === $two->link;
+            && $one->link === $two->link
+            && $one->colour === $two->colour
+            && $one->size === $two->size
+            && $one->font === $two->font
+            && $one->underline === $two->underline;
     }
 }

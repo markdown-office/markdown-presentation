@@ -82,7 +82,7 @@ function blocksOf(string $markdown): array
  */
 function inlineRuns(string $markdown): array
 {
-    return (new InlineTranslator(SlideEnvironment::build()))->runsIn($markdown);
+    return (new InlineTranslator(SlideEnvironment::build()))->runsIn($markdown, 1, Theme::defaults());
 }
 
 /**
@@ -599,7 +599,7 @@ it('refuses a leaf directive under a name this format does not draw', function (
             UnknownDirective::class,
             'Slide 1 opens the directive "::bogus", which is not something a slide draws. The free shapes '
             . 'are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, line, rectangle, '
-            . 'roundrect, triangle. Two colons mark a step as "::click" or a column as "::column" and '
+            . 'roundrect, slide-number, triangle. Two colons mark a step as "::click" or a column as "::column" and '
             . 'three open a step region as ":::click"; a placed text block is ":::content" with its '
             . 'Markdown between the fences.',
         );

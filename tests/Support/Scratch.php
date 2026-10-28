@@ -78,6 +78,14 @@ final class Scratch
 
             $path = $directory . '/' . $entry;
 
+            // A link is taken down rather than walked into: what it points at is a
+            // directory of somebody else's, and the walk would delete the files in it.
+            if (is_link($path)) {
+                @unlink($path);
+
+                continue;
+            }
+
             is_dir($path) ? self::removeTree($path) : @unlink($path);
         }
 

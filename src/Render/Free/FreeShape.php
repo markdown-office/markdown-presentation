@@ -7,10 +7,10 @@ namespace MarkdownPresentation\Render\Free;
 /**
  * A shape a deck placed itself, rather than one the layout put where it did.
  *
- * Three kinds rather than one class with a nullable payload on each: a shape is written as one
+ * Four kinds rather than one class with a nullable payload on each: a shape is written as one
  * shape, and {@see \MarkdownPresentation\Render\ShapeWriter} has to know which before it can
  * pick a shape class, so a {@see FreePicture} whose picture was missing and a {@see FreeText}
- * whose frame was missing would be two states the draw site has to defend against. Three
+ * whose frame was missing would be two states the draw site has to defend against. Four
  * classes make both impossible rather than merely discouraged.
  *
  * The paint and the label are here rather than on the subclasses that use them, because a
@@ -22,6 +22,9 @@ namespace MarkdownPresentation\Render\Free;
  * picture is a `p:pic` with no text body to put one in. A {@see FreeText} never carries a
  * label either — its body is Markdown, so a label on it would be a second way to put the same
  * words in the same box. Both hold the default, which nothing reads.
+ *
+ * A {@see FreeSlideNumber} is type as well, and its words are the number the renderer fills
+ * in rather than anything the deck wrote.
  *
  * The step is the one the deck wrote this on and nothing else, because a free shape does not
  * occupy a column: {@see \MarkdownPresentation\Render\PresentationRenderer} writes it in

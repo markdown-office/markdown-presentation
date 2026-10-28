@@ -13,5 +13,6 @@ parameters:
     paths:
         - src
         - tests/Support
+        - tools/generate-font-metrics.php
         - tools/install-phpstan.php
         - tools/install-ooxml-schemas.php
