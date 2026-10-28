@@ -10,6 +10,7 @@ use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Render\PresentationRenderer;
+use MarkdownPresentation\Render\Furniture;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Template\ChromeFile;
@@ -313,6 +314,32 @@ it('refuses a slide that names a template there is not, and names the templates 
     expect(templateFailure($deck))
         ->toContain('Slide 1 names the template "wordmark", which is not one')
         ->toContain('The templates are: brand');
+});
+
+it('refuses a slide that carries more shapes than one may', function () {
+    // The chrome of a template is read once and drawn on every slide that names it, so the
+    // shapes of a template are multiplied by the slides that draw them: the slide count is
+    // bounded, and this is the other half of that bound.
+    $chrome = str_repeat("::line{left=5% top=10% width=30% height=1%}\n", Furniture::MAX_SHAPES + 1);
+
+    $deck = "---\ntemplate: brand\n---\n" . $chrome . "\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateFailure($deck))
+        ->toContain(sprintf(
+            'Slide 1 carries %d shapes, and a slide may carry at most %d',
+            Furniture::MAX_SHAPES + 1,
+            Furniture::MAX_SHAPES,
+        ));
+});
+
+it('draws a slide that carries as many shapes as one may', function () {
+    // The other side of the ceiling: a slide at it is drawn rather than refused, because a
+    // ceiling that refused the shape it allowed would be a ceiling nobody could reach.
+    $chrome = str_repeat("::line{left=5% top=10% width=30% height=1%}\n", Furniture::MAX_SHAPES);
+
+    $deck = "---\ntemplate: brand\n---\n" . $chrome . "\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateDeck($deck)->shapeNames(1))->toHaveCount(Furniture::MAX_SHAPES);
 });
 
 it('imports the templates of a chrome file beside the deck', function () {

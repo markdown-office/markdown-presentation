@@ -19,6 +19,7 @@ use MarkdownPresentation\Exception\MalformedTextStyle;
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\NothingToConvert;
 use MarkdownPresentation\Exception\ThemeNotFound;
+use MarkdownPresentation\Exception\TooManyShapes;
 use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownFont;
@@ -107,6 +108,7 @@ it('reports what a deck author can fix under the class that says so', function (
         MalformedTextStyle::class,
         MalformedTheme::class,
         ThemeNotFound::class,
+        TooManyShapes::class,
         TooManySlides::class,
         UnknownDirective::class,
         UnknownFont::class,

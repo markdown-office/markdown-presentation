@@ -228,6 +228,14 @@ All notable changes to this project are documented here. The format follows
   a file over it is refused with its size and the ceiling in the message. The ceiling is an
   argument of `ChromeFile`, so a caller can hold a deck to a smaller one.
 
+- **A slide carries at most a hundred shapes.** The chrome of a template is read once and
+  drawn on every slide that names it, so the shapes of a template are multiplied by the
+  slides that draw them: two hundred shapes in a chrome file named by sixty slides is twelve
+  thousand shapes and ten megabytes of slide XML, and neither factor was bounded. The slide
+  count is bounded by `PresentationRenderer::MAX_SLIDES`, and `Furniture::MAX_SHAPES` is the
+  other half of that bound — a slide that carries more than a hundred shapes, the chrome of
+  a template included, is refused with the number and the ceiling in the message.
+
 - **A line of text is measured in the face it is drawn in, and in the units a box is.**
   The advance widths of a face are in units per em and the size of the type is in points,
   so the width they make is in points — and a box is measured in pixels. The two were

@@ -10,6 +10,7 @@ use MarkdownPresentation\Document\Slide as SourceSlide;
 use MarkdownPresentation\Exception\ChromeNotFound;
 use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\TooManyShapes;
 use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Render\Free\FreeSlideNumber;
@@ -32,6 +33,22 @@ use MarkdownPresentation\Theme\Theme;
  */
 final class Furniture
 {
+    /**
+     * The most shapes one slide may carry, the chrome of a template included.
+     *
+     * The chrome of a template is read once and drawn on every slide that names it, so the
+     * shapes of a template are multiplied by the slides that draw them: a template of two
+     * hundred shapes on sixty slides is twelve thousand shapes and ten megabytes of slide
+     * XML. The slide count is bounded by
+     * {@see \MarkdownPresentation\Render\PresentationRenderer::MAX_SLIDES}, and this is the
+     * other half of that bound.
+     *
+     * A hundred shapes is more than a page carries in practice, which is the point of a
+     * ceiling that is generous: it bounds the damage without being something a real deck
+     * can reach by accident.
+     */
+    public const MAX_SHAPES = 100;
+
     /**
      * @param Deck       $deck   The deck being rendered, which holds the templates it
      *                          defines and the chrome file it names.
@@ -103,9 +120,14 @@ final class Furniture
      * chrome alike: it is the one thing about a page number that is different on every slide,
      * and a shape carrying it cannot be drawn before the slide it is on is known.
      *
+     * The shapes are counted on the way, because the chrome of a template is drawn on every
+     * slide that names it and the slide count is bounded: {@see self::MAX_SHAPES} is the
+     * other half of that bound.
+     *
      * @param array<string, list<FreeShape>> $drawn The chrome every template draws.
      *
      * @throws MalformedFrontmatter
+     * @throws TooManyShapes
      * @throws UnknownTemplate
      */
     public function on(
@@ -124,6 +146,10 @@ final class Furniture
             foreach ($drawn[$name] as $shape) {
                 $shapes[] = $this->numbered($shape, $source->index() + 1);
             }
+        }
+
+        if (count($shapes) > self::MAX_SHAPES) {
+            throw TooManyShapes::on($source->index() + 1, count($shapes), self::MAX_SHAPES);
         }
 
         if ($shapes === []) {
