@@ -43,9 +43,9 @@ final class Furniture
      * {@see \MarkdownPresentation\Render\PresentationRenderer::MAX_SLIDES}, and this is the
      * other half of that bound.
      *
-     * A hundred shapes is more than a page carries in practice, which is the point of a
-     * ceiling that is generous: it bounds the damage without being something a real deck
-     * can reach by accident.
+     * A hundred shapes is far more than a slide asks for, which is the point of a ceiling
+     * that is generous: it bounds the damage without being something a real deck can reach
+     * by accident.
      */
     public const MAX_SHAPES = 100;
 

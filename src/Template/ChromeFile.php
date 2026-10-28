@@ -67,9 +67,9 @@ final class ChromeFile
         // The read only happens where the file can be read: `file_get_contents()` warns
         // when it cannot, and a warning is not a failure anybody can act on.
         //
-        // With a length, so that a file over the ceiling is abandoned rather than read: the
-        // size a file reports is the size it has now, and a file that grows between the
-        // measurement and the read is a file this library does not have room for.
+        // With a length, so that a file over the ceiling is abandoned rather than read
+        // whole: the memory a deck's frontmatter can ask for is bounded by the length and
+        // not by the size of the file on disk.
         $length = max(0, $this->maxBytes) + 1;
 
         $markdown = is_readable($resolved)
@@ -81,7 +81,7 @@ final class ChromeFile
         }
 
         if (strlen($markdown) > $this->maxBytes) {
-            throw ChromeTooLarge::of($written, $this->size($resolved), $this->maxBytes);
+            throw ChromeTooLarge::of($written, $this->size($resolved, strlen($markdown)), $this->maxBytes);
         }
 
         return $markdown;
@@ -91,12 +91,13 @@ final class ChromeFile
      * The size of the file, as the filesystem reports it.
      *
      * Asked for when the file is over the ceiling, so that the message says how far over it
-     * is rather than how many bytes were read before the read was abandoned.
+     * is rather than how many bytes were read before the read was abandoned. The bytes read
+     * are the floor of it: a file that grew between the two is at least that big.
      */
-    private function size(string $resolved): int
+    private function size(string $resolved, int $read): int
     {
         $size = filesize($resolved);
 
-        return $size === false ? $this->maxBytes + 1 : $size;
+        return max($size === false ? 0 : $size, $read);
     }
 }
