@@ -126,8 +126,13 @@ final class Theme
     {
         $written = strtolower($written);
 
-        return in_array($written, self::colourNames(), true)
-            || in_array($written, self::NO_COLOUR, true)
+        foreach (self::colourNames() as $name) {
+            if (strtolower($name) === $written) {
+                return true;
+            }
+        }
+
+        return in_array($written, self::NO_COLOUR, true)
             || preg_match('/\A#?[0-9A-Fa-f]{6}\z/', $written) === 1;
     }
 

@@ -105,10 +105,41 @@ final class ThemeMapping
      * Asked by {@see Theme::colour()} rather than duplicated there, because the two spellings
      * are a fact about the file and a value object must not carry a second copy of a map that
      * {@see self::readColours()} also consults.
+     *
+     * The name is folded before it is looked up, because `folHlink` is DrawingML's own
+     * spelling and `folhlink` is the same name in lower case — and a colour a theme's file
+     * names and a colour a deck names are one vocabulary.
      */
     public static function slot(string $written): string
     {
-        return self::ALIASES[$written] ?? $written;
+        return self::canonical($written) ?? $written;
+    }
+
+    /**
+     * The slot a colour name stands for, whatever it is written as, or null where it names
+     * no colour at all.
+     *
+     * One list of names rather than two: the aliases are the concept draft's spellings and
+     * the slots are DrawingML's own, and a name in either of them is the same slot whichever
+     * case it is written in.
+     */
+    private static function canonical(string $written): ?string
+    {
+        $folded = strtolower($written);
+
+        foreach (self::ALIASES as $alias => $slot) {
+            if (strtolower($alias) === $folded) {
+                return $slot;
+            }
+        }
+
+        foreach (Theme::COLOURS as $slot) {
+            if (strtolower($slot) === $folded) {
+                return $slot;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -185,21 +216,22 @@ final class ThemeMapping
         $named = [];
 
         foreach ($data as $key => $value) {
-            $slot = (string) $key;
+            $written = (string) $key;
+            $slot = self::canonical($written);
 
-            if (!in_array($slot, self::colourNames(), true)) {
-                throw MalformedTheme::unknownKey($file, $slot, self::colourNames());
+            if ($slot === null) {
+                throw MalformedTheme::unknownKey($file, $written, self::colourNames());
             }
 
             if (!is_string($value)) {
-                throw MalformedTheme::wrongType($file, $slot, 'a colour such as "#1E1E2E"');
+                throw MalformedTheme::wrongType($file, $written, 'a colour such as "#1E1E2E"');
             }
 
             if (preg_match(self::HEX, $value) !== 1) {
-                throw MalformedTheme::notHexColour($file, $slot, $value);
+                throw MalformedTheme::notHexColour($file, $written, $value);
             }
 
-            $named[self::ALIASES[$slot] ?? $slot] = strtoupper($value);
+            $named[$slot] = strtoupper($value);
         }
 
         $colours = [];

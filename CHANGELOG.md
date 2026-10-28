@@ -187,6 +187,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A colour named in either case is the colour it names.** Two of the library's own colour
+  names are written in mixed case — `folHlink`, which is DrawingML's own spelling, and
+  `followedHyperlink`, the concept draft's — and the gate that refuses a colour folded the
+  name it was given and then compared it with the names as they are written. A theme whose
+  `text-styles.yml` said `color: folHlink` was refused by a message that named `folHlink` as
+  a colour that would have been right.
+
+  The names are folded on both sides now, and a colour resolves to the same slot whichever
+  case it is written in — which is what the vocabulary has said all along.
+
 - **A line of text is measured in the face it is drawn in, and in the units a box is.**
   The advance widths of a face are in units per em and the size of the type is in points,
   so the width they make is in points — and a box is measured in pixels. The two were
