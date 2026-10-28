@@ -1712,6 +1712,20 @@ cost the renderer nothing at all. The numbers are the same because they were cho
 a build-up a person writes, not for how long one takes — a build-up of 500 clicks is not a slide
 anybody gives, and a talk of 1000 slides does not exist.
 
+### The ceilings of the furniture
+
+The furniture of a deck is bounded too, because the chrome of a template is drawn on every
+slide that names it:
+
+| Ceiling | Value | Bounds |
+| --- | --- | --- |
+| `Render\Furniture::MAX_SHAPES` | 100 | the shapes one slide may carry, the chrome of a template included |
+| `Template\ChromeFile::MAX_BYTES` | one megabyte | the chrome file a deck may name in its frontmatter |
+
+Both are refused with the number and the ceiling in the message, and the shape count is the
+other half of the slide count: a hundred shapes on a slide is a hundred shapes on each of the
+slides that draw them.
+
 ### Images
 
 A relative image path resolves against the directory the renderer was given, which is the
