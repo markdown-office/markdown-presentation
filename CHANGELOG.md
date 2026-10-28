@@ -107,6 +107,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The inline translator is told which slide and which theme it reads for.** `runs()`,
+  `runsIn()` and `plain()` each take an `$slide` and a `$theme` now: a word in a text style
+  is drawn in the face and the colour the theme names, and a mistake in one is a mistake on
+  a slide — so the reader is given both rather than left to find them. The three signatures
+  are `runs(Node $container, int $slide, Theme $theme, string $break = "\n")`,
+  `runsIn(string $markdown, int $slide, Theme $theme, string $break = "\n")` and
+  `plain(string $text, int $slide, Theme $theme)`.
+
 - **The page says what a link in a text style looks like.** A link with no style of its own
   is drawn in the theme's `hlink`, and a link written in a text style is drawn in the
   style's colour instead — the style is the more particular of the two statements — while
@@ -138,13 +146,12 @@ All notable changes to this project are documented here. The format follows
   a private constant, and a caller holding a table of them — the documentation's own
   reference table — had no way to read them without reflection.
 
-- **The faces a theme draws its words in are a thing of their own.** `Theme::font()` and
-  `Theme::face()` are gone: the three faces a theme names are now a `Fonts`, and the theme
-  hands it out as `Theme::fonts()` — the shape `Theme::style()` and `Theme::textStyles()`
-  already had, because the type scale and the named styles are parts of a theme too. A
-  theme written back out as an array is `ThemeMapping::write()` now, on the same seam
-  `StyleMapping::write()` is on: the file and the value it holds are read and written in
-  one place.
+- **The faces a theme draws its words in are a thing of their own.** `Theme::font()` is
+  gone: the three faces a theme names are now a `Fonts`, and the theme hands it out as
+  `Theme::fonts()` — the shape `Theme::style()` and `Theme::textStyles()` already had,
+  because the type scale and the named styles are parts of a theme too. A theme written back
+  out as an array is `ThemeMapping::write()` now, on the same seam `StyleMapping::write()`
+  is on: the file and the value it holds are read and written in one place.
 
 - **`ThemeResolver` looks in the roots it is given.** They were read into the scope a
   deck-written path is held to and never looked in, so a shared library of themes beside
