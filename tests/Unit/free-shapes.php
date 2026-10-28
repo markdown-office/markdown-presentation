@@ -16,6 +16,7 @@ use MarkdownPresentation\Render\Free\FreeAutoShape;
 use MarkdownPresentation\Render\Free\FreePicture;
 use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Render\Free\FreeShapes;
+use MarkdownPresentation\Render\Free\FreeSlideNumber;
 use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Render\Free\ShapeKind;
 use MarkdownPresentation\Render\PresentationRenderer;
@@ -152,6 +153,30 @@ it('refuses a container fence it cannot draw, and names the one container it can
         ->toThrow(UnknownDirective::class, 'a placed text block is ":::content" with its Markdown')
         ->and(fn () => placedShapes("::: {.panel}\nSomething.\n:::\n"))
         ->toThrow(UnknownDirective::class, 'opens the container "::: {.panel}"');
+});
+
+it('writes the number of the deck after the number of the slide', function () {
+    // The one attribute of the page number that is not a placement: it says whether the
+    // number of the deck follows the number of the slide.
+    $shape = placedShape("::slide-number{of=true}\n");
+
+    expect($shape)->toBeInstanceOf(FreeSlideNumber::class)
+        ->and($shape->of)->toBeTrue();
+});
+
+it('refuses an `of` that is neither true nor false', function () {
+    // Every other value in this vocabulary is refused with a sentence, and this one was the
+    // exception: `getBool()` answers false for a word it does not know, so `of=maybe` was a
+    // page number with no deck count on it and nothing said so.
+    expect(fn () => placedShapes("::slide-number{of=maybe}\n"))
+        ->toThrow(MalformedShape::class, 'A flag is true or false: of=true, of=false.');
+});
+
+it('reads a bare `of` as the flag it asks for', function () {
+    // `{bold}` on a text style means bold, and a bare attribute asks for the attribute
+    // rather than for its value — which is the flag.
+    expect(placedShape("::slide-number{of}\n")->of)->toBeTrue()
+        ->and(placedShape("::slide-number{}\n")->of)->toBeFalse();
 });
 
 it('places a size as a fraction of the slide on each of its axes', function () {

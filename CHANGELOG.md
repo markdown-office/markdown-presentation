@@ -197,6 +197,11 @@ All notable changes to this project are documented here. The format follows
   The names are folded on both sides now, and a colour resolves to the same slot whichever
   case it is written in — which is what the vocabulary has said all along.
 
+- **The `of` of a page number is checked like every other value.** `of=maybe` was read as
+  false, because `getBool()` answers false for a word it does not know: the page number was
+  drawn without the number of the deck and nothing said so. Every other value in the
+  free-shape vocabulary is refused with a sentence, and this one is refused with one too.
+
 - **A line of text is measured in the face it is drawn in, and in the units a box is.**
   The advance widths of a face are in units per em and the size of the type is in points,
   so the width they make is in points — and a box is measured in pixels. The two were

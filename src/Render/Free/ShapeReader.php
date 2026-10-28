@@ -125,7 +125,7 @@ final class ShapeReader
                 $state->step,
                 $paint,
                 TextStyle::read($state->slide, $kind->value, $attributes, $state->theme),
-                $attributes->getBool('of'),
+                self::of($state->slide, $attributes),
                 $shadow,
             ),
             $kind->isContent() => FreeText::at(
@@ -146,6 +146,44 @@ final class ShapeReader
                 $shadow,
             ),
         };
+    }
+
+    /**
+     * Whether the number of the deck is written after the number of the slide.
+     *
+     * A flag, and read as one: `getBool()` answers false for a word it does not know, so
+     * `of=maybe` was a page number with no deck count on it and nothing said so. Every other
+     * value in this vocabulary is refused with a sentence, and this one is refused with one
+     * too.
+     *
+     * A bare `of` asks for the attribute rather than for its value, which is the flag: it
+     * means true, the way `{bold}` on a text style means bold.
+     *
+     * @throws MalformedShape
+     */
+    private static function of(int $slide, DirectiveAttributes $attributes): bool
+    {
+        $written = $attributes->get('of');
+
+        if ($written === null) {
+            return false;
+        }
+
+        if ($written === true) {
+            return true;
+        }
+
+        $lower = strtolower(trim($written));
+
+        if ($lower === 'true') {
+            return true;
+        }
+
+        if ($lower === 'false') {
+            return false;
+        }
+
+        throw MalformedShape::flag($slide, ShapeKind::SlideNumber->value, 'of', $written);
     }
 
     /**

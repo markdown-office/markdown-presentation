@@ -74,6 +74,24 @@ final class MalformedShape extends InvalidInput
     }
 
     /**
+     * A flag whose value is neither true nor false.
+     *
+     * @param string $attribute The attribute the flag is written as.
+     */
+    public static function flag(int $slide, string $name, string $attribute, string $written): self
+    {
+        return new self(sprintf(
+            'Slide %d gives "%s" an "%s" of "%s". A flag is true or false: %s=true, %s=false.',
+            $slide,
+            $name,
+            $attribute,
+            $written,
+            $attribute,
+            $attribute,
+        ));
+    }
+
+    /**
      * A box that does not lie within the slide.
      *
      * `$where` is the diagnosis rather than two numbers, for the reason
