@@ -513,8 +513,8 @@ Resilience :brand[Bakery]
 :::
 ```
 
-That is one box, two words and two colours — which is the whole of what a wordmark is, and
-what a box could not say before.
+That is one box, two words and two colours — which is the whole of what a wordmark is (a
+company's name on a slide, with its mark), and what a box could not say before.
 
 Three forms, one grammar:
 
