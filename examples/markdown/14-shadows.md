@@ -30,8 +30,7 @@ layout: blank
 :::
 
 :::content{left=6% top=52% width=30% height=18% fill=lt1 stroke=accent1 stroke-width=2 shadow-distance=8 shadow-blur=6 shadow-direction=90 shadow-color=accent1 shadow-alpha=55 padding=18 font-size=13 vertical-align=middle}
-A **`:::content`** block takes a shadow too, and the shadow is around the block rather than
-around the words in it.
+A `:::content` block takes a shadow around the block, not the words.
 :::
 
 ::image{src="assets/logo.png" left=46% top=52% width=20% height=18% fit=contain shadow-distance=8 shadow-blur=8 shadow-alpha=55}

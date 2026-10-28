@@ -35,6 +35,23 @@ All notable changes to this project are documented here. The format follows
   `templates/chrome.md`, and a template of the deck's own of the same name as one the file
   holds — the one that is drawn. The company is invented.
 
+- **A whole corporate template, as the files a company has.** A theme, a brand mark and
+  the furniture of a deck are three separate things, and a company that has all three has
+  to keep them in step with each other.
+
+  `examples/markdown/17-corporate-template.md` is a deck that has them: a theme of its own
+  in `examples/markdown/corporate/theme.yml`, a mark in two colours — one for a light page
+  and one for a dark one, with the crosshair knocked out of it rather than painted on it,
+  so the page shows through it either way — and a chrome file holding the wordmark, the
+  rule and the footer.
+
+  **A dark slide and a light one are the same deck, and the furniture on them cannot be
+  the same furniture**: the name is ink on a light page and white on a dark one, so the
+  dark wordmark is the same named style with the colour laid over it. That is the one
+  thing a chrome file cannot decide for itself, and it is why there are two of them.
+
+  The company is invented, and so is every figure in the deck.
+
 - **The number of a slide is a shape.** A page number was the one piece of furniture a
   deck had to write out on every slide, because the number of a slide is not known until
   the deck is split.
@@ -169,6 +186,22 @@ All notable changes to this project are documented here. The format follows
   `UnknownFont`.
 
 ### Fixed
+
+- **A line of text is measured in the face it is drawn in, and in the units a box is.**
+  The advance widths of a face are in units per em and the size of the type is in points,
+  so the width they make is in points — and a box is measured in pixels. The two were
+  compared against each other, so every line of text was measured a quarter narrower than
+  it is drawn.
+
+  The consequence is a deck that looks right in the renderer and wrong in PowerPoint: a
+  paragraph is laid out on fewer lines than it takes, the box is written too short for the
+  text, and the text runs over whatever is under it. Nothing said so, because the
+  measurement that would have said so was measuring the wrong thing — and `--strict`,
+  which refuses a deck that does not fit, could not refuse one that did not.
+
+  The size of the type is converted where the two meet, and the tables of advance widths
+  are the faces' own: Georgia measured against the real Georgia is within a fifteenth of
+  a percent, which is as close as a table of integers gets.
 
 - **The PowerPoint tool renders the deck it was asked for.** PowerPoint knows a presentation
   by the name of its file, so a deck staged under the name of a presentation that was already

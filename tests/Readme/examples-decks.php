@@ -188,6 +188,7 @@ it('converts each deck that is not the rejected one', function (string $name) {
     '14-shadows.md',
     '15-inline-styles.md',
     '16-templates.md',
+    '17-corporate-template.md',
 ]);
 
 it('refuses the deck whose conversion is the failure it exists to demonstrate', function () use ($root) {
@@ -705,3 +706,85 @@ it('draws the imported template on the slide that names it, and on no other', fu
             ->and($bands[0]['width'])->toBe(960.0);
     }
 });
+
+it('draws the furniture of the corporate template on every slide that names it', function () {
+    [$pptx] = builtDeck('17-corporate-template.md');
+
+    // The wordmark, the rule and the footer are three templates of the deck's own chrome
+    // file, and a slide names the ones it wants. The five light slides name all three; the
+    // cover and the two dark slides name the light wordmark and nothing else — a cover has
+    // no page number, and a dark slide has no footer on it.
+    foreach (range(1, $pptx->slideCount()) as $slide) {
+        $names = $pptx->shapeNames($slide);
+
+        expect($names)->toContain('image');
+
+        if (in_array($slide, [1, 7, 8], true)) {
+            expect($names)->not->toContain('slide-number');
+
+            continue;
+        }
+
+        expect($names)->toContain('slide-number')
+            ->and($names)->toContain('rectangle');
+    }
+});
+
+it('writes the corporate template own name on the light slides and the light one on the dark', function () {
+    [$pptx] = builtDeck('17-corporate-template.md');
+
+    // The name is ink on a light page and white on a dark one, and the two are the same
+    // named style with the colour laid over it — a deck cannot carry one colour on both
+    // kinds of slide, and a chrome file cannot decide for itself.
+    $light = runOfText($pptx, 'Halden Instruments', 2);
+    $dark = runOfText($pptx, 'Halden Instruments', 7);
+
+    expect($light['colour'])->toBe('15243B')
+        ->and($light['size'])->toBe(15)
+        ->and($dark['colour'])->toBe('FFFFFF')
+        ->and($dark['size'])->toBe(15);
+});
+
+it('numbers the light slides of the corporate template and not its cover', function () {
+    [$pptx] = builtDeck('17-corporate-template.md');
+
+    // The number is the deck's own, and a cover carries none: the template that draws it
+    // names the footer, and the cover does not name the footer.
+    expect(runsOfShape($pptx, 'slide-number', 2)[0]['text'])->toBe('2')
+        ->and(runsOfShape($pptx, 'slide-number', 6)[0]['text'])->toBe('6');
+});
+
+/**
+ * The run of the text shape that holds the given text, on the given slide.
+ *
+ * A slide may hold a dozen text shapes and the one that matters is named by what it says
+ * rather than by where it is: the wordmark of the corporate template is drawn over what
+ * the slide placed itself, so its place in the order is the end of the slide and not a
+ * number anybody would want to write down.
+ *
+ * @return array{text: string, colour: string|null, size: float|null, bold: bool}
+ */
+function runOfText(Pptx $pptx, string $text, int $slide): array
+{
+    $shapes = preg_split('#(?=<p:sp>|<p:graphicFrame>|<p:pic>)#', $pptx->part("ppt/slides/slide{$slide}.xml")) ?: [];
+
+    foreach ($shapes as $shape) {
+        // A text shape and not a picture: the logo carries the company's name as its
+        // alternative text, and a picture has no colour of its own to read.
+        if (preg_match('#<p:cNvPr id="\d+" name="content"#', $shape) !== 1 || !str_contains($shape, $text)) {
+            continue;
+        }
+
+        preg_match('#<a:srgbClr val="([0-9A-Fa-f]{6})"#', $shape, $colour);
+        preg_match('#<a:rPr[^>]*\ssz="(\d+)"#', $shape, $size);
+
+        return [
+            'text' => $text,
+            'colour' => $colour[1] ?? null,
+            'size' => isset($size[1]) ? (int) $size[1] / 100 : null,
+            'bold' => preg_match('#<a:rPr[^>]*\bb="1"#', $shape) === 1,
+        ];
+    }
+
+    return ['text' => '', 'colour' => null, 'size' => null, 'bold' => false];
+}

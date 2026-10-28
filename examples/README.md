@@ -33,6 +33,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `14-shadows.md` | `14-shadows.pptx` | Five shadow types on five different kinds of object — a soft shadow straight down, a hard-edged one with no blur at all, a glow with no offset, one cast down and to the right, and one thrown upward at 40% — plus a shadow on a `:::content` block and on a `::image` |
 | `15-inline-styles.md` | `15-inline-styles.pptx` | A word in a style of the theme inside a box with a colour of its own, the raw form that needs no style of the theme's, an attribute laid over a named style for one property only, the seven attributes this half draws, and the three it refuses — a name the theme does not have, a label holding Markdown, and the `highlight` it cannot write. The company is invented |
 | `16-templates.md` | `16-templates.pptx` | The furniture of a deck, written once: a template defined in the deck, a slide that names one, a slide that names two, a slide that names three, a template imported from `templates/chrome.md`, and a template of the deck's own of the same name as one the file holds — the one that is drawn. The company is invented |
+| `17-corporate-template.md` | `17-corporate-template.pptx` | A whole corporate template: a theme of the company's own, a brand mark in two colours — one for a light page and one for a dark one — and the furniture of a deck written once and named by every slide that wants it. Eight slides of the kinds a company deck is made of: a cover, an agenda, a headline, two columns with a chart, a quote, a table, a divider and a closing. The company is invented |
 
 ## The deck that is not anybody's business
 
@@ -113,8 +114,9 @@ A few of these are here because the render is the only honest evidence:
   writes them with no `a:rPr` at all. Look at the third one — `**Churn**` in a
   label is six literal asterisks, where the first arrow's is real bold.
 - **`12`, the fifth slide.** Ten ink shapes on one slide, each its own
-  `<p:sp>`. The rule is a rectangle a pixel tall rather than a connector,
-  which is what a `---` has always been.
+  `<p:sp>`. The rule is a rectangle rather than a connector, which is what a
+  `---` has always been: it is `height=1%`, so it is five pixels of the
+  slide's five hundred and forty.
 - **`13`, the cover and the sign-off.** Neither dark slide is a layout: each
   is a full-bleed `::rectangle{fill=dk1 layer=back}` with everything else drawn
   over it. The background is set once on the master, so a slide wanting its own
@@ -158,6 +160,20 @@ A few of these are here because the render is the only honest evidence:
   `04-frontmatter.md` draws the file's, on its fifth slide.
 - **`16`, the last slide.** `5 / 5` rather than `5 / 7`: the file has five slides
   and two definitions, and the count is of the slides.
+- **`17`, the second slide.** One box, three words and three colours is `15`; what is
+  new here is the furniture around them. The wordmark is the company's own mark beside
+  the company's own name, the rule is a hairline under the header, and the footer is the
+  confidential mark and the page number. All three are templates of `corporate/chrome.md`
+  and every slide that names them is drawn with them.
+- **`17`, the seventh slide.** The divider is a dark panel with a gold number on it, and
+  the wordmark on it is the light one: the same named style with the colour laid over it,
+  because a deck cannot carry one colour on a light page and on a dark one at the same
+  time. The mark is the same shape in both, with the crosshair knocked out of it rather
+  than painted on it, so the panel shows through it.
+- **`17`, the third slide.** The title is one line and the rule under it is clear of it.
+  That is not luck: a line of text is measured in the face that will draw it, and the
+  measurement is in pixels because a box is — so a title that would wrap is a title that
+  is reported, not one that is discovered in PowerPoint.
 - **`03`, the same slide in each of the three themed decks.** The difference is not
   the palette. `default` is Office's colours at the library's own scale with a
   40px margin and a 2px rule; `minimal` is a serif deck with 64px margins, a
