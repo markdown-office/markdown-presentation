@@ -37,6 +37,7 @@ use PhpOffice\PhpPresentation\Style\Bullet;
 use PhpOffice\PhpPresentation\Style\Color;
 use PhpOffice\PhpPresentation\Style\Fill;
 use PhpOffice\PhpPresentation\Style\Font as StyleFont;
+use SplObjectStorage;
 
 /**
  * Turns a block into a shape, and says how tall it has to be before it does.
@@ -82,12 +83,24 @@ final class ShapeWriter
     /** Which row of a table is its header, counting from the first. */
     private const HEADER_ROW = 0;
 
+    /**
+     * The drawing each picture of a shape is written as.
+     *
+     * A picture in the chrome of a template is the same shape on every slide that names the
+     * template, and a picture in a package is one media part: the drawing is made once and
+     * every slide that draws the picture points at it.
+     *
+     * @var SplObjectStorage<FreePicture, AbstractDrawingAdapter>
+     */
+    private SplObjectStorage $drawings;
+
     public function __construct(
         private readonly Theme $theme,
         private readonly SlideGeometry $geometry = new SlideGeometry(),
         private readonly TextMetric $metric = new TextMetric(),
         private readonly FontReport $fonts = new FontReport(),
     ) {
+        $this->drawings = new SplObjectStorage();
     }
 
     /**
@@ -692,17 +705,7 @@ final class ShapeWriter
      */
     private function freePicture(Slide $slide, FreePicture $shape): AbstractDrawingAdapter
     {
-        // The same fork {@see self::image()} makes, for the same reason: a converted picture
-        // carries its bytes and its size with them and is written from those, while a file is
-        // measured by PHPPresentation from the path it was given.
-        $converted = $shape->image->converted;
-
-        // Both arms: `converted` is null for every format PHPPresentation can embed, so the
-        // file path is what a placed picture usually takes and the bytes are for a WebP or an
-        // SVG, which a `.pptx` cannot hold on its own.
-        $written = $converted === null
-            ? $this->fromFile($slide, $shape->image)
-            : $this->fromBytes($slide, $converted);
+        $written = $this->drawing($slide, $shape);
 
         // The alt text is what a screen reader reads and what PowerPoint's own pane shows, and
         // a file path read aloud is not a description of a picture. {@see self::image()} has
@@ -726,6 +729,44 @@ final class ShapeWriter
         $this->place($written, $box, $box->height);
         $this->fitted($written, $box, $box->height);
         $written->setRotation($shape->placement->rotate);
+
+        return $written;
+    }
+
+    /**
+     * The drawing a picture is written as, and the one every slide that draws the same
+     * picture points at.
+     *
+     * The picture of a template's chrome is the same shape on every slide that names the
+     * template, and a picture in a package is one media part: the drawing is made once and
+     * every slide that draws it points at it. A picture a deck placed on a slide of its own
+     * is a shape of its own, and is written as one.
+     */
+    private function drawing(Slide $slide, FreePicture $shape): AbstractDrawingAdapter
+    {
+        if ($this->drawings->offsetExists($shape)) {
+            $written = $this->drawings[$shape];
+
+            // The drawing is already in the package, and the slide it is drawn on needs it in
+            // its own shape tree: the same drawing, on two slides.
+            $slide->addShape($written);
+
+            return $written;
+        }
+
+        // The same fork {@see self::image()} makes, for the same reason: a converted picture
+        // carries its bytes and its size with them and is written from those, while a file is
+        // measured by PHPPresentation from the path it was given.
+        $converted = $shape->image->converted;
+
+        // Both arms: `converted` is null for every format PHPPresentation can embed, so the
+        // file path is what a placed picture usually takes and the bytes are for a WebP or an
+        // SVG, which a `.pptx` cannot hold on its own.
+        $written = $converted === null
+            ? $this->fromFile($slide, $shape->image)
+            : $this->fromBytes($slide, $converted);
+
+        $this->drawings[$shape] = $written;
 
         return $written;
     }

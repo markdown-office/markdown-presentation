@@ -342,6 +342,57 @@ it('draws a slide that carries as many shapes as one may', function () {
     expect(templateDeck($deck)->shapeNames(1))->toHaveCount(Furniture::MAX_SHAPES);
 });
 
+it('pays for a picture in a template once, however many slides draw it', function () {
+    // A picture in the chrome of a template is one picture in the package: the media part is
+    // written once and every slide that draws the picture points at it.
+    $picture = Scratch::file('logo.png', base64_decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    ));
+
+    $deck = sprintf(
+        "---\ntemplate: brand\n---\n::image{src=\"%s\" left=0 top=0 width=10%% height=10%%}\n\n"
+        . "---\nlayout: blank\ntemplate: brand\n---\n\n"
+        . "---\nlayout: blank\ntemplate: brand\n---\n",
+        basename($picture),
+    );
+
+    $file = templateDeck($deck);
+
+    $media = array_values(array_filter(
+        $file->parts(),
+        static fn (string $part): bool => str_starts_with($part, 'ppt/media/'),
+    ));
+
+    expect($media)->toHaveCount(1)
+        ->and($file->shapeNames(1))->toBe(['image'])
+        ->and($file->shapeNames(2))->toBe(['image']);
+});
+
+it('draws a picture a deck placed on two slides as two pictures', function () {
+    // The picture of a template's chrome is the same shape on every slide that names the
+    // template; a picture the deck placed is a shape of its own, and two of them are two
+    // pictures in the package.
+    $picture = Scratch::file('logo.png', base64_decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+    ));
+
+    $deck = sprintf(
+        "---\nlayout: blank\n---\n::image{src=\"%s\" left=0 top=0 width=10%% height=10%%}\n\n"
+        . "---\nlayout: blank\n---\n::image{src=\"%s\" left=0 top=0 width=10%% height=10%%}\n",
+        basename($picture),
+        basename($picture),
+    );
+
+    $file = templateDeck($deck);
+
+    $media = array_values(array_filter(
+        $file->parts(),
+        static fn (string $part): bool => str_starts_with($part, 'ppt/media/'),
+    ));
+
+    expect($media)->toHaveCount(2);
+});
+
 it('imports the templates of a chrome file beside the deck', function () {
     $chrome = Scratch::file('chrome.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n");
 

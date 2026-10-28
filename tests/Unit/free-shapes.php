@@ -176,6 +176,7 @@ it('reads a bare `of` as the flag it asks for', function () {
     // `{bold}` on a text style means bold, and a bare attribute asks for the attribute
     // rather than for its value — which is the flag.
     expect(placedShape("::slide-number{of}\n")->of)->toBeTrue()
+        ->and(placedShape("::slide-number{of=false}\n")->of)->toBeFalse()
         ->and(placedShape("::slide-number{}\n")->of)->toBeFalse();
 });
 

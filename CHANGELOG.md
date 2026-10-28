@@ -236,6 +236,12 @@ All notable changes to this project are documented here. The format follows
   other half of that bound — a slide that carries more than a hundred shapes, the chrome of
   a template included, is refused with the number and the ceiling in the message.
 
+- **A picture in a template is paid for once.** The chrome of a template is drawn on every
+  slide that names it, and each of those slides had a picture of its own in the package: a
+  mark on sixty slides was sixty media parts and sixty times the bytes of the mark. The
+  drawing a picture is written as is made once now, and every slide that draws that picture
+  points at it — which is what the two docblocks beside the chrome have said.
+
 - **A line of text is measured in the face it is drawn in, and in the units a box is.**
   The advance widths of a face are in units per em and the size of the type is in points,
   so the width they make is in points — and a box is measured in pixels. The two were
