@@ -6,7 +6,7 @@ description: Shapes a deck places itself, beside the ones a layout places.
 
 # Free shapes
 
-Twelve directives in the body of a slide put a shape where the deck wants it rather than where
+Thirteen directives in the body of a slide put a shape where the deck wants it rather than where
 the layout would. They are written in the two-colon syntax the step markers use, measured in
 fractions of the slide, and coloured in theme slots so they follow the theme.
 

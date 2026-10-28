@@ -1021,8 +1021,8 @@ A comma is not a separator: a value runs to the next space, so `width=40%, heigh
 value of `40%,` and one attribute nobody reads. A failure about such a value says so, rather
 than leaving the author to change a number that was right.
 
-Twelve names are drawn, and nothing else — a name outside them is a failure that lists all
-twelve, so the vocabulary is in the error rather than in a place you have to find:
+Thirteen names are drawn, and nothing else — a name outside them is a failure that lists all
+thirteen, so the vocabulary is in the error rather than in a place you have to find:
 
 | Directive | Draws |
 | --- | --- |
@@ -1037,6 +1037,7 @@ twelve, so the vocabulary is in the error rather than in a place you have to fin
 | `::arrow` | a right-pointing arrow |
 | `::line` | a hairline rule as thick as its `stroke-width` |
 | `::image` | a picture |
+| `::slide-number` | the number of the slide, and with `of=true` the number of the deck after it |
 | `:::content` … `:::` | Markdown, in a box you sized |
 
 `layout: blank` is what most of these want: a slide whose whole content is free shapes has no
@@ -1245,14 +1246,15 @@ An unrecognised name is refused, never quietly black.
 
 | Attribute | On | |
 | --- | --- | --- |
-| `fill`, `stroke` | the shapes, `::content` | |
-| `alpha` | the shapes, `::content` | 0–100 for the whole shape; one percentage, written on every colour it has |
-| `stroke-width` | the shapes, `::content` | in points; `0` is a hairline |
+| `fill`, `stroke` | the ten ink shapes, `::content`, `::slide-number` | |
+| `alpha` | the ten ink shapes, `::content`, `::slide-number` | 0–100 for the whole shape; one percentage, written on every colour it has |
+| `stroke-width` | the ten ink shapes, `::content`, `::slide-number` | in points; `0` is a hairline |
 | `border-radius` | `::roundrect` only | in pixels |
 | `label` | the ten ink shapes | the shape's own text — see [Text inside a shape](#text-inside-a-shape) |
 | `src`, `alt`, `fit` | `::image` | |
-| `color`, `font-size`, `font-family`, `align`, `vertical-align`, `padding` | `::content` only | |
-| `shadow-color`, `shadow-distance`, `shadow-blur`, `shadow-direction`, `shadow-alpha` | all twelve | see [A shadow](#a-shadow) |
+| `color`, `font-size`, `font-family`, `align`, `vertical-align`, `padding` | `::content`, `::slide-number` | |
+| `of` | `::slide-number` only | the number of the deck after the number of the slide |
+| `shadow-color`, `shadow-distance`, `shadow-blur`, `shadow-direction`, `shadow-alpha` | all thirteen | see [A shadow](#a-shadow) |
 
 `fit` is `contain` (keep the ratio, fit inside, centred) or `stretch` (take the box exactly).
 `fit=cover` is refused by name: it is a crop rather than a fit, PHPPresentation writes a picture
@@ -1328,13 +1330,14 @@ can double-click and drag, with words you cannot style; `:::content` is words yo
 an object that does not move when the shape moves. PowerPoint edits them as two things, because
 they are two things.
 
-A `label` is refused on `::image`, which is a `p:pic` with no text body at all, and on
-`:::content`, whose body is already its text — putting the same words in the same place twice is
-the mistake both refusals are about.
+A `label` is refused on `::image`, which is a `p:pic` with no text body at all, on
+`:::content`, whose body is already its text, and on `::slide-number`, whose text is the number
+of the slide — putting the same words in the same place twice is the mistake all three
+refusals are about.
 
 #### A shadow
 
-Five attributes, on all twelve directives:
+Five attributes, on all thirteen directives:
 
 | Attribute | | |
 | --- | --- | --- |

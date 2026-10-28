@@ -468,6 +468,14 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the kinds of free shape are counted in the writer' => 'three subclasses',
     // The ink shapes were counted, and the count was nine when the page number made ten.
     'the ink shapes are counted in the writer' => 'nine ink-only shapes',
+    // The free shapes were counted on the page, and the count was twelve when the page
+    // number made thirteen. The phrases are the sentences the page and the example deck
+    // gave, and the CHANGELOG has to be able to name what the vocabulary was.
+    'the free shapes are counted on the page' => 'twelve names are drawn',
+    'the failure for a name nobody draws lists twelve' => 'lists all twelve',
+    'the shadow attributes are counted on the page' => 'five attributes, on all twelve directives',
+    'the shadow attributes are counted in the table' => 'shadow-alpha` | all twelve',
+    'the free shapes are counted in the example deck' => 'twelve directives in the body of a slide',
 ]);
 
 it('has no decorative dividers in it', function () {
