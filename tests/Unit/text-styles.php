@@ -475,11 +475,11 @@ it('measures a placed box in the face it is drawn in', function () {
     // face is measured for type it does not draw: the words wrap where the other face
     // wraps them, and the box comes out the wrong height for what is in it.
     $directory = textStyleTheme(null);
-    $words = str_repeat('Resilience Bakery ', 12);
+    $words = str_repeat('Resilience Bakery ', 5);
 
     $wanted = function (string $face) use ($directory, $words): int {
         $deck = sprintf(
-            "---\ntheme: ./theme.yml\n---\n\n:::content{left=10%% top=10%% width=260px height=120px font-size=18 font-family=%s}\n%s\n:::\n",
+            "---\ntheme: ./theme.yml\n---\n\n:::content{left=10%% top=10%% width=860px height=20px font-size=18 font-family=%s}\n%s\n:::\n",
             $face,
             $words,
         );
@@ -491,7 +491,9 @@ it('measures a placed box in the face it is drawn in', function () {
     };
 
     // Calibri is the theme's body face and Arial Narrow is narrower, so the same words
-    // wrap into fewer lines in it and the box is shorter.
+    // wrap into fewer lines in it and the box is shorter. Five repetitions of the two
+    // words are 815px in Arial Narrow and 875px in Calibri, and the box leaves 840px for
+    // the text: one line in the first and two in the second.
     expect($wanted('"Arial Narrow"'))->toBeLessThan($wanted('Calibri'));
 });
 
@@ -500,11 +502,11 @@ it('measures a word in the face a style names', function () {
     // box's own face is: a word measured in another face wraps where the other face wraps
     // it, and the box comes out the wrong height for what is in it.
     $directory = textStyleTheme("brand:\n  font: \"Arial Narrow\"\n");
-    $word = str_repeat('Bakery', 20);
+    $word = str_repeat('Bakery', 80);
 
     $wanted = function (string $word) use ($directory): int {
         $deck = sprintf(
-            "---\ntheme: ./theme.yml\n---\n\n:::content{left=10%% top=10%% width=260px height=120px font-size=18}\n%s\n:::\n",
+            "---\ntheme: ./theme.yml\n---\n\n:::content{left=0 top=0 width=870px height=20px font-size=18}\n%s\n:::\n",
             $word,
         );
 
@@ -515,7 +517,9 @@ it('measures a word in the face a style names', function () {
     };
 
     // Arial Narrow is narrower than the theme's body face, so the same word takes fewer
-    // lines in it and the box is shorter.
+    // lines in it and the box is shorter. Eighty repetitions are 817px in Arial Narrow
+    // and 889px in Calibri, and the box leaves 850px for the text: one line in the
+    // first and two in the second.
     expect($wanted(':brand[' . $word . ']'))->toBeLessThan($wanted($word));
 });
 

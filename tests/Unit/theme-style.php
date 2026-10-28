@@ -312,9 +312,10 @@ it('measures a heading in the weight it is drawn in', function () {
     // the face's reading weight, so measuring it in the bold cut is measuring a face that is
     // not there — and a heading measured a line too tall is a gap under it.
     //
-    // 161 `h` at 20pt are 1691px in Calibri's regular cut and 1729px in its bold one, and the
-    // body box leaves 860px for the text, so the first takes two lines and the second three.
-    $heading = "---\ntheme: %s\n---\n\n# T\n\nBody.\n\n## " . str_repeat('h', 161) . "\n";
+    // 60 `h` at 20pt are 851px in Calibri's regular cut and 870px in its bold one — 20pt is
+    // 27px, and a width is measured in pixels because a box is — and the body box leaves
+    // 860px for the text, so the first takes one line and the second two.
+    $heading = "---\ntheme: %s\n---\n\n# T\n\nBody.\n\n## " . str_repeat('h', 60) . "\n";
     $regular = themedDeck(styledTheme(['heading-weight' => 'regular']), $heading);
     $bold = themedDeck(styledTheme(['heading-weight' => 'bold']), $heading);
 

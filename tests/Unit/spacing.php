@@ -202,7 +202,7 @@ it('counts a heading in the frame at its own line height rather than the body\'s
     // A heading first is not enough — the first heading of a slide is its title — so this one
     // is the second, which is a heading in a body box.
     expect(spaced('# Lead' . "\n\n## " . str_repeat('h', 500) . "\n")->positionOf('text')['height'])
-        ->toBe(7.0 * $geometry->lineHeight($heading))
+->toBe(9.0 * $geometry->lineHeight($heading))
         ->and($geometry->lineHeight($heading))->toBeGreaterThan($geometry->lineHeight($body));
 });
 

@@ -216,6 +216,12 @@ final class TextMetric
     /**
      * How wide one piece of text is, in pixels.
      *
+     * The size of the piece is in pixels too, because a width is only ever compared with
+     * a box and a box is measured in pixels. A size in points and a width in pixels are
+     * two different things, and comparing them measures every line of text a quarter
+     * narrower than it is drawn — so it is laid out on fewer lines than it takes, the box
+     * is written too short for it, and the text runs over whatever is under it.
+     *
      * @param Piece $piece
      */
     private function advance(array $piece): int

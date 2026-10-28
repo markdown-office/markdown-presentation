@@ -143,9 +143,9 @@ it('measures every shipped theme\'s monospaced face at its own advance', functio
 
 it('measures a code block in the monospaced face its theme names', function () {
     // Consolas advances by 550 units to the em and JetBrains Mono by 600, so a line of
-    // 130 characters is one line in the first and two in the second. The two themes
+        // 95 characters is one line in the first and two in the second.
     // differ in nothing else, so what differs is the face the code is drawn in.
-    $code = "```\n" . str_repeat('x', 130) . "\n```\n";
+    $code = "```\n" . str_repeat('x', 95) . "\n```\n";
 
     expect(measuredIn(themeNamingMono('Consolas'), $code)->positionOf('code')['height'])
         ->toBe(19 + 2 * 5.0)
@@ -282,10 +282,12 @@ it('measures an empty string as one line', function () {
 });
 
 it('measures a paragraph by the lines it wraps to', function () {
-    // `x` is 500 units, so 500 of them at 16pt is 4000px of type in the 860px the body
-    // box leaves: five lines, and five times the 26px a line of body text is. Written on one
-    // line, so there is no break in it for the theme's gap to follow.
-    expect(measured(str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(130.0);
+    // `x` is 433 units to the em, so 500 of them at 16pt are 4619px of type — 16pt is
+    // 21.3px, and a width is measured in pixels because a box is — in the 860px the body
+    // box leaves for the text: five lines and a bit, so six, and six times the 26px a
+    // line of body text is. Written on one line, so there is no break in it for the
+    // theme's gap to follow.
+expect(measured(str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(156.0);
 });
 
 it('measures a run boundary as a change of face rather than as a line', function () {
@@ -323,42 +325,48 @@ it('measures a paragraph carrying markup as the paragraph it reads as', function
 });
 
 it('measures a heading by the lines it wraps to', function () {
-        // `##` is 20pt and bold, so the same 500 characters are wider again and still come to
-        // seven lines of the 32px a line at that size is.
+    // `##` is 20pt and bold, and Calibri's bold `h` is 537 units to the em, so 500 of
+    // them are 7160px of type in the 860px the body box leaves: eight lines and a bit,
+    // so nine, and nine times the 32px a line at that size is.
         // A heading first, because the first heading of a slide is its title and is drawn in
         // the title box rather than in the body: this is the second one that is measured.
         expect(measured("# Lead\n\n## " . str_repeat('h', 500) . "\n")->positionOf('text')['height'])
-            ->toBe(224.0);
+->toBe(288.0);
 });
 
 it('measures a quote by the lines it wraps to', function () {
-    // A quote is indented by a gutter and set at 15pt, which is 24px a line.
+    // A quote is indented by a gutter and set at 15pt, which is 20px of em and 24px a
+    // line. Calibri's `q` is 525 units to the em, so 500 of them are 5250px of type in
+    // the 840px the text has left: six lines and a bit, so seven.
     expect(measured('> ' . str_repeat('q', 500) . "\n")->positionOf('text')['height'])
-        ->toBe(120.0);
+->toBe(168.0);
 });
 
 it('measures a list by the lines its items wrap to', function () {
-    // One item of five lines, so the same five lines of type as the paragraph above and no
-    // gap, the item having nothing under it inside the frame.
-    expect(measured('- ' . str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(130.0);
+    // One item of six lines, so the same six lines of type as the paragraph above and no
+    // gap, the item having nothing under it inside the frame. The item has a gutter of
+    // its own, so its text has 840px rather than 860px, and the paragraph's five lines
+    // and a bit are six.
+expect(measured('- ' . str_repeat('x', 500) . "\n")->positionOf('text')['height'])->toBe(156.0);
 });
 
 it('measures a code line by its characters, so a long one wraps', function () {
-    // 550 units at 12pt is 6.6px a character, so the 860px of text width holds 130 of
-    // them and a 131-character line needs two rows. This was `lines × 18 + 24`: a sixty-line
+    // 550 units at 12pt is 8.8px a character — 12pt is 16px, and a width is measured in
+    // pixels because a box is — so the 860px of text width holds 97 of them and a
+    // 98-character line needs two rows. This was `lines × 18 + 24`: a sixty-line
     // block measured 1104px, on a slide 540 tall.
-    expect(measured("```\n" . str_repeat('x', 130) . "\n```\n")->positionOf('code')['height'])
+expect(measured("```\n" . str_repeat('x', 97) . "\n```\n")->positionOf('code')['height'])
         ->toBe(19 + 2 * 5.0)
-        ->and(measured("```\n" . str_repeat('x', 131) . "\n```\n")->positionOf('code')['height'])
+->and(measured("```\n" . str_repeat('x', 98) . "\n```\n")->positionOf('code')['height'])
         ->toBe(2 * 19 + 2 * 5.0);
 });
 
 it('gives a table row the height of the lines its longest cell wraps to', function () {
-    // The header is one line and takes a 38px row; the body cell is 2370px of type in a
-    // column 880 wide — Calibri's `z` is 395 units to the em, where the face every word
-    // used to be measured with has 500 — so three lines of 19px.
+    // The header is one line and takes a 38px row; the body cell is 3160px of type in a
+    // column 880 wide — Calibri's `z` is 395 units to the em, and a table cell is set at
+    // 12pt, which is 16px — so four lines of 19px.
     expect(measured(oneColumnTable(500))->positionOf('table')['height'])
-        ->toBe(38 + 3 * 19.0);
+->toBe(38 + 4 * 19.0);
 });
 
 /**

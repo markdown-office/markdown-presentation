@@ -240,13 +240,27 @@ final class ShapeWriter
 
             $pieces[] = TextMetric::piece(
                 $run->text,
-                $run->size ?? ($run->code ? SlideGeometry::CODE_SIZE : $size),
+                self::pixels($run->size ?? ($run->code ? SlideGeometry::CODE_SIZE : $size)),
                 $run->bold || $bold,
                 $this->runFace($run, $face),
             );
         }
 
         return $pieces;
+    }
+
+    /**
+     * A size of type in points as the size of it in pixels.
+     *
+     * A width is only ever compared with a box, and a box is measured in pixels, so the
+     * size of the type is converted where the two meet. Without it a line of text is
+     * measured a quarter narrower than it is drawn: it is laid out on fewer lines than it
+     * takes, the box is written too short for it, and the text runs over whatever is
+     * under it — which is the one thing the measurement exists to prevent.
+     */
+    private static function pixels(int $points): int
+    {
+        return (int) round($points * SlideGeometry::PIXELS_PER_POINT);
     }
 
     /**
@@ -274,7 +288,7 @@ final class ShapeWriter
 
         foreach ($block->lines as $line) {
             $lines += $this->metric->lines(
-                [TextMetric::piece($line, SlideGeometry::CODE_SIZE, face: $this->font('mono'))],
+                [TextMetric::piece($line, self::pixels(SlideGeometry::CODE_SIZE), face: $this->font('mono'))],
                 $width,
             );
         }
