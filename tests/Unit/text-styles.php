@@ -246,8 +246,7 @@ it('refuses an attribute a text style does not read, and names the attributes it
 it('reads every attribute the vocabulary names', function () {
     // The theme file's vocabulary and the reader's are two lists, and an attribute in the
     // first and not in the second is one the reader refuses — or, worse, applies as the
-    // last property it knows. The reader is asked about every name the vocabulary has, and
-    // each of them has to set the property it names and no other.
+    // last property it knows. Each name has to set the property it names and no other.
     $values = [
         'color' => 'accent1',
         'size' => '18',
@@ -308,10 +307,6 @@ it('refuses a label holding a strong emphasis written with two underscores', fun
 });
 
 it('names the way out of a label that holds Markdown, and it depends on the form', function () {
-    // Two ways out of it, and they are in two different files: a named style is given its
-    // weight in the theme's own `text-styles.yml`, and the raw form carries it as an
-    // attribute. The raw form has no theme file to be given a weight in, because `style` is
-    // the one name a theme may not give a style of its own.
     [$named, $namedDirectory] = wordmark("brand:\n  color: accent1\n", ':brand[**Bakery**]');
     [$raw, $rawDirectory] = wordmark("brand:\n  color: accent1\n", ':style[**Bakery**]{bold=true}');
 

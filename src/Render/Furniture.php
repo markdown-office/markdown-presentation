@@ -43,9 +43,9 @@ final class Furniture
      * {@see \MarkdownPresentation\Render\PresentationRenderer::MAX_SLIDES}, and this is the
      * other half of that bound.
      *
-     * A hundred shapes is far more than a slide asks for, which is the point of a ceiling
-     * that is generous: it bounds the damage without being something a real deck can reach
-     * by accident.
+     * The ceiling is far above what a slide asks for, which is the point of a ceiling that
+     * is generous: it bounds the damage without being something a real deck can reach by
+     * accident.
      */
     public const MAX_SHAPES = 100;
 
@@ -120,9 +120,8 @@ final class Furniture
      * chrome alike: it is the one thing about a page number that is different on every slide,
      * and a shape carrying it cannot be drawn before the slide it is on is known.
      *
-     * The shapes are counted on the way, because the chrome of a template is drawn on every
-     * slide that names it and the slide count is bounded: {@see self::MAX_SHAPES} is the
-     * other half of that bound.
+     * The shapes are counted on the way, and a slide may not carry more than
+     * {@see self::MAX_SHAPES}.
      *
      * @param array<string, list<FreeShape>> $drawn The chrome every template draws.
      *

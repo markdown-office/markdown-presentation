@@ -106,9 +106,9 @@ final class ThemeMapping
      * are a fact about the file and a value object must not carry a second copy of a map that
      * {@see self::readColours()} also consults.
      *
-     * The name is folded before it is looked up, because `folHlink` is DrawingML's own
-     * spelling and `folhlink` is the same name in lower case — and a colour a theme's file
-     * names and a colour a deck names are one vocabulary.
+     * The name is folded before it is looked up: `folHlink` is DrawingML's own spelling and
+     * `folhlink` is the same name in lower case, and a colour a theme's file names and a
+     * colour a deck names are one vocabulary.
      */
     public static function slot(string $written): string
     {
@@ -119,9 +119,8 @@ final class ThemeMapping
      * The slot a colour name stands for, whatever it is written as, or null where it names
      * no colour at all.
      *
-     * One list of names rather than two: the aliases are the concept draft's spellings and
-     * the slots are DrawingML's own, and a name in either of them is the same slot whichever
-     * case it is written in.
+     * The aliases are the concept draft's spellings and the slots are DrawingML's own, and a
+     * name in either of them stands for the same slot.
      */
     private static function canonical(string $written): ?string
     {

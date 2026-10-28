@@ -7,12 +7,9 @@ namespace MarkdownPresentation\Exception;
 /**
  * A chrome file bigger than the library will read.
  *
- * The chrome file is the one file this library reads whole: a picture is bounded by the
- * pixels of its raster and a part of a template by the bytes it inflates to, and the file a
- * deck names in its frontmatter was bounded by nothing at all.
- *
- * The size is in the message because the fix is a number: only the author of the file can
- * say how much of the furniture belongs in it and how much belongs on the slides.
+ * The ceiling is {@see \MarkdownPresentation\Template\ChromeFile::MAX_BYTES}, and the size
+ * is in the message because the fix is a number: only the author of the file can say how
+ * much of the furniture belongs in it and how much belongs on the slides.
  */
 final class ChromeTooLarge extends InvalidInput
 {

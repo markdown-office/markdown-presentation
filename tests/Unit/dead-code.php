@@ -180,7 +180,7 @@ function holdsClaim(string $text, string $claim): bool
  * Every page under a directory, as paths relative to the project root.
  *
  * Recursive because a page is a page wherever it is: the example deck of a company has a
- * directory of its own, and the guard that reads the pages has to read that one too.
+ * directory of its own.
  *
  * @return list<string>
  */
@@ -476,6 +476,16 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the shadow attributes are counted on the page' => 'five attributes, on all twelve directives',
     'the shadow attributes are counted in the table' => 'shadow-alpha` | all twelve',
     'the free shapes are counted in the example deck' => 'twelve directives in the body of a slide',
+    // The docblock of the colour lookup called it one list of names rather than two, above a
+    // method that consults two: the aliases are the concept draft's spellings and the slots
+    // are DrawingML's own, and each of them is looked through in turn. The phrase is the
+    // claim as it was made, so that a comment may not make it again.
+    'the colour lookup is one list of names rather than two' => 'One list of names rather than two',
+    // The label refusal was described as the shapes that have no body of their own, which
+    // leaves out the placed text block: its body is the deck's own words and is already its
+    // text, so it is refused as well. The phrase is the claim as it was made, so that a
+    // comment may not make it again.
+    'a label is refused on the shapes with no body of their own' => 'the shapes with no body of their own have nowhere to put it',
 ]);
 
 it('has no decorative dividers in it', function () {

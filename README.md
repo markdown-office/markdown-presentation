@@ -1021,8 +1021,8 @@ A comma is not a separator: a value runs to the next space, so `width=40%, heigh
 value of `40%,` and one attribute nobody reads. A failure about such a value says so, rather
 than leaving the author to change a number that was right.
 
-Thirteen names are drawn, and nothing else — a name outside them is a failure that lists all
-thirteen, so the vocabulary is in the error rather than in a place you have to find:
+A closed set of names is drawn, and nothing else — a name outside it is a failure that lists
+them all, so the vocabulary is in the error rather than in a place you have to find:
 
 | Directive | Draws |
 | --- | --- |

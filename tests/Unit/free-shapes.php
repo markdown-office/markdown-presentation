@@ -156,8 +156,6 @@ it('refuses a container fence it cannot draw, and names the one container it can
 });
 
 it('carries the flag that writes the number of the deck after the number of the slide', function () {
-    // The one attribute of the page number that is not a placement: it says whether the
-    // number of the deck follows the number of the slide.
     $shape = placedShape("::slide-number{of=true}\n");
 
     expect($shape)->toBeInstanceOf(FreeSlideNumber::class)
@@ -165,16 +163,13 @@ it('carries the flag that writes the number of the deck after the number of the 
 });
 
 it('refuses an `of` that is neither true nor false', function () {
-    // Every other value in this vocabulary is refused with a sentence, and this one was the
-    // exception: `getBool()` answers false for a word it does not know, so `of=maybe` was a
-    // page number with no deck count on it and nothing said so.
+    // This one was the exception: `getBool()` answers false for a word it does not know, so
+    // `of=maybe` was a page number with no deck count on it and nothing said so.
     expect(fn () => placedShapes("::slide-number{of=maybe}\n"))
         ->toThrow(MalformedShape::class, 'A flag is true or false: of=true, of=false.');
 });
 
 it('reads a bare `of` as the flag it asks for', function () {
-    // `{bold}` on a text style means bold, and a bare attribute asks for the attribute
-    // rather than for its value — which is the flag.
     expect(placedShape("::slide-number{of}\n")->of)->toBeTrue()
         ->and(placedShape("::slide-number{of=false}\n")->of)->toBeFalse()
         ->and(placedShape("::slide-number{}\n")->of)->toBeFalse();
@@ -1163,9 +1158,8 @@ it('refuses a label on a placed text block, whose body is already its text', fun
 });
 
 it('gives the page number its own reason for having nowhere to put a label', function () {
-    // The page number is not a text block and has no body at all: the number of the slide is
-    // written into it by the renderer. A message that describes the body between the fences
-    // sends the author looking for a fence the page number has not got.
+    // The page number has no body at all, so a message describing the body between the
+    // fences sends the author looking for a fence it has not got.
     $message = function (string $markdown): string {
         try {
             placedShapes($markdown);

@@ -75,8 +75,6 @@ final class MalformedShape extends InvalidInput
 
     /**
      * A flag whose value is neither true nor false.
-     *
-     * @param string $attribute The attribute the flag is written as.
      */
     public static function flag(int $slide, string $name, string $attribute, string $written): self
     {
@@ -220,10 +218,10 @@ private const BODY_NOUNS = [
     /**
      * A label on a directive that has no shape to hold one in, or no body to put one in.
      *
-     * One failure with three reasons, and they are the same mistake: putting the same words in
-     * the same place twice. A picture is a `p:pic` with no text body at all, a placed text
-     * block's body *is* its text, and the number of a slide is written into the shape by the
-     * renderer.
+     * One failure, with a reason for each shape that has nowhere to put a label, and they are
+     * all the same mistake: putting the same words in the same place twice. A picture is a
+     * `p:pic` with no text body at all, a placed text block's body *is* its text, and the
+     * number of a slide is written into the shape by the renderer.
      *
      * @param string $why The reason this directive has nowhere to put one.
      */

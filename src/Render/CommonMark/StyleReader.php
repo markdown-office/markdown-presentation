@@ -164,8 +164,8 @@ final class StyleReader
             // rather than applied as the last one they do: a property nobody read is a deck
             // that renders and shows something the author did not write.
             //
-            // The value is read inside the arms for the same reason: an attribute nobody
-            // reads is refused by name rather than by the advice a bare attribute gets.
+            // The value is read inside the arms, so an attribute nobody reads is refused by
+            // name rather than by the advice a bare attribute gets.
             match ($attribute) {
                 'color' => $over['colour'] = $this->colour($slide, $name, 'color', $this->written($slide, $name, $attribute, $value), $theme),
                 'size' => $over['size'] = $this->size($slide, $name, $this->written($slide, $name, $attribute, $value)),
@@ -206,9 +206,9 @@ final class StyleReader
      * The way out of a label that holds Markdown.
      *
      * Two, and they are in two different files: a named style is given its weight in the
-     * theme's own `text-styles.yml`, and the raw form carries it as an attribute. The raw
-     * form has no theme file to be given a weight in, because `style` is the one name a
-     * theme may not give a style of its own.
+     * theme's own `text-styles.yml`, and the raw form carries it as an attribute — the raw
+     * form has no theme file, because `style` is the one name a theme may not give a style
+     * of its own.
      */
     private static function wayOut(string $name): string
     {
@@ -221,8 +221,8 @@ final class StyleReader
      * The value an attribute carries, as a string.
      *
      * A bare attribute asks for the attribute rather than for its value, which is a thing
-     * only a flag can be: `{bold}` is a word set in bold. So a bare attribute here is a
-     * mistake, and {@see self::flag()} is where a bare flag is read.
+     * only a flag can be: `{bold}` is a word set in bold. A bare attribute here is a
+     * mistake; a bare flag is read by {@see self::flag()}.
      *
      * @param string|true $value
      *
@@ -344,11 +344,7 @@ final class StyleReader
     /**
      * A flag, which is either set or not.
      *
-     * A bare attribute asks for the attribute rather than for its value, and a flag is the
-     * one thing in this vocabulary that can be asked for that way: `{bold}` is a word set in
-     * bold.
-     *
-     * @param string|true $written
+     * @param string|true $written True where the attribute was written bare.
      *
      * @throws MalformedTextStyle
      */

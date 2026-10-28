@@ -65,10 +65,8 @@ final class MalformedTextStyle extends InvalidInput
      * came out as `**Bakery**` would be a deck that renders and shows something the author
      * did not write.
      *
-     * `$wayOut` is a sentence rather than a noun phrase, because the way out is in a file and
-     * which file depends on the form the style was written in: a named style is given its
-     * weight in the theme's own `text-styles.yml`, and the raw form carries it as an
-     * attribute.
+     * `$wayOut` is a sentence rather than a noun phrase, because which file the way out is in
+     * depends on the form the style was written in.
      */
     public static function label(int $slide, string $name, string $label, string $wayOut): self
     {

@@ -156,8 +156,7 @@ final class ShapeReader
      * value in this vocabulary is refused with a sentence, and this one is refused with one
      * too.
      *
-     * A bare `of` asks for the attribute rather than for its value, which is the flag: it
-     * means true, the way `{bold}` on a text style means bold.
+     * A bare `of` asks for the attribute rather than for its value, so it means true.
      *
      * @throws MalformedShape
      */
@@ -191,8 +190,8 @@ final class ShapeReader
      *
      * Three come before the generic refusal, because each says more than "not an attribute"
      * would: a `border-radius` is a real attribute of this vocabulary and only one shape has the
-     * corners for it; a `label` is a real one and the shapes with no body of their own have
-     * nowhere to put it; and a label in brackets has nowhere on any of them.
+     * corners for it; a `label` is a real one and each shape it is refused on has a reason of
+     * its own; and a label in brackets has nowhere on any of them.
      *
      * @throws MalformedShape
      */

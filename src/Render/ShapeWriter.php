@@ -84,11 +84,7 @@ final class ShapeWriter
     private const HEADER_ROW = 0;
 
     /**
-     * The drawing each picture of a shape is written as.
-     *
-     * A picture in the chrome of a template is the same shape on every slide that names the
-     * template, and a picture in a package is one media part: the drawing is made once and
-     * every slide that draws the picture points at it.
+     * The drawing each picture is written as.
      *
      * @var SplObjectStorage<FreePicture, AbstractDrawingAdapter>
      */
@@ -600,9 +596,8 @@ final class ShapeWriter
         $written = match (true) {
             $shape instanceof FreeText => $this->freeText($slide, $shape, $box, $height),
             $shape instanceof FreePicture => $this->freePicture($slide, $shape),
-            // Everything else is an ink shape, which is what a free shape is when it is
-            // neither type nor a picture: {@see FreeShape} has a class of its own for each
-            // kind, and this is the one that is left.
+            // Everything else is an ink shape: {@see FreeShape} has a class of its own for
+            // each kind, and this is the one that is left.
             default => $this->autoshape($slide, $shape),
         };
 
@@ -734,13 +729,12 @@ final class ShapeWriter
     }
 
     /**
-     * The drawing a picture is written as, and the one every slide that draws the same
-     * picture points at.
+     * The drawing a picture is written as.
      *
-     * The picture of a template's chrome is the same shape on every slide that names the
+     * A picture in the chrome of a template is the same shape on every slide that names the
      * template, and a picture in a package is one media part: the drawing is made once and
-     * every slide that draws it points at it. A picture a deck placed on a slide of its own
-     * is a shape of its own, and is written as one.
+     * every slide that draws the picture points at it. A picture the deck placed on a slide
+     * of its own is a shape of its own, and is written as one.
      */
     private function drawing(Slide $slide, FreePicture $shape): AbstractDrawingAdapter
     {
@@ -748,7 +742,7 @@ final class ShapeWriter
             $written = $this->drawings[$shape];
 
             // The drawing is already in the package, and the slide it is drawn on needs it in
-            // its own shape tree: the same drawing, on two slides.
+            // its own shape tree.
             $slide->addShape($written);
 
             return $written;

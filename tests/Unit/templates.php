@@ -317,9 +317,6 @@ it('refuses a slide that names a template there is not, and names the templates 
 });
 
 it('refuses a slide that carries more shapes than one may', function () {
-    // The chrome of a template is read once and drawn on every slide that names it, so the
-    // shapes of a template are multiplied by the slides that draw them: the slide count is
-    // bounded, and this is the other half of that bound.
     $chrome = str_repeat("::line{left=5% top=10% width=30% height=1%}\n", Furniture::MAX_SHAPES + 1);
 
     $deck = "---\ntemplate: brand\n---\n" . $chrome . "\n---\nlayout: blank\ntemplate: brand\n---\n";
@@ -343,8 +340,6 @@ it('draws a slide that carries as many shapes as one may', function () {
 });
 
 it('pays for a picture in a template once, however many slides draw it', function () {
-    // A picture in the chrome of a template is one picture in the package: the media part is
-    // written once and every slide that draws the picture points at it.
     $picture = Scratch::file('logo.png', base64_decode(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
     ));
@@ -369,9 +364,7 @@ it('pays for a picture in a template once, however many slides draw it', functio
 });
 
 it('draws a picture the deck placed on two slides as two pictures', function () {
-    // The picture of a template's chrome is the same shape on every slide that names the
-    // template; a picture the deck placed is a shape of its own, and two of them are two
-    // pictures in the package — each of them in the box it was given.
+    // Two of them are two pictures in the package, each of them in the box it was given.
     $picture = Scratch::file('logo.png', base64_decode(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
     ));
@@ -431,8 +424,6 @@ it('refuses a chrome file that is a URL', function () {
 });
 
 it('refuses a chrome file that is larger than the library will read', function () {
-    // The chrome file is the one file this library reads whole, and the one a deck names in
-    // its frontmatter: the ceiling is what bounds the memory a deck can ask for.
     $chrome = Scratch::file('chrome.md', str_repeat('a', ChromeFile::MAX_BYTES + 1));
 
     $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n", $chrome);

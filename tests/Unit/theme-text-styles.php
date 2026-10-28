@@ -125,11 +125,10 @@ it('accepts a colour written in capitals, as a deck may write one', function () 
 });
 
 it('accepts a colour written as one of the names the library folds', function (string $written) {
-    // Two of the library's own colour names are written in mixed case — `folHlink` is
-    // DrawingML's own spelling and `followedHyperlink` is the concept draft's — and a name
-    // that is folded before it is looked up is a name that can be written in any case. The
-    // gate that refuses a colour has to agree with the resolver that draws one, or a theme
-    // is refused for a colour that would have been right.
+    // Two of the library's own colour names are written in mixed case, so a name that is
+    // folded before it is looked up is a name that can be written in any case. The gate that
+    // refuses a colour has to agree with the resolver that draws one, or a theme is refused
+    // for a colour that would have been right.
     $loaded = (new ThemeLoader())->load(themeWithTextStyles(sprintf("brand:\n  color: %s\n", $written)));
 
     expect($loaded->theme()->textStyles()->get('brand')?->colour)->toBe($written)
@@ -137,8 +136,8 @@ it('accepts a colour written as one of the names the library folds', function (s
 })->with(['folHlink', 'followedHyperlink', 'folhlink', 'FOLLOWEDHYPERLINK']);
 
 it('draws a word in a colour named in either case', function (string $written) {
-    // The name the theme carries is the one the deck resolves: a style that says `folHlink`
-    // is drawn in the theme's own `folHlink`, and one that says `folhlink` is the same name.
+    // The name the theme carries is the one the deck resolves: `folHlink` and `folhlink` are
+    // the same name.
     $theme = Theme::defaults();
 
     expect($theme->colour($written))->toBe($theme->colour('folHlink'))
