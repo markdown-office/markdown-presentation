@@ -12,6 +12,7 @@ use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
+use MarkdownPresentation\Template\ChromeFile;
 
 /**
  * Slide templates: a piece of furniture written once and drawn on every slide that names it.
@@ -348,6 +349,21 @@ it('refuses a chrome file that is a URL', function () {
     $deck = "---\nchrome: phar://chrome.md\nlayout: blank\n---\n";
 
     expect(templateFailure($deck))->toContain('is a URL rather than a path');
+});
+
+it('refuses a chrome file that is larger than the library will read', function () {
+    // The chrome file is the one file this library reads whole, and the one a deck names in
+    // its frontmatter: the ceiling is what bounds the memory a deck can ask for.
+    $chrome = Scratch::file('chrome.md', str_repeat('a', ChromeFile::MAX_BYTES + 1));
+
+    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n", $chrome);
+
+    expect(templateFailure($deck))
+        ->toContain(sprintf(
+            'is %d bytes, and a chrome file may be at most %d',
+            ChromeFile::MAX_BYTES + 1,
+            ChromeFile::MAX_BYTES,
+        ));
 });
 
 it('refuses a chrome file this render may not read', function () {

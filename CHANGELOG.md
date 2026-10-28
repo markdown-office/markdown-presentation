@@ -221,6 +221,13 @@ All notable changes to this project are documented here. The format follows
   struck-through word rather than refused. The arms of the match are the vocabulary now, and
   an attribute they do not know is refused by name.
 
+- **A chrome file is read with a ceiling.** The chrome file is the one file this library
+  reads whole, and it is the one a deck names in its frontmatter: a picture is bounded by
+  the pixels of its raster and a part of a template by the bytes it inflates to, and the
+  chrome file was bounded by nothing at all. It is read with a ceiling of a megabyte now, and
+  a file over it is refused with its size and the ceiling in the message. The ceiling is an
+  argument of `ChromeFile`, so a caller can hold a deck to a smaller one.
+
 - **A line of text is measured in the face it is drawn in, and in the units a box is.**
   The advance widths of a face are in units per em and the size of the type is in points,
   so the width they make is in points — and a box is measured in pixels. The two were

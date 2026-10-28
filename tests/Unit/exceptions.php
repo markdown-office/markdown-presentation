@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\ChromeNotFound;
+use MarkdownPresentation\Exception\ChromeTooLarge;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\FencedFrontmatter;
@@ -95,6 +96,7 @@ it('reports what a deck author can fix under the class that says so', function (
     // can fix by naming something else.
     $authorFixable = [
         ChromeNotFound::class,
+        ChromeTooLarge::class,
         ContentOverflow::class,
         FencedFrontmatter::class,
         ImageNotFound::class,
