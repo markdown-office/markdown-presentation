@@ -220,9 +220,10 @@ private const BODY_NOUNS = [
     /**
      * A label on a directive that has no shape to hold one in, or no body to put one in.
      *
-     * The two are one failure with two reasons, and both are the same mistake: putting the same
-     * words on the same thing twice. A picture is a `p:pic` with no text body at all, and a
-     * placed text block's body *is* its text.
+     * One failure with three reasons, and they are the same mistake: putting the same words in
+     * the same place twice. A picture is a `p:pic` with no text body at all, a placed text
+     * block's body *is* its text, and the number of a slide is written into the shape by the
+     * renderer.
      *
      * @param string $why The reason this directive has nowhere to put one.
      */
@@ -230,7 +231,7 @@ private const BODY_NOUNS = [
     {
         return new self(sprintf(
             'Slide %d gives "%s" a label, which it has nowhere to put: %s. A label goes on one of the ten ink '
-            . 'shapes, and a ":::content" box already has a body to write in.',
+            . 'shapes.',
             $slide,
             $name,
             $why,

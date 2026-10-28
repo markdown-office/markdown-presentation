@@ -191,8 +191,8 @@ final class ShapeReader
      *
      * Three come before the generic refusal, because each says more than "not an attribute"
      * would: a `border-radius` is a real attribute of this vocabulary and only one shape has the
-     * corners for it; a `label` is a real one and two of the twelve have nowhere to put it; and
-     * a label in brackets has nowhere on any of them.
+     * corners for it; a `label` is a real one and the shapes with no body of their own have
+     * nowhere to put it; and a label in brackets has nowhere on any of them.
      *
      * @throws MalformedShape
      */
@@ -211,9 +211,11 @@ final class ShapeReader
             throw MalformedShape::noLabel(
                 $slide,
                 $kind->value,
-                $kind === ShapeKind::Image
-                    ? 'a picture is a `p:pic`, which carries no text of its own'
-                    : 'the body between the fences is already its text',
+                match (true) {
+                    $kind === ShapeKind::Image => 'a picture is a `p:pic`, which carries no text of its own',
+                    $kind === ShapeKind::SlideNumber => 'the number of the slide is written into it by the renderer',
+                    default => 'the body between the fences is already its text',
+                },
             );
         }
 

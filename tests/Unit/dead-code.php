@@ -426,6 +426,16 @@ it('does not claim again what the code does not do', function (string $claim) {
     // had — a page quoting it, or a test asserting on it, is quoting a message this
     // library does not send.
     'the advice about a colour lists the absence of a colour among the colours' => 'is none or transparent, page',
+
+    // A `::slide-number` has no body between fences, and the refusal for a label on one
+    // described the body between the fences — which is the body of a `:::content`, a shape
+    // that has one. The phrase is the two together, because the half of it that is still
+    // true of a text block has to stay.
+    'a page number is refused for the body of a text block' => 'gives "slide-number" a label, which it has nowhere to put: the body between the fences is already its text',
+    // The shapes a label has nowhere to go were counted, and the count was two of twelve.
+    // A count in a docblock is wrong the moment a shape is added, and nothing reads prose
+    // to say so.
+    'a label has nowhere to go on two of the twelve shapes' => 'two of the twelve have nowhere to put it',
 ]);
 
 it('has no decorative dividers in it', function () {

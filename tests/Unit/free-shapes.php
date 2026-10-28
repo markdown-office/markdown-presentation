@@ -1161,6 +1161,26 @@ it('refuses a label on a placed text block, whose body is already its text', fun
         ->toThrow(MalformedShape::class, 'the body between the fences is already its text');
 });
 
+it('gives the page number its own reason for having nowhere to put a label', function () {
+    // The page number is not a text block and has no body at all: the number of the slide is
+    // written into it by the renderer. A message that describes the body between the fences
+    // sends the author looking for a fence the page number has not got.
+    $message = function (string $markdown): string {
+        try {
+            placedShapes($markdown);
+        } catch (MalformedShape $refusal) {
+            return $refusal->getMessage();
+        }
+
+        return '';
+    };
+
+    expect($message("::slide-number{label=\"Hi\"}\n"))
+        ->toContain('the number of the slide is written into it by the renderer')
+        ->and($message("::slide-number{label=\"Hi\"}\n"))
+        ->not->toBe($message(":::content{label=\"Hi\"}\nWords.\n:::\n"));
+});
+
 it('refuses a bare label, which asks for the attribute rather than for its value', function () {
     expect(fn () => placedShapes("::arrow{width=100 height=60 label}\n"))
         ->toThrow(MalformedShape::class, 'A bare attribute asks for the attribute rather than for its value');

@@ -202,6 +202,12 @@ All notable changes to this project are documented here. The format follows
   drawn without the number of the deck and nothing said so. Every other value in the
   free-shape vocabulary is refused with a sentence, and this one is refused with one too.
 
+- **A page number has its own reason for having nowhere to put a label.** The refusal for a
+  `label` on a `::slide-number` described the body between the fences, which is the body of a
+  `:::content`: a page number has no body at all, and the number of the slide is written into
+  it by the renderer. The shapes that have nowhere to put a label each have their own reason
+  now.
+
 - **A line of text is measured in the face it is drawn in, and in the units a box is.**
   The advance widths of a face are in units per em and the size of the type is in points,
   so the width they make is in points — and a box is measured in pixels. The two were
