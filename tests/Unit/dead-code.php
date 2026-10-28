@@ -177,6 +177,32 @@ function holdsClaim(string $text, string $claim): bool
 }
 
 /**
+ * Every page under a directory, as paths relative to the project root.
+ *
+ * Recursive because a page is a page wherever it is: the example deck of a company has a
+ * directory of its own, and the guard that reads the pages has to read that one too.
+ *
+ * @return list<string>
+ */
+function pagesUnder(string $directory): array
+{
+    $pages = [];
+    $root = Doctest::root() . '/' . $directory;
+
+    foreach (new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+    ) as $file) {
+        if ($file->isFile() && $file->getExtension() === 'md') {
+            $pages[] = $directory . '/' . substr($file->getPathname(), strlen($root) + 1);
+        }
+    }
+
+    sort($pages);
+
+    return $pages;
+}
+
+/**
  * The pages and the decks, which are read by people rather than executed.
  *
  * The gallery and the decks beside it are here because a deck that describes what it
@@ -196,14 +222,9 @@ function pagesWithClaim(string $claim): array
         }
     }
 
-    foreach ([
-        'examples/' => glob($root . '/examples/README.md') ?: [],
-        'examples/markdown/' => glob($root . '/examples/markdown/*.md') ?: [],
-    ] as $prefix => $pages) {
-        foreach ($pages as $page) {
-            if (holdsClaim((string) file_get_contents($page), $claim)) {
-                $found[] = $prefix . basename($page);
-            }
+    foreach (['examples/README.md', ...pagesUnder('examples/markdown')] as $page) {
+        if (holdsClaim((string) file_get_contents($root . '/' . $page), $claim)) {
+            $found[] = $page;
         }
     }
 
@@ -441,6 +462,12 @@ it('does not claim again what the code does not do', function (string $claim) {
     // The phrase is the advice as it was, because it is the advice that cannot be given
     // again.
     'the advice for a label that holds Markdown names a style a theme may not have' => 'give the style the weight ("style: { bold: true }")',
+    // The kinds of free shape were counted, and the count was three subclasses when the
+    // page number made four. A count in a docblock is wrong the moment a kind is added,
+    // and nothing reads prose to say so.
+    'the kinds of free shape are counted in the writer' => 'three subclasses',
+    // The ink shapes were counted, and the count was nine when the page number made ten.
+    'the ink shapes are counted in the writer' => 'nine ink-only shapes',
 ]);
 
 it('has no decorative dividers in it', function () {

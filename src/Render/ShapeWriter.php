@@ -600,9 +600,9 @@ final class ShapeWriter
         $written = match (true) {
             $shape instanceof FreeText => $this->freeText($slide, $shape, $box, $height),
             $shape instanceof FreePicture => $this->freePicture($slide, $shape),
-            // Everything else is one of the nine ink-only shapes, which is what a free shape is
-            // when it is neither type nor a picture: {@see FreeShape} has three subclasses and
-            // this is the one that is left.
+            // Everything else is an ink shape, which is what a free shape is when it is
+            // neither type nor a picture: {@see FreeShape} has a class of its own for each
+            // kind, and this is the one that is left.
             default => $this->autoshape($slide, $shape),
         };
 
@@ -615,7 +615,7 @@ final class ShapeWriter
     }
 
     /**
-     * One of the nine ink-only shapes, painted through its outline.
+     * An ink shape, painted through its outline.
      *
      * `getOutline()` rather than `getBorder()` because that is what the writer reads for an
      * autoshape — and because `a:noFill` on it is what says "no stroke". A `Border` left alone
