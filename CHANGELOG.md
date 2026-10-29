@@ -8,6 +8,29 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A theme can be named in code, and it outranks the deck's own.**
+  `PresentationRenderer::withTheme(string $name): self` names the theme the decks are
+  drawn in, the way the Word half's `MarkdownToWord::withTheme()` does.
+
+  A theme named in code answers for the deck, so the deck's own `theme:` is not read —
+  but it is still checked, because a value of the wrong type is a mistake in the deck
+  whatever theme the deck is drawn in: a deck writing `theme: 42` is refused.
+
+  The name is resolved through the finder when it is given, and the theme that came back
+  is kept, so the name is asked for once and not once for the name and once for the
+  deck. A theme that does not resolve is refused when the name is given rather than at
+  the render, so a typo is reported before the deck is read.
+
+- **A deck can come back as bytes.** `PresentationRenderer::toString(Deck $deck): string`
+  is the counterpart of the Word half's `MarkdownToWord::toDocx()`: the deck, as the
+  bytes of a `.pptx`.
+
+  A `.pptx` is a package, and PHP's `ZipArchive` cannot write one to memory —
+  `open('php://temp')` answers 9 and `open('php://temp', CREATE | OVERWRITE)` fails at
+  `close()` — and PHPPresentation's writer takes a path. The deck is therefore written
+  to a file of the library's own, read back and given back: nothing of the library's is
+  left on the disk, whether the deck was written or the write failed.
+
 - **The furniture of a deck can be written once.** A wordmark, a rule and a page number
   were the same on every slide of a deck, and writing them out on every slide meant
   changing them on every slide: twenty-eight slides to find and twenty-eight edits to
@@ -106,6 +129,12 @@ All notable changes to this project are documented here. The format follows
   deck that renders and shows something the author did not write.
 
 ### Changed
+
+- **A staged master is written again when it is asked for.** The file the library
+  staged for a theme's master is given back at the end of every render, so a theme kept
+  across renders — one the caller named in code — had no master to open the second
+  time. The master holds the source's bytes and writes them again when the file it
+  staged is gone, at the mode of a file nobody else on the machine can read.
 
 - **`ThemeLoader::load()` and `loadManifest()` take a name and a finder.** The third
   parameter was the scope a theme's own files were held to and is now the finder they

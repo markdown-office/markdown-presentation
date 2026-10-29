@@ -209,3 +209,24 @@ it('draws a deck in a theme that carries no master, and says nothing', function 
     expect(Pptx::open($path)->positionOf('title')['x'])
         ->toBe((float) (new SlideGeometry())->title(LayoutRole::Content)['box']->x);
 });
+
+it('draws a deck in a theme the caller named, again', function () {
+    // The theme is kept, and so is the master it carries: the file the library staged for
+    // it is given back at the end of the render, and the render after that writes it again.
+    $finder = new MemoryFinder([
+        'house/theme.yml' => (string) file_get_contents(masterTheme() . '/theme.yml'),
+        'house/layouts.yml' => (string) file_get_contents(masterTheme() . '/layouts.yml'),
+        'house/template.pptx' => (string) file_get_contents(masterTheme() . '/template.pptx'),
+    ]);
+
+    $renderer = (new PresentationRenderer(themes: masterResolver($finder)))->withTheme('house');
+
+    $first = Scratch::file('kept-first.pptx', '');
+    $second = Scratch::file('kept-second.pptx', '');
+
+    $renderer->render((new DeckParser())->parse("# One\n"), $first);
+    $renderer->render((new DeckParser())->parse("# Two\n"), $second);
+
+    expect(Pptx::open($first)->positionOf('title')['x'])->toBe(66.0)
+        ->and(Pptx::open($second)->positionOf('title')['x'])->toBe(66.0);
+});

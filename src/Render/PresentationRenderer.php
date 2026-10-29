@@ -204,6 +204,14 @@ final class PresentationRenderer
     private Theme $theme;
 
     /**
+     * The theme {@see self::withTheme()} resolved, kept so that the name is resolved once.
+     *
+     * A source that counts its reads would say so: the name is asked for when it is given,
+     * and the theme that came back is the one the deck is drawn in.
+     */
+    private ?LoadedTheme $resolved = null;
+
+    /**
      * The master the deck being rendered was drawn in.
      *
      * Held rather than dropped, so that the file it is in is given back by the render
@@ -259,6 +267,41 @@ final class PresentationRenderer
         $this->fonts = new FontReport($strict);
         $this->templatesFiles = new TemplatesFile($this->directory, $this->scope, files: $files);
         $this->chrome = new Chrome($this->blocks, $this->directory, $this->scope, $files);
+    }
+
+    /**
+     * A theme to draw this renderer's decks in, whatever the deck's own frontmatter says.
+     *
+     * The same rule the Word half follows: a theme named in code answers for the deck, so
+     * the frontmatter's `theme:` is not read — the name in the code is the one the deck is
+     * drawn in. The frontmatter's value is still checked, because a value of the wrong
+     * type is a mistake in the deck whatever theme the deck is drawn in: a deck writing
+     * `theme: 42` is refused.
+     *
+     * The name is resolved through the finder when it is given, and the theme that came
+     * back is kept: a source that counts its reads would say the name is asked for once and
+     * not once for the name and once for the deck. A theme that does not resolve is
+     * refused here rather than at the render, so a typo is reported before the deck is read.
+     *
+     * Mutating rather than returning a new renderer: the renderer holds the deck's
+     * directory and its sources, and there is no value in a copy that differs in a theme.
+     *
+     * @throws ThemeNotFound    When the theme is not one that resolves.
+     * @throws \MarkdownPresentation\Exception\MalformedTheme When the theme's own files do
+     *     not describe a theme.
+     * @throws UnknownLayoutRole When the theme names a layout role that does not exist.
+     * @throws \MarkdownPresentation\Exception\UnknownStyleSlot When the theme names a
+     *     style slot that does not exist.
+     * @throws \MarkdownPresentation\Exception\UnservedTemplate When the theme carries a
+     *     master the source of the theme cannot serve.
+     * @throws \MarkdownPresentation\Exception\Exception When one of the theme's files
+     *     cannot be read or parsed.
+     */
+    public function withTheme(string $name): self
+    {
+        $this->resolved = $this->themes->resolve($name);
+
+        return $this;
     }
 
     /**
@@ -364,6 +407,41 @@ final class PresentationRenderer
             $this->master?->release();
             $this->blocks->release();
         }
+    }
+
+    /**
+     * The deck, as the bytes of a `.pptx`.
+     *
+     * The counterpart of the Word half's `MarkdownToWord::toDocx()`: a deck that comes
+     * back as bytes rather than as a path.
+     *
+     * A `.pptx` is a package, and PHP's `ZipArchive` cannot write one to memory, and
+     * PHPPresentation's writer takes a path — so the deck is written to a file of the
+     * library's own, read back and given back. Nothing of the library's is left on the
+     * disk: neither the file the deck was written to, nor the master or the pictures the
+     * render staged, whether the deck was written or the write failed.
+     *
+     * @throws InvalidInput     When a slide names something this library cannot render.
+     * @throws ThemeNotFound    When the deck names a theme that does not resolve.
+     * @throws ContentOverflow  When a block does not fit and the renderer is strict.
+     * @throws MalformedTemplate When the theme's `template.pptx` cannot be read.
+     * @throws TooManySlides    When the deck asks for more slides than {@see self::MAX_SLIDES}.
+     * @throws \MarkdownPresentation\Exception\Exception When the deck cannot be written.
+     *
+     * @throws \MarkdownPresentation\Exception\MalformedShape When a free-placement directive
+     *     names an attribute it does not read, or gives one a value it cannot be.
+     *
+     * @throws \MarkdownPresentation\Exception\UnpatchedDependency When the installed
+     *     PHPPresentation lacks what this library needs of it.
+     *
+     * @throws \MarkdownPresentation\Exception\UnservedTemplate When the theme carries a
+     *     master the source of the theme cannot serve.
+     */
+    public function toString(Deck $deck): string
+    {
+        return Staging::of(function (string $path) use ($deck): void {
+            $this->render($deck, $path);
+        });
     }
 
     /**
@@ -596,15 +674,25 @@ final class PresentationRenderer
     }
 
     /**
+     * The theme the deck is drawn in.
+     *
+     * A theme named in code answers for the deck, so the frontmatter's `theme:` is not
+     * read — but it is checked, because a value of the wrong type is a mistake in the deck
+     * whatever theme the deck is drawn in.
+     *
      * @throws ThemeNotFound
      * @throws MalformedFrontmatter
-    */
+     */
     private function loaded(Deck $deck): LoadedTheme
     {
         $name = $deck->frontmatterValue('theme', self::DEFAULT_THEME);
 
         if (!is_string($name) || trim($name) === '') {
             throw MalformedFrontmatter::wrongType(1, 'theme', 'a theme name');
+        }
+
+        if ($this->resolved !== null) {
+            return $this->resolved;
         }
 
         return $this->themes->resolve(trim($name));

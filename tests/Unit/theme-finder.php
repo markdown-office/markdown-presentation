@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
+use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\MemoryFinder;
+use MarkdownPresentation\Tests\Support\Pptx;
+use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
 use MarkdownPresentation\Theme\ThemeLoader;
 use MarkdownPresentation\Theme\ThemeResolver;
@@ -178,4 +183,52 @@ it('names the themes that exist when a name is not one of them', function () {
 
     expect(fn () => finderResolver($finder)->resolve('huse'))
         ->toThrow(ThemeNotFound::class, 'There is no theme named "huse". Available: house.');
+});
+
+it('draws a deck in the theme the caller named, not the one the deck named', function () {
+    // A theme named in code answers for the deck, so the deck's own `theme:` is not read.
+    // The two themes are the ones that ship, and they are told apart by the page behind
+    // every slide: one is light and one is dark.
+    $deck = (new DeckParser())->parse("---\ntheme: minimal\n---\n\n# One\n");
+
+    $path = Scratch::file('caller-theme.pptx', '');
+
+    (new PresentationRenderer())->withTheme('corporate-dark')->render($deck, $path);
+
+    $master = Pptx::open($path)->part('ppt/slideMasters/slideMaster1.xml');
+
+    expect($master)->toMatch('#<p:bg>.*?<a:srgbClr val="1E1E2E".*?</p:bg>#s')
+        ->and($master)->not->toMatch('#<p:bg>.*?<a:srgbClr val="FFFFFF".*?</p:bg>#s');
+});
+
+it('refuses a frontmatter theme of the wrong type, whatever the caller named', function () {
+    // The caller's theme answers for the deck, but a value of the wrong type is a mistake
+    // in the deck whatever theme the deck is drawn in.
+    $deck = (new DeckParser())->parse("---\ntheme: 42\n---\n\n# One\n");
+
+    expect(fn () => (new PresentationRenderer())->withTheme('corporate-dark')->render($deck, Scratch::file('wrong-type.pptx', '')))
+        ->toThrow(MalformedFrontmatter::class, 'has a "theme" that is not a theme name');
+});
+
+it('resolves the theme the caller named once', function () {
+    // The name is asked for when it is given, and the theme that came back is the one the
+    // deck is drawn in: a source that counts its reads says the name is asked for once and
+    // not once for the name and once for the deck.
+    $finder = new MemoryFinder([
+        'house/theme.yml' => "name: House\n",
+        'house/layouts.yml' => "layouts:\n  content: Title and Content\n",
+    ]);
+
+    $renderer = (new PresentationRenderer(themes: finderResolver($finder)))->withTheme('house');
+
+    expect($finder->reads('house/theme.yml'))->toBe(1);
+
+    // The deck names the theme as well, so a render that resolved the frontmatter's name
+    // would read it a second time.
+    $renderer->render(
+        (new DeckParser())->parse("---\ntheme: house\n---\n\n# One\n"),
+        Scratch::file('resolved-once.pptx', ''),
+    );
+
+    expect($finder->reads('house/theme.yml'))->toBe(1);
 });

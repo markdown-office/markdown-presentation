@@ -14,17 +14,26 @@ namespace MarkdownPresentation\Theme;
  *
  * The staged file belongs to the render it was staged for, and the render is over when it
  * goes: the master gives it back in {@see self::release()}, and a caller who lets the
- * master go without saying so has it said for them.
+ * master go without saying so has it said for them. A theme kept across renders — one the
+ * caller named in code — is written again when it is asked for, because the file was given
+ * back at the end of the render before it.
  */
 final class Master
 {
     /** The prefix of a staged master, so a file in flight is recognisable as one. */
     private const PREFIX = 'mdpres_master_';
 
+    /**
+     * @param string      $path  Where the master is opened.
+     * @param string      $name  What a failure calls it.
+     * @param bool        $owned Whether the file is the library's to give back.
+     * @param string|null $bytes The source's bytes, where the library staged them.
+     */
     private function __construct(
         private readonly string $path,
         private readonly string $name,
-        private bool $owned,
+        private readonly bool $owned,
+        private readonly ?string $bytes = null,
     ) {
     }
 
@@ -55,12 +64,28 @@ final class Master
 
         @file_put_contents($path, $bytes);
 
-        return new self($path, $name, true);
+        // A master in flight through a shared temporary directory is not readable by every
+        // account on the machine, and the mode is narrowed here because the file may have
+        // been written at the process umask.
+        @chmod($path, 0o600);
+
+        return new self($path, $name, true, $bytes);
     }
 
-    /** The path the master is opened at. */
+    /**
+     * The path the master is opened at.
+     *
+     * A master the library staged is written there when the file is not there: the render
+     * that used it gave it back, and a theme kept across renders has to be able to open
+     * its master again. A caller that opens the path finds the master there.
+     */
     public function path(): string
     {
+        if ($this->bytes !== null && !is_file($this->path)) {
+            @file_put_contents($this->path, $this->bytes);
+            @chmod($this->path, 0o600);
+        }
+
         return $this->path;
     }
 
@@ -77,14 +102,8 @@ final class Master
      */
     public function release(): void
     {
-        if ($this->owned) {
-            // Given back once: the render asks for it and the destructor asks again, and a
-            // second removal of a file that is gone is a warning nobody can act on.
-            $this->owned = false;
-
-            if (is_file($this->path)) {
-                @unlink($this->path);
-            }
+        if ($this->owned && is_file($this->path)) {
+            @unlink($this->path);
         }
     }
 

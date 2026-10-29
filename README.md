@@ -267,7 +267,8 @@ Slide 1 opens a "::note" that is not the last thing on the slide. A note is "::n
 ## Rendering
 
 `PresentationRenderer` takes a split deck and writes a `.pptx`. It resolves the theme
-itself, from the deck's `theme:`, so there is nothing to resolve first.
+itself, from the deck's `theme:` or from the name a caller gave it, so there is nothing to
+resolve first.
 
 ```php
 use MarkdownPresentation\Document\DeckParser;
@@ -302,6 +303,31 @@ layout: Title and Content
 A deck that names no theme gets the built-in `default`. That is the absence of a directive,
 not a fallback from a directive that failed: a theme that does not resolve is still a failure,
 and it names the themes that do.
+
+**A theme can be named in code, and it outranks the deck's own.** A deck names a theme in
+its front matter, and a program that draws several decks may want one theme for all of
+them:
+
+```php
+$renderer = (new PresentationRenderer())->withTheme('corporate-dark');
+```
+
+The name is resolved through the finder when it is given, and the theme that came back is
+kept: the name is asked for once, and not once for the name and once for the deck. The
+deck's own `theme:` is not read — but it is checked, because a value of the wrong type is
+a mistake in the deck whatever theme the deck is drawn in.
+
+**A deck can come back as bytes.** `render()` writes the deck to a path and hands the path
+back; `toString()` hands back the bytes of the same deck:
+
+```php
+$bytes = (new PresentationRenderer())->toString($deck);
+```
+
+A `.pptx` is a package, and PHP's `ZipArchive` cannot write one to memory, so the deck is
+written to a file of the library's own and read back from it. Nothing of the library's is
+left on the disk: neither the file the deck was written to, nor the master or the pictures
+the render staged.
 
 ### What a slide becomes
 
@@ -2638,6 +2664,10 @@ scope and refuses what is out of reach in its own words.
 list of bases per role, tried in the order they are given. The directories of themes
 on disk remain the fallback, so a program with a finder of its own does not lose the
 themes that ship with the package.
+
+**A name that is already a path is the path, whatever the role.** A name beginning with
+`/` names a file, and resolving it against a base would name a file nobody meant — so it
+is taken as it stands, in the `theme` role as much as in any other.
 
 **A theme's master is a file, and a file the library stages.** A `template.pptx` is a
 package, and a package is opened as a file: a source that holds the master as bytes

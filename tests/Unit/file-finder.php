@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Files\DiskFinder;
+use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Tests\Support\Scratch;
 
 /*
@@ -85,6 +86,45 @@ it('takes a name that is already a path as it stands', function () {
     expect($finder->read($base . '/report.md', 'document'))->toBe('the bytes')
         ->and($finder->path($base . '/report.md', 'document'))->toBe($base . '/report.md')
         ->and($finder->read($base . '/nowhere.md', 'document'))->toBeNull();
+});
+
+it('takes a name that is already a path as it stands, whatever the role', function () {
+    // The theme role is where this is easiest to get wrong, because a theme's name is
+    // split into a theme and a file: the role says how a name is resolved, and a name
+    // that is already a path is not resolved at all.
+    $base = Scratch::directoryPath('absolute-role');
+    $outside = Scratch::directoryPath('absolute-outside');
+
+    mkdir($base . '/house');
+    file_put_contents($base . '/house/theme.yml', "name: House\n");
+    file_put_contents($outside . '/theme.yml', "name: Outside\n");
+
+    $finder = new DiskFinder(theme: [$base], picture: [$base], document: [$base]);
+
+    expect($finder->read($outside . '/theme.yml', 'theme'))->toBe("name: Outside\n")
+        ->and($finder->path($outside . '/theme.yml', 'theme'))->toBe($outside . '/theme.yml')
+        ->and($finder->read($outside . '/theme.yml', 'picture'))->toBe("name: Outside\n")
+        ->and($finder->read($outside . '/theme.yml', 'document'))->toBe("name: Outside\n")
+        ->and($finder->read($outside . '/nowhere.yml', 'theme'))->toBeNull()
+        ->and($finder->path($outside . '/nowhere.yml', 'theme'))->toBeNull()
+        // And the theme of the base is still where it was.
+        ->and($finder->read('house/theme.yml', 'theme'))->toBe("name: House\n");
+});
+
+it('does not split a name that is already a path into a theme and a file', function () {
+    // The leading slash is not a theme whose name is the empty string, and the rest of
+    // the name is not a file inside the first base: a name that is already a path is
+    // the path.
+    $base = Scratch::directoryPath('split');
+    mkdir($base . '/house');
+    file_put_contents($base . '/house/theme.yml', "name: House\n");
+
+    $finder = new DiskFinder(theme: [$base]);
+
+    expect($finder->path('/house/theme.yml', 'theme'))
+        ->not->toBe($base . '/house/theme.yml')
+        // And the theme of that name is still the theme it is.
+        ->and($finder->read('house/theme.yml', 'theme'))->toBe("name: House\n");
 });
 
 it('lists the themes that hold a manifest, sorted', function () {
@@ -243,4 +283,27 @@ it('does not throw for a name it cannot answer', function () {
         ->and($finder->read('phar://payload.phar/theme.yml', 'theme'))->toBeNull()
         ->and($finder->read("logo.png\0.txt", 'picture'))->toBeNull()
         ->and($finder->path('../elsewhere/secret.txt', 'document'))->toBeNull();
+});
+
+it('gives the finder the shape an adapter is written against', function () {
+    // One adapter serves both halves of this suite, so this interface is the shape both
+    // of them promise, and a change to it is a change to both.
+    $shape = [];
+
+    foreach ((new ReflectionClass(FileFinder::class))->getMethods() as $method) {
+        $parameters = [];
+
+        foreach ($method->getParameters() as $parameter) {
+            $parameters[] = $parameter->getName() . ': ' . (string) $parameter->getType();
+        }
+
+        $shape[$method->getName()] = implode(', ', $parameters) . ' => ' . (string) $method->getReturnType();
+    }
+
+    expect($shape)->toBe([
+        'read' => 'name: string, role: ?string => ?string',
+        'path' => 'name: string, role: ?string => ?string',
+        'themes' => ' => array',
+        'files' => 'theme: string => array',
+    ]);
 });
