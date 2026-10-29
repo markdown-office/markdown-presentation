@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedChrome;
+use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Code;
 use MarkdownPresentation\Render\Block\Heading;
@@ -36,11 +37,14 @@ final class Chrome
     /**
      * @param string $directory The directory a relative picture path in the template
      *                          resolves against, which is the directory the deck is in.
+     * @param FileFinder|null $files Where the deck's files come from: the pictures the
+     *                               template names are pictures of the deck.
      */
     public function __construct(
         private readonly BlockTranslator $blocks,
         private readonly string $directory,
-        private readonly PathScope $files,
+        private readonly PathScope $scope,
+        private readonly ?FileFinder $files = null,
     ) {
     }
 
@@ -57,7 +61,7 @@ final class Chrome
     public function shapes(Definition $definition, int $slide, Theme $theme): array
     {
         try {
-            $blocks = $this->blocks->parse($definition->body(), $slide, $this->directory, $this->files, $theme);
+            $blocks = $this->blocks->parse($definition->body(), $slide, $this->directory, $this->scope, $theme, $this->files);
         } catch (InvalidInput $failure) {
             // The name of the template, because the slide the message names is the first
             // one the template is drawn on and the author has to know which template it was.

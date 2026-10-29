@@ -2602,6 +2602,57 @@ linkFont:
 References to theme tokens — `{accent1}`, `{fonts.mono}` — are **not** resolved yet,
 so a `styles.yml` written with them carries the braces through untouched.
 
+### Where a deck's files come from
+
+The theme a deck names is looked for on disk — beside the deck, beside the working
+directory, and among the themes that ship with the package — and the pictures a deck
+names and the templates file it imports are read from disk as well. **The files a deck
+names come from somewhere the caller chooses**, so a program that keeps its own files
+somewhere else — in a database, say — says where they are with a **finder** and hands
+it over wherever a deck's files are wanted:
+
+```php
+use MarkdownPresentation\Render\PresentationRenderer;
+use MarkdownPresentation\Theme\ThemeResolver;
+
+$finder = new MyFinder();   // a MarkdownPresentation\Files\FileFinder
+
+$renderer = new PresentationRenderer(
+    themes: new ThemeResolver(files: $finder),
+    files: $finder,
+);
+```
+
+A finder is four methods: `read()` and `path()` answer for one file, `themes()` lists
+the themes that resolve and `files()` the files of one theme. The names it is asked for
+are the library's own — `house/theme.yml` for a theme's manifest, `logo.png` for a
+picture — and the role says which world a name is resolved in: `theme`, `picture` or
+`document`.
+
+**A finder answers; it does not refuse.** A file that is not there is `null`, and a
+file that is out of reach is answered like any other: the question of what a render
+may read belongs to the library, which holds the path a finder answered to its own
+scope and refuses what is out of reach in its own words.
+
+`Files\DiskFinder` is the default and answers out of directories on this machine, one
+list of bases per role, tried in the order they are given. The directories of themes
+on disk remain the fallback, so a program with a finder of its own does not lose the
+themes that ship with the package.
+
+**A theme's master is a file, and a file the library stages.** A `template.pptx` is a
+package, and a package is opened as a file: a source that holds the master as bytes
+rather than as a file has them staged into one, and the deck is drawn in the master's
+geometry all the same. The staged file is the render's, and it is given back when the
+render is over — nothing of the library's is left on the disk afterwards, whether the
+render worked or not.
+
+**A master the source cannot serve is refused by name.** A theme that carries no
+master is a theme that works, and nothing is said about it. A theme that carries one
+and a source that cannot hand it over is refused with
+`MarkdownPresentation\Exception\UnservedTemplate` rather than drawn without: a deck
+without the master's geometry is in the wrong design, with nothing in the file saying
+so. The listing of a theme's files is what tells the two apart.
+
 ## Loud failures
 
 Every mistake above is an exception naming what would have worked instead, because
@@ -2659,12 +2710,14 @@ Several sit beside those two rather than under `InvalidInput`:
 a part of one that cannot be decompressed; `MarkdownPresentation\Exception\UnreadableDeck`,
 for a deck this library cannot read; `MarkdownPresentation\Exception\UnpatchedDependency`,
 when the installed PHPPresentation lacks what the library needs of it;
-`MarkdownPresentation\Exception\NothingToConvert`, when there is nothing to convert; and
+`MarkdownPresentation\Exception\NothingToConvert`, when there is nothing to convert;
+`MarkdownPresentation\Exception\UnservedTemplate`, when a theme carries a master the
+source of the theme cannot serve; and
 `MarkdownPresentation\Exception\FileNotWritable`, when the result cannot be written. Nothing
 a deck names fixes any of them — it is the disk, the download that stopped, the file that
-was not a deck, the installer — and a deck author told to go and rename something would go
-and rename something. They are all still under the base class, so the same one `catch`
-reaches them.
+was not a deck, the installer, the source that could not serve what it was asked for — and
+a deck author told to go and rename something would go and rename something. They are all
+still under the base class, so the same one `catch` reaches them.
 
 ```php
 use MarkdownPresentation\Exception\Exception;

@@ -128,6 +128,42 @@ All notable changes to this project are documented here. The format follows
   the finder and from them together — so a failure still names every theme that would
   have worked.
 
+- **`PresentationRenderer` takes the source of the deck's files.** A `FileFinder` given
+  to it as `files:` is where the pictures a deck names and the templates file it
+  imports come from: they are asked for by name — `logo.png`, `templates.md` — and the
+  disk is where they are found when the source has none.
+
+  The scope check stays with the library, in the same terms and with the same messages:
+  a path the source answers is held to the directories this render may read, so a
+  picture or a templates file out of reach is refused in this library's own words. A
+  source that holds the bytes rather than a file has them taken on the caller's word:
+  there is no path to hold to the scope.
+
+  The ceiling on a templates file stays where it was, with the read: a file over it is
+  refused rather than read whole, whichever source it came from.
+
+- **A theme's master is read through the finder, and it is a file of the library's own
+  when the source holds only its bytes.** A `template.pptx` is a package, and a package
+  is opened as a file, so the bytes are staged into one and the deck is drawn in the
+  master's geometry all the same. The staged file is the render's: it is given back
+  when the render is over, and nothing of the library's is left on disk after it — not
+  after a render that worked and not after one that failed.
+
+  A master the theme carries and the source cannot serve is refused by name —
+  `Exception\UnservedTemplate` — rather than drawn without. The listing of a theme's
+  files settles what a null answer means: the theme may carry no master, or the source
+  may not be able to serve one, and a deck drawn without the master's geometry is drawn
+  in the wrong design with nothing saying so.
+
+- **`LoadedTheme::template()` returns the master rather than its path.** It is a
+  `Theme\Master` now: the path the master is opened at, the name a failure calls it,
+  and the file of the library's own to give back when the render is over.
+
+- **`TemplateGeometry` takes the name a failure calls the template.** The third
+  parameter is the name the master is known by, where the file it is in is not the name
+  it is known by: a master the library staged is a file of its own making under a name
+  of its own, and a reader told about that cannot tell which template it was.
+
 - **The inline translator is told which slide and which theme it reads for.** `runs()`,
   `runsIn()` and `plain()` each take an `$slide` and a `$theme` now: a word in a text style
   is drawn in the face and the colour the theme names, and a mistake in one is a mistake on

@@ -190,7 +190,7 @@ it('turns a role into the layout name of the theme\'s own template', function ()
         ]));
 
     expect($loaded->layout('two-column'))->toBe('Two Content')
-        ->and($loaded->template())->toBe($loaded->directory() . '/template.pptx');
+        ->and($loaded->template()?->path())->toBe($loaded->directory() . '/template.pptx');
 });
 
 it('refuses a file of a theme that resolves outside the scope', function () {

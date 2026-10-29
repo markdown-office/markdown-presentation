@@ -18,6 +18,7 @@ use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
+use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Fixes;
 use MarkdownPresentation\Render\Block\Code;
@@ -37,6 +38,7 @@ use MarkdownPresentation\Template\Templates;
 use MarkdownPresentation\Template\TemplatesFile;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
+use MarkdownPresentation\Theme\Master;
 use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeResolver;
 use PhpOffice\PhpPresentation\PhpPresentation;
@@ -150,7 +152,15 @@ final class PresentationRenderer
      */
     private readonly FontReport $fonts;
 
-    private readonly PathScope $files;
+    private readonly PathScope $scope;
+
+    /**
+     * The source of the deck's files: its pictures and the templates file it names.
+     *
+     * Null for the disk, which is where a deck's files were found before there was a
+     * source. A source that holds them as bytes is asked for them by name.
+     */
+    private readonly ?FileFinder $files;
 
     private readonly ThemeResolver $themes;
 
@@ -194,6 +204,15 @@ final class PresentationRenderer
     private Theme $theme;
 
     /**
+     * The master the deck being rendered was drawn in.
+     *
+     * Held rather than dropped, so that the file it is in is given back by the render
+     * that opened it rather than by a destructor that may run much later: a file of the
+     * library's own is the render's to give back.
+     */
+    private ?Master $master = null;
+
+    /**
      * @param string       $directory  The directory a relative image path in the deck
      *                                 resolves against, which is the directory the deck
      *                                 itself is in. It is also the first of the roots an
@@ -217,6 +236,11 @@ final class PresentationRenderer
      *                                 the deck's: a deck that could widen this would be the
      *                                 arbitrary path read this constructor argument exists
      *                                 to stop.
+     * @param FileFinder|null $files Where the deck's files come from: the pictures it
+     *                                 names and the templates file it imports. Null for the
+     *                                 disk, which is where a deck's files were found before
+     *                                 there was a source. The theme is not among them: the
+     *                                 resolver the caller brought is where themes come from.
      */
     public function __construct(
         private readonly string $directory = '.',
@@ -224,15 +248,17 @@ final class PresentationRenderer
         private readonly BlockTranslator $blocks = new BlockTranslator(),
         bool $strict = false,
         array $imageRoots = [],
+        ?FileFinder $files = null,
     ) {
         // The theme of a deck sits beside it, and a relative image path in the deck
         // resolves against the same directory: a deck and its theme are one thing.
         $this->themes = $themes->beside($this->directory);
-        $this->files = new PathScope([$this->directory, ...$imageRoots]);
+        $this->scope = new PathScope([$this->directory, ...$imageRoots]);
+        $this->files = $files;
         $this->overflows = new Overflows($strict);
         $this->fonts = new FontReport($strict);
-        $this->templatesFiles = new TemplatesFile($this->directory, $this->files);
-        $this->chrome = new Chrome($this->blocks, $this->directory, $this->files);
+        $this->templatesFiles = new TemplatesFile($this->directory, $this->scope, files: $files);
+        $this->chrome = new Chrome($this->blocks, $this->directory, $this->scope, $files);
     }
 
     /**
@@ -300,6 +326,9 @@ final class PresentationRenderer
      * @throws \MarkdownPresentation\Exception\UnpatchedDependency When the installed
      *     PHPPresentation lacks what this library needs of it.
      *
+     * @throws \MarkdownPresentation\Exception\UnservedTemplate When the theme carries a
+     *     master the source of the theme cannot serve.
+     *
      * @return string The path written.
      */
     public function render(Deck $deck, string $path): string
@@ -322,6 +351,37 @@ final class PresentationRenderer
         }
 
         $loaded = $this->loaded($deck);
+        $this->master = $loaded->template();
+
+        try {
+            return $this->draw($deck, $loaded, $path);
+        } finally {
+            // The files the library staged for this render: the theme's master, when the
+            // source of the theme held only its bytes, and the pictures the deck named,
+            // when the source of the deck's files held only theirs. A render is over when
+            // it is written, and nothing of the library's is left on disk after it — not
+            // after a render that worked and not after one that failed.
+            $this->master?->release();
+            $this->blocks->release();
+        }
+    }
+
+    /**
+     * The deck, drawn and written.
+     *
+     * The theme is resolved before this is called, so that the files the library stages
+     * for the render are given back whether the deck is drawn or refused.
+     *
+     * @throws InvalidInput
+     * @throws ThemeNotFound
+     * @throws ContentOverflow
+     * @throws MalformedTemplate
+     * @throws \MarkdownPresentation\Exception\Exception
+     * @throws \MarkdownPresentation\Exception\MalformedShape
+     * @throws \MarkdownPresentation\Exception\UnpatchedDependency
+     */
+    private function draw(Deck $deck, LoadedTheme $loaded, string $path): string
+    {
         $roles = $this->roles($deck, $loaded);
         $this->theme = $loaded->theme();
 
@@ -462,8 +522,9 @@ final class PresentationRenderer
                 $source->content(),
                 $source->index() + 1,
                 $this->directory,
-                $this->files,
+                $this->scope,
                 $theme,
+                $this->files,
             );
         }
 
@@ -491,11 +552,16 @@ final class PresentationRenderer
      */
     private function template(LoadedTheme $theme, array $roles): array
     {
-        if ($theme->template() === null) {
+        $master = $theme->template();
+
+        if ($master === null) {
             return [];
         }
 
-        $layouts = (new TemplateGeometry((string) $theme->template()))->boxes();
+        // The name the master is known by, rather than the path it is in: a master the
+        // library staged is a file of its own making under a name of its own, and a reader
+        // told about that cannot tell which template it was.
+        $layouts = (new TemplateGeometry($master->path(), name: $master->name()))->boxes();
         $boxes = [];
 
         foreach ($roles as $role) {

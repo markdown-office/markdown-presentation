@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Template;
 
 use MarkdownPresentation\Exception\TemplatesFileNotFound;
 use MarkdownPresentation\Exception\TemplatesFileTooLarge;
+use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Filesystem\PathScope;
 
 /**
@@ -14,6 +15,15 @@ use MarkdownPresentation\Filesystem\PathScope;
  * A path a deck writes, so it is resolved and held to the directories this render may
  * read — the same rule an image path has to pass, because both are paths a deck wrote and
  * neither is worth a way out of the directory the deck was given.
+ *
+ * **The templates file comes from the source the deck's files come from.** A source that
+ * holds it as a file answers a path, and the path is held to the scope as any other path
+ * is. A source that holds the contents answers no path, and the contents are taken on the
+ * caller's word: there is no path to hold to the scope, and a caller that brings a source
+ * of its own vouches for what is in it.
+ *
+ * The ceiling is where it was: with the read. A file over it is abandoned rather than
+ * read whole, which is what keeps the memory a deck's frontmatter can ask for bounded.
  */
 final class TemplatesFile
 {
@@ -30,11 +40,15 @@ final class TemplatesFile
     /**
      * @param string $directory The directory the deck is in, which is where a relative path
      *                          in the deck is written from.
+     * @param FileFinder|null $files Where the deck's files come from. Null for the disk,
+     *                               which is where a templates file was found before there
+     *                               was a source.
      */
     public function __construct(
         private readonly string $directory,
-        private readonly PathScope $files,
+        private readonly PathScope $scope,
         private readonly int $maxBytes = self::MAX_BYTES,
+        private readonly ?FileFinder $files = null,
     ) {
     }
 
@@ -50,6 +64,12 @@ final class TemplatesFile
             throw TemplatesFileNotFound::aUrl($written);
         }
 
+        $fromSource = $this->fromSource($written);
+
+        if ($fromSource !== null) {
+            return $fromSource;
+        }
+
         $joined = str_starts_with($written, '/') ? $written : rtrim($this->directory, '/') . '/' . $written;
 
         if (!is_file($joined)) {
@@ -60,15 +80,66 @@ final class TemplatesFile
         // out of a directory that a prefix test says they are inside.
         $resolved = PathScope::canonical($joined);
 
-        if ($resolved === null || !$this->files->holds($resolved)) {
-            throw TemplatesFileNotFound::outside($written, $resolved ?? $joined, $this->files->roots());
+        if ($resolved === null || !$this->scope->holds($resolved)) {
+            throw TemplatesFileNotFound::outside($written, $resolved ?? $joined, $this->scope->roots());
         }
 
-        // The read only happens where the file can be read: `file_get_contents()` warns
-        // when it cannot, and a warning is not a failure anybody can act on.
-        //
-        // With a length, so that a file over the ceiling is abandoned rather than read
-        // whole.
+        return $this->readFile($written, $resolved);
+    }
+
+    /**
+     * The templates file in the source the deck's files come from, or null when it has none.
+     *
+     * A path the source answers is held to the scope, exactly as a path on disk is: a
+     * `templates-file:` is written by the deck, and what is allowed is where it lands.
+     */
+    private function fromSource(string $written): ?string
+    {
+        if ($this->files === null) {
+            return null;
+        }
+
+        $path = $this->files->path($written, 'document');
+
+        if ($path !== null) {
+            if (!is_file($path)) {
+                throw TemplatesFileNotFound::at($path);
+            }
+
+            $resolved = PathScope::canonical($path);
+
+            if ($resolved === null || !$this->scope->holds($resolved)) {
+                throw TemplatesFileNotFound::outside($written, $resolved ?? $path, $this->scope->roots());
+            }
+
+            return $this->readFile($written, $resolved);
+        }
+
+        $markdown = $this->files->read($written, 'document');
+
+        if ($markdown === null) {
+            return null;
+        }
+
+        if (strlen($markdown) > $this->maxBytes) {
+            throw TemplatesFileTooLarge::of($written, strlen($markdown), $this->maxBytes);
+        }
+
+        return $markdown;
+    }
+
+    /**
+     * A file's Markdown, up to the ceiling.
+     *
+     * The read only happens where the file can be read: `file_get_contents()` warns when
+     * it cannot, and a warning is not a failure anybody can act on. And it happens with a
+     * length, so that a file over the ceiling is abandoned rather than read whole.
+     *
+     * @throws TemplatesFileNotFound
+     * @throws TemplatesFileTooLarge
+     */
+    private function readFile(string $written, string $resolved): string
+    {
         $length = max(0, $this->maxBytes) + 1;
 
         $markdown = is_readable($resolved)

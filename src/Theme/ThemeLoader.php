@@ -9,6 +9,7 @@ use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Exception\UnservedTemplate;
 use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Filesystem\PathScope;
 use Symfony\Component\Yaml\Exception\ParseException;
@@ -18,9 +19,10 @@ use Symfony\Component\Yaml\Yaml;
  * Reads a theme out of a finder: the `theme.yml` and the files beside it.
  *
  * Only `theme.yml` is required. `styles.yml`, `layouts.yml` and `text-styles.yml` are
- * read when they are there, and `template.pptx` is only a path: nothing here opens a
- * `.pptx`, because a theme's template belongs to whoever renders the deck rather than to
- * the loader that found it.
+ * read when they are there, and `template.pptx` is the theme's master: it is opened as a
+ * file, so a source that holds only its bytes has them staged into one, and nothing here
+ * reads what is inside it — a theme's master belongs to whoever renders the deck rather
+ * than to the loader that found it.
  *
  * The finder is asked by name — `house/theme.yml`, `house/styles.yml` — because the
  * library composes names and a finder answers them. A theme that never had a directory
@@ -67,6 +69,7 @@ final class ThemeLoader
      * @throws MalformedTheme  when a file in it does not describe a theme
      * @throws UnknownStyleSlot when `styles.yml` names a slot that does not exist
      * @throws UnknownLayoutRole when `layouts.yml` names a role that does not exist
+     * @throws UnservedTemplate when the theme carries a master the source cannot serve
      * @throws Exception      when a file in it cannot be read or parsed, or resolves out
      *                        of the scope
      */
@@ -103,6 +106,7 @@ final class ThemeLoader
      * @throws MalformedTheme  when the file does not describe a theme
      * @throws UnknownStyleSlot when `styles.yml` names a slot that does not exist
      * @throws UnknownLayoutRole when `layouts.yml` names a role that does not exist
+     * @throws UnservedTemplate when the theme carries a master the source cannot serve
      * @throws Exception      when a file in it cannot be read or parsed, or resolves out
      *                        of the scope
      */
@@ -223,23 +227,46 @@ final class ThemeLoader
     }
 
     /**
-     * The theme's template, held to the scope before it is named.
+     * The theme's master, and the refusal of one the source cannot serve.
      *
-     * The path is what the renderer opens, and it opens whatever it is given: a template
-     * that is a symlink out of the scope is a file outside it, read under a name that is
-     * inside.
+     * The master is asked for by name like the rest of the theme's files. A source that
+     * holds it as a file has it opened where it is — held to the scope first, because the
+     * renderer opens whatever it is given, and a master that is a symlink out of the scope
+     * is a file outside it read under a name that is inside. A source that holds only the
+     * bytes has them staged into a file of the library's own.
      *
-     * @throws ThemeNotFound
+     * A null answer is ambiguous on its own: the theme may carry no master, or the source
+     * may not be able to serve one. The listing of the theme's files tells the two apart,
+     * and a master the theme carries and the source cannot serve is refused rather than
+     * drawn without — a deck without the master's geometry is in the wrong design, with
+     * nothing in it saying so.
+     *
+     * @throws UnservedTemplate when the theme carries a master the source cannot serve
+     * @throws ThemeNotFound when the master resolves outside the directories this render may read
      */
-    private function template(string $name, string $written, ?FileFinder $files): ?string
+    private function template(string $name, string $written, ?FileFinder $files): ?Master
     {
-        $path = $files?->path($name . '/' . self::TEMPLATE_FILE, 'theme');
+        $file = $name . '/' . self::TEMPLATE_FILE;
 
-        if ($path === null) {
-            return null;
+        $path = $files?->path($file, 'theme');
+
+        if ($path !== null) {
+            $real = $this->contained($path, $written);
+
+            return $real === null ? null : Master::at($real, $file);
         }
 
-        return $this->contained($path, $written);
+        $bytes = $files?->read($file, 'theme');
+
+        if ($bytes !== null) {
+            return Master::of($bytes, $file);
+        }
+
+        if ($files !== null && in_array(self::TEMPLATE_FILE, $files->files($name), true)) {
+            throw UnservedTemplate::named($written, self::TEMPLATE_FILE);
+        }
+
+        return null;
     }
 
     /**

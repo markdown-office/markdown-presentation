@@ -26,7 +26,7 @@ final class LoadedTheme
         private readonly Theme $theme,
         private readonly array $styles,
         private readonly array $layouts,
-        private readonly ?string $template,
+        private readonly ?Master $template,
     ) {
     }
 
@@ -94,8 +94,8 @@ final class LoadedTheme
         return $layout;
     }
 
-    /** The path of the theme's `.pptx`, or null when it ships without one. */
-    public function template(): ?string
+    /** The theme's master, or null when it ships without one. */
+    public function template(): ?Master
     {
         return $this->template;
     }

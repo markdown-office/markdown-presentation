@@ -8,8 +8,11 @@ use MarkdownPresentation\Exception\Exception as MarkdownException;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownTemplate;
+use MarkdownPresentation\Files\DiskFinder;
+use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Render\Furniture;
 use MarkdownPresentation\Render\PresentationRenderer;
+use MarkdownPresentation\Tests\Support\MemoryFinder;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Template\TemplatesFile;
@@ -133,6 +136,36 @@ function templateFailure(string $markdown): string
 {
     try {
         templateDeck($markdown);
+    } catch (MarkdownException $failure) {
+        return $failure->getMessage();
+    }
+
+    return '';
+}
+
+/**
+ * A rendered deck drawn with the source of the deck's files given.
+ *
+ * The source is the one a caller brings: a plugin that keeps its files in a database and
+ * never had a directory to hand over.
+ */
+function templateDeckFrom(?FileFinder $files, string $markdown): Pptx
+{
+    $path = Scratch::file('template.pptx', '');
+
+    (new PresentationRenderer(directory: Scratch::directory(), files: $files))
+        ->render((new DeckParser())->parse($markdown), $path);
+
+    return Pptx::open($path);
+}
+
+/**
+ * A rendered deck drawn with the source given, and the message it failed with.
+ */
+function templateFailureFrom(?FileFinder $files, string $markdown): string
+{
+    try {
+        templateDeckFrom($files, $markdown);
     } catch (MarkdownException $failure) {
         return $failure->getMessage();
     }
@@ -420,6 +453,117 @@ it('refuses a templates file that is a URL', function () {
     $deck = "---\ntemplates-file: phar://templates.md\nlayout: blank\n---\n";
 
     expect(templateFailure($deck))->toContain('is a URL rather than a path');
+});
+
+it('reads a templates file the source holds as bytes', function () {
+    // The source the finder exists for: a plugin that keeps its files in a database and
+    // never had a directory to hand over. The furniture comes from it and is drawn.
+    $finder = new MemoryFinder([
+        'templates.md' => "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n",
+    ]);
+
+    $deck = "---\ntemplates-file: templates.md\nlayout: blank\n---\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateDeckFrom($finder, $deck)->shapeNames(2))->toBe(['line']);
+});
+
+it('asks the source for the templates file as a document', function () {
+    // The role says which world the name is resolved in: a templates file is a document's
+    // own file rather than a picture or a file of a theme.
+    $finder = new MemoryFinder([
+        'templates.md' => "---\ntemplate: brand\n---\n::line{}\n",
+    ]);
+
+    $deck = "---\ntemplates-file: templates.md\nlayout: blank\n---\n";
+
+    templateDeckFrom($finder, $deck);
+
+    expect($finder->asked())->toContain('templates.md')
+        ->and($finder->askedFor('templates.md'))->toBe('document');
+});
+
+it('refuses a templates file the source holds that is larger than the library will read', function () {
+    // The ceiling is where it was, with the read: a file over it is refused rather than
+    // read whole, whichever source it came from.
+    $finder = new MemoryFinder([
+        'templates.md' => str_repeat('a', TemplatesFile::MAX_BYTES + 1),
+    ]);
+
+    $deck = "---\ntemplates-file: templates.md\nlayout: blank\n---\n";
+
+    expect(templateFailureFrom($finder, $deck))
+        ->toContain(sprintf(
+            'is %d bytes, and a templates file may be at most %d',
+            TemplatesFile::MAX_BYTES + 1,
+            TemplatesFile::MAX_BYTES,
+        ));
+});
+
+it('refuses a templates file the source holds out of reach, in the library\'s words', function () {
+    // The finder answers the path; the library holds it to its own scope and refuses it.
+    // The message is the library's, because the library is what knows what this render
+    // may read.
+    $outside = sys_get_temp_dir() . '/templates-' . bin2hex(random_bytes(6));
+    mkdir($outside);
+    file_put_contents($outside . '/templates.md', "---\ntemplate: brand\n---\n::line{}\n");
+
+    $deck = "---\ntemplates-file: templates.md\nlayout: blank\n---\n";
+
+    expect(templateFailureFrom(new DiskFinder(document: [$outside]), $deck))
+        ->toContain('rather than one this render may read');
+
+    unlink($outside . '/templates.md');
+    rmdir($outside);
+});
+
+it('reads a templates file the source holds as a file', function () {
+    // A source that holds the templates file as a file answers a path, and the file is
+    // read from where it is.
+    file_put_contents(Scratch::directory() . '/templates.md', "---\ntemplate: brand\n---\n::line{}\n");
+
+    $deck = "---\ntemplates-file: templates.md\nlayout: blank\n---\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateDeckFrom(new DiskFinder(document: [Scratch::directory()]), $deck)->shapeNames(2))->toBe(['line']);
+});
+
+it('falls back to the disk when the source has no templates file', function () {
+    // A source that has nothing is asked all the same, and the file beside the deck is
+    // still where a templates file is found.
+    file_put_contents(Scratch::directory() . '/templates.md', "---\ntemplate: brand\n---\n::line{}\n");
+
+    $deck = "---\ntemplates-file: templates.md\nlayout: blank\n---\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+
+    expect(templateDeckFrom(new MemoryFinder(), $deck)->shapeNames(2))->toBe(['line']);
+});
+
+it('refuses a templates file the source answers a path for but does not have', function () {
+    // A finder that answers a path for a file that has since gone: the templates file is
+    // not there, and the library says so rather than reading nothing.
+    $finder = new class implements FileFinder {
+        public function read(string $name, ?string $role = null): ?string
+        {
+            return null;
+        }
+
+        public function path(string $name, ?string $role = null): ?string
+        {
+            return '/mdpresentation-not-here/templates.md';
+        }
+
+        public function themes(): array
+        {
+            return [];
+        }
+
+        public function files(string $theme): array
+        {
+            return [];
+        }
+    };
+
+    $deck = "---\ntemplates-file: templates.md\nlayout: blank\n---\n";
+
+    expect(templateFailureFrom($finder, $deck))->toContain('There is no templates file at');
 });
 
 it('refuses a templates file that is larger than the library will read', function () {

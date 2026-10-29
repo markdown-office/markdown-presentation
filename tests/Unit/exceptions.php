@@ -35,6 +35,7 @@ use MarkdownPresentation\Exception\UnpatchedDependency;
 use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Exception\UnsupportedLink;
+use MarkdownPresentation\Exception\UnservedTemplate;
 use MarkdownPresentation\Render\NotesColourMapPass;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Doctest;
@@ -134,12 +135,17 @@ it('reports what a deck author can fix under the class that says so', function (
     //
     // A PHPPresentation without the fixes is the caller's too: it is what the installer
     // put there, and no deck author can put it back.
+    //
+    // A master the source of a theme cannot serve is the caller's as well: the theme is
+    // right and the deck is right, and it is the program that brought the source that has
+    // to serve it.
     $callerSide = [
         FileNotWritable::class,
         NothingToConvert::class,
         UnreadableDeck::class,
         UnreadablePackage::class,
         UnpatchedDependency::class,
+        UnservedTemplate::class,
     ];
 
     if ($class === Exception::class || $class === InvalidInput::class) {
