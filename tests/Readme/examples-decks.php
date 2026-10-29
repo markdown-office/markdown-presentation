@@ -686,7 +686,7 @@ it('draws the deck own page number rather than the one the file holds', function
 it('draws the imported template on the slide that names it, and on no other', function () {
     [$pptx] = builtDeck('16-templates.md');
 
-    // The band is the one piece of furniture that came out of `templates/chrome.md` and
+    // The band is the one piece of furniture that came out of `templates/templates.md` and
     // was not overridden, so it is on the slide that names it and nowhere else — and it is
     // across the head of the slide, which is where the file puts it.
     foreach (range(1, $pptx->slideCount()) as $slide) {
@@ -710,7 +710,7 @@ it('draws the imported template on the slide that names it, and on no other', fu
 it('draws the furniture of the corporate template on every slide that names it', function () {
     [$pptx] = builtDeck('17-corporate-template.md');
 
-    // The wordmark, the rule and the footer are three templates of the deck's own chrome
+    // The wordmark, the rule and the footer are three templates of the deck's own templates
     // file, and a slide names the ones it wants. The five light slides name all three; the
     // cover and the two dark slides name the light wordmark and nothing else — a cover has
     // no page number, and a dark slide has no footer on it.
@@ -735,7 +735,7 @@ it('writes the corporate template own name on the light slides and the light one
 
     // The name is ink on a light page and white on a dark one, and the two are the same
     // named style with the colour laid over it — a deck cannot carry one colour on both
-    // kinds of slide, and a chrome file cannot decide for itself.
+    // kinds of slide, and a templates file cannot decide for itself.
     $light = runOfText($pptx, 'Halden Instruments', 2);
     $dark = runOfText($pptx, 'Halden Instruments', 7);
 

@@ -7,16 +7,17 @@ namespace MarkdownPresentation\Render;
 use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Document\Slide as SourceSlide;
-use MarkdownPresentation\Exception\ChromeNotFound;
 use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\MalformedTemplatesFile;
+use MarkdownPresentation\Exception\TemplatesFileNotFound;
 use MarkdownPresentation\Exception\TooManyShapes;
 use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Render\Free\FreeSlideNumber;
-use MarkdownPresentation\Template\ChromeFile;
 use MarkdownPresentation\Template\Definition;
 use MarkdownPresentation\Template\Templates;
+use MarkdownPresentation\Template\TemplatesFile;
 use MarkdownPresentation\Theme\Theme;
 
 /**
@@ -50,27 +51,28 @@ final class Furniture
     public const MAX_SHAPES = 100;
 
     /**
-     * @param Deck       $deck   The deck being rendered, which holds the templates it
-     *                          defines and the chrome file it names.
-     * @param ChromeFile $files  The reader of the chrome file the deck names.
-     * @param Chrome     $chrome The reader of a template's body.
+     * @param Deck          $deck   The deck being rendered, which holds the templates it
+     *                               defines and the templates file it names.
+     * @param TemplatesFile $files  The reader of the templates file the deck names.
+     * @param Chrome        $chrome The reader of a template's body.
      */
     public function __construct(
         private readonly Deck $deck,
-        private readonly ChromeFile $files,
+        private readonly TemplatesFile $files,
         private readonly Chrome $chrome,
     ) {
     }
 
     /**
-     * The templates the deck has: its own over the ones a chrome file holds.
+     * The templates the deck has: its own over the ones a templates file holds.
      *
-     * Read before anything is built, so a chrome file that cannot be read fails while there
-     * is still no file on disk to clean up.
+     * Read before anything is built, so a templates file that cannot be read fails while
+     * there is still no file on disk to clean up.
      *
-     * @throws ChromeNotFound
      * @throws MalformedChrome
      * @throws MalformedFrontmatter
+     * @throws MalformedTemplatesFile
+     * @throws TemplatesFileNotFound
      */
     public function templates(): Templates
     {
@@ -203,39 +205,39 @@ final class Furniture
     }
 
     /**
-     * The templates a chrome file holds.
+     * The templates a templates file holds.
      *
      * A file beside the deck, named by the deck's frontmatter and resolved against the
      * deck's own directory, so that a deck and the furniture it shares travel together.
      *
      * @return list<Definition>
      *
-     * @throws ChromeNotFound
-     * @throws MalformedChrome
      * @throws MalformedFrontmatter
+     * @throws MalformedTemplatesFile
+     * @throws TemplatesFileNotFound
      */
     private function imported(): array
     {
-        $written = $this->deck->frontmatterValue('chrome');
+        $written = $this->deck->frontmatterValue('templates-file');
 
         if ($written === null) {
             return [];
         }
 
         if (!is_string($written) || trim($written) === '') {
-            throw MalformedFrontmatter::wrongType(1, 'chrome', 'a path to a file of chrome');
+            throw MalformedFrontmatter::wrongType(1, 'templates-file', 'a path to a file of templates');
         }
 
         $markdown = $this->files->read(trim($written));
-        $chrome = (new DeckParser())->parse($markdown);
+        $templates = (new DeckParser())->parse($markdown);
 
-        // A chrome file holds definitions and nothing else: a slide in it is a slide
+        // A templates file holds definitions and nothing else: a slide in it is a slide
         // nobody asked for, and one that would be drawn on a deck it was not written for.
-        if ($chrome->slides() !== []) {
-            throw MalformedChrome::slide(trim($written));
+        if ($templates->slides() !== []) {
+            throw MalformedTemplatesFile::slide(trim($written));
         }
 
-        return $chrome->definitions();
+        return $templates->definitions();
     }
 
     /**

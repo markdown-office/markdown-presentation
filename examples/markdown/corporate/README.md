@@ -12,7 +12,7 @@ decks have, and every part of it is a file you edit.
 | `theme.yml` | the design — the twelve colour slots, the faces, the type scale and the rhythm |
 | `layouts.yml` | which layout each of the eight roles gets |
 | `text-styles.yml` | the named text styles a deck writes words in |
-| `chrome.md` | the furniture of a deck: the wordmark, the rule, the footer |
+| `templates.md` | the furniture of a deck: the wordmark, the rule, the footer |
 | `logo.png`, `logo-light.png` | the mark, for a light page and for a dark one |
 | `make-logo.php` | draws the two marks from the theme's colours |
 
@@ -22,7 +22,7 @@ The deck that uses all of it is `../17-corporate-template.md`.
 
 Three things, and each is one file.
 
-**The name.** `chrome.md` holds the wordmark, and the name is in it twice — once in the
+**The name.** `templates.md` holds the wordmark, and the name is in it twice — once in the
 light template and once in the dark one. The dark one is the same named style with the
 colour laid over it:
 
@@ -45,7 +45,7 @@ the table uses it for the one row that went down.
 
 ## The furniture
 
-The chrome file holds four templates, and a slide names the ones it wants:
+The templates file holds four templates, and a slide names the ones it wants:
 
 ```markdown
 ---
@@ -63,7 +63,7 @@ template: [wordmark, rule, footer]
 
 **A dark slide and a light one are the same deck, and the furniture on them cannot be the
 same furniture** — the name is ink on a light page and white on a dark one. That is what
-the second wordmark is for, and it is the one thing a single chrome file cannot decide for
+the second wordmark is for, and it is the one thing a single templates file cannot decide for
 you.
 
 The cover and the two dark slides name `wordmark-light` and nothing else; the light slides

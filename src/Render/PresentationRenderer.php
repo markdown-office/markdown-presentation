@@ -33,8 +33,8 @@ use MarkdownPresentation\Render\CommonMark\InlineTranslator;
 use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Render\Free\FreeSlideNumber;
 use MarkdownPresentation\Render\Free\FreeText;
-use MarkdownPresentation\Template\ChromeFile;
 use MarkdownPresentation\Template\Templates;
+use MarkdownPresentation\Template\TemplatesFile;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
 use MarkdownPresentation\Theme\Theme;
@@ -92,10 +92,12 @@ final class PresentationRenderer
      * the whole of what makes it affordable is that {@see UnknownDirective} names this list
      * in the failure itself.
     */
-    public const DIRECTIVES = ['title', 'name', 'level', 'layout', 'theme', 'author', 'description', 'template', 'chrome'];
+    public const DIRECTIVES = [
+        'title', 'name', 'level', 'layout', 'theme', 'author', 'description', 'template', 'templates-file',
+    ];
 
     /** The keys that describe the deck rather than a slide, and so belong to slide 1's block. */
-    public const DECK_DIRECTIVES = ['theme', 'author', 'description', 'chrome'];
+    public const DECK_DIRECTIVES = ['theme', 'author', 'description', 'templates-file'];
 
     /** The theme a deck that names none gets. */
     public const DEFAULT_THEME = 'default';
@@ -153,9 +155,9 @@ final class PresentationRenderer
     private readonly ThemeResolver $themes;
 
     /**
-     * The reader of the chrome file a deck names.
+     * The reader of the templates file a deck names.
      */
-    private readonly ChromeFile $chromeFiles;
+    private readonly TemplatesFile $templatesFiles;
 
     /**
      * The reader of a template's body.
@@ -229,7 +231,7 @@ final class PresentationRenderer
         $this->files = new PathScope([$this->directory, ...$imageRoots]);
         $this->overflows = new Overflows($strict);
         $this->fonts = new FontReport($strict);
-        $this->chromeFiles = new ChromeFile($this->directory, $this->files);
+        $this->templatesFiles = new TemplatesFile($this->directory, $this->files);
         $this->chrome = new Chrome($this->blocks, $this->directory, $this->files);
     }
 
@@ -332,7 +334,7 @@ final class PresentationRenderer
         // The templates before the slides are drawn, and the chrome before either: a slide
         // that names a template that is not there, and a template that cannot be drawn, are
         // both failures that happen with no file written behind them.
-        $this->furniture = new Furniture($deck, $this->chromeFiles, $this->chrome);
+        $this->furniture = new Furniture($deck, $this->templatesFiles, $this->chrome);
         $this->templates = $this->furniture->templates();
 
         foreach ($deck->slides() as $slide) {

@@ -4,24 +4,24 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Template;
 
-use MarkdownPresentation\Exception\ChromeNotFound;
-use MarkdownPresentation\Exception\ChromeTooLarge;
+use MarkdownPresentation\Exception\TemplatesFileNotFound;
+use MarkdownPresentation\Exception\TemplatesFileTooLarge;
 use MarkdownPresentation\Filesystem\PathScope;
 
 /**
- * The chrome file a deck names, read from beside the deck.
+ * The templates file a deck names, read from beside the deck.
  *
  * A path a deck writes, so it is resolved and held to the directories this render may
  * read — the same rule an image path has to pass, because both are paths a deck wrote and
  * neither is worth a way out of the directory the deck was given.
  */
-final class ChromeFile
+final class TemplatesFile
 {
     /**
-     * The largest a chrome file may be.
+     * The largest a templates file may be.
      *
-     * A chrome file is the furniture of a deck — a handful of shapes for each of its
-     * templates — and a megabyte of it is far past any file of chrome. It is the one file
+     * A templates file is the furniture of a deck — a handful of shapes for each of its
+     * templates — and a megabyte of it is far past any file of furniture. It is the one file
      * this library reads whole, so this is what bounds the memory a deck's frontmatter can
      * ask for.
      */
@@ -39,21 +39,21 @@ final class ChromeFile
     }
 
     /**
-     * The Markdown of the chrome file a deck names.
+     * The Markdown of the templates file a deck names.
      *
-     * @throws ChromeNotFound
-     * @throws ChromeTooLarge
+     * @throws TemplatesFileNotFound
+     * @throws TemplatesFileTooLarge
      */
     public function read(string $written): string
     {
         if (PathScope::isUrl($written)) {
-            throw ChromeNotFound::aUrl($written);
+            throw TemplatesFileNotFound::aUrl($written);
         }
 
         $joined = str_starts_with($written, '/') ? $written : rtrim($this->directory, '/') . '/' . $written;
 
         if (!is_file($joined)) {
-            throw ChromeNotFound::at($joined);
+            throw TemplatesFileNotFound::at($joined);
         }
 
         // `realpath()` rather than the path as written, because `..` and a symlink both walk
@@ -61,7 +61,7 @@ final class ChromeFile
         $resolved = PathScope::canonical($joined);
 
         if ($resolved === null || !$this->files->holds($resolved)) {
-            throw ChromeNotFound::outside($written, $resolved ?? $joined, $this->files->roots());
+            throw TemplatesFileNotFound::outside($written, $resolved ?? $joined, $this->files->roots());
         }
 
         // The read only happens where the file can be read: `file_get_contents()` warns
@@ -76,11 +76,11 @@ final class ChromeFile
             : false;
 
         if ($markdown === false) {
-            throw ChromeNotFound::at($resolved);
+            throw TemplatesFileNotFound::at($resolved);
         }
 
         if (strlen($markdown) > $this->maxBytes) {
-            throw ChromeTooLarge::of($written, $this->size($resolved, strlen($markdown)), $this->maxBytes);
+            throw TemplatesFileTooLarge::of($written, $this->size($resolved, strlen($markdown)), $this->maxBytes);
         }
 
         return $markdown;

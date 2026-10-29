@@ -11,7 +11,7 @@ namespace MarkdownPresentation\Template;
  * told apart by where they come from: the deck's own templates override the imported ones
  * of the same name. It is the rule the theme resolver applies by search order — the first
  * one found under a name is the one that is used — and it is here rather than in the
- * resolver because a chrome file is not a theme and is not found by looking through
+ * resolver because a templates file is not a theme and is not found by looking through
  * directories: a deck names the one file it wants.
  */
 final class Templates
@@ -30,7 +30,7 @@ final class Templates
      * that is left under a name both of them use.
      *
      * @param list<Definition> $local    The templates the deck defines.
-     * @param list<Definition> $imported The templates a chrome file defines.
+     * @param list<Definition> $imported The templates a templates file defines.
      */
     public static function of(array $local, array $imported): self
     {

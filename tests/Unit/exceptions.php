@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
-use MarkdownPresentation\Exception\ChromeNotFound;
-use MarkdownPresentation\Exception\ChromeTooLarge;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\FencedFrontmatter;
@@ -15,9 +13,12 @@ use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\MalformedShape;
 use MarkdownPresentation\Exception\MalformedTemplate;
+use MarkdownPresentation\Exception\MalformedTemplatesFile;
 use MarkdownPresentation\Exception\MalformedTextStyle;
 use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\NothingToConvert;
+use MarkdownPresentation\Exception\TemplatesFileNotFound;
+use MarkdownPresentation\Exception\TemplatesFileTooLarge;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\TooManyShapes;
 use MarkdownPresentation\Exception\TooManySlides;
@@ -96,8 +97,6 @@ it('reports what a deck author can fix under the class that says so', function (
     // The base is for everything; the one below it is for the failures a deck author
     // can fix by naming something else.
     $authorFixable = [
-        ChromeNotFound::class,
-        ChromeTooLarge::class,
         ContentOverflow::class,
         FencedFrontmatter::class,
         ImageNotFound::class,
@@ -105,8 +104,11 @@ it('reports what a deck author can fix under the class that says so', function (
         MalformedFrontmatter::class,
         MalformedShape::class,
         MalformedTemplate::class,
+        MalformedTemplatesFile::class,
         MalformedTextStyle::class,
         MalformedTheme::class,
+        TemplatesFileNotFound::class,
+        TemplatesFileTooLarge::class,
         ThemeNotFound::class,
         TooManyShapes::class,
         TooManySlides::class,

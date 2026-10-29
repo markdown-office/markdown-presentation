@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Exception;
 
 /**
- * A template that is not chrome, or a chrome file that is not templates.
+ * A template that holds the wrong thing.
+ *
+ * A template holds chrome — the free shapes it draws — and nothing else, so a body that
+ * holds ordinary Markdown, a column marker, or nothing at all is a mistake in the template
+ * rather than in the deck that draws it.
  *
  * Kept apart from {@see UnknownTemplate} because the two failures have opposite fixes: a
  * name nobody has needs a different name, and a body that holds the wrong thing needs a
@@ -55,18 +59,6 @@ final class MalformedChrome extends InvalidInput
             'The template "%s" draws nothing. A template holds chrome: the free shapes it draws on every slide that '
             . 'names it.',
             $name,
-        ));
-    }
-
-    /**
-     * A chrome file that holds something other than template definitions.
-     */
-    public static function slide(string $file): self
-    {
-        return new self(sprintf(
-            'The chrome file "%s" holds a slide that is not a template definition. A chrome file holds definitions: '
-            . 'slides whose frontmatter names a template and nothing else.',
-            $file,
         ));
     }
 

@@ -26,14 +26,14 @@ All notable changes to this project are documented here. The format follows
   not over it.
 
   The templates may also live in a file beside the deck, named by the deck's frontmatter
-  and resolved against the deck's own directory, so that a deck and the furniture it
-  shares travel together. The deck's own templates override the imported ones of the same
-  name, the way a deck's own theme overrides the shipped one.
+  with `templates-file:` and resolved against the deck's own directory, so that a deck and
+  the furniture it shares travel together. The deck's own templates override the imported
+  ones of the same name, the way a deck's own theme overrides the shipped one.
 
   `examples/markdown/16-templates.md` is the deck that shows it: a template defined in the
   deck, slides that name one, two and three of them, a template imported from
-  `templates/chrome.md`, and a template of the deck's own of the same name as one the file
-  holds — the one that is drawn. The company is invented.
+  `templates/templates.md`, and a template of the deck's own of the same name as one the
+  file holds — the one that is drawn. The company is invented.
 
 - **A whole corporate template, as the files a company has.** A theme, a brand mark and
   the furniture of a deck are three separate things, and a company that has all three has
@@ -42,13 +42,13 @@ All notable changes to this project are documented here. The format follows
   `examples/markdown/17-corporate-template.md` is a deck that has them: a theme of its own
   in `examples/markdown/corporate/theme.yml`, a mark in two colours — one for a light page
   and one for a dark one, with the crosshair knocked out of it rather than painted on it,
-  so the page shows through it either way — and a chrome file holding the wordmark, the
+  so the page shows through it either way — and a templates file holding the wordmark, the
   rule and the footer.
 
   **A dark slide and a light one are the same deck, and the furniture on them cannot be
   the same furniture**: the name is ink on a light page and white on a dark one, so the
   dark wordmark is the same named style with the colour laid over it. That is the one
-  thing a chrome file cannot decide for itself, and it is why there are two of them.
+  thing a templates file cannot decide for itself, and it is why there are two of them.
 
   The company is invented, and so is every figure in the deck.
 
@@ -228,20 +228,22 @@ All notable changes to this project are documented here. The format follows
   struck-through word rather than refused. The arms of the match are the vocabulary now, and
   an attribute they do not know is refused by name.
 
-- **A chrome file is read with a ceiling.** The chrome file is the one file this library
-  reads whole, and it is the one a deck names in its frontmatter: a picture is bounded by
-  the pixels of its raster and a part of a template by the bytes it inflates to, and the
-  chrome file was bounded by nothing at all. It is read with a ceiling of a megabyte now, and
-  a file over it is refused with its size and the ceiling in the message. The ceiling is an
-  argument of `ChromeFile`, so a caller can hold a deck to a smaller one.
+- **A templates file is read with a ceiling.** The templates file is the one file this
+  library reads whole, and it is the one a deck names in its frontmatter: a picture is
+  bounded by the pixels of its raster and a part of a template by the bytes it inflates to,
+  and the templates file was bounded by nothing at all. It is read with a ceiling of a
+  megabyte now, and a file over it is refused with its size and the ceiling in the message.
+  The ceiling is an argument of `TemplatesFile`, so a caller can hold a deck to a smaller
+  one.
 
 - **A slide carries at most a hundred shapes.** The chrome of a template is read once and
   drawn on every slide that names it, so the shapes of a template are multiplied by the
-  slides that draw them: two hundred shapes in a chrome file named by sixty slides is twelve
-  thousand shapes and ten megabytes of slide XML, and neither factor was bounded. The slide
-  count is bounded by `PresentationRenderer::MAX_SLIDES`, and `Furniture::MAX_SHAPES` is the
-  other half of that bound — a slide that carries more than a hundred shapes, the chrome of
-  a template included, is refused with the number and the ceiling in the message.
+  slides that draw them: two hundred shapes in a templates file named by sixty slides is
+  twelve thousand shapes and ten megabytes of slide XML, and neither factor was bounded.
+  The slide count is bounded by `PresentationRenderer::MAX_SLIDES`, and
+  `Furniture::MAX_SHAPES` is the other half of that bound — a slide that carries more than
+  a hundred shapes, the chrome of a template included, is refused with the number and the
+  ceiling in the message.
 
 - **A picture in a template is paid for once.** The chrome of a template is drawn on every
   slide that names it, and each of those slides had a picture of its own in the package: a

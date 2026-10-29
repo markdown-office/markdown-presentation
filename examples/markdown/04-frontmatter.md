@@ -3,14 +3,14 @@ title: Every frontmatter key
 description: One slide per key, and what each one reaches.
 theme: minimal
 author: markdown-office
-chrome: ./templates/chrome.md
+templates-file: ./templates/templates.md
 ---
 
 # Every frontmatter key
 
 Nine keys: `title`, `name`, `level`, `layout`, `theme`, `author`, `description`,
-`template` and `chrome`. A block naming a tenth is a failure that names these
-nine, and this slide carries the first four.
+`template` and `templates-file`. A block naming a tenth is a failure that names
+these nine, and this slide carries the first four.
 
 ---
 name: A title that is not a heading
@@ -61,7 +61,7 @@ template: [wordmark, page]
 ---
 
 This slide names two templates. `wordmark` is the one this deck defines below,
-and `page` is the one `templates/chrome.md` — the file this deck's frontmatter
+and `page` is the one `templates/templates.md` — the file this deck's frontmatter
 names — holds.
 
 A template's frontmatter names the template and nothing else, which is what

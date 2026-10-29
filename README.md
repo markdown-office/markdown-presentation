@@ -1549,19 +1549,19 @@ The page number is furniture, so it is written in a template and drawn on every 
 names it. A slide may write one itself as well, and the number it carries is the number of
 the slide it is on.
 
-#### The chrome file
+#### The templates file
 
 A deck may keep its templates in a file beside it and name it in the deck's frontmatter:
 
 ```markdown
 ---
 theme: ./theme.yml
-chrome: ./chrome.md
+templates-file: ./templates.md
 ---
 ```
 
-`chrome.md` is a Markdown file of template definitions in the same syntax as a deck, and it is
-resolved against the deck's own directory — so a deck and the furniture it shares travel
+`templates.md` is a Markdown file of template definitions in the same syntax as a deck, and it
+is resolved against the deck's own directory — so a deck and the furniture it shares travel
 together. A file that is not there is a failure, and so is a file outside the directories the
 render may read: a path a deck wrote is held to the same scope as a picture in it.
 
@@ -1720,7 +1720,7 @@ slide that names it:
 | Ceiling | Value | Bounds |
 | --- | --- | --- |
 | `Render\Furniture::MAX_SHAPES` | 100 | the shapes one slide may carry, the chrome of a template included |
-| `Template\ChromeFile::MAX_BYTES` | one megabyte | the chrome file a deck may name in its frontmatter |
+| `Template\TemplatesFile::MAX_BYTES` | one megabyte | the templates file a deck may name in its frontmatter |
 
 Both are refused with the number and the ceiling in the message, and the shape count is the
 other half of the slide count: a hundred shapes on a slide is a hundred shapes on each of the
@@ -1997,7 +1997,7 @@ try {
 ```
 
 ```text
-The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, chrome.
+The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file.
 ```
 
 Slidev accepts dozens of directives this library does not read, so a deck written for it will

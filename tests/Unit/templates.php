@@ -5,7 +5,6 @@ declare(strict_types=1);
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Document\Slide;
 use MarkdownPresentation\Exception\Exception as MarkdownException;
-use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownTemplate;
@@ -13,7 +12,7 @@ use MarkdownPresentation\Render\Furniture;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
-use MarkdownPresentation\Template\ChromeFile;
+use MarkdownPresentation\Template\TemplatesFile;
 
 /**
  * Slide templates: a piece of furniture written once and drawn on every slide that names it.
@@ -387,10 +386,10 @@ it('draws a picture the deck placed on two slides as two pictures', function () 
         ->and($file->positionOf('image', 1))->not->toBe($file->positionOf('image', 2));
 });
 
-it('imports the templates of a chrome file beside the deck', function () {
-    $chrome = Scratch::file('chrome.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n");
+it('imports the templates of a templates file beside the deck', function () {
+    $templates = Scratch::file('templates.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n");
 
-    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n\n---\nlayout: blank\ntemplate: brand\n---\n", $chrome);
+    $deck = sprintf("---\ntemplates-file: %s\nlayout: blank\n---\n\n---\nlayout: blank\ntemplate: brand\n---\n", $templates);
 
     $file = templateDeck($deck);
 
@@ -399,11 +398,11 @@ it('imports the templates of a chrome file beside the deck', function () {
 
 it('lets the deck\'s own template override an imported one of the same name', function () {
     // The same rule the theme resolver applies by search order: the deck's own wins.
-    $chrome = Scratch::file('chrome.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n");
+    $templates = Scratch::file('templates.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n");
 
     $deck = sprintf(
-        "---\nchrome: %s\nlayout: blank\n---\n\n---\ntemplate: brand\n---\n:::content{left=5%% top=5%% width=30%% height=5%%}\nDeck\n:::\n\n---\nlayout: blank\ntemplate: brand\n---\n",
-        $chrome,
+        "---\ntemplates-file: %s\nlayout: blank\n---\n\n---\ntemplate: brand\n---\n:::content{left=5%% top=5%% width=30%% height=5%%}\nDeck\n:::\n\n---\nlayout: blank\ntemplate: brand\n---\n",
+        $templates,
     );
 
     $file = templateDeck($deck);
@@ -411,76 +410,76 @@ it('lets the deck\'s own template override an imported one of the same name', fu
     expect($file->shapeNames(2))->toBe(['content']);
 });
 
-it('refuses a chrome file that is not there', function () {
-    $deck = "---\nchrome: ./nowhere.md\nlayout: blank\n---\n";
+it('refuses a templates file that is not there', function () {
+    $deck = "---\ntemplates-file: ./nowhere.md\nlayout: blank\n---\n";
 
-    expect(templateFailure($deck))->toContain('There is no chrome file at');
+    expect(templateFailure($deck))->toContain('There is no templates file at');
 });
 
-it('refuses a chrome file that is a URL', function () {
-    $deck = "---\nchrome: phar://chrome.md\nlayout: blank\n---\n";
+it('refuses a templates file that is a URL', function () {
+    $deck = "---\ntemplates-file: phar://templates.md\nlayout: blank\n---\n";
 
     expect(templateFailure($deck))->toContain('is a URL rather than a path');
 });
 
-it('refuses a chrome file that is larger than the library will read', function () {
-    $chrome = Scratch::file('chrome.md', str_repeat('a', ChromeFile::MAX_BYTES + 1));
+it('refuses a templates file that is larger than the library will read', function () {
+    $templates = Scratch::file('templates.md', str_repeat('a', TemplatesFile::MAX_BYTES + 1));
 
-    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n", $chrome);
+    $deck = sprintf("---\ntemplates-file: %s\nlayout: blank\n---\n", $templates);
 
     expect(templateFailure($deck))
         ->toContain(sprintf(
-            'is %d bytes, and a chrome file may be at most %d',
-            ChromeFile::MAX_BYTES + 1,
-            ChromeFile::MAX_BYTES,
+            'is %d bytes, and a templates file may be at most %d',
+            TemplatesFile::MAX_BYTES + 1,
+            TemplatesFile::MAX_BYTES,
         ));
 });
 
-it('refuses a chrome file this render may not read', function () {
-    $chrome = Scratch::file('chrome.md', "---\ntemplate: brand\n---\n::line{}\n");
-    $outside = sys_get_temp_dir() . '/chrome-' . bin2hex(random_bytes(6)) . '.md';
+it('refuses a templates file this render may not read', function () {
+    $templates = Scratch::file('templates.md', "---\ntemplate: brand\n---\n::line{}\n");
+    $outside = sys_get_temp_dir() . '/templates-' . bin2hex(random_bytes(6)) . '.md';
 
     file_put_contents($outside, "---\ntemplate: brand\n---\n::line{}\n");
 
-    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n", $outside);
+    $deck = sprintf("---\ntemplates-file: %s\nlayout: blank\n---\n", $outside);
 
     expect(templateFailure($deck))->toContain('rather than one this render may read');
 
     unlink($outside);
 });
 
-it('refuses a chrome file that holds a slide', function () {
-    $chrome = Scratch::file('chrome.md', "# A slide\n");
+it('refuses a templates file that holds a slide', function () {
+    $templates = Scratch::file('templates.md', "# A slide\n");
 
-    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n", $chrome);
+    $deck = sprintf("---\ntemplates-file: %s\nlayout: blank\n---\n", $templates);
 
     expect(templateFailure($deck))->toContain('holds a slide that is not a template definition');
 });
 
-it('refuses a chrome file it cannot read', function () {
+it('refuses a templates file it cannot read', function () {
     skipWithoutPermissions('The unreadable file');
 
-    $chrome = Scratch::file('chrome.md', "---\ntemplate: brand\n---\n::line{}\n");
+    $templates = Scratch::file('templates.md', "---\ntemplate: brand\n---\n::line{}\n");
 
-    chmod($chrome, 0o000);
+    chmod($templates, 0o000);
 
-    $deck = sprintf("---\nchrome: %s\nlayout: blank\n---\n", $chrome);
+    $deck = sprintf("---\ntemplates-file: %s\nlayout: blank\n---\n", $templates);
 
-    expect(templateFailure($deck))->toContain('There is no chrome file at');
+    expect(templateFailure($deck))->toContain('There is no templates file at');
 });
 
-it('refuses a chrome file named on a later slide', function () {
-    $deck = "---\nlayout: blank\n---\n\n---\nchrome: ./chrome.md\n---\n";
+it('refuses a templates file named on a later slide', function () {
+    $deck = "---\nlayout: blank\n---\n\n---\ntemplates-file: ./templates.md\n---\n";
 
     expect(templateFailure($deck))
-        ->toContain('The frontmatter of slide 2 names "chrome", which is a deck directive');
+        ->toContain('The frontmatter of slide 2 names "templates-file", which is a deck directive');
 });
 
-it('refuses a chrome file that is not a path', function () {
-    $deck = "---\nchrome: 42\nlayout: blank\n---\n";
+it('refuses a templates file that is not a path', function () {
+    $deck = "---\ntemplates-file: 42\nlayout: blank\n---\n";
 
     expect(templateFailure($deck))
-        ->toContain('The frontmatter of slide 1 has a "chrome" that is not a path to a file of chrome');
+        ->toContain('The frontmatter of slide 1 has a "templates-file" that is not a path to a file of templates');
 });
 
 it('refuses a template that is named by something other than a name', function () {

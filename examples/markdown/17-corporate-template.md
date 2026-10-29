@@ -2,7 +2,7 @@
 title: Third-quarter review
 description: A corporate deck built out of the house template.
 theme: ./corporate/theme.yml
-chrome: ./corporate/chrome.md
+templates-file: ./corporate/templates.md
 layout: title
 template: wordmark
 ---
