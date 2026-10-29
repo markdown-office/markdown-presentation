@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Tests\Support;
 
+use MarkdownPresentation\Files\DiskFinder;
+use MarkdownPresentation\Theme\LoadedTheme;
+use MarkdownPresentation\Theme\ThemeLoader;
+
 /**
  * A theme directory built for one test.
  */
@@ -94,5 +98,52 @@ final class ThemeDirectory
     public static function acme(array $beside = [], string $prefix = 'theme'): string
     {
         return self::create(['theme.yml' => self::ACME] + $beside, $prefix);
+    }
+
+    /**
+     * A theme read out of a directory, the way the loader reads one.
+     *
+     * A theme is read by name: the finder is told where the themes are and the loader
+     * asks it for `<name>/<file>`. The name is the directory's own, and the finder is
+     * given the directory that holds it.
+     *
+     * @param string $directory The theme's own directory.
+     * @param ThemeLoader|null $loader The loader, which brings its own scope. Null takes
+     *                                 a loader that trusts the files it is given.
+     */
+    public static function load(string $directory, ?ThemeLoader $loader = null): LoadedTheme
+    {
+        return ($loader ?? new ThemeLoader())->load(
+            basename($directory),
+            $directory,
+            self::finder($directory),
+        );
+    }
+
+    /**
+     * A theme read out of the manifest that describes it, the way the loader reads one.
+     *
+     * @param string $directory The theme's own directory.
+     * @param string|null $written What the deck wrote, which is what a failure names.
+     * @param ThemeLoader|null $loader The loader, which brings its own scope.
+     */
+    public static function loadManifest(
+        string $directory,
+        ?string $written = null,
+        ?ThemeLoader $loader = null,
+    ): LoadedTheme {
+        return ($loader ?? new ThemeLoader())->loadManifest(
+            basename($directory),
+            $written ?? $directory . '/' . ThemeLoader::THEME_FILE,
+            self::finder($directory),
+        );
+    }
+
+    /**
+     * The finder that resolves the themes in a directory.
+     */
+    public static function finder(string $directory): DiskFinder
+    {
+        return new DiskFinder(theme: [dirname($directory)]);
     }
 }

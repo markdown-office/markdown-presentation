@@ -256,9 +256,10 @@ it('lists the style slots a theme may name', function () {
 
 it('loads every theme that ships with the library', function () {
     $loader = new MarkdownPresentation\Theme\ThemeLoader();
+    $finder = new MarkdownPresentation\Files\DiskFinder(theme: [dirname(__DIR__, 2) . THEMES]);
 
     foreach (['default', 'corporate-dark', 'minimal'] as $name) {
-        $loaded = $loader->load(dirname(__DIR__, 2) . THEMES . $name);
+        $loaded = $loader->load($name, $name, $finder);
 
         expect($loaded->theme()->name())->not->toBeEmpty()
             ->and($loaded->roles())->toContain('title', 'content', 'two-column');
@@ -267,22 +268,24 @@ it('loads every theme that ships with the library', function () {
 
 it('loads the dark flag off disk, so the shipped dark theme really is one', function () {
     $loader = new MarkdownPresentation\Theme\ThemeLoader();
+    $finder = new MarkdownPresentation\Files\DiskFinder(theme: [dirname(__DIR__, 2) . THEMES]);
 
     // The file is read, not assumed: `corporate-dark` has said it is dark since the
     // flag was added, and a theme with a near-black `dk1` and no flag renders light.
-    expect($loader->load(dirname(__DIR__, 2) . THEMES . 'corporate-dark')->theme()->isDark())->toBeTrue();
+    expect($loader->load('corporate-dark', 'corporate-dark', $finder)->theme()->isDark())->toBeTrue();
 
     foreach (['default', 'minimal'] as $name) {
-        expect($loader->load(dirname(__DIR__, 2) . THEMES . $name)->theme()->isDark())->toBeFalse();
+        expect($loader->load($name, $name, $finder)->theme()->isDark())->toBeFalse();
     }
 });
 
 it('paints every dark theme that ships in type a reader can read', function () {
     $loader = new MarkdownPresentation\Theme\ThemeLoader();
+    $finder = new MarkdownPresentation\Files\DiskFinder(theme: [dirname(__DIR__, 2) . THEMES]);
     $ratios = [];
 
     foreach (['default', 'corporate-dark', 'minimal'] as $name) {
-        $theme = $loader->load(dirname(__DIR__, 2) . THEMES . $name)->theme();
+        $theme = $loader->load($name, $name, $finder)->theme();
 
         if ($theme->isDark() === false) {
             continue;

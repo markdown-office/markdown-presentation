@@ -2461,9 +2461,16 @@ else can. Here a theme whose template maps only two roles:
 
 ```php
 use MarkdownPresentation\Exception\UnknownLayoutRole;
+use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Theme\ThemeLoader;
 
-$theme = (new ThemeLoader())->load((string) getenv('MARKDOWN_PRESENTATION_ROOT') . '/tests/fixtures/themes/sparse');
+$root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
+
+$theme = (new ThemeLoader())->load(
+    'sparse',
+    'sparse',
+    new DiskFinder(theme: [$root . '/tests/fixtures/themes']),
+);
 
 foreach (['three-column', 'section'] as $role) {
     try {
@@ -2554,12 +2561,17 @@ of the styling the theme asked for:
 
 ```php
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Theme\ThemeLoader;
 
 $root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
 
 try {
-    (new ThemeLoader())->load($root . '/tests/fixtures/themes/broken');
+    (new ThemeLoader())->load(
+        'broken',
+        'broken',
+        new DiskFinder(theme: [$root . '/tests/fixtures/themes']),
+    );
 } catch (UnknownStyleSlot $failure) {
     echo $failure->getMessage(), "\n";
 }

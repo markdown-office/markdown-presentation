@@ -107,6 +107,27 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`ThemeLoader::load()` and `loadManifest()` take a name and a finder.** The third
+  parameter was the scope a theme's own files were held to and is now the finder they
+  are read through; the first was a directory and is now the name the theme is known
+  by. The library composes the names — `house/theme.yml`, `house/styles.yml`,
+  `house/layouts.yml`, `house/text-styles.yml` and `house/template.pptx` — and asks
+  the finder for them, so a theme that never had a directory is read the same way as
+  one that did.
+
+  The scope check stays where it was, with the messages it had: each of a theme's own
+  files is resolved and held to the scope before it is read, so a `styles.yml` that is
+  a symlink out of the scope is still refused in this library's own words. The scope
+  is the loader's own now — `new ThemeLoader($scope)` — and `ThemeResolver` builds a
+  loader with its own scope unless it is given one.
+
+- **`ThemeResolver` takes the source of themes.** A `FileFinder` given to it is where
+  the themes come from: a theme the source holds resolves the same way as one on disk,
+  and it is refused in the same words when it resolves out of the roots. The
+  directories on disk remain the fallback, and the themes that resolve are listed from
+  the finder and from them together — so a failure still names every theme that would
+  have worked.
+
 - **The inline translator is told which slide and which theme it reads for.** `runs()`,
   `runsIn()` and `plain()` each take an `$slide` and a `$theme` now: a word in a text style
   is drawn in the face and the colour the theme names, and a mistake in one is a mistake on

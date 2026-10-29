@@ -11,10 +11,8 @@ use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
 use MarkdownPresentation\Theme\ThemeLoader;
 
-$loader = new ThemeLoader();
-
-it('reads a theme from a directory with nothing but a theme.yml in it', function () use ($loader) {
-    $loaded = $loader->load(ThemeDirectory::minimal('acme'));
+it('reads a theme from a directory with nothing but a theme.yml in it', function () {
+    $loaded = ThemeDirectory::load(ThemeDirectory::minimal('acme'));
 
     expect($loaded->theme()->name())->toBe('acme')
         ->and($loaded->directory())->toEndWith('/' . basename($loaded->directory()))
@@ -23,8 +21,8 @@ it('reads a theme from a directory with nothing but a theme.yml in it', function
         ->and($loaded->template())->toBeNull();
 });
 
-it('reads the style slots and the layout roles beside a theme.yml', function () use ($loader) {
-    $loaded = $loader->load(ThemeDirectory::acme([
+it('reads the style slots and the layout roles beside a theme.yml', function () {
+    $loaded = ThemeDirectory::load(ThemeDirectory::acme([
         'styles.yml' => "heading.1: ReportTitle\nparagraph: BodyText\ncodeFont:\n  name: Fira Code\n  size: 10\n",
         'layouts.yml' => "layouts:\n  title: Title Slide\n  two-column: Two Content\n",
     ]));
@@ -37,19 +35,19 @@ it('reads the style slots and the layout roles beside a theme.yml', function () 
         ->and($loaded->roles())->toBe(['title', 'two-column']);
 });
 
-it('reads a layouts file whose mappings stand on their own', function () use ($loader) {
-    $loaded = $loader->load(ThemeDirectory::acme([
+it('reads a layouts file whose mappings stand on their own', function () {
+    $loaded = ThemeDirectory::load(ThemeDirectory::acme([
         'layouts.yml' => "title: Title Slide\nblank: Blank\n",
     ]));
 
     expect($loaded->layout('blank'))->toBe('Blank');
 });
 
-it('says a directory with no theme.yml is not a theme', function () use ($loader) {
-    $loader->load(ThemeDirectory::create(['layouts.yml' => "title: Title Slide\n"], 'not-a-theme'));
+it('says a directory with no theme.yml is not a theme', function () {
+    ThemeDirectory::load(ThemeDirectory::create(['layouts.yml' => "title: Title Slide\n"], 'not-a-theme'));
 })->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
 
-it('reads a theme from the manifest file that describes it', function () use ($loader) {
+it('reads a theme from the manifest file that describes it', function () {
     // The manifest is the theme, and the rest of the theme is read from beside it: a
     // theme is a directory, and the manifest is the one file that directory cannot do
     // without.
@@ -57,134 +55,136 @@ it('reads a theme from the manifest file that describes it', function () use ($l
         'layouts.yml' => "layouts:\n  content: Title and Content\n",
     ]);
 
-    $loaded = $loader->loadManifest($directory . '/theme.yml');
+    $loaded = ThemeDirectory::loadManifest($directory);
 
     expect($loaded->theme()->name())->toBe('Acme')
         ->and($loaded->directory())->toBe($directory)
         ->and($loaded->layouts())->toBe(['content' => 'Title and Content']);
 });
 
-it('says a file that is not a theme manifest is not one', function () use ($loader) {
+it('says a file that is not a theme manifest is not one', function () {
     $directory = ThemeDirectory::create(['notes.txt' => 'not a theme'], 'not-a-manifest');
 
-    $loader->loadManifest($directory . '/notes.txt');
+    ThemeDirectory::loadManifest($directory, 'notes.txt');
 })->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
 
-it('says a manifest file that is not there is not a theme', function () use ($loader) {
+it('says a manifest file that is not there is not one', function () {
     $directory = ThemeDirectory::create([], 'empty');
 
-    $loader->loadManifest($directory . '/theme.yml');
+    ThemeDirectory::loadManifest($directory);
 })->throws(ThemeNotFound::class, 'is not a theme: it has no theme.yml');
 
-it('hands a style value back as it was written, tokens and all', function () use ($loader) {
+it('hands a style value back as it was written, tokens and all', function () {
     // A `styles.yml` may already reference a theme token. Resolving them is not
     // written yet, so the value passes through exactly as the file has it rather
     // than losing the reference.
-    $loaded = $loader->load(ThemeDirectory::acme([
+    $loaded = ThemeDirectory::load(ThemeDirectory::acme([
         'styles.yml' => "linkFont:\n  color: \"{accent1}\"\n  name: \"{fonts.mono}\"\n",
     ]));
 
     expect($loaded->styles())->toBe(['linkFont' => ['color' => '{accent1}', 'name' => '{fonts.mono}']]);
 });
 
-it('refuses a styles.yml slot that is not a style slot, and names the slots that are', function () use ($loader) {
+it('refuses a styles.yml slot that is not a style slot, and names the slots that are', function () {
     // The shipped fixture, so the README can show the same failure from the same
     // file rather than a directory built for the occasion.
-    $loader->load(dirname(__DIR__) . '/fixtures/themes/broken');
+    $directory = dirname(__DIR__) . '/fixtures/themes/broken';
+
+    ThemeDirectory::load($directory);
 })->throws(UnknownStyleSlot::class, '"blockquote" is not a style slot. The slots are: heading.1, heading.2');
 
-it('refuses a layouts.yml role that is not a role, and names the roles that are', function () use ($loader) {
-    $loader->load(ThemeDirectory::acme([
+it('refuses a layouts.yml role that is not a role, and names the roles that are', function () {
+    ThemeDirectory::load(ThemeDirectory::acme([
         'layouts.yml' => "layouts:\n  two-columns: Two Content\n",
     ]));
 })->throws(UnknownLayoutRole::class, '"two-columns" is not a layout role. The roles are: title, content, two-column, section, blank, image-text, image-title, image-slide');
 
-it('refuses a key beside the mappings that is not one', function () use ($loader) {
-    $loader->load(ThemeDirectory::acme([
+it('refuses a key beside the mappings that is not one', function () {
+    ThemeDirectory::load(ThemeDirectory::acme([
         'layouts.yml' => "layouts:\n  title: Title Slide\nlayout: Two Content\n",
     ]));
 })->throws(UnknownLayoutRole::class, '"layout" is not a key of a layouts file. Valid keys: layouts');
 
-it('refuses a layouts key that does not hold the mappings', function () use ($loader) {
-    $loader->load(ThemeDirectory::acme([
+it('refuses a layouts key that does not hold the mappings', function () {
+    ThemeDirectory::load(ThemeDirectory::acme([
         'layouts.yml' => "layouts: Two Content\n",
     ]));
 })->throws(UnknownLayoutRole::class, '"layouts" is not a mapping of roles to layout names');
 
-it('refuses a role mapped to nothing', function () use ($loader) {
-    $loader->load(ThemeDirectory::acme([
+it('refuses a role mapped to nothing', function () {
+    ThemeDirectory::load(ThemeDirectory::acme([
         'layouts.yml' => "layouts:\n  title:\n",
     ]));
 })->throws(UnknownLayoutRole::class, 'the "title" role is not a layout name');
 
-it('refuses a styles file that is not YAML', function () use ($loader) {
-    $loader->load(ThemeDirectory::acme([
+it('refuses a styles file that is not YAML', function () {
+    ThemeDirectory::load(ThemeDirectory::acme([
         'styles.yml' => "heading.1: \"unclosed\n",
     ]));
 })->throws(Exception::class, 'is not valid YAML');
 
-it('refuses a styles file that is not a mapping of slots', function () use ($loader) {
-    $loader->load(ThemeDirectory::acme([
+it('refuses a styles file that is not a mapping of slots', function () {
+    ThemeDirectory::load(ThemeDirectory::acme([
         'styles.yml' => "- heading.1\n",
     ]));
 })->throws(MalformedTheme::class, 'The file does not contain a mapping of style slots to styles');
 
-it('refuses a layouts file that is not a mapping of roles', function () use ($loader) {
-    $loader->load(ThemeDirectory::acme([
+it('refuses a layouts file that is not a mapping of roles', function () {
+    ThemeDirectory::load(ThemeDirectory::acme([
         'layouts.yml' => "- title\n",
     ]));
 })->throws(MalformedTheme::class, 'The file does not contain a mapping of layout roles to layout names');
 
-it('says a file it cannot read is a file it cannot read', function () use ($loader) {
+it('says a file it cannot read is a file it cannot read', function () {
     skipWithoutPermissions('The unreadable file');
 
     $directory = ThemeDirectory::acme();
 
     chmod($directory . '/theme.yml', 0o000);
 
-    $loader->load($directory);
+    ThemeDirectory::load($directory);
 })->throws(Exception::class, 'Unable to read');
 
-it('refuses a theme.yml that is not a theme', function () use ($loader) {
-    $loader->load(ThemeDirectory::create(['theme.yml' => "- one\n- two\n"]));
+it('refuses a theme.yml that is not a theme', function () {
+    ThemeDirectory::load(ThemeDirectory::create(['theme.yml' => "- one\n- two\n"]));
 })->throws(MalformedTheme::class, 'The file does not contain a theme — it is a list');
 
-it('refuses a theme.yml that is a bare string rather than a mapping of keys', function () use ($loader) {
-    $loader->load(ThemeDirectory::create(['theme.yml' => "Corporate Dark\n"]));
+it('refuses a theme.yml that is a bare string rather than a mapping of keys', function () {
+    ThemeDirectory::load(ThemeDirectory::create(['theme.yml' => "Corporate Dark\n"]));
 })->throws(MalformedTheme::class, 'The file does not contain a theme — it is a string');
 
-it('reads a file with nothing in it as a file with nothing in it', function () use ($loader) {
+it('reads a file with nothing in it as a file with nothing in it', function () {
     // An empty styles file is a theme that overrides nothing, which is a fact about
     // the theme rather than a mistake in it.
-    $loaded = $loader->load(ThemeDirectory::acme([
+    $loaded = ThemeDirectory::load(ThemeDirectory::acme([
         'styles.yml' => '',
     ]));
 
     expect($loaded->styles())->toBe([]);
 });
 
-it('names a theme that has no layouts.yml when a role cannot be resolved', function () use ($loader) {
-    $loaded = $loader->load(ThemeDirectory::minimal('acme'));
+it('names a theme that has no layouts.yml when a role cannot be resolved', function () {
+    $loaded = ThemeDirectory::load(ThemeDirectory::minimal('acme'));
 
     $loaded->layout('content');
 })->throws(UnknownLayoutRole::class, 'The theme "acme" maps no "content" layout. It maps: (none — the theme has no layouts.yml)');
 
-it('names the roles a theme does have when the one asked for is not one of them', function () use ($loader) {
-    $loaded = $loader->load(ThemeDirectory::acme([
+it('names the roles a theme does have when the one asked for is not one of them', function () {
+    $loaded = ThemeDirectory::load(ThemeDirectory::acme([
         'layouts.yml' => "layouts:\n  title: Title Slide\n  blank: Blank\n",
     ]));
 
     $loaded->layout('section');
 })->throws(UnknownLayoutRole::class, 'The theme "Acme" maps no "section" layout. It maps: title, blank');
 
-it('refuses a layout name that is not a role at all', function () use ($loader) {
-    $loaded = $loader->load(ThemeDirectory::minimal('acme'));
+it('refuses a layout name that is not a role at all', function () {
+    $loaded = ThemeDirectory::load(ThemeDirectory::minimal('acme'));
 
     $loaded->layout('Two Content');
 })->throws(UnknownLayoutRole::class, '"Two Content" is not a layout role. The roles are: title, content, two-column, section, blank, image-text, image-title, image-slide');
 
-it('turns a role into the layout name of the theme\'s own template', function () use ($loader) {
-    $loaded = $loader->load(ThemeDirectory::acme([
+it('turns a role into the layout name of the theme\'s own template', function () {
+    $loaded = ThemeDirectory::load(ThemeDirectory::acme([
         'layouts.yml' => "layouts:\n  two-column: Two Content\n",
             'template.pptx' => 'not really a template',
         ]));
@@ -193,7 +193,7 @@ it('turns a role into the layout name of the theme\'s own template', function ()
         ->and($loaded->template())->toBe($loaded->directory() . '/template.pptx');
 });
 
-it('refuses a file of a theme that resolves outside the scope', function () use ($loader) {
+it('refuses a file of a theme that resolves outside the scope', function () {
     // The loader's own scope, for a caller that reads a theme without the resolver.
     // The file is resolved and held, and one that reaches out of the scope is
     // refused by name.
@@ -202,7 +202,7 @@ it('refuses a file of a theme that resolves outside the scope', function () use 
     ThemeDirectory::link($directory . '/styles.yml', $outside . '/styles.yml');
     $scope = new PathScope([$directory]);
 
-    expect(fn () => $loader->load($directory, 'acme', $scope))
+    expect(fn () => ThemeDirectory::load($directory, new ThemeLoader($scope)))
         ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/styles.yml') . '" rather than one this render may read');
 });
 
@@ -210,15 +210,14 @@ it('takes the files of a theme on trust when it has no scope', function () {
     // The scope is what makes the check; without one the loader reads what it is
     // given, which is what a theme this library ships is and what a caller naming a
     // directory of its own is asking for.
-    $loader = new ThemeLoader();
     $outside = ThemeDirectory::create(['styles.yml' => "heading.1: ReportTitle\n"], 'outside');
     $directory = ThemeDirectory::acme();
     ThemeDirectory::link($directory . '/styles.yml', $outside . '/styles.yml');
 
-    expect($loader->load($directory)->styles())->toBe(['heading.1' => 'ReportTitle']);
+    expect(ThemeDirectory::load($directory)->styles())->toBe(['heading.1' => 'ReportTitle']);
 });
 
-it('reads a manifest the deck named, whatever the file it reached is called', function () use ($loader) {
+it('reads a manifest the deck named, whatever the file it reached is called', function () {
     // The resolver resolves a path before it hands it over, so the loader is given the
     // file the path reached, whose name is the target's rather than the one the deck
     // wrote. The name the deck wrote is what makes a file the manifest of a theme, so
@@ -226,18 +225,18 @@ it('reads a manifest the deck named, whatever the file it reached is called', fu
     $directory = ThemeDirectory::create(['other.yml' => "name: Linked\n"], 'manifest');
     ThemeDirectory::link($directory . '/theme.yml', $directory . '/other.yml');
 
-    $loaded = $loader->loadManifest(realpath($directory . '/other.yml'), 'theme.yml', new PathScope([$directory]));
+    $loaded = ThemeDirectory::loadManifest($directory, 'theme.yml', new ThemeLoader(new PathScope([$directory])));
 
     expect($loaded->theme()->name())->toBe('Linked');
 });
 
-it('refuses a manifest that resolves outside the scope', function () use ($loader) {
+it('refuses a manifest that resolves outside the scope', function () {
     // The scope is about where the file is, not what it is called: a manifest reaching
     // out of the scope is refused by the scope, whatever the deck called it.
     $outside = ThemeDirectory::create(['other.yml' => "name: Stolen\n"], 'outside');
     $directory = ThemeDirectory::create(['theme.yml' => "name: Acme\n"], 'theme');
     ThemeDirectory::link($directory . '/theme.yml', $outside . '/other.yml');
 
-    expect(fn () => $loader->loadManifest($directory . '/theme.yml', 'theme.yml', new PathScope([$directory])))
+    expect(fn () => ThemeDirectory::loadManifest($directory, 'theme.yml', new ThemeLoader(new PathScope([$directory]))))
         ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/other.yml') . '" rather than one this render may read');
 });
