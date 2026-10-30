@@ -8,6 +8,7 @@ use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownStyleSlot;
 use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Tests\Support\ThemeDirectory;
 use MarkdownPresentation\Theme\ThemeLoader;
 
@@ -204,6 +205,22 @@ it('refuses a file of a theme that resolves outside the scope', function () {
 
     expect(fn () => ThemeDirectory::load($directory, new ThemeLoader($scope)))
         ->toThrow(ThemeNotFound::class, 'is at "' . realpath($outside . '/styles.yml') . '" rather than one this render may read');
+});
+
+it('resolves the path of a theme\'s files, with a scope or without one', function () {
+    // The Word half's loader resolves the path whether or not it has a scope, and the two
+    // loaders are meant to be interchangeable: a theme read through a link is the theme
+    // the link reaches, whichever half reads it.
+    $real = ThemeDirectory::create(['theme.yml' => "name: Linked\n"], 'real');
+    $holder = Scratch::directoryPath('holder');
+
+    if (!@symlink($real, $holder . '/house')) {
+        test()->markTestSkipped('symlinks are not available here');
+    }
+
+    $loaded = ThemeDirectory::load($holder . '/house');
+
+    expect($loaded->directory())->toBe(realpath($real));
 });
 
 it('takes the files of a theme on trust when it has no scope', function () {

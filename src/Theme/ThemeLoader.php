@@ -193,33 +193,30 @@ final class ThemeLoader
     }
 
     /**
-     * A path held to the scope, and the file it names.
+     * A path resolved and held to the scope.
      *
      * The path is resolved before it is held, because a prefix is not containment: `..`
      * and a symlink both defeat one, and a symlink pointing outside the roots is the
      * ordinary way a path that looks harmless turns into a read of the wrong file.
      *
-     * Without a scope there is nothing to hold the path to, and it is taken as the
-     * finder answered it: a theme this library ships is read on trust, and so is one a
-     * caller named a directory of its own.
+     * Without a scope there is nothing to hold the path to, and the file is read on
+     * trust: a theme this library ships is one, and so is one a caller named a directory
+     * of its own. The path is resolved all the same, because the Word half's loader
+     * resolves it and the two have to answer the same way.
      *
-     * @return string|null The path of the file, or null when there is none.
+     * @return string|null The resolved path, or null when there is no such file.
      *
      * @throws ThemeNotFound when the file is somewhere this render may not read
      */
     private function contained(string $path, string $written): ?string
     {
-        if ($this->scope === null) {
-            return file_exists($path) ? $path : null;
-        }
-
         $real = PathScope::resolve($path);
 
         if ($real === null) {
             return null;
         }
 
-        if (!$this->scope->holds($real)) {
+        if ($this->scope !== null && !$this->scope->holds($real)) {
             throw ThemeNotFound::outside($written, $real, $this->scope->roots());
         }
 
@@ -235,11 +232,11 @@ final class ThemeLoader
      * is a file outside it read under a name that is inside. A source that holds only the
      * bytes has them staged into a file of the library's own.
      *
-     * A null answer is ambiguous on its own: the theme may carry no master, or the source
-     * may not be able to serve one. The listing of the theme's files tells the two apart,
-     * and a master the theme carries and the source cannot serve is refused rather than
-     * drawn without — a deck without the master's geometry is in the wrong design, with
-     * nothing in it saying so.
+     * A master the theme carries and the source cannot serve is refused rather than drawn
+     * without — a deck without the master's geometry is in the wrong design, with nothing
+     * in it saying so. The listing of the theme's files tells a theme that carries no
+     * master from a source that cannot serve one, and a path the source answers for a
+     * master it cannot serve is the same case said the other way round.
      *
      * @throws UnservedTemplate when the theme carries a master the source cannot serve
      * @throws ThemeNotFound when the master resolves outside the directories this render may read
@@ -253,7 +250,11 @@ final class ThemeLoader
         if ($path !== null) {
             $real = $this->contained($path, $written);
 
-            return $real === null ? null : Master::at($real, $file);
+            if ($real === null) {
+                throw UnservedTemplate::named($written, self::TEMPLATE_FILE);
+            }
+
+            return Master::at($real, $file);
         }
 
         $bytes = $files?->read($file, 'theme');

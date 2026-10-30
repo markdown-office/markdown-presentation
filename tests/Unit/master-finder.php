@@ -13,6 +13,7 @@ use MarkdownPresentation\Tests\Support\MemoryFinder;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 use MarkdownPresentation\Theme\LayoutRole;
+use MarkdownPresentation\Theme\ThemeLoader;
 use MarkdownPresentation\Theme\ThemeResolver;
 
 /*
@@ -86,6 +87,61 @@ final class MasterlessSource implements FileFinder
     {
         return ['layouts.yml', 'template.pptx', 'theme.yml'];
     }
+}
+
+/**
+ * A source that holds the theme's files as paths, and cannot serve the master.
+ *
+ * The other way a source cannot serve a master: it answers a path for one and the file is
+ * not there. The listing says the theme carries a master, and the path says where it
+ * should be.
+ */
+final class UnmountedSource implements FileFinder
+{
+    /**
+     * @param string $directory Where the theme's files are said to be.
+     */
+    public function __construct(private readonly string $directory)
+    {
+    }
+
+    public function read(string $name, ?string $role = null): ?string
+    {
+        return null;
+    }
+
+    public function path(string $name, ?string $role = null): ?string
+    {
+        return $this->directory . '/' . $name;
+    }
+
+    public function themes(): array
+    {
+        return ['house'];
+    }
+
+    public function files(string $theme): array
+    {
+        return ['layouts.yml', 'template.pptx', 'theme.yml'];
+    }
+}
+
+/**
+ * A theme's own files, written where a source says a theme's files are.
+ *
+ * The master is left out on purpose: the source cannot serve it, and the path it answers
+ * for it is the one that is not there.
+ */
+function unmountedTheme(string $prefix = 'mounted'): string
+{
+    $directory = Scratch::directoryPath($prefix);
+
+    mkdir($directory . '/house');
+
+    file_put_contents($directory . '/house/theme.yml', (string) file_get_contents(masterTheme() . '/theme.yml'));
+    file_put_contents($directory . '/house/layouts.yml', (string) file_get_contents(masterTheme() . '/layouts.yml'));
+
+    return $directory;
 }
 
 it('draws a deck in the geometry of a master the source holds as a file', function () {
@@ -187,6 +243,40 @@ it('refuses a master the source cannot serve, by name', function () {
         ->toThrow(UnservedTemplate::class, 'The theme "house" carries a "template.pptx" that the source of this render cannot serve');
 
     // And no deck was written: the refusal came before anything was built.
+    expect(filesize($path))->toBe(0);
+});
+
+it('refuses a master the source answers a path for and cannot serve', function () {
+    // The source names the master and answers a path for it, and the file is not there:
+    // the same refusal as a source that answers nothing for it, said the other way
+    // round. A deck drawn without the master would be in the wrong design with nothing in
+    // it saying so.
+    $finder = new UnmountedSource(unmountedTheme());
+
+    expect(fn () => (new ThemeLoader())->load('house', 'house', $finder))
+        ->toThrow(UnservedTemplate::class, 'The theme "house" carries a "template.pptx" that the source of this render cannot serve');
+});
+
+it('draws no deck when the source answers a path for a master it cannot serve', function () {
+    // The refusal came before anything was built, so there is no file behind it.
+    $directory = unmountedTheme('unmounted');
+
+    $resolver = new ThemeResolver(
+        workingDirectory: Scratch::directoryPath('working'),
+        builtinDirectory: Scratch::directoryPath('builtin'),
+        roots: [$directory],
+        files: new UnmountedSource($directory),
+    );
+
+    $path = Scratch::file('master-unmounted.pptx', '');
+
+    expect(fn () => (new PresentationRenderer(themes: $resolver))
+        ->render(
+            (new DeckParser())->parse("---\ntheme: house\n---\n# One\n"),
+            $path,
+        ))
+        ->toThrow(UnservedTemplate::class);
+
     expect(filesize($path))->toBe(0);
 });
 

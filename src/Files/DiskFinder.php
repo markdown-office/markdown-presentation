@@ -22,12 +22,9 @@ use MarkdownPresentation\Theme\ThemeLoader;
 final class DiskFinder implements FileFinder
 {
     /**
-     * @param list<string> $theme    The directories a theme's files are looked for in, in
-     *                               the order they are tried.
-     * @param list<string> $picture  The directories a picture is looked for in, in the
-     *                               order they are tried.
-     * @param list<string> $document The directories a deck's own file is looked for in,
-     *                               in the order they are tried.
+     * @param list<string> $theme    The directories a theme's files are looked for in.
+     * @param list<string> $picture  The directories a picture is looked for in.
+     * @param list<string> $document The directories a deck's own file is looked for in.
      */
     public function __construct(
         private readonly array $theme = [],
@@ -47,9 +44,6 @@ final class DiskFinder implements FileFinder
             return null;
         }
 
-        // `@file_get_contents()` rather than a check first: a file that cannot be read is
-        // a file the finder has no contents for, and the warning it would print is not
-        // a failure anybody can act on.
         $contents = @file_get_contents($path);
 
         return $contents === false ? null : $contents;
@@ -58,9 +52,8 @@ final class DiskFinder implements FileFinder
     /**
      * The path of a file a name identifies, when this finder holds it as a file.
      *
-     * The path as it was resolved rather than as the machine spells it: the library
-     * resolves what it is given and holds it to its own roots, and a path that arrives
-     * already resolved is a path it cannot check.
+     * The path as it was written, not as the file system resolved it: the library
+     * resolves what it is given and holds it to its own roots.
      */
     public function path(string $name, ?string $role = null): ?string
     {
@@ -182,8 +175,7 @@ final class DiskFinder implements FileFinder
      * A theme's file is named inside its theme, so the name is `<theme>/<file>` and
      * the theme's directory is found first. The file is then looked for inside that
      * directory and nowhere else: a directory that exists but holds no manifest
-     * shadows a later one, which is what a theme resolved from a directory has always
-     * done.
+     * shadows a later one.
      */
     private function resolveTheme(string $name): ?string
     {
@@ -231,11 +223,10 @@ final class DiskFinder implements FileFinder
      * A role the finder was given no bases for looks in none of them: the role says
      * which world the name is resolved in, and a world it does not know about is not
      * one it can answer for. A name with no role is looked for in every world, in the
-     * order the roles are declared, and is resolved as a plain name — the role is
-     * what says how a name is resolved.
+     * order the roles are declared.
      *
      * The theme role is not among them: a theme is resolved by its directory rather
-     * than by a file in a base, which {@see self::resolveTheme()} is where happens.
+     * than by a file in a base, which {@see self::resolveTheme()} does.
      *
      * @return list<string>
      */

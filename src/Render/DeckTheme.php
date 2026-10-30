@@ -20,10 +20,6 @@ use MarkdownPresentation\Theme\ThemeResolver;
  * than a step of the walk that draws it: the theme is resolved, the role of each slide is
  * read, and the boxes the theme's own template gives those roles are taken — and none of
  * that is the renderer's own work.
- *
- * A theme named in code answers for the deck, so the name is resolved once and kept: a
- * source that counts its reads would say the name is asked for once and not once for the
- * name and once for the deck.
  */
 final class DeckTheme
 {

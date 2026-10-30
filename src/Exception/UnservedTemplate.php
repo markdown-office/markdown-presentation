@@ -7,11 +7,11 @@ namespace MarkdownPresentation\Exception;
 /**
  * A theme's master that the source of a render cannot serve.
  *
- * The theme carries a `template.pptx` — the listing of the theme's files says so — and the
- * source cannot hand it over. That is a different thing from a theme that carries no
- * master at all, and the difference is the whole of why this is a failure of its own: a
- * deck drawn without the master's geometry is drawn in the wrong design, with nothing in
- * the file saying so.
+ * The theme carries a `template.pptx` and the source cannot hand it over: the listing of
+ * the theme's files says the theme carries one, or the source answers a path for one it
+ * cannot serve. That is a different thing from a theme that carries no master at all, and
+ * the difference is the whole of why this is a failure of its own: a deck drawn without
+ * the master's geometry is drawn in the wrong design, with nothing in the file saying so.
  *
  * `Exception` rather than `InvalidInput`, because neither the author of the deck nor the
  * author of the theme can act on it: the file is right and the program that brought the

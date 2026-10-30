@@ -312,10 +312,10 @@ them:
 $renderer = (new PresentationRenderer())->withTheme('corporate-dark');
 ```
 
-The name is resolved through the finder when it is given, and the theme that came back is
-kept: the name is asked for once, and not once for the name and once for the deck. The
-deck's own `theme:` is not read — but it is checked, because a value of the wrong type is
-a mistake in the deck whatever theme the deck is drawn in.
+The name is resolved through the resolver's finder when it is given, and the theme that
+came back is kept: the name is asked for once, and not once for the name and once for the
+deck. The deck's own `theme:` is not read — but it is checked, because a value of the wrong
+type is a mistake in the deck whatever theme the deck is drawn in.
 
 **A deck can come back as bytes.** `render()` writes the deck to a path and hands the path
 back; `toString()` hands back the bytes of the same deck:
@@ -2660,10 +2660,13 @@ file that is out of reach is answered like any other: the question of what a ren
 may read belongs to the library, which holds the path a finder answered to its own
 scope and refuses what is out of reach in its own words.
 
-`Files\DiskFinder` is the default and answers out of directories on this machine, one
-list of bases per role, tried in the order they are given. The directories of themes
-on disk remain the fallback, so a program with a finder of its own does not lose the
-themes that ship with the package.
+`Files\DiskFinder` answers out of directories on this machine, one list of bases per
+role, tried in the order they are given. A program that brings no finder of its own gets
+one for its **themes** — the directories of themes beside the deck, beside the working
+directory and the ones that ship with the package. A picture falls back to the deck's own
+directory, and so does the templates file it imports. The directories of themes on disk
+remain the fallback, so a program with a finder of its own does not lose the themes that
+ship with the package.
 
 **A name that is already a path is the path, whatever the role.** A name beginning with
 `/` names a file, and resolving it against a base would name a file nobody meant — so it
@@ -2681,7 +2684,8 @@ master is a theme that works, and nothing is said about it. A theme that carries
 and a source that cannot hand it over is refused with
 `MarkdownPresentation\Exception\UnservedTemplate` rather than drawn without: a deck
 without the master's geometry is in the wrong design, with nothing in the file saying
-so. The listing of a theme's files is what tells the two apart.
+so. The listing of a theme's files is what tells the two apart, and a source that
+answers a path for a master it cannot serve is refused the same way.
 
 ## Loud failures
 

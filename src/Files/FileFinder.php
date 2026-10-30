@@ -18,8 +18,9 @@ namespace MarkdownPresentation\Files;
  * not what may be served. The three role names are the same in both halves of this
  * suite, so a finder written once serves both.
  *
- * The names are the library's own: a theme's manifest is `corporate/theme.yml` and a
- * picture is `logo.png`. A name is looked for in the places the finder was told about.
+ * The names are the library's own: a theme's manifest is `corporate/theme.yml`, its
+ * master `corporate/template.pptx` and a picture is `logo.png`. A name is looked for
+ * in the places the finder was told about.
  *
  * **A finder answers; it does not refuse.** A file that is not there is null, and
  * nothing else. Each half of this suite has its own exceptions, so a finder that

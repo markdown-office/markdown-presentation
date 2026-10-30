@@ -54,11 +54,10 @@ use MarkdownPresentation\Filesystem\PathScope;
  * path as written cannot tell. The loader holds each file it reads, and the template it
  * names, and refuses the one that resolves elsewhere.
  *
- * The themes themselves are read through a finder, which is given the directories of
- * themes above: the finder resolves a name against them in the order they are given,
- * and a theme directory that holds no manifest still shadows a later one. A finder the
- * calling program brought is the source of themes in its own right, and the directories
- * on disk remain the fallback rather than the only place a theme is looked for.
+ * The themes themselves are read through a finder: the one the calling program brought,
+ * or one over the directories of themes above. A theme directory that holds no manifest
+ * still shadows a later one, and the directories on disk remain the fallback rather than
+ * the only place a theme is looked for.
  */
 final class ThemeResolver
 {
@@ -247,7 +246,7 @@ final class ThemeResolver
      * The finder the themes are read through: the source the calling program brought,
      * or the disk default.
      *
-     * The default holds the directories of themes the six steps name, in the order they
+     * The default holds the directories of themes the resolver looks in, in the order they
      * are tried, so a theme is resolved by its directory and a theme directory that holds
      * no manifest still shadows a later one.
      */

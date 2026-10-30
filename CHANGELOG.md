@@ -16,9 +16,9 @@ All notable changes to this project are documented here. The format follows
   but it is still checked, because a value of the wrong type is a mistake in the deck
   whatever theme the deck is drawn in: a deck writing `theme: 42` is refused.
 
-  The name is resolved through the finder when it is given, and the theme that came back
-  is kept, so the name is asked for once and not once for the name and once for the
-  deck. A theme that does not resolve is refused when the name is given rather than at
+  The name is resolved through the resolver's finder when it is given, and the theme that
+  came back is kept, so the name is asked for once and not once for the name and once for
+  the deck. A theme that does not resolve is refused when the name is given rather than at
   the render, so a typo is reported before the deck is read.
 
 - **A deck can come back as bytes.** `PresentationRenderer::toString(Deck $deck): string`
@@ -151,6 +151,20 @@ All notable changes to this project are documented here. The format follows
   time. The master holds the source's bytes and writes them again when the file it
   staged is gone, at the mode of a file nobody else on the machine can read.
 
+- **Four parameters are named `$scope` rather than `$files`.** The directories a render
+  may read are not a source of files, and a parameter named `$files` said the opposite:
+  `Render\CommonMark\BlockTranslator::parse()`,
+  `Render\CommonMark\SlideState::__construct()`, `Render\Chrome::__construct()` and
+  `Theme\ThemeLoader::__construct()` all take one. A caller using PHP 8's named
+  arguments has to say the new name.
+
+- **A theme's own files are resolved whether the loader has a scope or not.** The path
+  of a file was resolved before it was read, but only where a scope was given: a loader
+  without one returned the path as it was written, so `LoadedTheme::directory()` and the
+  failures that name a path said one thing in one half of the suite and another in the
+  other. The Word half's loader resolves the path either way, and this one does the
+  same now.
+
 - **`ThemeLoader::load()` and `loadManifest()` take a name and a finder.** The third
   parameter was the scope a theme's own files were held to and is now the finder they
   are read through; the first was a directory and is now the name the theme is known
@@ -197,7 +211,8 @@ All notable changes to this project are documented here. The format follows
   `Exception\UnservedTemplate` — rather than drawn without. The listing of a theme's
   files settles what a null answer means: the theme may carry no master, or the source
   may not be able to serve one, and a deck drawn without the master's geometry is drawn
-  in the wrong design with nothing saying so.
+  in the wrong design with nothing saying so. A source that answers a path for a master
+  it cannot serve is refused the same way, rather than drawn without.
 
 - **`LoadedTheme::template()` returns the master rather than its path.** It is a
   `Theme\Master` now: the path the master is opened at, the name a failure calls it,

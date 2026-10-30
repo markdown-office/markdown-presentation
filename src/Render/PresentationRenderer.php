@@ -156,7 +156,7 @@ final class PresentationRenderer
     /**
      * The source of the deck's files: its pictures and the templates file it names.
      *
-     * Null for the disk, which is where a deck's files were found before there was a
+     * Null for the disk, which is where a deck's files are found when there is no
      * source. A source that holds them as bytes is asked for them by name.
      */
     private readonly ?FileFinder $files;
@@ -223,7 +223,7 @@ final class PresentationRenderer
      * @param string       $directory  The directory a relative image path in the deck
      *                                 resolves against, which is the directory the deck
      *                                 itself is in. It is also the first of the roots an
-     *                                 image may be read from: see {@see self::$files}.
+     *                                 image may be read from: see {@see self::$scope}.
      * @param ThemeResolver $themes    The resolver the themes are looked up in. It is
      *                                 copied rather than used as it is: the renderer hands
      *                                 it the deck's directory, and the copy is the one
@@ -244,10 +244,9 @@ final class PresentationRenderer
      *                                 arbitrary path read this constructor argument exists
      *                                 to stop.
      * @param FileFinder|null $files Where the deck's files come from: the pictures it
-     *                                 names and the templates file it imports. Null for the
-     *                                 disk, which is where a deck's files were found before
-     *                                 there was a source. The theme is not among them: the
-     *                                 resolver the caller brought is where themes come from.
+     *                                 names and the templates file it imports. The theme is
+     *                                 not among them: the resolver the caller brought is
+     *                                 where themes come from.
      */
     public function __construct(
         private readonly string $directory = '.',
@@ -278,10 +277,11 @@ final class PresentationRenderer
      * type is a mistake in the deck whatever theme the deck is drawn in: a deck writing
      * `theme: 42` is refused.
      *
-     * The name is resolved through the finder when it is given, and the theme that came
-     * back is kept: a source that counts its reads would say the name is asked for once and
-     * not once for the name and once for the deck. A theme that does not resolve is
-     * refused here rather than at the render, so a typo is reported before the deck is read.
+     * The name is resolved through the resolver's finder when it is given, and the theme
+     * that came back is kept: a source that counts its reads would say the name is asked
+     * for once and not once for the name and once for the deck. A theme that does not
+     * resolve is refused here rather than at the render, so a typo is reported before the
+     * deck is read.
      *
      * Mutating rather than returning a new renderer: the renderer holds the deck's
      * directory and its sources, and there is no value in a copy that differs in a theme.

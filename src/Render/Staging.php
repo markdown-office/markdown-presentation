@@ -41,10 +41,11 @@ final class Staging
         try {
             $write($path);
 
-            // The writer unlinks the file `tempnam()` made and writes its own at the
-            // process umask: a deck in flight through a shared temporary directory is not
-            // readable by every account on the machine, and this is the only moment its
-            // permissions can be narrowed.
+            // The writer replaces the file and keeps the mode of the file it replaces, so
+            // the mode `tempnam()` gave it is the mode it keeps. The fallback path is the
+            // one that was not there to be replaced: the writer creates that file at the
+            // process umask, and a deck in flight through a shared temporary directory is
+            // then readable by every account on the machine.
             if (is_file($path)) {
                 @chmod($path, 0o600);
             }

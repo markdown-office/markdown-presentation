@@ -64,9 +64,10 @@ final class Master
 
         @file_put_contents($path, $bytes);
 
-        // A master in flight through a shared temporary directory is not readable by every
-        // account on the machine, and the mode is narrowed here because the file may have
-        // been written at the process umask.
+        // The mode is narrowed here: the mode `tempnam()` gave the file is the mode it
+        // keeps, but a file created from scratch — the fallback path — is created at the
+        // process umask, and a master in flight through a shared temporary directory is
+        // then readable by every account on the machine.
         @chmod($path, 0o600);
 
         return new self($path, $name, true, $bytes);

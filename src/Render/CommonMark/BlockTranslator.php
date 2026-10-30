@@ -158,8 +158,7 @@ final class BlockTranslator
      * Give back the files this translator staged.
      *
      * A picture the source held as bytes is staged into a file of the library's own, and
-     * the file is the render's: it goes when the render is over, and the render asks for
-     * it back here.
+     * the file is the render's: it goes when the render is over.
      */
     public function release(): void
     {

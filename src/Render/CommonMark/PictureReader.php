@@ -117,8 +117,7 @@ final class PictureReader
      * The source is asked first: a source that holds the picture as a file gives a path,
      * which is held to the scope as any other path is, and one that holds the bytes gives
      * the picture itself, which is staged into a file of the library's own. The disk is
-     * what a picture was found in before there was a source, and it is still where one is
-     * found when the source has none.
+     * where a picture is found when the source has none.
      *
      * @throws ImageNotFound
      */
@@ -178,10 +177,10 @@ final class PictureReader
      * name as well as the bytes, and a `.svgz` is a gzipped drawing rather than a broken
      * one.
      *
-     * It is made with `tempnam()`, so its name is one nobody guessed and its mode is one
-     * nobody else on the machine can read; renaming it keeps that mode. A file that could
-     * not be written is left as it is: the reader that opens the picture refuses it and
-     * says so, which is a better sentence than one about a temporary directory.
+     * It is made with `tempnam()`, so its name is one nobody guessed, and its mode is
+     * narrowed here, so that it is one nobody else on the machine can read. A file that
+     * could not be written is left as it is: the reader that opens the picture refuses it
+     * and says so, which is a better sentence than one about a temporary directory.
      */
     private function stage(string $bytes, string $written): string
     {
@@ -193,11 +192,16 @@ final class PictureReader
         $path = $extension === '' ? $temporary : $temporary . '.' . $extension;
 
         // Renamed rather than written under a second name, so that the file keeps the mode
-        // `tempnam()` gave it: a picture in flight through a shared temporary directory is
-        // not readable by every account on the machine.
+        // `tempnam()` gave it.
         @rename($temporary, $path);
 
         @file_put_contents($path, $bytes);
+
+        // The mode is narrowed here: renaming keeps the mode `tempnam()` gave the file,
+        // but a file created from scratch — the fallback path — is created at the process
+        // umask, and a picture in flight through a shared temporary directory is then
+        // readable by every account on the machine.
+        @chmod($path, 0o600);
 
         // Both names are the library's to remove: the picture is under the second, and the
         // first is where the file is if the rename did not happen.
