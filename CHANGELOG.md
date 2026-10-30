@@ -130,6 +130,23 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The install says which plugin, and what happens without it.** The requirement named
+  "a plugin" and the plugin two sentences later, so a consumer who stopped at the
+  requirement did not know what to allow. The README names
+  [`cweagans/composer-patches`][composer-patches] where the requirement is stated now,
+  and says what follows: the install stops with Composer's own message naming the
+  plugin, and a conversion against an unpatched PHPPresentation raises
+  `MarkdownPresentation\Exception\UnpatchedDependency`, whose message names the plugin
+  as well.
+
+  The page names the five methods [the patch][the-patch] adds and says which direction
+  needs each: the writer — the direction that writes a deck — needs
+  `Table::setFirstRow`, `AutoShape::setRoundRectCorner` and `RichText::setDescription`,
+  and the reader — the direction that takes a deck apart, through the patched
+  `PowerPoint2007` reader — needs `PowerPoint2007::zipPath` and `Gd::setContents` as well
+  as the description. The check asks for all five whichever way the library is used, and a
+  package that carries only some of them is refused rather than half-worked.
+
 - **`PresentationRenderer` is split, and `php:S1448` is closed on it.** Twenty-three
   methods was one finding too many, and the finding says what to do: split it.
 

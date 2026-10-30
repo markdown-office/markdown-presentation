@@ -33,12 +33,12 @@ PHP 8.2 or newer, `symfony/yaml` and `phpoffice/phppresentation` as hard depende
 frontmatter of a deck and every file of a theme is YAML, and a partial parser is worse for
 the machines that write them than for the people that do.
 
-**The project that installs this one has to allow a plugin.** This library writes a few
-things a released PHPPresentation cannot — a table that says which row is its header, a
-shape that says how round its corners are, a picture that says where it was read from — and
-gets them from a patch applied to the installed package. The patch is applied by
-[`cweagans/composer-patches`][composer-patches], which Composer only runs when the project
-allows it:
+**The project that installs this one has to allow [`cweagans/composer-patches`][composer-patches].**
+This library writes a few things a released PHPPresentation cannot — a table that says which
+row is its header, a shape that says how round its corners are, a run of text that says what
+it is, and a picture that says where it was read from — and gets them from a patch applied to
+the installed package. The plugin applies that patch, and Composer runs it only when the
+project allows it:
 
 ```json
 {
@@ -50,9 +50,26 @@ allows it:
 }
 ```
 
-Without that line the install stops with Composer's own message naming the plugin. The
-library refuses to work rather than write a deck with the parts missing, and says which
-plugin is the reason.
+Without that line the install stops with Composer's own message naming
+`cweagans/composer-patches`. A deck converted against an unpatched PHPPresentation raises
+`MarkdownPresentation\Exception\UnpatchedDependency`, whose message names the plugin as
+well.
+
+The patch adds five methods to PHPPresentation:
+
+| Method | Needed by | What it is for |
+| --- | --- | --- |
+| `Table::setFirstRow` | the writer | whether the first row of a table is its header |
+| `AutoShape::setRoundRectCorner` | the writer | how round the corners of a rounded rectangle are |
+| `RichText::setDescription` | the writer and the reader | the description a shape carries: the writer sets it, the reader reads it back |
+| `PowerPoint2007::zipPath` | the reader | the path a picture was read from, inside the package |
+| `Gd::setContents` | the reader | the bytes a picture was read from, as the package holds them |
+
+The writer is the direction that writes a `.pptx`; the reader is the direction that takes one
+apart, and it reads a deck through the patched `PowerPoint2007` reader. The check asks for
+all five of them, in either direction, and a package that carries only some is refused
+rather than half-worked. What is missing either fails somewhere else — naming a method
+rather than the reason — or is quietly left out of the deck that comes back.
 
 `ext-imagick` is optional and enables [SVG](#what-an-svg-costs-you). PowerPoint holds a
 vector only beside a raster of it, so something has to draw the raster; without the
