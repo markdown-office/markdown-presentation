@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The patch carries one more fix from upstream.** A chart's series is written in the
+  order the schema names it: the shape properties right after the title rather than after
+  the data points and the data labels, and the separator of the data labels of a doughnut
+  before the leader lines rather than after them. PowerPoint repairs a chart written the
+  other way round before it opens it
+  ([#695](https://github.com/PHPOffice/PHPPresentation/issues/695),
+  [#1044](https://github.com/PHPOffice/PHPPresentation/pull/1044)).
+
+  This library writes no chart, so nothing it draws changes: the patch is upstream's
+  branch whole, and the fix belongs to that branch rather than to this one.
+
 ## [0.3.0] - 2026-10-30
 
 ### Added
