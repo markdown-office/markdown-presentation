@@ -121,6 +121,14 @@ jobs:
       - name: Install
         run: composer install --prefer-dist --no-interaction --no-progress
 
+      - name: What the runner has
+        run: |
+          php -r 'var_dump(extension_loaded("imagick"));'
+          php -r 'print_r(Imagick::queryFormats("*SVG*"));'
+          convert -list format 2>/dev/null | grep -i svg || echo "no convert"
+          convert -list delegate 2>/dev/null | grep -i svg || echo "no delegate"
+          fc-list 2>/dev/null | head -3 || echo "no fonts"
+
       - name: The decks are valid OOXML
         run: vendor/bin/pest --testsuite=conformance --fail-on-skipped
 
