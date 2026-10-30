@@ -84,6 +84,88 @@ it('writes the deck that carries a vector and it is valid OOXML', function () {
     expect($status)->toBe(0, $output);
 });
 
+it('finds an error in a deck that has one', function () {
+    skipWithoutDotnetSdk();
+
+    // The gate is worth nothing if it cannot fail. A validator that answered "no
+    // errors" about every deck would pass the two tests above, so this one asks
+    // it about a deck with an error in it and expects to be told.
+    //
+    // The error is an element no schema names, and the deck is otherwise the one
+    // the library wrote: it still opens, so what refuses it is the schema and
+    // not a broken archive.
+    $decks = writeExampleDecks(false);
+
+    expect($decks)->not->toBe([]);
+
+    $broken = deckWithAnUnknownElement($decks[0]);
+
+    [$status, $output] = validateWithOpenXml([$broken]);
+
+    expect($status)->toBe(1, 'The validator did not refuse the deck:' . PHP_EOL . $output)
+        ->and($output)->toContain('notAnElement');
+});
+
+/**
+ * A copy of a deck, with an element in it that no schema names.
+ *
+ * The element goes into the shape tree of the first slide, which is where the
+ * schema is strictest about what may sit there.
+ */
+function deckWithAnUnknownElement(string $deck): string
+{
+    $archive = new ZipArchive();
+    $opened = $archive->open($deck);
+
+    if (true !== $opened) {
+        throw new RuntimeException(sprintf('The deck %s could not be opened.', $deck));
+    }
+
+    $parts = [];
+    $slide = null;
+
+    for ($i = 0; $i < $archive->numFiles; $i++) {
+        $name = (string) $archive->getNameIndex($i);
+        $parts[$name] = (string) $archive->getFromIndex($i);
+
+        if ($slide === null
+            && str_starts_with($name, 'ppt/slides/slide')
+            && str_ends_with($name, '.xml')
+        ) {
+            $slide = $name;
+        }
+    }
+
+    $archive->close();
+
+    if ($slide === null) {
+        throw new RuntimeException(sprintf('The deck %s has no slide in it.', $deck));
+    }
+
+    $broken = str_replace('<p:spTree>', '<p:spTree><p:notAnElement/>', $parts[$slide]);
+
+    if ($broken === $parts[$slide]) {
+        throw new RuntimeException(sprintf('The slide %s has no shape tree in it.', $slide));
+    }
+
+    $parts[$slide] = $broken;
+
+    // The extension matters: the tool decides how to open a file from it, and a
+    // scratch file whose name ends in a random suffix is not a deck to it.
+    $path = Scratch::directoryPath('deck') . '/broken.pptx';
+
+    file_put_contents($path, '');
+
+    $copy = new ZipArchive();
+    $copy->open($path, ZipArchive::OVERWRITE);
+    foreach ($parts as $name => $contents) {
+        $copy->addFromString($name, $contents);
+    }
+    $copy->close();
+
+    return $path;
+}
+
 /**
  * Skips the test where the machine cannot run the validator.
  *

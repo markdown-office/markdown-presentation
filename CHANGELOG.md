@@ -22,6 +22,8 @@ All notable changes to this project are documented here. The format follows
   The one deck that carries a vector needs a rasteriser to be written at all — the library
   refuses a picture it cannot draw rather than writing a diagram that has lost its words
   — so a machine without one says which deck it did not check and checks the rest.
+  **The continuous integration runner is such a machine**, so the gate checks eighteen of
+  the nineteen decks there, and the nineteenth is checked where a vector can be drawn.
 
 ### Changed
 
