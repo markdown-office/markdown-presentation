@@ -248,6 +248,11 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a directive nobody acts on is passed over' => 'an unknown directive is ignored',
     'a directive nobody reads is drawn as the words the deck wrote it' => 'draws a directive it does not read',
     'a v-click marker closing a list item is honoured' => 'a marker closing a list item',
+    // The pin and the strictness, as claims rather than as syntax: the history in
+    // `CHANGELOG.md` has to be able to say that the manifest once pinned a commit, so a
+    // phrase naming the old pin would fire on the history rather than on a wrong page.
+    'the manifest pins a commit of PHPPresentation master' => 'pins a commit of',
+    'the contributor instructions say validate runs without strict' => '`composer validate` is run **without**',
     // The old spellings, as claims rather than as syntax: `CHANGELOG.md` has to be able to
     // name what a deck used to be written in, so a phrase that only says "<!-- v-click"
     // would fire on the history that documents the change rather than on a wrong page.

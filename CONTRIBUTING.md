@@ -149,15 +149,18 @@ whether these decks open.
 ## What a change has to pass
 
 ```
-composer validate
+composer validate --strict
 vendor/bin/pest
 XDEBUG_MODE=coverage vendor/bin/pest --coverage --min=100
 sh tools/phpstan.sh
 php examples/build.php
 ```
 
-`composer validate` is run **without** `--strict` on purpose: the manifest pins a commit of
-PHPPresentation's `master` branch rather than a tag, and `--strict` refuses that.
+`composer validate` is run **with** `--strict`: the manifest requires `phpoffice/phppresentation`
+at `~1.2.0`, a range of tags, and `--strict` passes there. The fixes this library needs are not
+in that release, so they come from a patch the library applies to the installed package — the
+[README](README.md#installation) says what a project has to allow for the patch to land, and the
+[suite's own site](https://markdown-office.github.io/suite/) says the same.
 
 Coverage is 100% and PHPStan is level 9. Neither a baseline nor an `ignoreErrors` entry nor a
 suppression comment: a finding is fixed or left red with a reason. The analyser is fetched by
