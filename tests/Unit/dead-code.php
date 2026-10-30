@@ -486,6 +486,34 @@ it('does not claim again what the code does not do', function (string $claim) {
     // text, so it is refused as well. The phrase is the claim as it was made, so that a
     // comment may not make it again.
     'a label is refused on the shapes with no body of their own' => 'the shapes with no body of their own have nowhere to put it',
+
+    // The three files a render stages are the library's own, and a file in a shared
+    // temporary directory is not readable by every account on the machine. The comments
+    // gave three different accounts of how the mode is arrived at, and two of them were
+    // false: PHPPresentation's writer replaces the file and keeps the mode of the file it
+    // replaces, and the file `tempnam()` made is 0600 to begin with. The phrases are what
+    // the comments said rather than the idea, so that a comment may not make them again.
+    // Each phrase is one line of the comment it came from, because a guard that a line
+    // break can walk past is not a guard.
+    'a staged file is written at the process umask by the writer' => 'The writer unlinks the file `tempnam()` made',
+    'a staged file keeps the mode the rename gave it' => 'renaming it keeps that mode',
+    // The path a finder answers is the path as it was written, and the library resolves it
+    // before it reads it: a path that arrives already resolved is a path the library
+    // cannot check. The phrase is what the docblock said, which said the opposite.
+    'the path a finder answers is the path the machine spells' => 'as it was resolved rather than as the machine spells it',
+    // A loader without a scope reads the file it is given on trust, but it resolves the
+    // path all the same, because the Word half's loader does and the two have to answer
+    // the same way. The phrase is what the docblock said about the path it returned.
+    'a loader without a scope takes the path as the finder answered it' => 'nothing to hold the path to, and it is taken as the',
+    // The theme a deck is drawn in comes from the resolver's finder, and the deck's own
+    // files come from the renderer's: they are different finders, and a docblock that says
+    // "the finder" names the wrong one half the time.
+    'a theme named in code is resolved through the finder of the renderer' => 'resolved through the finder when it is given',
+    // A `DiskFinder` is built for the themes of a render and for nothing else: a picture
+    // falls back to the deck's own directory, and the templates file with it.
+    'the disk finder is the default of every role' => '`Files\DiskFinder` is the default',
+    // A docblock that points at a property by name has to point at the property there is.
+    'a docblock points at the property the rename left behind' => 'see {@see self::$files}',
 ]);
 
 it('has no decorative dividers in it', function () {

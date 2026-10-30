@@ -8,6 +8,29 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **A theme can be named in code, and it outranks the deck's own.**
+  `PresentationRenderer::withTheme(string $name): self` names the theme the decks are
+  drawn in, the way the Word half's `MarkdownToWord::withTheme()` does.
+
+  A theme named in code answers for the deck, so the deck's own `theme:` is not read —
+  but it is still checked, because a value of the wrong type is a mistake in the deck
+  whatever theme the deck is drawn in: a deck writing `theme: 42` is refused.
+
+  The name is resolved through the resolver's finder when it is given, and the theme that
+  came back is kept, so the name is asked for once and not once for the name and once for
+  the deck. A theme that does not resolve is refused when the name is given rather than at
+  the render, so a typo is reported before the deck is read.
+
+- **A deck can come back as bytes.** `PresentationRenderer::toString(Deck $deck): string`
+  is the counterpart of the Word half's `MarkdownToWord::toDocx()`: the deck, as the
+  bytes of a `.pptx`.
+
+  A `.pptx` is a package, and PHP's `ZipArchive` cannot write one to memory —
+  `open('php://temp')` answers 9 and `open('php://temp', CREATE | OVERWRITE)` fails at
+  `close()` — and PHPPresentation's writer takes a path. The deck is therefore written
+  to a file of the library's own, read back and given back: nothing of the library's is
+  left on the disk, whether the deck was written or the write failed.
+
 - **The furniture of a deck can be written once.** A wordmark, a rule and a page number
   were the same on every slide of a deck, and writing them out on every slide meant
   changing them on every slide: twenty-eight slides to find and twenty-eight edits to
@@ -26,14 +49,14 @@ All notable changes to this project are documented here. The format follows
   not over it.
 
   The templates may also live in a file beside the deck, named by the deck's frontmatter
-  and resolved against the deck's own directory, so that a deck and the furniture it
-  shares travel together. The deck's own templates override the imported ones of the same
-  name, the way a deck's own theme overrides the shipped one.
+  with `templates-file:` and resolved against the deck's own directory, so that a deck and
+  the furniture it shares travel together. The deck's own templates override the imported
+  ones of the same name, the way a deck's own theme overrides the shipped one.
 
   `examples/markdown/16-templates.md` is the deck that shows it: a template defined in the
   deck, slides that name one, two and three of them, a template imported from
-  `templates/chrome.md`, and a template of the deck's own of the same name as one the file
-  holds — the one that is drawn. The company is invented.
+  `templates/templates.md`, and a template of the deck's own of the same name as one the
+  file holds — the one that is drawn. The company is invented.
 
 - **A whole corporate template, as the files a company has.** A theme, a brand mark and
   the furniture of a deck are three separate things, and a company that has all three has
@@ -42,13 +65,13 @@ All notable changes to this project are documented here. The format follows
   `examples/markdown/17-corporate-template.md` is a deck that has them: a theme of its own
   in `examples/markdown/corporate/theme.yml`, a mark in two colours — one for a light page
   and one for a dark one, with the crosshair knocked out of it rather than painted on it,
-  so the page shows through it either way — and a chrome file holding the wordmark, the
+  so the page shows through it either way — and a templates file holding the wordmark, the
   rule and the footer.
 
   **A dark slide and a light one are the same deck, and the furniture on them cannot be
   the same furniture**: the name is ink on a light page and white on a dark one, so the
   dark wordmark is the same named style with the colour laid over it. That is the one
-  thing a chrome file cannot decide for itself, and it is why there are two of them.
+  thing a templates file cannot decide for itself, and it is why there are two of them.
 
   The company is invented, and so is every figure in the deck.
 
@@ -106,6 +129,99 @@ All notable changes to this project are documented here. The format follows
   deck that renders and shows something the author did not write.
 
 ### Changed
+
+- **`PresentationRenderer` is split, and `php:S1448` is closed on it.** Twenty-three
+  methods was one finding too many, and the finding says what to do: split it.
+
+  `Render\DeckTheme` is the theme a deck is drawn in — the name resolved in code or in
+  the deck's own frontmatter, the role of each of its slides, and the boxes a theme's
+  own `template.pptx` gives those roles. `Render\DeckFaces` is the faces a theme, a
+  deck and a template's chrome name, and the report of the ones there are no advance
+  widths for. Neither is a step of the walk that draws the deck: they are the things
+  the walk works with.
+
+  Nothing a caller can see has changed. The same methods, the same messages and the
+  same order — a deck over the ceiling is still refused before its theme is resolved,
+  and nothing the library staged is left on the disk whether the deck was written or
+  refused.
+
+- **A staged master is written again when it is asked for.** The file the library
+  staged for a theme's master is given back at the end of every render, so a theme kept
+  across renders — one the caller named in code — had no master to open the second
+  time. The master holds the source's bytes and writes them again when the file it
+  staged is gone, at the mode of a file nobody else on the machine can read.
+
+- **Four parameters are named `$scope` rather than `$files`.** The directories a render
+  may read are not a source of files, and a parameter named `$files` said the opposite:
+  `Render\CommonMark\BlockTranslator::parse()`,
+  `Render\CommonMark\SlideState::__construct()`, `Render\Chrome::__construct()` and
+  `Theme\ThemeLoader::__construct()` all take one. A caller using PHP 8's named
+  arguments has to say the new name.
+
+- **A theme's own files are resolved whether the loader has a scope or not.** The path
+  of a file was resolved before it was read, but only where a scope was given: a loader
+  without one returned the path as it was written, so `LoadedTheme::directory()` and the
+  failures that name a path said one thing in one half of the suite and another in the
+  other. The Word half's loader resolves the path either way, and this one does the
+  same now.
+
+- **`ThemeLoader::load()` and `loadManifest()` take a name and a finder.** The third
+  parameter was the scope a theme's own files were held to and is now the finder they
+  are read through; the first was a directory and is now the name the theme is known
+  by. The library composes the names — `house/theme.yml`, `house/styles.yml`,
+  `house/layouts.yml`, `house/text-styles.yml` and `house/template.pptx` — and asks
+  the finder for them, so a theme that never had a directory is read the same way as
+  one that did.
+
+  The scope check stays where it was, with the messages it had: each of a theme's own
+  files is resolved and held to the scope before it is read, so a `styles.yml` that is
+  a symlink out of the scope is still refused in this library's own words. The scope
+  is the loader's own now — `new ThemeLoader($scope)` — and `ThemeResolver` builds a
+  loader with its own scope unless it is given one.
+
+- **`ThemeResolver` takes the source of themes.** A `FileFinder` given to it is where
+  the themes come from: a theme the source holds resolves the same way as one on disk,
+  and it is refused in the same words when it resolves out of the roots. The
+  directories on disk remain the fallback, and the themes that resolve are listed from
+  the finder and from them together — so a failure still names every theme that would
+  have worked.
+
+- **`PresentationRenderer` takes the source of the deck's files.** A `FileFinder` given
+  to it as `files:` is where the pictures a deck names and the templates file it
+  imports come from: they are asked for by name — `logo.png`, `templates.md` — and the
+  disk is where they are found when the source has none.
+
+  The scope check stays with the library, in the same terms and with the same messages:
+  a path the source answers is held to the directories this render may read, so a
+  picture or a templates file out of reach is refused in this library's own words. A
+  source that holds the bytes rather than a file has them taken on the caller's word:
+  there is no path to hold to the scope.
+
+  The ceiling on a templates file stays where it was, with the read: a file over it is
+  refused rather than read whole, whichever source it came from.
+
+- **A theme's master is read through the finder, and it is a file of the library's own
+  when the source holds only its bytes.** A `template.pptx` is a package, and a package
+  is opened as a file, so the bytes are staged into one and the deck is drawn in the
+  master's geometry all the same. The staged file is the render's: it is given back
+  when the render is over, and nothing of the library's is left on disk after it — not
+  after a render that worked and not after one that failed.
+
+  A master the theme carries and the source cannot serve is refused by name —
+  `Exception\UnservedTemplate` — rather than drawn without. The listing of a theme's
+  files settles what a null answer means: the theme may carry no master, or the source
+  may not be able to serve one, and a deck drawn without the master's geometry is drawn
+  in the wrong design with nothing saying so. A source that answers a path for a master
+  it cannot serve is refused the same way, rather than drawn without.
+
+- **`LoadedTheme::template()` returns the master rather than its path.** It is a
+  `Theme\Master` now: the path the master is opened at, the name a failure calls it,
+  and the file of the library's own to give back when the render is over.
+
+- **`TemplateGeometry` takes the name a failure calls the template.** The third
+  parameter is the name the master is known by, where the file it is in is not the name
+  it is known by: a master the library staged is a file of its own making under a name
+  of its own, and a reader told about that cannot tell which template it was.
 
 - **The inline translator is told which slide and which theme it reads for.** `runs()`,
   `runsIn()` and `plain()` each take an `$slide` and a `$theme` now: a word in a text style
@@ -228,20 +344,22 @@ All notable changes to this project are documented here. The format follows
   struck-through word rather than refused. The arms of the match are the vocabulary now, and
   an attribute they do not know is refused by name.
 
-- **A chrome file is read with a ceiling.** The chrome file is the one file this library
-  reads whole, and it is the one a deck names in its frontmatter: a picture is bounded by
-  the pixels of its raster and a part of a template by the bytes it inflates to, and the
-  chrome file was bounded by nothing at all. It is read with a ceiling of a megabyte now, and
-  a file over it is refused with its size and the ceiling in the message. The ceiling is an
-  argument of `ChromeFile`, so a caller can hold a deck to a smaller one.
+- **A templates file is read with a ceiling.** The templates file is the one file this
+  library reads whole, and it is the one a deck names in its frontmatter: a picture is
+  bounded by the pixels of its raster and a part of a template by the bytes it inflates to,
+  and the templates file was bounded by nothing at all. It is read with a ceiling of a
+  megabyte now, and a file over it is refused with its size and the ceiling in the message.
+  The ceiling is an argument of `TemplatesFile`, so a caller can hold a deck to a smaller
+  one.
 
 - **A slide carries at most a hundred shapes.** The chrome of a template is read once and
   drawn on every slide that names it, so the shapes of a template are multiplied by the
-  slides that draw them: two hundred shapes in a chrome file named by sixty slides is twelve
-  thousand shapes and ten megabytes of slide XML, and neither factor was bounded. The slide
-  count is bounded by `PresentationRenderer::MAX_SLIDES`, and `Furniture::MAX_SHAPES` is the
-  other half of that bound — a slide that carries more than a hundred shapes, the chrome of
-  a template included, is refused with the number and the ceiling in the message.
+  slides that draw them: two hundred shapes in a templates file named by sixty slides is
+  twelve thousand shapes and ten megabytes of slide XML, and neither factor was bounded.
+  The slide count is bounded by `PresentationRenderer::MAX_SLIDES`, and
+  `Furniture::MAX_SHAPES` is the other half of that bound — a slide that carries more than
+  a hundred shapes, the chrome of a template included, is refused with the number and the
+  ceiling in the message.
 
 - **A picture in a template is paid for once.** The chrome of a template is drawn on every
   slide that names it, and each of those slides had a picture of its own in the package: a

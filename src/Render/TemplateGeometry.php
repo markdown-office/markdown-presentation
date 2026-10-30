@@ -78,10 +78,14 @@ final class TemplateGeometry
      * @param string $path The theme's `template.pptx`.
      * @param int    $maxPartBytes The largest one part of it may be once it is inflated, which is
      *        what bounds the document built from it.
+     * @param string|null $name What a failure calls the template, where the file it is in is
+     *        not the name it is known by — a master the library staged, which is a file of
+     *        its own making under a name of its own.
      */
     public function __construct(
         private readonly string $path,
         private readonly int $maxPartBytes = self::MAX_PART_BYTES,
+        private readonly ?string $name = null,
     ) {
     }
 
@@ -109,7 +113,7 @@ final class TemplateGeometry
         $zip = new ZipArchive();
 
         if ($zip->open($this->path) !== true) {
-            throw MalformedTemplate::notAPackage($this->path);
+            throw MalformedTemplate::notAPackage($this->label());
         }
 
         try {
@@ -117,6 +121,18 @@ final class TemplateGeometry
         } finally {
             $zip->close();
         }
+    }
+
+    /**
+     * What a failure calls the template.
+     *
+     * The name it is known by where there is one, and the path it is in where there is
+     * not: a template the library staged is a file of its own making under a name of its
+     * own, and a reader told about that cannot tell which template it was.
+     */
+    private function label(): string
+    {
+        return $this->name ?? $this->path;
     }
 
     /**
@@ -183,7 +199,7 @@ final class TemplateGeometry
         $cy = (int) ($size?->getAttribute('cy') ?? 0);
 
         if ($cx < 1 || $cy < 1) {
-            throw MalformedTemplate::noPageSize($this->path);
+            throw MalformedTemplate::noPageSize($this->label());
         }
 
         return ['cx' => $cx, 'cy' => $cy];
@@ -426,7 +442,7 @@ final class TemplateGeometry
         libxml_use_internal_errors($quiet);
 
         if ($loaded === false) {
-            throw MalformedTemplate::unreadable($this->path, $part);
+            throw MalformedTemplate::unreadable($this->label(), $part);
         }
 
         return $document;
@@ -457,7 +473,7 @@ final class TemplateGeometry
         fclose($stream);
 
         if (strlen($bytes) > $this->maxPartBytes) {
-            throw MalformedTemplate::partTooLarge($this->path, $part, $this->maxPartBytes);
+            throw MalformedTemplate::partTooLarge($this->label(), $part, $this->maxPartBytes);
         }
 
         return $bytes;

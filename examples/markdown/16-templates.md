@@ -1,7 +1,7 @@
 ---
 title: Slide templates
 theme: minimal
-chrome: ./templates/chrome.md
+templates-file: ./templates/templates.md
 description: The furniture of a deck, written once, and the slides that draw it.
 template: wordmark
 ---
@@ -18,7 +18,7 @@ A deck gets its templates three ways:
 
 - a **definition** in the deck, a block whose frontmatter names a template
 - a **slide** that names a template, or several of them
-- a **chrome file** beside the deck, named in the deck's frontmatter
+- a **templates file** beside the deck, named in the deck's frontmatter
 
 ---
 template: wordmark
@@ -60,7 +60,7 @@ template: [wordmark, band, page]
 
 # A template out of a file
 
-The deck's frontmatter names `templates/chrome.md`.
+The deck's frontmatter names `templates/templates.md`.
 That file holds a template called `band`.
 The band across the head of this slide came out of that file, and this deck says nothing
 about where it is or how thick it is.
@@ -77,7 +77,7 @@ template: [wordmark, page]
 # The deck's own template wins
 
 :::content{left=6.7% top=20% width=86.7% height=70% font-size=17}
-`templates/chrome.md` holds a template called `page` too, and it puts a bare number at
+`templates/templates.md` holds a template called `page` too, and it puts a bare number at
 the foot of the slide.
 This deck defines its own `page` above, and the deck's own one is the one that is drawn:
 the number is in the theme's `accent1` rather than its `subtle`, at twelve points rather

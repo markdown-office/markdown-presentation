@@ -267,7 +267,8 @@ Slide 1 opens a "::note" that is not the last thing on the slide. A note is "::n
 ## Rendering
 
 `PresentationRenderer` takes a split deck and writes a `.pptx`. It resolves the theme
-itself, from the deck's `theme:`, so there is nothing to resolve first.
+itself, from the deck's `theme:` or from the name a caller gave it, so there is nothing to
+resolve first.
 
 ```php
 use MarkdownPresentation\Document\DeckParser;
@@ -302,6 +303,31 @@ layout: Title and Content
 A deck that names no theme gets the built-in `default`. That is the absence of a directive,
 not a fallback from a directive that failed: a theme that does not resolve is still a failure,
 and it names the themes that do.
+
+**A theme can be named in code, and it outranks the deck's own.** A deck names a theme in
+its front matter, and a program that draws several decks may want one theme for all of
+them:
+
+```php
+$renderer = (new PresentationRenderer())->withTheme('corporate-dark');
+```
+
+The name is resolved through the resolver's finder when it is given, and the theme that
+came back is kept: the name is asked for once, and not once for the name and once for the
+deck. The deck's own `theme:` is not read — but it is checked, because a value of the wrong
+type is a mistake in the deck whatever theme the deck is drawn in.
+
+**A deck can come back as bytes.** `render()` writes the deck to a path and hands the path
+back; `toString()` hands back the bytes of the same deck:
+
+```php
+$bytes = (new PresentationRenderer())->toString($deck);
+```
+
+A `.pptx` is a package, and PHP's `ZipArchive` cannot write one to memory, so the deck is
+written to a file of the library's own and read back from it. Nothing of the library's is
+left on the disk: neither the file the deck was written to, nor the master or the pictures
+the render staged.
 
 ### What a slide becomes
 
@@ -1549,19 +1575,19 @@ The page number is furniture, so it is written in a template and drawn on every 
 names it. A slide may write one itself as well, and the number it carries is the number of
 the slide it is on.
 
-#### The chrome file
+#### The templates file
 
 A deck may keep its templates in a file beside it and name it in the deck's frontmatter:
 
 ```markdown
 ---
 theme: ./theme.yml
-chrome: ./chrome.md
+templates-file: ./templates.md
 ---
 ```
 
-`chrome.md` is a Markdown file of template definitions in the same syntax as a deck, and it is
-resolved against the deck's own directory — so a deck and the furniture it shares travel
+`templates.md` is a Markdown file of template definitions in the same syntax as a deck, and it
+is resolved against the deck's own directory — so a deck and the furniture it shares travel
 together. A file that is not there is a failure, and so is a file outside the directories the
 render may read: a path a deck wrote is held to the same scope as a picture in it.
 
@@ -1720,7 +1746,7 @@ slide that names it:
 | Ceiling | Value | Bounds |
 | --- | --- | --- |
 | `Render\Furniture::MAX_SHAPES` | 100 | the shapes one slide may carry, the chrome of a template included |
-| `Template\ChromeFile::MAX_BYTES` | one megabyte | the chrome file a deck may name in its frontmatter |
+| `Template\TemplatesFile::MAX_BYTES` | one megabyte | the templates file a deck may name in its frontmatter |
 
 Both are refused with the number and the ceiling in the message, and the shape count is the
 other half of the slide count: a hundred shapes on a slide is a hundred shapes on each of the
@@ -1997,7 +2023,7 @@ try {
 ```
 
 ```text
-The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, chrome.
+The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file.
 ```
 
 Slidev accepts dozens of directives this library does not read, so a deck written for it will
@@ -2461,9 +2487,16 @@ else can. Here a theme whose template maps only two roles:
 
 ```php
 use MarkdownPresentation\Exception\UnknownLayoutRole;
+use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Theme\ThemeLoader;
 
-$theme = (new ThemeLoader())->load((string) getenv('MARKDOWN_PRESENTATION_ROOT') . '/tests/fixtures/themes/sparse');
+$root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
+
+$theme = (new ThemeLoader())->load(
+    'sparse',
+    'sparse',
+    new DiskFinder(theme: [$root . '/tests/fixtures/themes']),
+);
 
 foreach (['three-column', 'section'] as $role) {
     try {
@@ -2554,12 +2587,17 @@ of the styling the theme asked for:
 
 ```php
 use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Theme\ThemeLoader;
 
 $root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
 
 try {
-    (new ThemeLoader())->load($root . '/tests/fixtures/themes/broken');
+    (new ThemeLoader())->load(
+        'broken',
+        'broken',
+        new DiskFinder(theme: [$root . '/tests/fixtures/themes']),
+    );
 } catch (UnknownStyleSlot $failure) {
     echo $failure->getMessage(), "\n";
 }
@@ -2589,6 +2627,65 @@ linkFont:
 
 References to theme tokens — `{accent1}`, `{fonts.mono}` — are **not** resolved yet,
 so a `styles.yml` written with them carries the braces through untouched.
+
+### Where a deck's files come from
+
+The theme a deck names is looked for on disk — beside the deck, beside the working
+directory, and among the themes that ship with the package — and the pictures a deck
+names and the templates file it imports are read from disk as well. **The files a deck
+names come from somewhere the caller chooses**, so a program that keeps its own files
+somewhere else — in a database, say — says where they are with a **finder** and hands
+it over wherever a deck's files are wanted:
+
+```php
+use MarkdownPresentation\Render\PresentationRenderer;
+use MarkdownPresentation\Theme\ThemeResolver;
+
+$finder = new MyFinder();   // a MarkdownPresentation\Files\FileFinder
+
+$renderer = new PresentationRenderer(
+    themes: new ThemeResolver(files: $finder),
+    files: $finder,
+);
+```
+
+A finder is four methods: `read()` and `path()` answer for one file, `themes()` lists
+the themes that resolve and `files()` the files of one theme. The names it is asked for
+are the library's own — `house/theme.yml` for a theme's manifest, `logo.png` for a
+picture — and the role says which world a name is resolved in: `theme`, `picture` or
+`document`.
+
+**A finder answers; it does not refuse.** A file that is not there is `null`, and a
+file that is out of reach is answered like any other: the question of what a render
+may read belongs to the library, which holds the path a finder answered to its own
+scope and refuses what is out of reach in its own words.
+
+`Files\DiskFinder` answers out of directories on this machine, one list of bases per
+role, tried in the order they are given. A program that brings no finder of its own gets
+one for its **themes** — the directories of themes beside the deck, beside the working
+directory and the ones that ship with the package. A picture falls back to the deck's own
+directory, and so does the templates file it imports. The directories of themes on disk
+remain the fallback, so a program with a finder of its own does not lose the themes that
+ship with the package.
+
+**A name that is already a path is the path, whatever the role.** A name beginning with
+`/` names a file, and resolving it against a base would name a file nobody meant — so it
+is taken as it stands, in the `theme` role as much as in any other.
+
+**A theme's master is a file, and a file the library stages.** A `template.pptx` is a
+package, and a package is opened as a file: a source that holds the master as bytes
+rather than as a file has them staged into one, and the deck is drawn in the master's
+geometry all the same. The staged file is the render's, and it is given back when the
+render is over — nothing of the library's is left on the disk afterwards, whether the
+render worked or not.
+
+**A master the source cannot serve is refused by name.** A theme that carries no
+master is a theme that works, and nothing is said about it. A theme that carries one
+and a source that cannot hand it over is refused with
+`MarkdownPresentation\Exception\UnservedTemplate` rather than drawn without: a deck
+without the master's geometry is in the wrong design, with nothing in the file saying
+so. The listing of a theme's files is what tells the two apart, and a source that
+answers a path for a master it cannot serve is refused the same way.
 
 ## Loud failures
 
@@ -2647,12 +2744,14 @@ Several sit beside those two rather than under `InvalidInput`:
 a part of one that cannot be decompressed; `MarkdownPresentation\Exception\UnreadableDeck`,
 for a deck this library cannot read; `MarkdownPresentation\Exception\UnpatchedDependency`,
 when the installed PHPPresentation lacks what the library needs of it;
-`MarkdownPresentation\Exception\NothingToConvert`, when there is nothing to convert; and
+`MarkdownPresentation\Exception\NothingToConvert`, when there is nothing to convert;
+`MarkdownPresentation\Exception\UnservedTemplate`, when a theme carries a master the
+source of the theme cannot serve; and
 `MarkdownPresentation\Exception\FileNotWritable`, when the result cannot be written. Nothing
 a deck names fixes any of them — it is the disk, the download that stopped, the file that
-was not a deck, the installer — and a deck author told to go and rename something would go
-and rename something. They are all still under the base class, so the same one `catch`
-reaches them.
+was not a deck, the installer, the source that could not serve what it was asked for — and
+a deck author told to go and rename something would go and rename something. They are all
+still under the base class, so the same one `catch` reaches them.
 
 ```php
 use MarkdownPresentation\Exception\Exception;

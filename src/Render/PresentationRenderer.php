@@ -18,6 +18,7 @@ use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
+use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Fixes;
 use MarkdownPresentation\Render\Block\Code;
@@ -31,12 +32,11 @@ use MarkdownPresentation\Render\Block\Table;
 use MarkdownPresentation\Render\CommonMark\BlockTranslator;
 use MarkdownPresentation\Render\CommonMark\InlineTranslator;
 use MarkdownPresentation\Render\Free\FreeShape;
-use MarkdownPresentation\Render\Free\FreeSlideNumber;
-use MarkdownPresentation\Render\Free\FreeText;
-use MarkdownPresentation\Template\ChromeFile;
 use MarkdownPresentation\Template\Templates;
+use MarkdownPresentation\Template\TemplatesFile;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\LoadedTheme;
+use MarkdownPresentation\Theme\Master;
 use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeResolver;
 use PhpOffice\PhpPresentation\PhpPresentation;
@@ -76,12 +76,13 @@ use PhpOffice\PhpPresentation\Slide\SlideLayout;
  * laid out, so it takes no column and is not measured against the layout's box — see
  * {@see SlideShapes}, which is the write order a `layer` decides.
  *
- * Three things it does not do are somebody else's job, and all three classes that do them sit
- * in this directory rather than being reached through a caller: {@see MasterLayouts} writes
- * the master, the layouts and the document's metadata, {@see DeckWriter} writes the file and
- * runs the passes over it, and {@see Furniture} reads the templates of the deck and the
- * chrome they draw. What is left here is the walk: a deck's blocks, and the shapes they are
- * drawn as.
+ * The work that is not the walk is somebody else's job, and the classes that do it sit in
+ * this directory rather than being reached through a caller: {@see MasterLayouts} writes the
+ * master, the layouts and the document's metadata, {@see DeckWriter} writes the file and
+ * runs the passes over it, {@see Furniture} reads the templates of the deck and the chrome
+ * they draw, {@see DeckTheme} resolves the theme and reads the role of each slide, and
+ * {@see DeckFaces} finds the faces that have no table of advance widths. What is left here
+ * is the walk: a deck's blocks, and the shapes they are drawn as.
  */
 final class PresentationRenderer
 {
@@ -92,13 +93,15 @@ final class PresentationRenderer
      * the whole of what makes it affordable is that {@see UnknownDirective} names this list
      * in the failure itself.
     */
-    public const DIRECTIVES = ['title', 'name', 'level', 'layout', 'theme', 'author', 'description', 'template', 'chrome'];
+    public const DIRECTIVES = [
+        'title', 'name', 'level', 'layout', 'theme', 'author', 'description', 'template', 'templates-file',
+    ];
 
     /** The keys that describe the deck rather than a slide, and so belong to slide 1's block. */
-    public const DECK_DIRECTIVES = ['theme', 'author', 'description', 'chrome'];
+    public const DECK_DIRECTIVES = ['theme', 'author', 'description', 'templates-file'];
 
     /** The theme a deck that names none gets. */
-    public const DEFAULT_THEME = 'default';
+    public const DEFAULT_THEME = DeckTheme::DEFAULT_THEME;
 
     /** The step a slide with no marker in it is drawn at. */
     private const FIRST_STEP = 1;
@@ -148,14 +151,20 @@ final class PresentationRenderer
      */
     private readonly FontReport $fonts;
 
-    private readonly PathScope $files;
-
-    private readonly ThemeResolver $themes;
+    private readonly PathScope $scope;
 
     /**
-     * The reader of the chrome file a deck names.
+     * The source of the deck's files: its pictures and the templates file it names.
+     *
+     * Null for the disk, which is where a deck's files are found when there is no
+     * source. A source that holds them as bytes is asked for them by name.
      */
-    private readonly ChromeFile $chromeFiles;
+    private readonly ?FileFinder $files;
+
+    /**
+     * The reader of the templates file a deck names.
+     */
+    private readonly TemplatesFile $templatesFiles;
 
     /**
      * The reader of a template's body.
@@ -192,10 +201,29 @@ final class PresentationRenderer
     private Theme $theme;
 
     /**
+     * The master the deck being rendered was drawn in.
+     *
+     * Held rather than dropped, so that the file it is in is given back by the render
+     * that opened it rather than by a destructor that may run much later: a file of the
+     * library's own is the render's to give back.
+     */
+    private ?Master $master = null;
+
+    /**
+     * The theme the deck is drawn in, and the roles of its slides.
+     */
+    private readonly DeckTheme $deckTheme;
+
+    /**
+     * The faces the deck, its theme and its chrome name.
+     */
+    private readonly DeckFaces $faces;
+
+    /**
      * @param string       $directory  The directory a relative image path in the deck
      *                                 resolves against, which is the directory the deck
      *                                 itself is in. It is also the first of the roots an
-     *                                 image may be read from: see {@see self::$files}.
+     *                                 image may be read from: see {@see self::$scope}.
      * @param ThemeResolver $themes    The resolver the themes are looked up in. It is
      *                                 copied rather than used as it is: the renderer hands
      *                                 it the deck's directory, and the copy is the one
@@ -215,6 +243,10 @@ final class PresentationRenderer
      *                                 the deck's: a deck that could widen this would be the
      *                                 arbitrary path read this constructor argument exists
      *                                 to stop.
+     * @param FileFinder|null $files Where the deck's files come from: the pictures it
+     *                                 names and the templates file it imports. The theme is
+     *                                 not among them: the resolver the caller brought is
+     *                                 where themes come from.
      */
     public function __construct(
         private readonly string $directory = '.',
@@ -222,15 +254,54 @@ final class PresentationRenderer
         private readonly BlockTranslator $blocks = new BlockTranslator(),
         bool $strict = false,
         array $imageRoots = [],
+        ?FileFinder $files = null,
     ) {
         // The theme of a deck sits beside it, and a relative image path in the deck
         // resolves against the same directory: a deck and its theme are one thing.
-        $this->themes = $themes->beside($this->directory);
-        $this->files = new PathScope([$this->directory, ...$imageRoots]);
+        $this->deckTheme = new DeckTheme($themes->beside($this->directory));
+        $this->scope = new PathScope([$this->directory, ...$imageRoots]);
+        $this->files = $files;
         $this->overflows = new Overflows($strict);
         $this->fonts = new FontReport($strict);
-        $this->chromeFiles = new ChromeFile($this->directory, $this->files);
-        $this->chrome = new Chrome($this->blocks, $this->directory, $this->files);
+        $this->faces = new DeckFaces($this->fonts);
+        $this->templatesFiles = new TemplatesFile($this->directory, $this->scope, files: $files);
+        $this->chrome = new Chrome($this->blocks, $this->directory, $this->scope, $files);
+    }
+
+    /**
+     * A theme to draw this renderer's decks in, whatever the deck's own frontmatter says.
+     *
+     * The same rule the Word half follows: a theme named in code answers for the deck, so
+     * the frontmatter's `theme:` is not read — the name in the code is the one the deck is
+     * drawn in. The frontmatter's value is still checked, because a value of the wrong
+     * type is a mistake in the deck whatever theme the deck is drawn in: a deck writing
+     * `theme: 42` is refused.
+     *
+     * The name is resolved through the resolver's finder when it is given, and the theme
+     * that came back is kept: a source that counts its reads would say the name is asked
+     * for once and not once for the name and once for the deck. A theme that does not
+     * resolve is refused here rather than at the render, so a typo is reported before the
+     * deck is read.
+     *
+     * Mutating rather than returning a new renderer: the renderer holds the deck's
+     * directory and its sources, and there is no value in a copy that differs in a theme.
+     *
+     * @throws ThemeNotFound    When the theme is not one that resolves.
+     * @throws \MarkdownPresentation\Exception\MalformedTheme When the theme's own files do
+     *     not describe a theme.
+     * @throws UnknownLayoutRole When the theme names a layout role that does not exist.
+     * @throws \MarkdownPresentation\Exception\UnknownStyleSlot When the theme names a
+     *     style slot that does not exist.
+     * @throws \MarkdownPresentation\Exception\UnservedTemplate When the theme carries a
+     *     master the source of the theme cannot serve.
+     * @throws \MarkdownPresentation\Exception\Exception When one of the theme's files
+     *     cannot be read or parsed.
+     */
+    public function withTheme(string $name): self
+    {
+        $this->deckTheme->resolve($name);
+
+        return $this;
     }
 
     /**
@@ -298,6 +369,9 @@ final class PresentationRenderer
      * @throws \MarkdownPresentation\Exception\UnpatchedDependency When the installed
      *     PHPPresentation lacks what this library needs of it.
      *
+     * @throws \MarkdownPresentation\Exception\UnservedTemplate When the theme carries a
+     *     master the source of the theme cannot serve.
+     *
      * @return string The path written.
      */
     public function render(Deck $deck, string $path): string
@@ -319,20 +393,86 @@ final class PresentationRenderer
             $this->check($slide);
         }
 
-        $loaded = $this->loaded($deck);
-        $roles = $this->roles($deck, $loaded);
+        $loaded = $this->deckTheme->load($deck);
+        $this->master = $loaded->template();
+
+        try {
+            return $this->draw($deck, $loaded, $path);
+        } finally {
+            // The files the library staged for this render: the theme's master, when the
+            // source of the theme held only its bytes, and the pictures the deck named,
+            // when the source of the deck's files held only theirs. A render is over when
+            // it is written, and nothing of the library's is left on disk after it — not
+            // after a render that worked and not after one that failed.
+            $this->master?->release();
+            $this->blocks->release();
+        }
+    }
+
+    /**
+     * The deck, as the bytes of a `.pptx`.
+     *
+     * The counterpart of the Word half's `MarkdownToWord::toDocx()`: a deck that comes
+     * back as bytes rather than as a path.
+     *
+     * A `.pptx` is a package, and PHP's `ZipArchive` cannot write one to memory, and
+     * PHPPresentation's writer takes a path — so the deck is written to a file of the
+     * library's own, read back and given back. Nothing of the library's is left on the
+     * disk: neither the file the deck was written to, nor the master or the pictures the
+     * render staged, whether the deck was written or the write failed.
+     *
+     * @throws InvalidInput     When a slide names something this library cannot render.
+     * @throws ThemeNotFound    When the deck names a theme that does not resolve.
+     * @throws ContentOverflow  When a block does not fit and the renderer is strict.
+     * @throws MalformedTemplate When the theme's `template.pptx` cannot be read.
+     * @throws TooManySlides    When the deck asks for more slides than {@see self::MAX_SLIDES}.
+     * @throws \MarkdownPresentation\Exception\Exception When the deck cannot be written.
+     *
+     * @throws \MarkdownPresentation\Exception\MalformedShape When a free-placement directive
+     *     names an attribute it does not read, or gives one a value it cannot be.
+     *
+     * @throws \MarkdownPresentation\Exception\UnpatchedDependency When the installed
+     *     PHPPresentation lacks what this library needs of it.
+     *
+     * @throws \MarkdownPresentation\Exception\UnservedTemplate When the theme carries a
+     *     master the source of the theme cannot serve.
+     */
+    public function toString(Deck $deck): string
+    {
+        return Staging::of(function (string $path) use ($deck): void {
+            $this->render($deck, $path);
+        });
+    }
+
+    /**
+     * The deck, drawn and written.
+     *
+     * The theme is resolved before this is called, so that the files the library stages
+     * for the render are given back whether the deck is drawn or refused.
+     *
+     * @throws InvalidInput
+     * @throws ThemeNotFound
+     * @throws ContentOverflow
+     * @throws MalformedTemplate
+     * @throws \MarkdownPresentation\Exception\Exception
+     * @throws \MarkdownPresentation\Exception\MalformedShape
+     * @throws \MarkdownPresentation\Exception\UnpatchedDependency
+     */
+    private function draw(Deck $deck, LoadedTheme $loaded, string $path): string
+    {
+        $roles = $this->deckTheme->roles($deck, $loaded);
         $this->theme = $loaded->theme();
 
         // A theme naming a face there is no table for is measured with the reference face's
         // widths, and the strict renderer refuses the deck rather than measuring it with the
         // wrong face — so the faces are asked about before anything is built.
         $metric = new TextMetric();
-        $this->recordUnknownFaces($this->theme, $metric);
+        $this->faces->theme($this->theme, $metric);
 
         // The templates before the slides are drawn, and the chrome before either: a slide
         // that names a template that is not there, and a template that cannot be drawn, are
         // both failures that happen with no file written behind them.
-        $this->furniture = new Furniture($deck, $this->chromeFiles, $this->chrome);
+        $this->furniture = new Furniture($deck, $this->templatesFiles, $this->chrome);
         $this->templates = $this->furniture->templates();
 
         foreach ($deck->slides() as $slide) {
@@ -343,14 +483,14 @@ final class PresentationRenderer
 
         $presentation = new PhpPresentation();
 
-        $used = $this->usedRoles($roles);
+        $used = $this->deckTheme->usedRoles($roles);
         // The theme's type scale and spacing first, then the boxes a template gives for the
         // roles it covers: a template places, and placing is the later of the two answers.
         // The parentheses are load-bearing, not decoration: `new X()->y()` on one expression
         // is PHP 8.4 syntax, and `composer.json` promises 8.2, where it does not parse. Written
         // without them this file cannot be loaded at all, so every test that renders a deck
         // fails on the 8.2 job and nothing local says why.
-        $geometry = (new SlideGeometry(style: $this->theme->style()))->with($this->template($loaded, $used));
+        $geometry = (new SlideGeometry(style: $this->theme->style()))->with($this->deckTheme->template($loaded, $used));
         $layouts = MasterLayouts::build($presentation, $deck, $loaded, $used, $this->blocks->inline());
 
         $writer = new ShapeWriter($this->theme, $geometry, $metric, $this->fonts);
@@ -360,12 +500,12 @@ final class PresentationRenderer
         // The faces the deck named, asked about once the deck has been read and before
         // anything is built: a box with a `font-family` of its own is drawn in it, and a box
         // measured with another face's widths is a box measured for type it does not hold.
-        $this->recordUnknownFacesOfTheDeck($blocks, $metric);
+        $this->faces->deck($blocks, $metric);
 
         // The faces the chrome named, asked about on the same terms: the chrome of a
         // template is drawn on the slides that name it, and the words in it are drawn in
         // the face it names.
-        $this->recordUnknownFacesOfTheChrome($metric);
+        $this->faces->chrome($this->drawn, $metric);
 
         $builds = [];
 
@@ -460,51 +600,13 @@ final class PresentationRenderer
                 $source->content(),
                 $source->index() + 1,
                 $this->directory,
-                $this->files,
+                $this->scope,
                 $theme,
+                $this->files,
             );
         }
 
         return $blocks;
-    }
-
-    /**
-     * The boxes a theme's own `template.pptx` gives the roles the deck uses.
-     *
-     * A theme ships one or ships none, and this is where that decides anything: the roles a
-     * template covers are drawn in the template's geometry and the rest keep
-     * {@see SlideGeometry}'s, which is the precedence — a template fills in what it has and
-     * says nothing about what it does not, the same rule `layouts.yml` follows. Read before
-     * anything is built, so a template that cannot be read fails while there is still no file
-     * on disk to clean up.
-     *
-     * Keyed by the layout *name* rather than by the role, because that is what the template
-     * has: two roles a theme maps onto one name are one layout, and take the same boxes.
-     *
-     * @param list<LayoutRole> $roles
-     *
-     * @return array<string, array{title?: Box, body?: non-empty-list<Box>}>
-     *
-     * @throws MalformedTemplate
-     */
-    private function template(LoadedTheme $theme, array $roles): array
-    {
-        if ($theme->template() === null) {
-            return [];
-        }
-
-        $layouts = (new TemplateGeometry((string) $theme->template()))->boxes();
-        $boxes = [];
-
-        foreach ($roles as $role) {
-            $name = $theme->layout($role->value);
-
-            if (isset($layouts[$name])) {
-                $boxes[$role->value] = $layouts[$name];
-            }
-        }
-
-        return $boxes;
     }
 
     /**
@@ -525,209 +627,6 @@ final class PresentationRenderer
                 throw UnknownDirective::misplaced($slide->index() + 1, $key);
             }
         }
-    }
-
-    /**
-     * @throws ThemeNotFound
-     * @throws MalformedFrontmatter
-    */
-    private function loaded(Deck $deck): LoadedTheme
-    {
-        $name = $deck->frontmatterValue('theme', self::DEFAULT_THEME);
-
-        if (!is_string($name) || trim($name) === '') {
-            throw MalformedFrontmatter::wrongType(1, 'theme', 'a theme name');
-        }
-
-        return $this->themes->resolve(trim($name));
-    }
-
-    /**
-     * The faces the theme named that this renderer has no table of advance widths for,
-     * recorded.
-     *
-     * The heading and the body faces are the ones that decide how a line wraps, and a face
-     * with no table of its own is measured with the reference face's widths — which is what
-     * every face was measured with before there were tables of their own. The monospaced
-     * face is asked about as well: it is measured by its own advance, and which face it is
-     * says exactly how wide its text is.
-     *
-     * The slot is named rather than the face alone, because the face alone does not say
-     * where to change it.
-     *
-     * The faces the theme's text styles name are asked about here too, because
-     * `text-styles.yml` is a file of the theme and a style in it is a face the theme
-     * names — a face a word written in that style is drawn in, and therefore measured in.
-     * A style that names one of the theme's own slots is that slot's face and is not a
-     * finding: the theme has already said it.
-     */
-    private function recordUnknownFaces(Theme $theme, TextMetric $metric): void
-    {
-        foreach (Theme::FONTS as $slot) {
-            $face = $theme->fonts()->get($slot);
-
-            if ($face !== null && !$metric->has($face)) {
-                $this->fonts->record($face, sprintf("the theme's %s slot", $slot), $metric->faces());
-            }
-        }
-
-        foreach ($theme->textStyleFaces() as $name => $face) {
-            if (!$metric->has($face)) {
-                $this->fonts->record($face, sprintf('the text style "%s"', $name), $metric->faces());
-            }
-        }
-    }
-
-    /**
-     * The faces the deck named that this renderer has no table of advance widths for,
-     * recorded.
-     *
-     * A box the deck placed itself may name a face of its own with `font-family`, and that
-     * face is the one its words are drawn in and measured in. It is in the deck rather than
-     * in the theme, so it does not exist when the theme is resolved — it exists once the
-     * deck has been read, which is before anything is built and therefore before a byte
-     * reaches the disk.
-     *
-     * The box is named rather than the slide it is on, because a deck that writes two boxes
-     * of the same kind is two boxes and a reader who is told which one to change can find
-     * it; the slide is named as well, because two boxes of the same kind on two slides are
-     * two places and one of them is not the one meant.
-     *
-     * @param array<int, SlideBlocks> $blocks The deck's slides, as they were read.
-     */
-    private function recordUnknownFacesOfTheDeck(array $blocks, TextMetric $metric): void
-    {
-        foreach ($blocks as $index => $slide) {
-            foreach ($slide->shapes() as $shape) {
-                $face = self::faceOf($shape);
-
-                if ($face !== null && !$metric->has($face)) {
-                    $this->fonts->record(
-                        $face,
-                        sprintf('the "%s" box on slide %d', $shape->name(), $index + 1),
-                        $metric->faces(),
-                    );
-                }
-            }
-        }
-    }
-
-    /**
-     * The faces the chrome of a template named that this renderer has no table of advance
-     * widths for, recorded.
-     *
-     * The chrome of a template is held apart from the shapes of the slides: it is read once
-     * for the deck and drawn on every slide that names the template, so a walk over the
-     * slides never sees it.
-     *
-     * One entry for the whole template rather than one for each of the slides that draw it,
-     * because the face is named in one place: in the chrome. Twenty-eight slides carrying
-     * one wordmark is one name to change, and a report of twenty-eight entries would say so
-     * twenty-eight times and hide the fact that there is one thing to do. The place is
-     * named instead of the slide, so the reader is sent to the template rather than to one
-     * of the slides that happens to draw it.
-     */
-    private function recordUnknownFacesOfTheChrome(TextMetric $metric): void
-    {
-        foreach ($this->drawn as $template => $shapes) {
-            foreach ($shapes as $shape) {
-                $face = self::faceOf($shape);
-
-                if ($face !== null && !$metric->has($face)) {
-                    $this->fonts->record(
-                        $face,
-                        sprintf('the "%s" box of the template "%s"', $shape->name(), $template),
-                        $metric->faces(),
-                    );
-                }
-            }
-        }
-    }
-
-    /**
-     * The face a shape names for the type in it, or null where it names none.
-     *
-     * Two classes carry a {@see \MarkdownPresentation\Render\Free\TextStyle}: the text a
-     * deck wrote and the number the renderer writes. Both are drawn in the face their style
-     * names and measured in it, so both are a place a face is named — and a walk that
-     * looked at one of them would miss the other.
-     */
-    private static function faceOf(FreeShape $shape): ?string
-    {
-        return match (true) {
-            $shape instanceof FreeText => $shape->style->face,
-            $shape instanceof FreeSlideNumber => $shape->style->face,
-            default => null,
-        };
-    }
-
-    /**
-     * The role of each of the deck's slides, by index.
-     *
-     * Resolved before anything is built so that a role the theme does not map fails while
-     * there is still no file on disk to clean up.
-     *
-     * @return array<int, LayoutRole>
-     *
-     * @throws MalformedFrontmatter
-     * @throws UnknownLayoutRole
-    */
-    private function roles(Deck $deck, LoadedTheme $theme): array
-    {
-        $roles = [];
-
-        foreach ($deck->slides() as $slide) {
-            $named = $slide->frontmatterValue('layout', LayoutRole::Content->value);
-
-            if (!is_string($named) || trim($named) === '') {
-                throw MalformedFrontmatter::wrongType(
-                    $slide->index() + 1,
-                    'layout',
-                    sprintf('a layout role — one of: %s', implode(', ', LayoutRole::names())),
-                );
-            }
-
-            $role = trim($named);
-
-            if (LayoutRole::tryFrom($role) === null) {
-                throw UnknownLayoutRole::notARoleOn($slide->index() + 1, $role, LayoutRole::names());
-            }
-
-            // Asked of the theme rather than checked here, because a role the theme does not
-            // map is the theme's to fix and its message already says so.
-            $theme->layout($role);
-
-            $roles[$slide->index()] = LayoutRole::from($role);
-        }
-
-        return $roles;
-    }
-
-    /**
-     * The roles the deck's slides use, in first-seen order and each of them once.
-     *
-     * Only the roles that are used are built. A theme that maps some of them would
-     * otherwise fail on the ones its deck never asked for, which is not the same failure as a
-     * deck that asks for one it did not map.
-     *
-     * Compared on the role's value rather than with `array_unique`, which casts each element
-     * to a string and an enum cannot be cast to one.
-     *
-     * @param array<int, LayoutRole> $roles
-     *
-     * @return list<LayoutRole>
-    */
-    private function usedRoles(array $roles): array
-    {
-        $used = [];
-
-        foreach ($roles as $role) {
-            if (!in_array($role->value, array_column($used, 'value'), true)) {
-                $used[] = $role;
-            }
-        }
-
-        return $used;
     }
 
     /**

@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Render\CommonMark;
 
 use League\CommonMark\Node\Block\AbstractBlock;
 use League\CommonMark\Node\Node;
+use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Free\FreeShape;
 use MarkdownPresentation\Theme\Theme;
@@ -23,6 +24,10 @@ use MarkdownPresentation\Theme\Theme;
  * `fill=panel` needs the theme the deck named, and a directive naming an attribute nothing
  * reads has to be refused before anything is built rather than after a shape exists to refuse
  * it on.
+ *
+ * The source of the deck's files is here for the same reason again: a picture a deck names
+ * may come from a source that holds it as bytes rather than as a file, and where it comes
+ * from is a fact about the deck rather than about the slide it is on.
  *
  * The lines the deck was written as are held too. CommonMark normalises the text it parses —
  * a code block loses the indentation of its fence, a paragraph loses the trailing space of
@@ -53,9 +58,10 @@ final class SlideState
     public function __construct(
         public readonly int $slide,
         public readonly string $directory,
-        public readonly PathScope $files,
+        public readonly PathScope $scope,
         private readonly array $lines,
         public readonly Theme $theme,
+        public readonly ?FileFinder $files = null,
     ) {
     }
 

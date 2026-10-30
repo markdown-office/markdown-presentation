@@ -27,6 +27,7 @@ use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownMarker;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Exception\UnsupportedLink;
+use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Block;
 use MarkdownPresentation\Render\Block\Code;
@@ -115,6 +116,10 @@ final class BlockTranslator
     /**
      * The blocks of one slide's content, and the column each was written for.
      *
+     * @param FileFinder|null $files Where the deck's files come from: the pictures it
+     *                               names. Null for the disk, which is where a picture was
+     *                               found before there was a source.
+     *
      * @throws ImageNotFound
      * @throws MalformedShape
      * @throws UnknownDirective
@@ -122,9 +127,22 @@ final class BlockTranslator
      * @throws UnsupportedImageFormat
      * @throws UnsupportedLink
      */
-    public function parse(string $content, int $slide, string $directory, PathScope $files, Theme $theme): SlideBlocks
-    {
-        $state = new SlideState($slide, $directory, $files, explode("\n", str_replace("\r\n", "\n", $content)), $theme);
+    public function parse(
+        string $content,
+        int $slide,
+        string $directory,
+        PathScope $scope,
+        Theme $theme,
+        ?FileFinder $files = null,
+    ): SlideBlocks {
+        $state = new SlideState(
+            $slide,
+            $directory,
+            $scope,
+            explode("\n", str_replace("\r\n", "\n", $content)),
+            $theme,
+            $files,
+        );
         $blocks = [];
         $columns = [];
 
@@ -134,6 +152,17 @@ final class BlockTranslator
         }
 
         return new SlideBlocks($blocks, $columns, $state->markers, $state->shapes());
+    }
+
+    /**
+     * Give back the files this translator staged.
+     *
+     * A picture the source held as bytes is staged into a file of the library's own, and
+     * the file is the render's: it goes when the render is over.
+     */
+    public function release(): void
+    {
+        $this->pictures->release();
     }
 
     /**

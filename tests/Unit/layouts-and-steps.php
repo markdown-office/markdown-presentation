@@ -766,6 +766,22 @@ it('leaves a deck on the far side of the deck ceiling alone', function () {
         ->toBe(PresentationRenderer::MAX_SLIDES);
 });
 
+it('counts the slides of a deck before it resolves the theme', function () {
+    // The order the work happens in is the order of what can go wrong, and a deck over the
+    // ceiling is refused before anything is read. A deck that is over the ceiling and asks
+    // for a theme that does not resolve is therefore refused for the ceiling: the two
+    // refusals are about different things, and the one that costs the least to fix is the
+    // one that is reported first.
+    $deck = "---\ntheme: nowhere\n---\n\n" . slidesDeck(PresentationRenderer::MAX_SLIDES + 1);
+
+    expect(fn () => slideDeck($deck))
+        ->toThrow(TooManySlides::class, sprintf(
+            'This deck asks for %d slides, and one presentation may carry %d.',
+            PresentationRenderer::MAX_SLIDES + 1,
+            PresentationRenderer::MAX_SLIDES,
+        ));
+});
+
 it('reads a :::click region as one step of its own', function () {
     // The boundary and its fences are one thing: what is between them is read at the step the
     // opener names, through the same counter a bare marker moves, so there is no second
