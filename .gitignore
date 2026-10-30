@@ -30,6 +30,10 @@
 # The OOXML schemas `tools/install-ooxml-schemas.php` fetches and checksums.
 /tools/ooxml-schemas/
 
+# The validator's own build output, which the .NET SDK writes beside the project.
+/tools/ooxml-validator/bin/
+/tools/ooxml-validator/obj/
+
 # The fonts `tools/generate-font-metrics.php` fetches and checksums.
 /tools/fonts/
 

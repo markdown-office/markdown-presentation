@@ -81,6 +81,49 @@ jobs:
       - name: Test
         run: vendor/bin/pest
 
+  # The decks the library writes, checked against the schema Microsoft's own validator
+  # reads.
+  #
+  # Its own job rather than a step in the test matrix, because the validator is a .NET
+  # program: the SDK it is built and run with is a second toolchain, and the job that
+  # installs it is the job that runs the gate.
+  #
+  # `--fail-on-skipped` because the test skips itself where the .NET SDK is missing, and
+  # a skipped test is a green tick for a check that never ran. The rasteriser is
+  # installed for the same reason: the deck carrying an SVG cannot be written without
+  # one, and a gate that checked one deck fewer than the gallery holds would be a gate
+  # that says less than it says.
+  conformance:
+    name: valid OOXML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+          extensions: imagick
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # The delegate ImageMagick hands an SVG to. Without one that can draw a letter the
+      # picture in the deck is refused rather than drawn, and the deck is not written at
+      # all — which would leave the gate checking one deck fewer than the gallery holds.
+      - name: A rasteriser that can draw an SVG
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends librsvg2-bin
+
+      - name: Install
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: The decks are valid OOXML
+        run: vendor/bin/pest --testsuite=conformance --fail-on-skipped
+
   coverage:
     name: coverage
     runs-on: ubuntu-latest

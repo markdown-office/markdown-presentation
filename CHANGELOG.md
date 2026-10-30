@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Every deck the library writes is checked against the schema Microsoft's own validator
+  reads.** Nothing in the suite could see that before: the decks were checked against the
+  parts they carry, and a deck whose XML is outside the schema passes every one of those
+  checks and opens in PowerPoint as `[Repaired]`.
+
+  The validator is Microsoft's own — the one the Open XML SDK Productivity Tool uses — and
+  it is a program in `tools/ooxml-validator/` rather than a dependency: nothing that ships
+  with the library needs it. A machine without the .NET SDK runs the rest of the suite and
+  says what is missing, and the job that runs the gate in continuous integration installs
+  it, so the gate cannot skip itself there.
+
 ### Changed
 
 - **The patch carries one more fix from upstream.** A chart's series is written in the

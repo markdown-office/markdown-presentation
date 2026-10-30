@@ -16,6 +16,14 @@
             <directory suffix=".php">tests/Unit</directory>
         </testsuite>
         <!--
+            The decks the library writes, checked against the schema Microsoft's own
+            validator reads. It needs the .NET SDK, which a machine without it does not
+            have, so the test skips itself there.
+        -->
+        <testsuite name="conformance">
+            <directory suffix=".php">tests/Conformance</directory>
+        </testsuite>
+        <!--
             Every fenced example in README.md, run. The mechanism is described where
             it is written down — in tests/Support/Doctest.php.
         -->
