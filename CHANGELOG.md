@@ -130,6 +130,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`PresentationRenderer` is split, and `php:S1448` is closed on it.** Twenty-three
+  methods was one finding too many, and the finding says what to do: split it.
+
+  `Render\DeckTheme` is the theme a deck is drawn in — the name resolved in code or in
+  the deck's own frontmatter, the role of each of its slides, and the boxes a theme's
+  own `template.pptx` gives those roles. `Render\DeckFaces` is the faces a theme, a
+  deck and a template's chrome name, and the report of the ones there are no advance
+  widths for. Neither is a step of the walk that draws the deck: they are the things
+  the walk works with.
+
+  Nothing a caller can see has changed. The same methods, the same messages and the
+  same order — a deck over the ceiling is still refused before its theme is resolved,
+  and nothing the library staged is left on the disk whether the deck was written or
+  refused.
+
 - **A staged master is written again when it is asked for.** The file the library
   staged for a theme's master is given back at the end of every render, so a theme kept
   across renders — one the caller named in code — had no master to open the second
