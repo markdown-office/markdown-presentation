@@ -27,16 +27,49 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- **The patch carries one more fix from upstream.** A chart's series is written in the
-  order the schema names it: the shape properties right after the title rather than after
-  the data points and the data labels, and the separator of the data labels of a doughnut
-  before the leader lines rather than after them. PowerPoint repairs a chart written the
-  other way round before it opens it
+- **The patch carries four more fixes from upstream.** A chart's series is written in
+  the order the schema names it: the shape properties right after the title rather than
+  after the data points and the data labels, and the separator of the data labels of a
+  doughnut before the leader lines rather than after them. PowerPoint repairs a chart
+  written the other way round before it opens it
   ([#695](https://github.com/PHPOffice/PHPPresentation/issues/695),
   [#1044](https://github.com/PHPOffice/PHPPresentation/pull/1044)).
 
+  Three of them are charts that carried less than they were given: the area, the line,
+  the radar and the scatter dropped the fill of a single data point
+  ([#1048](https://github.com/PHPOffice/PHPPresentation/issues/1048),
+  [#1052](https://github.com/PHPOffice/PHPPresentation/pull/1052)), a doughnut, a pie
+  and a pie in three dimensions dropped the fill of the series itself
+  ([#1049](https://github.com/PHPOffice/PHPPresentation/issues/1049),
+  [#1051](https://github.com/PHPOffice/PHPPresentation/pull/1051)), and a category axis
+  wrote its major unit as the number of labels to skip — and as a fraction, where the
+  schema wants a count, so the file was outside the schema
+  ([#1047](https://github.com/PHPOffice/PHPPresentation/issues/1047),
+  [#1050](https://github.com/PHPOffice/PHPPresentation/pull/1050)).
+
   This library writes no chart, so nothing it draws changes: the patch is upstream's
   branch whole, and the fix belongs to that branch rather than to this one.
+
+- **The charts are checked too, and the gate knows what a chart has to carry.** The
+  patch is the library that writes the charts, and a patch that is re-rolled without a
+  fix is a patch that has lost it — nothing else in this suite would have noticed. So
+  the gate writes a chart of every kind through the patched library, and checks two
+  things about it: that the file is within the schema, which the validator reads, and
+  that it carries what it was given, which the validator cannot see.
+
+  A chart that is missing a data point is a valid chart. The validator reads what a
+  file holds and says nothing about what it does not, so the elements themselves are
+  asserted on: every kind of series carries the fill it was given, and every kind of
+  series carries the fill of the point it was given.
+
+  Three defects were found this way and are fixed upstream:
+  [#1047](https://github.com/PHPOffice/PHPPresentation/issues/1047) — a category axis
+  wrote its major unit as the number of labels to skip, and wrote it as a fraction
+  where the schema wants a count, so the file was outside the schema;
+  [#1048](https://github.com/PHPOffice/PHPPresentation/issues/1048) — the area, line,
+  radar and scatter charts dropped the fill of a single data point;
+  [#1049](https://github.com/PHPOffice/PHPPresentation/issues/1049) — a doughnut, a pie
+  and a pie in three dimensions dropped the fill of the series itself.
 
 ## [0.3.0] - 2026-10-30
 

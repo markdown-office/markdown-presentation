@@ -166,37 +166,7 @@ function deckWithAnUnknownElement(string $deck): string
     return $path;
 }
 
-/**
- * Skips the test where the machine cannot run the validator.
- *
- * The validator is a .NET program, so the SDK is what runs it. A machine without it runs
- * the rest of the suite and says what is missing.
- */
-function skipWithoutDotnetSdk(): void
-{
-    if (dotnetSdkIsThere()) {
-        return;
-    }
 
-    test()->markTestSkipped(
-        'The .NET SDK is not installed, so the Open XML validator cannot be run. '
-        . 'The job that runs this test in continuous integration installs it.',
-    );
-}
-
-/**
- * Whether this machine has the .NET SDK the validator is built with.
- *
- * The version rather than the path, because a machine with the runtime and not the SDK
- * can run a program but not build one, and a path lookup would find the runtime and
- * answer yes.
- */
-function dotnetSdkIsThere(): bool
-{
-    exec('dotnet --version 2>&1', $output, $status);
-
-    return $status === 0;
-}
 
 /**
  * The decks of the gallery that are written in this run, and where they are written to.
@@ -287,22 +257,3 @@ function carriesVector(string $source): bool
     return str_contains($source, '.svg)');
 }
 
-/**
- * What Microsoft's validator makes of the given decks: the exit code and what it said.
- *
- * @param list<string> $decks
- *
- * @return array{0: int, 1: string}
- */
-function validateWithOpenXml(array $decks): array
-{
-    $command = sprintf(
-        'dotnet run --project %s -- %s 2>&1',
-        escapeshellarg(Doctest::root() . '/tools/ooxml-validator'),
-        implode(' ', array_map('escapeshellarg', $decks)),
-    );
-
-    exec($command, $output, $status);
-
-    return [$status, implode("\n", $output)];
-}
