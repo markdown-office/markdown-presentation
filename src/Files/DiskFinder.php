@@ -157,7 +157,15 @@ final class DiskFinder implements FileFinder
             return $this->resolveTheme($name);
         }
 
-        foreach ($this->bases($role) as $base) {
+        return $this->inWorlds($name, $role);
+    }
+
+    /**
+     * The file one of the worlds holds, or null when none of them does.
+     */
+    private function inWorlds(string $name, ?string $role): ?string
+    {
+        foreach ($this->worlds($role) as $base) {
             $path = rtrim($base, '/') . '/' . $name;
 
             if (is_file($path)) {
@@ -226,9 +234,12 @@ final class DiskFinder implements FileFinder
      * order the roles are declared, and is resolved as a plain name — the role is
      * what says how a name is resolved.
      *
+     * The theme role is not among them: a theme is resolved by its directory rather
+     * than by a file in a base, which {@see self::resolveTheme()} is where happens.
+     *
      * @return list<string>
      */
-    private function bases(?string $role): array
+    private function worlds(?string $role): array
     {
         return match ($role) {
             null => [...$this->theme, ...$this->picture, ...$this->document],

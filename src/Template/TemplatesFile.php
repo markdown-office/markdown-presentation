@@ -90,32 +90,61 @@ final class TemplatesFile
     /**
      * The templates file in the source the deck's files come from, or null when it has none.
      *
-     * A path the source answers is held to the scope, exactly as a path on disk is: a
-     * `templates-file:` is written by the deck, and what is allowed is where it lands.
+     * The path is asked for first, because a source that answers one holds the file as
+     * a file — read from where it is and held to the scope — and only a source that
+     * answers none holds the contents.
      */
     private function fromSource(string $written): ?string
     {
-        if ($this->files === null) {
+        $source = $this->files;
+
+        if ($source === null) {
             return null;
         }
 
-        $path = $this->files->path($written, 'document');
+        $path = $source->path($written, 'document');
 
         if ($path !== null) {
-            if (!is_file($path)) {
-                throw TemplatesFileNotFound::at($path);
-            }
-
-            $resolved = PathScope::canonical($path);
-
-            if ($resolved === null || !$this->scope->holds($resolved)) {
-                throw TemplatesFileNotFound::outside($written, $resolved ?? $path, $this->scope->roots());
-            }
-
-            return $this->readFile($written, $resolved);
+            return $this->fromPath($written, $path);
         }
 
-        $markdown = $this->files->read($written, 'document');
+        return $this->fromContents($written, $source);
+    }
+
+    /**
+     * The Markdown of the file the source holds at a path.
+     *
+     * The path is held to the scope, so a source may not reach a file this render may
+     * not read.
+     *
+     * @throws TemplatesFileNotFound
+     */
+    private function fromPath(string $written, string $path): string
+    {
+        if (!is_file($path)) {
+            throw TemplatesFileNotFound::at($path);
+        }
+
+        $resolved = PathScope::canonical($path);
+
+        if ($resolved === null || !$this->scope->holds($resolved)) {
+            throw TemplatesFileNotFound::outside($written, $resolved ?? $path, $this->scope->roots());
+        }
+
+        return $this->readFile($written, $resolved);
+    }
+
+    /**
+     * The Markdown the source holds as contents, or null when it holds none.
+     *
+     * There is no path to hold to the scope here, so the ceiling is the only rule the
+     * contents are measured against.
+     *
+     * @throws TemplatesFileTooLarge
+     */
+    private function fromContents(string $written, FileFinder $source): ?string
+    {
+        $markdown = $source->read($written, 'document');
 
         if ($markdown === null) {
             return null;
