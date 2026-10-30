@@ -8,7 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **Every deck the library writes is checked against the schema Microsoft's own validator
+- **The decks the library writes are checked against the schema Microsoft's own validator
   reads.** Nothing in the suite could see that before: the decks were checked against the
   parts they carry, and a deck whose XML is outside the schema passes every one of those
   checks and opens in PowerPoint as `[Repaired]`.
@@ -18,6 +18,10 @@ All notable changes to this project are documented here. The format follows
   with the library needs it. A machine without the .NET SDK runs the rest of the suite and
   says what is missing, and the job that runs the gate in continuous integration installs
   it, so the gate cannot skip itself there.
+
+  The one deck that carries a vector needs a rasteriser to be written at all — the library
+  refuses a picture it cannot draw rather than writing a diagram that has lost its words
+  — so a machine without one says which deck it did not check and checks the rest.
 
 ### Changed
 

@@ -151,11 +151,13 @@ whether these decks open.
 A deck whose XML is outside the schema opens in PowerPoint as `[Repaired]`, and the
 checks written by hand here did not catch that. `tests/Conformance/ooxml.php` runs
 Microsoft's Open XML validator — the one the Open XML SDK Productivity Tool uses — over
-every deck the library writes, and the program that does it is in `tools/ooxml-validator/`.
+the decks the library writes, and the program that does it is in
+`tools/ooxml-validator/`.
 
-It is a .NET program, so a machine without the SDK skips that test and says what is
-missing; the job that runs it in continuous integration installs it, so the gate cannot
-skip itself there.
+It is a .NET program, so a machine without the SDK skips those tests and says what is
+missing; the job that runs them in continuous integration installs it, so the gate cannot
+skip itself there. The one deck that carries a vector needs a rasteriser to be written at
+all, and a machine without one says which deck it did not check.
 
 ## What a change has to pass
 
