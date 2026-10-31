@@ -39,9 +39,9 @@
         "patches": {
             "phpoffice/phppresentation": [
                 {
-                    "description": "PHPPresentation 1.2.0 brought up to upstream's master, with the fixes that give a picture the path, the bytes and the name it was read from, and that find the folder of a part of a package with the slashes of the package",
-                    "url": "https://raw.githubusercontent.com/markdown-office/PHPPresentation/9aa3f4624f1cab54fc5d275397c2fc59cf6f276d/patches/phpoffice-phppresentation-1.2.0-to-master.patch",
-                    "sha256": "0b8f7c150f7ba5d12671fb9e211c9f1a4db549d7609239f49c0cea707a190551"
+                    "description": "PHPPresentation 1.2.0 brought up to upstream's master, with the fixes that give a picture the path, the bytes and the name it was read from, that find the folder of a part of a package with the slashes of the package, that write a chart series in the order the schema names it, that write the data points of a series and the fill of the series itself, and that give a category axis a tick label skip of its own",
+                    "url": "https://raw.githubusercontent.com/markdown-office/PHPPresentation/605bc7c9724ac4a0781cc1692ff7ae279a33bb8a/patches/phpoffice-phppresentation-1.2.0-to-master.patch",
+                    "sha256": "46862cef4470ae8e755a03f1f8afd94c7e772cc1ee4ab0a39441c2cb392d5146"
                 }
             ]
         }
@@ -69,6 +69,7 @@
     "scripts": {
         "test": "pest",
         "test:unit": "pest --testsuite=unit",
+        "test:conformance": "pest --testsuite=conformance",
         "test:readme": "pest --testsuite=readme",
         "test:coverage": "php -d memory_limit=-1 vendor/bin/pest --coverage --min=100",
         "analyse": "tools/phpstan.sh",

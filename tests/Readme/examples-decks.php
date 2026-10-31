@@ -155,16 +155,16 @@ it('lists every deck that is on disk', function () use ($readme, $root) {
 });
 
 it('builds every deck the page says it builds', function () use ($readme, $root) {
-    $build = (string) file_get_contents($root . '/examples/build.php');
+    $decks = (string) file_get_contents($root . '/examples/decks.php');
     preg_match_all('/`(\d{2}-[a-z-]+)\.md`\s*\|\s*\*\*nothing\*\*/', $readme, $declined);
 
     // A page that says a deck is not built has to be right about it: the reason has to be
-    // in `build.php`, keyed by the stem, or the deck stops being built for a reason nobody
-    // wrote down.
+    // in the plan of the decks, keyed by the stem, or the deck stops being built for a
+    // reason nobody wrote down.
     expect($declined[1])->not->toBe([]);
 
     foreach ($declined[1] as $name) {
-        expect($build)->toContain("'" . $name . "' => '");
+        expect($decks)->toContain("'" . $name . "' => '");
     }
 });
 

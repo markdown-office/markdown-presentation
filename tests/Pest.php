@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Filesystem\PathScope;
+use MarkdownPresentation\Tests\Support\Doctest;
 use MarkdownPresentation\Tests\Support\Scratch;
 
 pest()->afterEach(function (): void {
@@ -52,3 +53,55 @@ const SLIDE_ONE = 'ppt/slides/slide1.xml';
 const TWO_SLIDES = "# One\n\n---\n\n# Two\n";
 
 const TITLE_AND_CONTENT = 'Title and Content';
+
+/**
+ * Skips the test where the machine cannot run the validator.
+ *
+ * The validator is a .NET program, so the SDK is what runs it. A machine without it runs
+ * the rest of the suite and says what is missing.
+ */
+function skipWithoutDotnetSdk(): void
+{
+    if (dotnetSdkIsThere()) {
+        return;
+    }
+
+    test()->markTestSkipped(
+        'The .NET SDK is not installed, so the Open XML validator cannot be run. '
+        . 'The job that runs this test in continuous integration installs it.',
+    );
+}
+
+/**
+ * Whether this machine has the .NET SDK the validator is built with.
+ *
+ * The version rather than the path, because a machine with the runtime and not the SDK
+ * can run a program but not build one, and a path lookup would find the runtime and
+ * answer yes.
+ */
+function dotnetSdkIsThere(): bool
+{
+    exec('dotnet --version 2>&1', $output, $status);
+
+    return $status === 0;
+}
+
+/**
+ * What Microsoft's validator makes of the given decks: the exit code and what it said.
+ *
+ * @param list<string> $decks
+ *
+ * @return array{0: int, 1: string}
+ */
+function validateWithOpenXml(array $decks): array
+{
+    $command = sprintf(
+        'dotnet run --project %s -- %s 2>&1',
+        escapeshellarg(Doctest::root() . '/tools/ooxml-validator'),
+        implode(' ', array_map('escapeshellarg', $decks)),
+    );
+
+    exec($command, $output, $status);
+
+    return [$status, implode("\n", $output)];
+}

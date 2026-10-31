@@ -146,6 +146,19 @@ it would import the file through a lossy converter and report nothing about whet
 is valid. PowerPoint is the only application on this machine that will tell the truth about
 whether these decks open.
 
+### The schema is checked by Microsoft's own validator
+
+A deck whose XML is outside the schema opens in PowerPoint as `[Repaired]`, and the
+checks written by hand here did not catch that. `tests/Conformance/ooxml.php` runs
+Microsoft's Open XML validator — the one the Open XML SDK Productivity Tool uses — over
+the decks the library writes, and the program that does it is in
+`tools/ooxml-validator/`.
+
+It is a .NET program, so a machine without the SDK skips those tests and says what is
+missing; the job that runs them in continuous integration installs it, so the gate cannot
+skip itself there. The one deck that carries a vector needs a rasteriser to be written at
+all, and a machine without one says which deck it did not check.
+
 ## What a change has to pass
 
 ```
