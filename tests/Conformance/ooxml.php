@@ -14,20 +14,15 @@ require_once dirname(__DIR__, 2) . '/examples/decks.php';
  * Every deck this library writes, checked against the schema Microsoft's own validator
  * reads — the one the Open XML SDK Productivity Tool uses.
  *
- * Nothing in this suite could see that before: the decks were checked against the parts
- * they carry, and a deck whose XML is outside the schema passes every one of those
- * checks and opens in PowerPoint as `[Repaired]`. The validator is the oracle, and it is
- * a program in `tools/ooxml-validator/` rather than a library this package depends on:
- * nothing that ships with the library needs it, and the suite runs without it.
- *
- * A machine with no .NET SDK says what is missing and skips the test. A green tick for a
- * check that never ran is a check nobody made.
+ * Nothing in this suite could see that before: a deck whose XML is outside the schema
+ * passes every check the suite made and opens in PowerPoint as `[Repaired]`. The
+ * validator is a program in `tools/ooxml-validator/` rather than a dependency, and a
+ * machine without the .NET SDK says what is missing and skips the test — a green tick
+ * for a check that never ran is a check nobody made.
  *
  * The deck that carries a vector is a test of its own, because it is the one deck a
- * machine without a rasteriser cannot write: the library refuses the picture rather than
- * writing a diagram that has lost its words, and a machine that cannot draw one has
- * nothing to check. It is a test of its own so that a run says which deck it did not
- * check, rather than checking one deck fewer and saying nothing.
+ * machine without a rasteriser cannot write. It is a test of its own so that a run says
+ * which deck it did not check, rather than checking one deck fewer and saying nothing.
  */
 
 it('writes decks that are valid OOXML', function () {
@@ -37,19 +32,16 @@ it('writes decks that are valid OOXML', function () {
 
     [$status, $output] = validateWithOpenXml($decks);
 
-    // Every deck named, because a gate that checked nothing is not a gate. The validator
-    // prints one line per file and how many errors it holds, so a deck missing from the
-    // output is a deck that was not read — which is a failure, not a pass.
+    // Every deck named: the validator prints one line per file, so a deck missing
+    // from the output is a deck that was not read.
     expect($decks)->not->toBe([]);
 
     foreach ($decks as $deck) {
         expect($output)->toContain(basename($deck) . ': 0 error(s)');
     }
 
-    // The exit code is the tool's own answer, and it is what a caller that reads nothing
-    // else gets: 0 when every deck is clean, 1 when one of them is not, and 2 when the
-    // tool could not run at all. What the tool said is the message, because a failure
-    // here is a failure of the deck and the deck is what has to be looked at.
+    // The tool's own answer: 0 when every deck is clean, 1 when one is not, and 2
+    // when the tool could not run at all.
     expect($status)->toBe(0, $output);
 });
 
@@ -87,13 +79,9 @@ it('writes the deck that carries a vector and it is valid OOXML', function () {
 it('finds an error in a deck that has one', function () {
     skipWithoutDotnetSdk();
 
-    // The gate is worth nothing if it cannot fail. A validator that answered "no
-    // errors" about every deck would pass the two tests above, so this one asks
-    // it about a deck with an error in it and expects to be told.
-    //
-    // The error is an element no schema names, and the deck is otherwise the one
-    // the library wrote: it still opens, so what refuses it is the schema and
-    // not a broken archive.
+    // The gate is worth nothing if it cannot fail, so this one asks the validator
+    // about a deck with an error in it. The error is an element no schema names; the
+    // deck still opens, so what refuses it is the schema and not a broken archive.
     $decks = writeExampleDecks(false);
 
     expect($decks)->not->toBe([]);
@@ -150,8 +138,7 @@ function deckWithAnUnknownElement(string $deck): string
 
     $parts[$slide] = $broken;
 
-    // The extension matters: the tool decides how to open a file from it, and a
-    // scratch file whose name ends in a random suffix is not a deck to it.
+    // The extension matters: the tool decides how to open a file from it.
     $path = Scratch::directoryPath('deck') . '/broken.pptx';
 
     file_put_contents($path, '');
@@ -166,16 +153,12 @@ function deckWithAnUnknownElement(string $deck): string
     return $path;
 }
 
-
-
 /**
  * The decks of the gallery that are written in this run, and where they are written to.
  *
- * The plan of the decks is the one `examples/decks.php` holds, because that is the file
- * the script that writes them holds it in: a list of its own here would be a second
- * answer to a question that already has one, and the two would drift. A deck the
- * gallery no longer builds and the gate still checks is the worse of the two — a gate
- * that says less than it says.
+ * The plan of the decks is the one `examples/decks.php` holds: a list of its own here
+ * would be a second answer to a question that already has one, and the two would
+ * drift.
  *
  * @param bool $withVector Whether the decks that carry a vector are among them.
  *
@@ -195,10 +178,8 @@ function writeExampleDecks(bool $withVector): array
 
         $renderer = new PresentationRenderer($sources);
 
-        // A deck written more than once is written once per theme, which the renderer is
-        // told rather than the source: the theme in the source's own frontmatter is the
-        // one the deck asked for, and the copy in the gallery is the same deck in another
-        // theme.
+        // The theme is told to the renderer rather than to the source: the theme in
+        // the source's own frontmatter is the one the deck asked for.
         if ($deck['theme'] !== null) {
             $renderer->withTheme($deck['theme']);
         }
@@ -249,8 +230,7 @@ function exampleDecks(): array
 /**
  * Whether a deck's source carries a vector, and so needs a rasteriser to be written.
  *
- * A `.pptx` holds a vector only beside a raster of it, so the vector is drawn before it
- * goes in — and Imagick is the only thing here that draws one.
+ * A `.pptx` holds a vector only beside a raster of it.
  */
 function carriesVector(string $source): bool
 {

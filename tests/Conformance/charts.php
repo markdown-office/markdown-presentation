@@ -21,23 +21,15 @@ use MarkdownPresentation\Tests\Support\Scratch;
 /*
  * The charts, checked against the schema Microsoft's own validator reads.
  *
- * **This library writes no charts.** A deck of Markdown is slides, shapes, text and
- * pictures; there is no chart in it and no way to ask for one. What it does carry is a
- * patch of the library that writes the charts, and the patch is what the charts in
- * this file are for: a patch that is re-rolled without a fix is a patch that has lost
- * it, and nothing else in this repository would notice.
+ * **This library writes no charts.** What it carries is a patch of the library that
+ * writes them, and the patch is what the charts here are for: a patch re-rolled
+ * without a fix is a patch that has lost it, and nothing else in this repository
+ * would notice.
  *
- * So the charts are written here, through the patched library, and the two things
- * that can go wrong with them are checked:
- *
- * - **The file is outside the schema.** A chart is a part of its own with a schema of
- *   its own, and the order of the children of a series is a sequence and not a set. The
- *   validator is the oracle, and it is the same one the decks are checked with.
- * - **The file is valid and carries nothing.** A deck that is missing a data point is
- *   a valid deck: the validator reads what is there and says nothing about what is
- *   not. So the elements themselves are asserted on — every kind of series carries the
- *   fill it was given, and every kind of series carries the fill of the point it was
- *   given.
+ * Two things can go wrong with a chart, and they are checked both ways: the file can
+ * be outside the schema, which the validator reads, and the file can be valid and
+ * carry nothing — a chart without a data point is a valid chart, and the validator
+ * says nothing about what is not there. So the elements themselves are asserted on.
  */
 
 it('writes charts that are valid OOXML', function () {
@@ -65,15 +57,12 @@ it('writes into every kind of series what the series was given', function () {
 
         $children = seriesChildrenOf($deck);
 
-        // The fill of the series itself. The schema names it right after the title,
-        // and a chart that does not carry it draws the series in the colour the
-        // application chooses rather than the one that was asked for.
+        // The fill of the series itself, which the schema names right after the title.
         if (!in_array('c:spPr', $children, true)) {
             $withoutFill[] = $name;
         }
 
-        // The fill of one point of the series. The schema names it after the shared
-        // part of the series and before the labels.
+        // The fill of one point of the series, which the schema names before the labels.
         if (!in_array('c:dPt', $children, true)) {
             $withoutPoint[] = $name;
         }
@@ -94,9 +83,8 @@ it('writes the fill of a data point into the data point', function () {
 
 it('gives a category axis a tick label skip of its own, and not a major unit', function () {
     // A major unit is the distance between the ticks of a value axis; a category axis
-    // has no scale for a unit to be a distance between. The writer used to write one
-    // as the number of labels to skip, and the number it wrote was a fraction where
-    // the schema wants a count.
+    // has no scale for a unit to be a distance between. The writer used to write one as
+    // the number of labels to skip, and as a fraction where the schema wants a count.
     $deck = writeChartDeck('axis', Bar::class, majorUnit: 2.5);
 
     expect(chartPartOf($deck))

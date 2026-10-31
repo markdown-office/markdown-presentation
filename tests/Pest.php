@@ -57,8 +57,7 @@ const TITLE_AND_CONTENT = 'Title and Content';
 /**
  * Skips the test where the machine cannot run the validator.
  *
- * The validator is a .NET program, so the SDK is what runs it. A machine without it runs
- * the rest of the suite and says what is missing.
+ * The validator is a .NET program, so the SDK is what runs it.
  */
 function skipWithoutDotnetSdk(): void
 {
@@ -75,9 +74,8 @@ function skipWithoutDotnetSdk(): void
 /**
  * Whether this machine has the .NET SDK the validator is built with.
  *
- * The version rather than the path, because a machine with the runtime and not the SDK
- * can run a program but not build one, and a path lookup would find the runtime and
- * answer yes.
+ * The version rather than the path: a machine with the runtime and not the SDK can run
+ * a program but not build one.
  */
 function dotnetSdkIsThere(): bool
 {

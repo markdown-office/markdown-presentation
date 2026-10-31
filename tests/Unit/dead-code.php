@@ -549,6 +549,18 @@ it('declares a constant in one test file at most', function () {
     expect(constantDeclarations())->toBe([]);
 });
 
+it('keeps the install state out of the package', function () {
+    // `patches.lock.json` records the patch composer-patches applied on one
+    // machine, and it wins over the manifest: a file left in the repository
+    // installs that patch rather than the one the manifest names. Every
+    // `composer install` writes it, so it is ignored rather than committed.
+    $root = Doctest::root();
+    $tracked = [];
+    exec(sprintf('git -C %s ls-files -- patches.lock.json 2>&1', escapeshellarg($root)), $tracked);
+
+    expect($tracked)->toBe([]);
+});
+
 it('says in the code why ShapeWriter is not split', function () {
     // The one class where `php:S1448` is open on purpose, so the reason has to be somewhere
     // a person deciding whether to split it will actually read — which is the class itself,
