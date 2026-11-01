@@ -12,21 +12,10 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/decks.php';
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Render\PresentationRenderer;
-
-/**
- * The sources this script does not convert, and why.
- *
- * Keyed by the file's stem. A deck is here because converting it is the failure it
- * exists to demonstrate, which is the same reason `markdown-word` does not build its
- * `14-rejected.md`: the build would stop, or — worse — would not stop and the gallery
- * would contain a deck that quietly came out wrong.
- */
-const NOT_BUILT = [
-    '10-rejected' => 'converting it is the failure it exists to demonstrate; see examples/README.md',
-];
 
 /** Where the decks, their PDFs and their previews are written. */
 const OUT = __DIR__ . '/out';
@@ -36,19 +25,6 @@ const DECK = '.pptx';
 
 /** The directory a relative image path in a deck resolves against. */
 const SOURCES = __DIR__ . '/markdown';
-
-/**
- * The sources written more than once, and the one line each copy differs in.
- *
- * A theme is a frontmatter key, so the only way to see the three palettes side by side is
- * to write the same deck three times. Varying it here rather than in three files keeps
- * the three decks identical apart from the one line, which is the point of the
- * comparison.
- */
-const VARIANTS = [
-    '03-themes' => ['theme' => ['default', 'corporate-dark', 'minimal']],
-    '11-type-scale' => ['theme' => ['default', 'dense']],
-];
 
 /**
  * What each built deck is for, for the report at the end and for nothing else.

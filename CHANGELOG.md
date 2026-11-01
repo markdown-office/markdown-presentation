@@ -4,6 +4,73 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-10-31
+
+### Added
+
+- **The decks the library writes are checked against the schema Microsoft's own validator
+  reads.** Nothing in the suite could see that before: the decks were checked against the
+  parts they carry, and a deck whose XML is outside the schema passes every one of those
+  checks and opens in PowerPoint as `[Repaired]`.
+
+  The validator is Microsoft's own — the one the Open XML SDK Productivity Tool uses — and
+  it is a program in `tools/ooxml-validator/` rather than a dependency: nothing that ships
+  with the library needs it. A machine without the .NET SDK runs the rest of the suite and
+  says what is missing, and the job that runs the gate in continuous integration installs
+  it, so the gate cannot skip itself there.
+
+  The one deck that carries a vector needs a rasteriser to be written at all — the library
+  refuses a picture it cannot draw rather than writing a diagram that has lost its words
+  — so a machine without one says which deck it did not check and checks the rest.
+  **The continuous integration runner is such a machine**, so the gate checks eighteen of
+  the nineteen decks there, and the nineteenth is checked where a vector can be drawn.
+
+### Changed
+
+- **The patch carries four more fixes from upstream.** A chart's series is written in
+  the order the schema names it: the shape properties right after the title rather than
+  after the data points and the data labels, and the separator of the data labels of a
+  doughnut before the leader lines rather than after them. PowerPoint repairs a chart
+  written the other way round before it opens it
+  ([#695](https://github.com/PHPOffice/PHPPresentation/issues/695),
+  [#1044](https://github.com/PHPOffice/PHPPresentation/pull/1044)).
+
+  Three of them are charts that carried less than they were given: the area, the line,
+  the radar and the scatter dropped the fill of a single data point
+  ([#1048](https://github.com/PHPOffice/PHPPresentation/issues/1048),
+  [#1052](https://github.com/PHPOffice/PHPPresentation/pull/1052)), a doughnut, a pie
+  and a pie in three dimensions dropped the fill of the series itself
+  ([#1049](https://github.com/PHPOffice/PHPPresentation/issues/1049),
+  [#1051](https://github.com/PHPOffice/PHPPresentation/pull/1051)), and a category axis
+  wrote its major unit as the number of labels to skip — and as a fraction, where the
+  schema wants a count, so the file was outside the schema
+  ([#1047](https://github.com/PHPOffice/PHPPresentation/issues/1047),
+  [#1050](https://github.com/PHPOffice/PHPPresentation/pull/1050)).
+
+  This library writes no chart, so nothing it draws changes: the patch is upstream's
+  branch whole, and the fix belongs to that branch rather than to this one.
+
+- **The charts are checked too, and the gate knows what a chart has to carry.** The
+  patch is the library that writes the charts, and a patch that is re-rolled without a
+  fix is a patch that has lost it — nothing else in this suite would have noticed. So
+  the gate writes a chart of every kind through the patched library, and checks two
+  things about it: that the file is within the schema, which the validator reads, and
+  that it carries what it was given, which the validator cannot see.
+
+  A chart that is missing a data point is a valid chart. The validator reads what a
+  file holds and says nothing about what it does not, so the elements themselves are
+  asserted on: every kind of series carries the fill it was given, and every kind of
+  series carries the fill of the point it was given.
+
+  Three defects were found this way and are fixed upstream:
+  [#1047](https://github.com/PHPOffice/PHPPresentation/issues/1047) — a category axis
+  wrote its major unit as the number of labels to skip, and wrote it as a fraction
+  where the schema wants a count, so the file was outside the schema;
+  [#1048](https://github.com/PHPOffice/PHPPresentation/issues/1048) — the area, line,
+  radar and scatter charts dropped the fill of a single data point;
+  [#1049](https://github.com/PHPOffice/PHPPresentation/issues/1049) — a doughnut, a pie
+  and a pie in three dimensions dropped the fill of the series itself.
+
 ## [0.3.0] - 2026-10-30
 
 ### Added
@@ -2500,5 +2567,6 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
 [0.2.1]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.2.1
 [0.2.2]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.2.2
 [0.3.0]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.3.0
+[0.3.1]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.3.1
 [composer-patches]: https://github.com/cweagans/composer-patches
 [the-patch]: https://github.com/markdown-office/PHPPresentation/blob/patches/1.2.0-to-master/patches/phpoffice-phppresentation-1.2.0-to-master.patch
