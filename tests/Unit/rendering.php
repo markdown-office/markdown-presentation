@@ -5,6 +5,7 @@ declare(strict_types=1);
 use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Exception\FileNotWritable;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\ThemeNotFound;
@@ -313,6 +314,20 @@ it('declares every slide in the content types', function () {
 
 it('writes one slide per slide of the deck', function () {
     expect(renderDeck("# One\n\n---\n\n# Two\n\n---\n\n# Three\n")->slideCount())->toBe(3);
+});
+
+it('refuses to write a deck to a path that is not a file', function () {
+    // A device, a directory or a named pipe is not a file, and the archive writer opens
+    // whatever it is given — which is how writing to `/dev/null` produced a message about
+    // an empty file rather than a sentence that says what was wrong.
+    $directory = Scratch::directory() . '/not-a-file.pptx';
+
+    mkdir($directory, 0o777, true);
+
+    expect(fn () => (new PresentationRenderer())->render(
+        (new DeckParser())->parse("# One\n\nText.\n"),
+        $directory,
+    ))->toThrow(FileNotWritable::class, 'is not a regular file');
 });
 
 it('renders a deck whose theme sits beside it', function () {

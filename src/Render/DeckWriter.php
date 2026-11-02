@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Exception\FileNotWritable;
 use MarkdownPresentation\Theme\LayoutRole;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
@@ -55,6 +56,13 @@ final class DeckWriter
 
         if (!is_dir($directory)) {
             throw new Exception(sprintf('There is no directory at "%s" to write "%s" into.', $directory, basename($path)));
+        }
+
+        // A path that names something that is not a file is refused here rather than by the
+        // writer, which would open it and report an empty file or a deprecation instead of
+        // a sentence that says what was wrong.
+        if (file_exists($path) && !is_file($path)) {
+            throw FileNotWritable::notAFile($path);
         }
 
         IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);

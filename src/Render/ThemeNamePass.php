@@ -43,12 +43,15 @@ final class ThemeNamePass
     /**
      * Names the theme in the package at `$path`, and reports whether it changed.
      *
+     * @param ZipArchive|null $archive An archive to work in rather than one this opens.
+     *        {@see NotesColourMapPass::applyTo()} is where that is explained.
+     *
      * @throws UnreadablePackage When the presentation cannot be opened for writing, or a part
      *         cannot be read out of it.
      */
-    public static function applyTo(string $path, string $name): int
+    public static function applyTo(string $path, string $name, ?ZipArchive $archive = null): int
     {
-        $zip = new ZipArchive();
+        $zip = $archive ?? new ZipArchive();
 
         if ($zip->open($path) !== true) {
             throw UnreadablePackage::cannotOpen($path);

@@ -17,7 +17,6 @@ use PhpOffice\PhpPresentation\Shape\RichText\Paragraph;
 use PhpOffice\PhpPresentation\Shape\RichText\TextElement;
 use PhpOffice\PhpPresentation\Shape\Table;
 use PhpOffice\PhpPresentation\Style\Bullet;
-use PhpOffice\PhpPresentation\Style\Color;
 use PhpOffice\PhpPresentation\Style\Fill;
 use PhpOffice\PhpPresentation\Style\Font;
 
@@ -99,6 +98,8 @@ final class ShapeMapper
      * recognised by its own geometry, which is the true inverse: the name is
      * what this library writes, and a deck written by another program has
      * names of its own.
+     *
+     * @return list<Block>
      */
     private function placed(AbstractShape $shape): array
     {
@@ -134,11 +135,15 @@ final class ShapeMapper
             return null;
         }
 
-        // A text box the library wrote carries the name of the directive that draws
-        // it, and the layout's own text carries the name of the block it was drawn
-        // from. Only the first is a free shape.
+        // A text box the library wrote carries the name of the directive that draws it, and
+        // the layout's own text carries the name of the block it was drawn from. Only the
+        // first is a free shape.
+        //
+        // The name is the only way to tell, because a rectangle is read as a text shape and
+        // not as an autoshape: PowerPoint keeps most of its formatted text in one, and a
+        // reader that wants the formatting keeps the text shape.
         foreach (ShapeKind::cases() as $kind) {
-            if ($kind->value === $shape->getName() && $kind->isContent()) {
+            if ($kind->value === $shape->getName()) {
                 return $kind;
             }
         }
@@ -178,7 +183,9 @@ final class ShapeMapper
             $attributes['bleed'] = 'true';
         }
 
-        $body = $kind->isContent()
+        // A free text block holds its body; the page number holds the number the renderer
+        // wrote into it, which is not the author's to write back.
+        $body = $kind === ShapeKind::Content && $shape instanceof RichText
             ? $this->prose(array_values($shape->getParagraphs()))
             : [];
 
@@ -240,24 +247,18 @@ final class ShapeMapper
     {
         $fill = $shape->getFill();
 
-        if (!$fill instanceof Fill || $fill->getFillType() !== Fill::FILL_SOLID) {
+        if ($fill->getFillType() !== Fill::FILL_SOLID) {
             return null;
         }
 
-        $colour = $fill->getStartColor();
-
-        if (!$colour instanceof Color) {
-            return null;
-        }
-
-        return strtoupper($colour->getRGB());
+        return strtoupper($fill->getStartColor()->getRGB());
     }
 
     /**
      * The words an ink shape holds, or null where it holds none.
      *
-     * A label is the shape's own text, and it is plain: a label is one run of text, and the
-     * text of a shape with paragraphs in it is a body rather than a label.
+     * A label is the shape's own text, and it is plain: a label is one run of text, and a
+     * free text block holds its words as a body rather than as a label.
      */
     private function label(AbstractShape $shape): ?string
     {
@@ -267,11 +268,7 @@ final class ShapeMapper
             return $text === '' ? null : $text;
         }
 
-        if (!$shape instanceof RichText) {
-            return null;
-        }
-
-        $paragraphs = array_values($shape->getParagraphs());
+        $paragraphs = $shape instanceof RichText ? array_values($shape->getParagraphs()) : [];
 
         if (count($paragraphs) !== 1) {
             return null;
@@ -402,7 +399,7 @@ final class ShapeMapper
      * @param list<array{level: int, ordered: bool, inlines: list<Inline>}> $items
      * @param int $position How far through the list this has got.
      *
-     * @return list<list<list<Inline>>>
+     * @return list<Block>
      */
     private function items(array $items, int &$position, int $level): array
     {

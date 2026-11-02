@@ -54,9 +54,24 @@ final class Package
 
     public static function open(string $path, Options $options = new Options()): self
     {
-        self::bounds($path, $options);
+        // One archive for the bounding and the reading: the file is opened once and the
+        // theme's name is taken out of the same reading, rather than the two disagreeing
+        // about a file that changed between them.
+        $zip = new ZipArchive();
 
-        return new self(self::load($path), self::themeOf($path), $path);
+        if ($zip->open($path) !== true) {
+            throw UnreadableDeck::cannotOpen($path);
+        }
+
+        try {
+            self::bounds($path, $options, $zip);
+
+            $theme = ThemePart::nameOf($zip);
+        } finally {
+            $zip->close();
+        }
+
+        return new self(self::load($path), $theme, $path);
     }
 
     public static function fromString(string $bytes, Options $options = new Options()): self
@@ -121,36 +136,26 @@ final class Package
      * downward is caught by the reader's own consistency check, and one that
      * lies upward is caught here.
      */
-    private static function bounds(string $path, Options $options): void
+    private static function bounds(string $path, Options $options, ZipArchive $zip): void
     {
-        $zip = new ZipArchive();
-
-        if ($zip->open($path) !== true) {
-            throw UnreadableDeck::cannotOpen($path);
+        if ($zip->numFiles > $options->maxEntries) {
+            throw UnreadableDeck::tooManyParts($path, $zip->numFiles, $options->maxEntries);
         }
 
-        try {
-            if ($zip->numFiles > $options->maxEntries) {
-                throw UnreadableDeck::tooManyParts($path, $zip->numFiles, $options->maxEntries);
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $stat = $zip->statIndex($index) ?: ['name' => '', 'size' => 0];
+            $name = (string) $stat['name'];
+
+            if ((int) $stat['size'] > $options->maxPartBytes) {
+                throw UnreadableDeck::partTooLarge(
+                    $path,
+                    $name,
+                    (int) $stat['size'],
+                    $options->maxPartBytes,
+                );
             }
 
-            for ($index = 0; $index < $zip->numFiles; $index++) {
-                $stat = $zip->statIndex($index) ?: ['name' => '', 'size' => 0];
-                $name = (string) $stat['name'];
-
-                if ((int) $stat['size'] > $options->maxPartBytes) {
-                    throw UnreadableDeck::partTooLarge(
-                        $path,
-                        $name,
-                        (int) $stat['size'],
-                        $options->maxPartBytes,
-                    );
-                }
-
-                self::boundsPicture($path, $name, $zip);
-            }
-        } finally {
-            $zip->close();
+            self::boundsPicture($path, $name, $zip);
         }
     }
 
@@ -191,27 +196,6 @@ final class Package
                 $size[1],
                 ImageConverter::MAX_PIXELS,
             );
-        }
-    }
-
-    /**
-     * The name in the package's theme part, read out of the archive rather than the deck.
-     *
-     * The reader underneath reads the slides and the shapes; the theme part is not one of
-     * them, and the name in it is the only trace of the theme the deck was drawn in.
-     */
-    private static function themeOf(string $path): ?string
-    {
-        $zip = new ZipArchive();
-
-        if ($zip->open($path) !== true) {
-            return null;
-        }
-
-        try {
-            return ThemePart::nameOf($zip);
-        } finally {
-            $zip->close();
         }
     }
 

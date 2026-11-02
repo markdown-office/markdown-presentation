@@ -32,4 +32,15 @@ final class UnreadableArchive extends ZipArchive
             ? false
             : parent::getFromIndex($index, $length, $flags);
     }
+
+    /**
+     * The same part, read by name.
+     *
+     * Both ways of reading a part are refused, because the passes read them both ways and a
+     * double that refused one of them would let a path through that the real thing refuses.
+     */
+    public function getFromName(string $name, int $length = 0, int $flags = 0): string|false
+    {
+        return $name === $this->part ? false : parent::getFromName($name, $length, $flags);
+    }
 }
