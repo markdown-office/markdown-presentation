@@ -46,6 +46,19 @@ function templatedTheme(): string
 }
 
 /**
+ * The theme whose template anchors its title in the middle of its box.
+ *
+ * A directory of its own rather than a theme built in the test, because the point of it is
+ * the *file*: a template with an anchor in it is what PowerPoint writes and what a reader has
+ * to agree with, and a theme assembled in a test is a description of one rather than the
+ * thing itself.
+ */
+function anchoredTheme(): string
+{
+    return dirname(__DIR__, 2) . '/tests/fixtures/themes/anchored';
+}
+
+/**
  * A deck written against `$theme`, as the frontmatter that points at one.
  *
  * A function rather than a constant because every deck below opens with the same
@@ -347,25 +360,29 @@ it('writes the anchor a template gave its placeholder', function () {
     // the layout this library writes has to say so too: the slide's own title states no
     // anchor of its own and inherits this one, so a layout that dropped it drew every
     // title at the top of whatever box it was given.
-    $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Anchored\n",
-        'layouts.yml' => CONTENT_LAYOUT,
-        'template.pptx' => file_get_contents(builtTemplate([
-            ['name' => TITLE_AND_CONTENT, 'shapes' => [
-                ['type' => 'title', 'x' => 100, 'y' => 100, 'cx' => 400, 'cy' => 200, 'anchor' => 'ctr'],
-            ]],
-        ])),
-    ]);
-
     $path = Scratch::file('anchored.pptx', '');
 
     (new PresentationRenderer())->render(
-        (new DeckParser())->parse(themed($theme)),
+        (new DeckParser())->parse(themed(anchoredTheme())),
         $path,
     );
 
     expect(Pptx::open($path)->part('ppt/slideLayouts/slideLayout1.xml'))
         ->toContain('<a:bodyPr anchor="ctr"/>');
+});
+
+it('leaves the anchor of a template it says nothing about alone', function () {
+    // A template that anchors nothing is a template whose titles are at the top of their
+    // boxes, and a layout that gave every title an anchor would be inventing one.
+    $path = Scratch::file('unanchored.pptx', '');
+
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse(themed(templatedTheme())),
+        $path,
+    );
+
+    expect(Pptx::open($path)->part('ppt/slideLayouts/slideLayout1.xml'))
+        ->toContain('<a:bodyPr/>');
 });
 
 it('refuses a template with a part it cannot read', function () {

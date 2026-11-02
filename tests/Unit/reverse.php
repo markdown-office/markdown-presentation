@@ -21,9 +21,11 @@ use MarkdownPresentation\Tests\Support\Scratch;
 use PhpOffice\PhpPresentation\DocumentProperties;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
+use MarkdownPresentation\Render\Free\ShapeKind;
 use PhpOffice\PhpPresentation\Shape\AutoShape;
 use PhpOffice\PhpPresentation\Shape\Hyperlink;
 use PhpOffice\PhpPresentation\Style\Bullet;
+use PhpOffice\PhpPresentation\Style\Fill;
 use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
 use PhpOffice\PhpPresentation\Shape\Placeholder;
 use PhpOffice\PhpPresentation\Shape\Table as TableShape;
@@ -264,6 +266,48 @@ function zipUrl(string $part, string $contents): string
 function converted(string $path, ?Options $options = null): string
 {
     return (new PowerPointToMarkdown($path, $options ?? new Options(mediaDirectory: null)))->convert();
+}
+
+/**
+ * The free shapes of a deck, by slide and by name, with the box and the paint each has.
+ *
+ * The names the library gives its free shapes are the names of the directives that draw
+ * them, so a shape whose name is one of those is a shape the deck placed itself.
+ *
+ * @return array<int, array<string, array{box: string, paint: string}>>
+ */
+function freeShapesOf(string $path): array
+{
+    $deck = (new IOFactory())->createReader('PowerPoint2007')->load($path);
+    $kinds = array_column(ShapeKind::cases(), 'value');
+    $shapes = [];
+
+    foreach ($deck->getAllSlides() as $index => $slide) {
+        foreach ($slide->getShapeCollection() as $shape) {
+            $name = $shape->getName();
+
+            if (!in_array($name, $kinds, true)) {
+                continue;
+            }
+
+            $fill = $shape->getFill();
+
+            $shapes[$index][$name] = [
+                'box' => sprintf(
+                    '%d,%d %dx%d',
+                    $shape->getOffsetX(),
+                    $shape->getOffsetY(),
+                    $shape->getWidth(),
+                    $shape->getHeight(),
+                ),
+                'paint' => $fill->getFillType() === Fill::FILL_SOLID
+                    ? $fill->getStartColor()->getRGB()
+                    : $fill->getFillType(),
+            ];
+        }
+    }
+
+    return $shapes;
 }
 
 /**
@@ -1261,6 +1305,73 @@ it('writes nothing for a shape it was handed without one', function () {
 
     expect($writer->write([new Slide(0, null, [new Block(Block::SHAPE)], null)], $properties))
         ->not->toContain('::');
+});
+
+it('brings the free shapes of a gallery deck back with the same boxes and the same paint', function () {
+    // The gallery's own deck and not one the test wrote: the claim is about the decks the
+    // library ships, and a deck a test made is a deck nobody else has.
+    $source = dirname(__DIR__, 2) . '/examples/markdown/12-free-shapes.md';
+
+    $first = Scratch::file('gallery.pptx', '');
+    $second = Scratch::file('gallery-again.pptx', '');
+
+    $renderer = new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown');
+    $renderer->render((new DeckParser())->parse((string) file_get_contents($source)), $first);
+
+    $markdown = (new PowerPointToMarkdown($first, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
+        (new DeckParser())->parse($markdown),
+        $second,
+    );
+
+    $before = freeShapesOf($first);
+    $after = freeShapesOf($second);
+
+    expect($before)->not->toBe([]);
+
+    foreach ($before as $slide => $shapes) {
+        foreach ($shapes as $name => $shape) {
+            // A picture placed by the deck comes back as a picture — its bytes and its alt
+            // text — and not as a placed picture, because where a picture sits is part of the
+            // design and not part of the picture.
+            if ($name === ShapeKind::Image->value) {
+                expect($after[$slide][$name] ?? null)->toBeNull();
+
+                continue;
+            }
+
+            expect($after[$slide][$name] ?? null)->toBe($shape, sprintf(
+                'The "%s" of slide %d came back differently.',
+                $name,
+                $slide + 1,
+            ));
+        }
+    }
+});
+
+it('reads a shape of another program by its geometry', function () {
+    // A deck written by another program has names of its own, and its geometry is what says
+    // what it drew.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createAutoShape();
+        $shape->setType(AutoShape::TYPE_OVAL);
+        $shape->setName('A shape of somebody else');
+        $shape->setOffsetX(10);
+        $shape->setOffsetY(20);
+        $shape->setWidth(100);
+        $shape->setHeight(80);
+    });
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->toContain('::ellipse{');
 });
 
 it('leaves a shape that is none of the three kinds out', function () {

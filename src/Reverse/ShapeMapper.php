@@ -125,30 +125,36 @@ final class ShapeMapper
      */
     private function kindOf(AbstractShape $shape): ?array
     {
-        if ($shape instanceof AutoShape) {
-            foreach (ShapeKind::cases() as $kind) {
-                if ($kind->autoShape() === $shape->getType()) {
+        // A placeholder is the layout's own, and the layout is not in the deck.
+        if ($shape->isPlaceholder()) {
+            return null;
+        }
+
+        $kinds = ShapeKind::cases();
+
+        if ($shape instanceof AutoShape || $shape instanceof RichText) {
+            // The name the library gave the shape is the directive that drew it, and it is
+            // more precise than the geometry: a circle and an ellipse are the same preset,
+            // and only the name says which one the deck wrote.
+            //
+            // It is also the only way to tell a rectangle at all, because a rectangle is read
+            // as a text shape and not as an autoshape — PowerPoint keeps most of its
+            // formatted text in one, and a reader that wants the formatting keeps the text
+            // shape.
+            foreach ($kinds as $kind) {
+                if ($kind->value === $shape->getName()) {
                     return ['kind' => $kind, 'shape' => $shape];
                 }
             }
-
-            return null;
         }
 
-        if (!$shape instanceof RichText || $shape->isPlaceholder()) {
-            return null;
-        }
-
-        // A text box the library wrote carries the name of the directive that draws it, and
-        // the layout's own text carries the name of the block it was drawn from. Only the
-        // first is a free shape.
-        //
-        // The name is the only way to tell, because a rectangle is read as a text shape and
-        // not as an autoshape: PowerPoint keeps most of its formatted text in one, and a
-        // reader that wants the formatting keeps the text shape.
-        foreach (ShapeKind::cases() as $kind) {
-            if ($kind->value === $shape->getName()) {
-                return ['kind' => $kind, 'shape' => $shape];
+        // A deck written by another program has names of its own, and its geometry is what
+        // says what it drew.
+        if ($shape instanceof AutoShape) {
+            foreach ($kinds as $kind) {
+                if ($kind->autoShape() === $shape->getType()) {
+                    return ['kind' => $kind, 'shape' => $shape];
+                }
             }
         }
 
@@ -161,10 +167,17 @@ final class ShapeMapper
     private function freeShape(AutoShape|RichText $shape, ShapeKind $kind): Shape
     {
         $box = $this->box($shape);
+
+        // A circle's two sides are one number, and its percentages resolve against the height
+        // either way: a circle is the one shape whose width is a fraction of the slide's
+        // height rather than of its width, so that `width=14% height=14%` is the square the
+        // author wrote rather than 134 by 76.
+        $across = $kind->isCircle() ? SlideGeometry::HEIGHT : SlideGeometry::WIDTH;
+
         $attributes = [
             'left' => $this->percentage($box['x'], SlideGeometry::WIDTH),
             'top' => $this->percentage($box['y'], SlideGeometry::HEIGHT),
-            'width' => $this->percentage($box['width'], SlideGeometry::WIDTH),
+            'width' => $this->percentage($box['width'], $across),
             'height' => $this->percentage($box['height'], SlideGeometry::HEIGHT),
         ];
 

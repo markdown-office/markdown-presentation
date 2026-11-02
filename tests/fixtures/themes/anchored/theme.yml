@@ -1,0 +1,26 @@
+# A theme whose template anchors its title in the middle of its box.
+#
+# The anchor is the text's and not the box's, and it is what a designer uses to say where the
+# words sit inside the box they drew. A reader that took the placeholder's geometry and
+# dropped its anchor drew every title at the top of whatever box it was given.
+name: Anchored
+description: A theme whose title is centred in the box its own template drew for it.
+author: markdown-office
+dark: false
+colors:
+  dk1: "#1B1B1F"
+  lt1: "#FAFAFA"
+  dk2: "#4A4A55"
+  lt2: "#E6E6EC"
+  accent1: "#3F6FB5"
+  accent2: "#C4622D"
+  accent3: "#8A8A93"
+  accent4: "#B58900"
+  accent5: "#2E8B9E"
+  accent6: "#4F7A3D"
+  hlink: "#2B5C9E"
+  folHlink: "#6B4A9E"
+fonts:
+  heading: Source Sans Pro
+  body: Source Sans Pro
+  mono: Fira Code

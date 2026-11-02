@@ -60,6 +60,11 @@ All notable changes to this project are documented here. The format follows
   border is born black, and a reader cannot tell a border that was never given a colour from
   one that was given black — so a stroke of pure black comes back as no stroke at all.
 
+  **Two things are the design and do not travel.** The `layout:` of a slide is not in the
+  file: the role is a thing the deck said, and what the file holds is a layout part, which is
+  the design. And a picture the deck placed comes back as a picture — its bytes and its alt
+  text — because where a picture sits is part of the design and not part of the picture.
+
 - **A deck records the theme it was drawn in.** A `.pptx` carried the theme's colours and its
   fonts and nothing else about it: the name a deck's `theme:` names was a property of the
   Markdown the deck was written from, and nothing in the package said which directory it came
