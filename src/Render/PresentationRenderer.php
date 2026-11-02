@@ -532,7 +532,7 @@ final class PresentationRenderer
             $presentation->removeSlideByIndex(0);
         }
 
-        return DeckWriter::save($presentation, $path, $geometry, $used, $this->chain($builds));
+        return DeckWriter::save($presentation, $path, $geometry, $used, $this->chain($builds), $loaded->name());
     }
 
     /**

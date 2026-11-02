@@ -1123,7 +1123,7 @@ text has to be written before the text.
 
 #### Placement
 
-Six attributes, on every name:
+Seven attributes, on every name:
 
 | Attribute | Default | |
 | --- | --- | --- |
@@ -1132,6 +1132,7 @@ Six attributes, on every name:
 | `anchor` | `nw` | which corner `left` and `top` name: `nw` `n` `ne` `e` `se` `s` `sw` `w` `center` |
 | `layer` | `front` | `back` writes the shape before the layout's own, `front` after |
 | `rotate` | `0` | degrees clockwise, about the middle of the box: `45`, `-30`, `45deg` |
+| `bleed` | `false` | whether the shape may run off the edge of the slide |
 
 `anchor` is what makes a percentage usable for centring, which is the thing a model reaches for
 most often. `left=50% top=50% anchor=center` puts the box's **middle** at the middle of the
@@ -1169,6 +1170,27 @@ Full bleed is still reachable, because `left=0 width=100%` is exactly the edge.
 That is a claim about the **box**, and `rotate` is what makes it worth saying so: a square
 turned forty-five degrees keeps its hundred-pixel box and reaches past the edge of it. What
 is checked is what the deck placed; the tilt is the author's.
+
+### Bleeding off the edge
+
+A shape that runs off the edge of the slide is a thing a deck may want: the eight grey
+circles behind a title are meant to be cut off by the page, and a shape that cannot be
+written that way has to be a picture of one.
+
+`bleed=true` on the shape is the permission:
+
+```markdown
+::ellipse{left=-8% top=62% width=22% height=34% fill=panel bleed=true}
+```
+
+A shape that bleeds may have a negative `left` or `top`, and may be wider than the slide
+reaches. It still has to be **on** the slide: a shape whose whole box is past an edge is a
+shape nobody will ever see, and `bleed=true` does not make it visible.
+
+The permission is on the shape rather than on the deck, because the refusal it replaces is on
+the shape too. A deck-level switch would silence the check for every shape in it, including
+the ones nobody thought about, and a `left=-20` that was a typo is exactly what the check is
+for.
 
 ### Turning a shape
 
@@ -1458,7 +1480,7 @@ foreach ($decks as $slide) {
 ```text
 Slide 1 opens the directive "::rect{a=1}", which is not something a slide draws. The free shapes are: arrow, chevron, circle, content, diamond, ellipse, hexagon, image, line, rectangle, roundrect, slide-number, triangle. Two colons mark a step as "::click" or a column as "::column" and three open a step region as ":::click"; a placed text block is ":::content" with its Markdown between the fences.
 
-Slide 1 places "rectangle" at left 900px with a width of 120px, which reaches 1020px. A free shape lies within the 960px wide slide: write left=0 width=100% for one that reaches the edge.
+Slide 1 places "rectangle" at left 900px with a width of 120px, which reaches 1020px. A free shape lies within the 960px wide slide: write left=0 width=100% for one that reaches the edge — or write bleed=true if it is meant to run off it.
 
 Slide 1 gives a "::circle" a width of 120 and a height of 80. A circle is as wide as it is tall; give one size or the other.
 
@@ -1466,7 +1488,7 @@ Slide 1 gives "rectangle" a fill of "chartreuse". A colour is either no colour a
 
 Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
 
-Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.
+Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, bleed, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.
 
 Slide 1 gives "rectangle" a left of "10%,". Attributes are separated by a space, not a comma. A length is a number, a number of pixels, a number of points, or — for a position or a size — a percentage of the slide: left=40%, left=320, font-size=24pt.
 ```
@@ -2172,10 +2194,45 @@ deck. A `.pptx` records what is on a slide, not how it was drawn.
 | a table | a Markdown table |
 | the speaker's note | a `::note` block |
 | the date, the footer and the slide number | nothing |
+| a free shape | nothing, unless `preserveGeometry` says otherwise |
 
 The order is the order the slide lists its shapes in, which is the order they were put on
 it. A slide is a set of boxes rather than a flow, and the order the file records is the one
 claim about the reading order that the file itself makes.
+
+### Keeping the geometry
+
+A deck read back into Markdown comes back as text, and the shapes it placed itself are left
+out of it: the design of a deck is in its theme and in its master, and a new deck draws its
+own. A deck that is *taken apart* rather than edited wants the other answer, and
+`preserveGeometry` is the switch that gives it:
+
+```php
+echo (new PowerPointToMarkdown($path, new Options(
+    mediaDirectory: null,
+    preserveGeometry: true,
+)))->convert();
+```
+
+A free shape then comes back as the free shape it is, with the box it was given and the
+colour it was painted:
+
+```markdown
+::roundrect{left=10% top=40% width=30% height=20% fill=4472C4}
+
+:::content{left=50% top=40% width=30% height=20%}
+Text in a free box.
+:::
+```
+
+The box is written as a percentage of the slide, because a shape is placed relative to the
+slide rather than in the pixels of one page size. A shape that runs off the edge is written
+with `bleed=true`, because a shape off the edge is refused by the renderer unless it says so.
+
+What still does not travel is what a shape is besides its box and its colour: the theme slot
+a colour came from (the colour is written as the colour it resolved to), the shadow it casts,
+the corner radius of a rounded rectangle, the layer it was drawn on and the anchor of its
+box. A free text block's body travels; the size of the type in it does not.
 
 ### What the round trip does not keep
 

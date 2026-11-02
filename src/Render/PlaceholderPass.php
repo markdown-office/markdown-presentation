@@ -225,7 +225,7 @@ final class PlaceholderPass
             . "          </a:prstGeom>\n"
             . "        </p:spPr>\n"
             . "        <p:txBody>\n"
-            . "          <a:bodyPr/>\n"
+            . '          %s' . "\n"
             . "          <a:lstStyle/>\n"
             . "          <a:p>\n"
             . '            <a:endParaRPr lang="en-US"/>' . "\n"
@@ -239,6 +239,22 @@ final class PlaceholderPass
             (int) CommonDrawing::pixelsToEmu($box->y),
             (int) CommonDrawing::pixelsToEmu($box->width),
             (int) CommonDrawing::pixelsToEmu($box->height),
+            self::bodyProperties($box),
         );
+    }
+
+    /**
+     * The body properties of a placeholder, with the anchor a template gave it.
+     *
+     * Empty where the template said nothing, and carrying the anchor where it did: a
+     * placeholder whose text is anchored in the middle of its box and a placeholder whose
+     * text is anchored at the top draw the same box and different documents, and a slide's
+     * own placeholder inherits this one because it states no anchor of its own.
+     */
+    private static function bodyProperties(Box $box): string
+    {
+        return $box->textAnchor === null
+            ? '<a:bodyPr/>'
+            : sprintf('<a:bodyPr anchor="%s"/>', $box->textAnchor);
     }
 }

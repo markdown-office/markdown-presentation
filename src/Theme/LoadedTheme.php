@@ -22,12 +22,29 @@ final class LoadedTheme
      * @param array<string, mixed>  $styles  Word style slot to styleId or inline style array.
     */
     public function __construct(
+        private readonly string $name,
         private readonly string $directory,
         private readonly Theme $theme,
         private readonly array $styles,
         private readonly array $layouts,
         private readonly ?Master $template,
     ) {
+    }
+
+    /**
+     * The name the theme was resolved by.
+     *
+     * The name a deck's `theme:` names and not the theme's own title: a theme directory is
+     * called `pitch` whatever its `theme.yml` says it is called, and a deck that says
+     * `theme: pitch` means the directory called `pitch`.
+     *
+     * It is here because the deck has to be able to say which theme it was drawn in — the
+     * name travels into the `.pptx` and comes back out of it, so that a deck read back into
+     * Markdown can be drawn again in the theme it was drawn in.
+     */
+    public function name(): string
+    {
+        return $this->name;
     }
 
     public function directory(): string

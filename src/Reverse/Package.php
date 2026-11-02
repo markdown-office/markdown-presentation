@@ -8,6 +8,7 @@ use MarkdownPresentation\Exception\UnreadableDeck;
 use MarkdownPresentation\Exception\UnpatchedDependency;
 use MarkdownPresentation\Fixes;
 use MarkdownPresentation\Render\ImageConverter;
+use MarkdownPresentation\ThemePart;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
 use ZipArchive;
@@ -32,15 +33,30 @@ final class Package
 {
     private ?string $scratchPath = null;
 
-    private function __construct(private readonly PhpPresentation $deck)
+    private function __construct(
+        private readonly PhpPresentation $deck,
+        private readonly ?string $theme = null,
+        private readonly string $path = '',
+    ) {
+    }
+
+    /**
+     * The name of the theme the deck was drawn in, or null where the package says nothing.
+     *
+     * The name is the theme part's own, and it is the name a deck's `theme:` names only when
+     * this library wrote the deck: another program writes `Office Theme` there, or nothing.
+     * A caller that means to use the name has to be ready for both.
+     */
+    public function theme(): ?string
     {
+        return $this->theme;
     }
 
     public static function open(string $path, Options $options = new Options()): self
     {
         self::bounds($path, $options);
 
-        return new self(self::load($path));
+        return new self(self::load($path), self::themeOf($path), $path);
     }
 
     public static function fromString(string $bytes, Options $options = new Options()): self
@@ -65,6 +81,17 @@ final class Package
     public function deck(): PhpPresentation
     {
         return $this->deck;
+    }
+
+    /**
+     * The directory the deck is in, which is where its theme is looked for.
+     *
+     * A deck and its theme are one thing, and the theme the deck was drawn in is usually
+     * beside it.
+     */
+    public function directory(): string
+    {
+        return dirname($this->scratchPath ?? $this->path);
     }
 
     /**
@@ -164,6 +191,27 @@ final class Package
                 $size[1],
                 ImageConverter::MAX_PIXELS,
             );
+        }
+    }
+
+    /**
+     * The name in the package's theme part, read out of the archive rather than the deck.
+     *
+     * The reader underneath reads the slides and the shapes; the theme part is not one of
+     * them, and the name in it is the only trace of the theme the deck was drawn in.
+     */
+    private static function themeOf(string $path): ?string
+    {
+        $zip = new ZipArchive();
+
+        if ($zip->open($path) !== true) {
+            return null;
+        }
+
+        try {
+            return ThemePart::nameOf($zip);
+        } finally {
+            $zip->close();
         }
     }
 

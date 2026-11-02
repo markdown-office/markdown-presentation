@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Reverse;
 
 use MarkdownPresentation\Exception\UnreadableDeck;
+use MarkdownPresentation\Render\Free\ShapeKind;
+use MarkdownPresentation\Render\SlideGeometry;
 use PhpOffice\PhpPresentation\AbstractShape;
+use PhpOffice\PhpPresentation\Shape\AutoShape;
 use PhpOffice\PhpPresentation\Shape\Drawing\Base64;
 use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
 use PhpOffice\PhpPresentation\Shape\RichText;
@@ -14,6 +17,8 @@ use PhpOffice\PhpPresentation\Shape\RichText\Paragraph;
 use PhpOffice\PhpPresentation\Shape\RichText\TextElement;
 use PhpOffice\PhpPresentation\Shape\Table;
 use PhpOffice\PhpPresentation\Style\Bullet;
+use PhpOffice\PhpPresentation\Style\Color;
+use PhpOffice\PhpPresentation\Style\Fill;
 use PhpOffice\PhpPresentation\Style\Font;
 
 /**
@@ -31,6 +36,11 @@ use PhpOffice\PhpPresentation\Style\Font;
  *   design of the old one — and because the label of a text style is plain
  *   text with no escape in it, so a word whose text carries a bracket cannot be
  *   written back as a style at all.
+ *
+ * A shape the deck placed itself is a third kind, and it is written back as the
+ * free shape it is when {@see Options::$preserveGeometry} says to. That is the
+ * inverse of the renderer: the box it was given, the colour it was painted and
+ * the words in it travel, and the rest of what a shape is does not.
  */
 final class ShapeMapper
 {
@@ -61,6 +71,14 @@ final class ShapeMapper
      */
     public function blocks(AbstractShape $shape, int $slide, int $image, bool $outline = false): array
     {
+        // A free shape is asked about first, because a free text block is a text box and
+        // would otherwise be read as the prose it happens to hold.
+        $placed = $this->placed($shape);
+
+        if ($placed !== []) {
+            return $placed;
+        }
+
         return match (true) {
             $shape instanceof Table => $this->table($shape),
             $shape instanceof Gd || $shape instanceof Base64 => $this->picture($shape, $slide, $image),
@@ -74,12 +92,211 @@ final class ShapeMapper
     }
 
     /**
+     * The free shape a shape becomes, or nothing where it is not one.
+     *
+     * A shape the deck placed itself is an autoshape, or a text box the library
+     * wrote under the name of the directive that draws it. The autoshape is
+     * recognised by its own geometry, which is the true inverse: the name is
+     * what this library writes, and a deck written by another program has
+     * names of its own.
+     */
+    private function placed(AbstractShape $shape): array
+    {
+        if (!$this->options->preserveGeometry) {
+            return [];
+        }
+
+        $kind = $this->kindOf($shape);
+
+        if ($kind === null) {
+            return [];
+        }
+
+        return [Block::shape($this->freeShape($shape, $kind))];
+    }
+
+    /**
+     * The free shape a shape is, or null where it is not one this library draws.
+     */
+    private function kindOf(AbstractShape $shape): ?ShapeKind
+    {
+        if ($shape instanceof AutoShape) {
+            foreach (ShapeKind::cases() as $kind) {
+                if ($kind->autoShape() === $shape->getType()) {
+                    return $kind;
+                }
+            }
+
+            return null;
+        }
+
+        if (!$shape instanceof RichText || $shape->isPlaceholder()) {
+            return null;
+        }
+
+        // A text box the library wrote carries the name of the directive that draws
+        // it, and the layout's own text carries the name of the block it was drawn
+        // from. Only the first is a free shape.
+        foreach (ShapeKind::cases() as $kind) {
+            if ($kind->value === $shape->getName() && $kind->isContent()) {
+                return $kind;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The free shape, with the box it was given and the colour it was painted.
+     */
+    private function freeShape(AbstractShape $shape, ShapeKind $kind): Shape
+    {
+        $box = $this->box($shape);
+        $attributes = [
+            'left' => $this->percentage($box['x'], SlideGeometry::WIDTH),
+            'top' => $this->percentage($box['y'], SlideGeometry::HEIGHT),
+            'width' => $this->percentage($box['width'], SlideGeometry::WIDTH),
+            'height' => $this->percentage($box['height'], SlideGeometry::HEIGHT),
+        ];
+
+        $fill = $this->fill($shape);
+
+        if ($fill !== null) {
+            $attributes['fill'] = $fill;
+        }
+
+        $rotation = $shape->getRotation();
+
+        if ($rotation !== 0) {
+            $attributes['rotate'] = (string) $rotation;
+        }
+
+        // A shape that runs off the edge is refused by the renderer unless it says so, and
+        // the shape it was read from ran off the edge.
+        if ($box['x'] < 0 || $box['y'] < 0 || $box['x'] + $box['width'] > SlideGeometry::WIDTH
+            || $box['y'] + $box['height'] > SlideGeometry::HEIGHT) {
+            $attributes['bleed'] = 'true';
+        }
+
+        $body = $kind->isContent()
+            ? $this->prose(array_values($shape->getParagraphs()))
+            : [];
+
+        // A label is the words an ink shape holds. A free text block holds its body
+        // instead, and a shape with both is a shape with two places for its words.
+        $label = $kind->isContent() ? null : $this->label($shape);
+
+        if ($label !== null) {
+            $attributes['label'] = '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $label) . '"';
+        }
+
+        return new Shape($kind->value, $attributes, $body);
+    }
+
+    /**
+     * The box a shape occupies, in the pixels the library counts in.
+     *
+     * The pixels are the reader's own: PHPPresentation converts the EMU of the file into
+     * pixels when it reads a shape, and a pixel is 9525 EMU at the 96 dpi the library
+     * converts at, so the two count the same grid.
+     *
+     * @return array{x: int, y: int, width: int, height: int}
+     */
+    private function box(AbstractShape $shape): array
+    {
+        return [
+            'x' => (int) round($shape->getOffsetX()),
+            'y' => (int) round($shape->getOffsetY()),
+            'width' => (int) round($shape->getWidth()),
+            'height' => (int) round($shape->getHeight()),
+        ];
+    }
+
+    /**
+     * A measurement as a percentage of the slide, as the free shapes write it.
+     *
+     * Four decimals and no more: a shape at a third of the way across a 960-pixel slide is
+     * 33.3333%, and that is the nearest a percentage gets to it. A percentage rather than a
+     * number of pixels because a shape is placed relative to the slide, and a deck read on a
+     * page of another size is the same deck.
+     */
+    private function percentage(int $pixels, int $of): string
+    {
+        $percentage = round($pixels / $of * 100, 4);
+
+        $written = rtrim(rtrim(number_format($percentage, 4, '.', ''), '0'), '.');
+
+        return ($written === '' || $written === '-' ? '0' : $written) . '%';
+    }
+
+    /**
+     * The colour a shape is painted, or null where it is painted with none.
+     *
+     * The colour a theme slot resolved to and not the slot itself: the slot is in the theme,
+     * and the theme is not in the deck. A shape painted with a gradient or a pattern is left
+     * without a colour, because one colour is not what it is painted with.
+     */
+    private function fill(AbstractShape $shape): ?string
+    {
+        $fill = $shape->getFill();
+
+        if (!$fill instanceof Fill || $fill->getFillType() !== Fill::FILL_SOLID) {
+            return null;
+        }
+
+        $colour = $fill->getStartColor();
+
+        if (!$colour instanceof Color) {
+            return null;
+        }
+
+        return strtoupper($colour->getRGB());
+    }
+
+    /**
+     * The words an ink shape holds, or null where it holds none.
+     *
+     * A label is the shape's own text, and it is plain: a label is one run of text, and the
+     * text of a shape with paragraphs in it is a body rather than a label.
+     */
+    private function label(AbstractShape $shape): ?string
+    {
+        if ($shape instanceof AutoShape) {
+            $text = trim($shape->getText());
+
+            return $text === '' ? null : $text;
+        }
+
+        if (!$shape instanceof RichText) {
+            return null;
+        }
+
+        $paragraphs = array_values($shape->getParagraphs());
+
+        if (count($paragraphs) !== 1) {
+            return null;
+        }
+
+        $text = '';
+
+        foreach ($paragraphs[0]->getRichTextElements() as $element) {
+            if ($element instanceof TextElement) {
+                $text .= $element->getText();
+            }
+        }
+
+        $text = trim($text);
+
+        return $text === '' ? null : $text;
+    }
+
+    /**
      * The address a shape's text is a link to, or an empty string when it is
      * not one.
      *
      * A link to another slide of the same deck is not an address, and a deck
-     * has no way to say "go to slide three", so those are left out rather
-     * than written as a link to a file that is not there.
+     * has no way to say "go to slide three", so those are left out rather than
+     * written as a link to a file that is not there.
      */
     private function linkOf(RichText $shape): string
     {
@@ -185,7 +402,7 @@ final class ShapeMapper
      * @param list<array{level: int, ordered: bool, inlines: list<Inline>}> $items
      * @param int $position How far through the list this has got.
      *
-     * @return list<Block>
+     * @return list<list<list<Inline>>>
      */
     private function items(array $items, int &$position, int $level): array
     {
@@ -360,7 +577,7 @@ final class ShapeMapper
         $name = basename($path);
         $contents = @file_get_contents($path);
 
-        if ($contents === false || ! $this->isImage($name, $contents)) {
+        if ($contents === false || !$this->isImage($name, $contents)) {
             return null;
         }
 
@@ -384,7 +601,7 @@ final class ShapeMapper
     {
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
-        if (str_starts_with($name, '.') || ! in_array($extension, self::IMAGE_EXTENSIONS, true)) {
+        if (str_starts_with($name, '.') || !in_array($extension, self::IMAGE_EXTENSIONS, true)) {
             return false;
         }
 

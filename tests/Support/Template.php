@@ -20,7 +20,7 @@ use ZipArchive;
  * one that is not a placeholder at all. A template built by the library would agree with the
  * reader about everything that matters.
  *
- * @phpstan-type Shape array{type?: string, idx?: int, x?: int, y?: int, cx?: int, cy?: int}
+ * @phpstan-type Shape array{type?: string, idx?: int, x?: int, y?: int, cx?: int, cy?: int, anchor?: string}
  */
 final class Template
 {
@@ -175,12 +175,20 @@ final class Template
                 $placeholder = sprintf('<p:nvPr><p:ph type="%s"%s/></p:nvPr>', $shape['type'], $index);
             }
 
+            // The body, where the anchor of the text in the box is stated. PowerPoint writes
+            // one on every placeholder, and a template that says where its text sits is a
+            // template the reader has to agree with.
+            $body = isset($shape['anchor'])
+                ? sprintf('<p:txBody><a:bodyPr anchor="%s"/><a:lstStyle/><a:p/></p:txBody>', $shape['anchor'])
+                : '';
+
             $written .= sprintf(
-                '<p:sp><p:nvSpPr><p:cNvPr id="%d" name="Shape %d"/>%s</p:nvSpPr><p:spPr>%s</p:spPr></p:sp>',
+                '<p:sp><p:nvSpPr><p:cNvPr id="%d" name="Shape %d"/>%s</p:nvSpPr><p:spPr>%s</p:spPr>%s</p:sp>',
                 $number + 2,
                 $number + 2,
                 $placeholder,
                 self::transform($shape),
+                $body,
             );
         }
 

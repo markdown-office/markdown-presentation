@@ -20,6 +20,7 @@ final class Block
     public const ROW = 'row';
     public const CELL = 'cell';
     public const IMAGE = 'image';
+    public const SHAPE = 'shape';
 
     /**
      * @param string         $kind     One of the `PARAGRAPH`, `LIST`, `ITEM`,
@@ -29,6 +30,7 @@ final class Block
      * @param bool           $ordered  Whether a list is numbered rather than
      *        bulleted.
      * @param Image|null     $image    The picture, for a block that is one.
+     * @param Shape|null     $shape    The free shape, for a block that is one.
      */
     public function __construct(
         public readonly string $kind,
@@ -36,6 +38,7 @@ final class Block
         public readonly array $inlines = [],
         public readonly bool $ordered = false,
         public readonly ?Image $image = null,
+        public readonly ?Shape $shape = null,
     ) {
     }
 
@@ -92,6 +95,11 @@ final class Block
     public static function image(Image $image): self
     {
         return new self(self::IMAGE, image: $image);
+    }
+
+    public static function shape(Shape $shape): self
+    {
+        return new self(self::SHAPE, shape: $shape);
     }
 
     public function is(string ...$kinds): bool

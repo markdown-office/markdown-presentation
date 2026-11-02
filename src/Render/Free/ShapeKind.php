@@ -41,8 +41,14 @@ enum ShapeKind: string
     case Content = 'content';
     case SlideNumber = 'slide-number';
 
-    /** Where a shape sits, how it is turned and when it is drawn, beside the layout's. */
-    private const PLACEMENT = ['left', 'top', 'width', 'height', 'anchor', 'layer', 'rotate'];
+    /**
+     * Where a shape sits, how it is turned and when it is drawn, beside the layout's.
+     *
+     * `bleed` is here rather than with the paint because it is about where the shape is: it is
+     * the permission to run off the edge of the slide, and a shape that does is still a shape
+     * the deck wrote where it wrote it.
+     */
+    private const PLACEMENT = ['left', 'top', 'width', 'height', 'anchor', 'layer', 'rotate', 'bleed'];
 
     /** What a shape is painted with. */
     private const PAINT = ['fill', 'alpha', 'stroke', 'stroke-width'];

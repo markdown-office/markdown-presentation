@@ -75,12 +75,20 @@ final class Length
      *
      * @param int|null $of {@see SlideGeometry::WIDTH} or `HEIGHT` for a measurement that may be
      *                     a percentage of the slide, or null for one that may not.
+     * @param bool|null $bleed Whether the measurement may be negative, and whether the author
+     *                         could say so — see {@see self::parse()}.
      *
      * @throws MalformedShape
      */
-    public static function measure(int $slide, string $name, string $attribute, string $written, ?int $of): float
-    {
-        [$number, $unit] = self::parse($slide, $name, $attribute, $written);
+    public static function measure(
+        int $slide,
+        string $name,
+        string $attribute,
+        string $written,
+        ?int $of,
+        ?bool $bleed = null,
+    ): float {
+        [$number, $unit] = self::parse($slide, $name, $attribute, $written, $bleed);
 
         if ($unit === '%') {
             return self::percentage($number, $of ?? throw MalformedShape::attributeValue(
@@ -107,9 +115,15 @@ final class Length
      *
      * @throws MalformedShape
      */
-    public static function pixels(int $slide, string $name, string $attribute, string $written, ?int $of): int
-    {
-        return (int) round(self::measure($slide, $name, $attribute, $written, $of));
+    public static function pixels(
+        int $slide,
+        string $name,
+        string $attribute,
+        string $written,
+        ?int $of,
+        ?bool $bleed = null,
+    ): int {
+        return (int) round(self::measure($slide, $name, $attribute, $written, $of, $bleed));
     }
 
     /**
@@ -148,10 +162,23 @@ final class Length
      * @return array{0: float, 1: string} The number and the unit, lower-cased and with a bare
      *                                    number already read as the unit the caller asked for.
      *
+     * @param bool|null $bleed Whether this measurement may be negative, and whether the author
+     *                         could say so. `null` is a measurement that may never be negative
+     *                         — a size, a size of type, a stroke — and the refusal does not
+     *                         mention bleeding. `false` is one the author could bleed: the
+     *                         refusal then names `bleed=true`, because a shape that runs off the
+     *                         edge is a thing the deck's author may have meant. `true` is one
+     *                         the author has said bleeds, and a negative is permitted.
+     *
      * @throws MalformedShape
      */
-    private static function parse(int $slide, string $name, string $attribute, string $written): array
-    {
+    private static function parse(
+        int $slide,
+        string $name,
+        string $attribute,
+        string $written,
+        ?bool $bleed = null,
+    ): array {
         if (preg_match(self::PATTERN, $written, $match) !== 1) {
             throw MalformedShape::attributeValue(
                 $slide,
@@ -165,17 +192,43 @@ final class Length
 
         $number = (float) $match[1];
 
-        if ($number < 0) {
+        if ($number < 0 && $bleed !== true) {
             throw MalformedShape::attributeValue(
                 $slide,
                 $name,
                 $attribute,
                 $written,
-                'A length is not negative: a free shape lies within the slide, so write left=0 rather than a negative one.',
+                self::negative($attribute, $bleed),
             );
         }
 
         return [$number, strtolower($match[2] ?? '')];
+    }
+
+    /**
+     * What a negative measurement is refused with.
+     *
+     * The attribute is named rather than `left`, because the same rule is read on every
+     * measurement and `left` was the only one of them that ever had a negative written
+     * against it — a `top` of `-20%` was told to write `left=0`.
+     *
+     * @param bool|null $bleed Whether the author could say the measurement bleeds; see
+     *                         {@see self::parse()}.
+     */
+    private static function negative(string $attribute, ?bool $bleed): string
+    {
+        if ($bleed === false) {
+            return sprintf(
+                'A length is not negative: a free shape lies within the slide unless it is written to bleed, so write '
+                . '%s=0 rather than a negative one — or write bleed=true if the shape is meant to run off the edge.',
+                $attribute,
+            );
+        }
+
+        return sprintf(
+            'A length is not negative: write %s=0 rather than a negative one.',
+            $attribute,
+        );
     }
 
     /**

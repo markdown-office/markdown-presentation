@@ -238,6 +238,48 @@ it('refuses a negative length, because a free shape lies within the slide', func
         ->toThrow(MalformedShape::class, 'A length is not negative');
 });
 
+it('names what would have worked, when a shape is meant to bleed off the edge', function () {
+    // The refusal has to name the way out, or the author reads "a free shape lies within
+    // the slide" and concludes the shape cannot be drawn.
+    expect(fn () => placedShapes("::rectangle{left=-40}\n"))
+        ->toThrow(MalformedShape::class, 'or write bleed=true if the shape is meant to run off the edge');
+});
+
+it('draws a shape that bleeds off the edge when it says so', function () {
+    // The eight decorative circles of a deck that runs off the page are a shape the library
+    // could not write at all until this: a negative left was refused with no way to say that
+    // the negative was the point.
+    $shape = placedShape("::rectangle{left=-20% top=10% width=30% height=20% bleed=true}\n");
+
+    expect($shape->placement->box)
+        ->toMatchArray(['x' => -192, 'y' => 54, 'width' => 288, 'height' => 108]);
+});
+
+it('reads a bare bleed as a bleed, because a bare attribute asks for the attribute', function () {
+    expect(placedShape("::rectangle{left=-20% top=10% width=30% height=20% bleed}\n")->placement->box)
+        ->toMatchArray(['x' => -192]);
+});
+
+it('refuses a bleed that is not a flag', function () {
+    expect(fn () => placedShapes("::rectangle{left=-20% bleed=maybe}\n"))
+        ->toThrow(MalformedShape::class, 'A flag is true or false: bleed=true, bleed=false.');
+});
+
+it('refuses a negative size, because a size that bleeds is not a size', function () {
+    // Bleeding is a position off the edge of the slide. A width of -30% is not a shape that
+    // runs off the edge; it is a mistake, and the refusal does not offer bleed as a way out
+    // of one.
+    expect(fn () => placedShapes("::rectangle{width=-30%}\n"))
+        ->toThrow(MalformedShape::class, 'A length is not negative: write width=0 rather than a negative one.');
+});
+
+it('refuses a bleeding shape that is not on the slide at all', function () {
+    // Bleeding is a shape crossing an edge. A shape whose whole box is past the edge is a
+    // shape somewhere else, and `bleed=true` does not make it visible.
+    expect(fn () => placedShapes("::rectangle{left=100% width=30% bleed=true}\n"))
+        ->toThrow(MalformedShape::class, 'A shape that bleeds off the edge still has to be on the slide');
+});
+
 it('refuses a bare attribute, which asks for the attribute rather than its value', function () {
     // `{width}` is the RFC's spelling of "this attribute is present". Answering it with the
     // default would draw a full-bleed shape out of what was a typo.
@@ -287,7 +329,8 @@ it('refuses a box past the edge of the slide, with the numbers that put it there
         ->toThrow(
             MalformedShape::class,
             'Slide 1 places "rectangle" at left 900px with a width of 120px, which reaches 1020px. '
-            . 'A free shape lies within the 960px wide slide: write left=0 width=100% for one that reaches the edge.',
+            . 'A free shape lies within the 960px wide slide: write left=0 width=100% for one that reaches the edge '
+            . '— or write bleed=true if it is meant to run off it.',
         );
 });
 
@@ -415,7 +458,7 @@ it('refuses an attribute the directive does not read, and names the ones it does
     // The one mistake in this vocabulary that would otherwise leave no trace: a shape drawn
     // without the fill that was asked for, on a deck that looks rendered.
     expect(fn () => placedShapes("::image{src=\"logo.png\" padding=8}\n"))
-        ->toThrow(MalformedShape::class, 'The attributes are: alt, anchor, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.');
+        ->toThrow(MalformedShape::class, 'The attributes are: alt, anchor, bleed, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.');
 });
 
 it('gives each directive its own attribute vocabulary', function (ShapeKind $kind, string $last) {

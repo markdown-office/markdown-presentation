@@ -342,6 +342,32 @@ it('refuses a template that does not say how big its slides are', function () {
     ))->toThrow(MalformedTemplate::class, 'says nothing about how big its slides are');
 });
 
+it('writes the anchor a template gave its placeholder', function () {
+    // A template whose title is centred in the box it drew says so on the placeholder, and
+    // the layout this library writes has to say so too: the slide's own title states no
+    // anchor of its own and inherits this one, so a layout that dropped it drew every
+    // title at the top of whatever box it was given.
+    $theme = ThemeDirectory::create([
+        'theme.yml' => "name: Anchored\n",
+        'layouts.yml' => CONTENT_LAYOUT,
+        'template.pptx' => file_get_contents(builtTemplate([
+            ['name' => TITLE_AND_CONTENT, 'shapes' => [
+                ['type' => 'title', 'x' => 100, 'y' => 100, 'cx' => 400, 'cy' => 200, 'anchor' => 'ctr'],
+            ]],
+        ])),
+    ]);
+
+    $path = Scratch::file('anchored.pptx', '');
+
+    (new PresentationRenderer())->render(
+        (new DeckParser())->parse(themed($theme)),
+        $path,
+    );
+
+    expect(Pptx::open($path)->part('ppt/slideLayouts/slideLayout1.xml'))
+        ->toContain('<a:bodyPr anchor="ctr"/>');
+});
+
 it('refuses a template with a part it cannot read', function () {
     $theme = ThemeDirectory::create([
         'theme.yml' => "name: Broken\n",

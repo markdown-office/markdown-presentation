@@ -49,6 +49,7 @@ final class DeckWriter
         SlideGeometry $geometry,
         array $roles,
         array $builds = [],
+        ?string $theme = null,
     ): string {
         $directory = dirname($path);
 
@@ -57,6 +58,14 @@ final class DeckWriter
         }
 
         IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
+
+        // The theme's name, in the theme part, so that a deck read back into Markdown knows
+        // which theme it was drawn in. Before the notes master is given its own copy of the
+        // theme, so that the copy carries the name too: it is a copy of the deck's theme, and
+        // a copy of a named theme is named.
+        if ($theme !== null) {
+            ThemeNamePass::applyTo($path, $theme);
+        }
 
         NotesColourMapPass::applyTo($path);
         NotesChainPass::applyTo($path);

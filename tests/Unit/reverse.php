@@ -364,6 +364,47 @@ function slideTexts(string $path): array
     return $slides;
 }
 
+it('names the theme a deck was drawn in, so that it can be drawn in it again', function () {
+    // A deck carries the theme's colours and its fonts and nothing else about it: the name a
+    // deck's `theme:` names is a property of the Markdown it was written from, and nothing in
+    // the package said which directory it came from. So a deck read back into Markdown came
+    // back in the library's own theme rather than the one it was drawn in.
+    $path = writtenDeck("---\ntitle: Themed\ntheme: pitch\n---\n\n# One\n\nText.\n");
+
+    $zip = new ZipArchive();
+    $zip->open($path);
+    $theme = (string) $zip->getFromName('ppt/theme/theme1.xml');
+    $zip->close();
+
+    expect($theme)->toContain('name="pitch"');
+});
+
+it('writes the theme back into the Markdown it reads a deck into', function () {
+    $markdown = converted(writtenDeck("---\ntitle: Themed\ntheme: pitch\n---\n\n# One\n\nText.\n"));
+
+    expect($markdown)->toContain('theme: "pitch"');
+});
+
+it('writes no theme into the Markdown of a deck drawn in the default one', function () {
+    // A deck that names the default theme names nothing in particular, and a line saying so
+    // is a line the reader has to read past.
+    $markdown = converted(writtenDeck("# One\n\nText.\n"));
+
+    expect($markdown)->not->toContain('theme:');
+});
+
+it('writes no theme into the Markdown of a deck another program wrote', function () {
+    // The name in the theme part is the name a deck's `theme:` names only when this library
+    // wrote the deck. Another program writes `Office Theme` there, and a deck that names a
+    // theme nobody has is a deck that cannot be drawn again.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->createText('Text');
+    });
+
+    expect(converted($path))->not->toContain('theme:');
+});
+
 it('reads a deck back into a deck', function () {
     $markdown = <<<'MD'
     ---
@@ -973,6 +1014,81 @@ it('leaves a field out, which is a number and not a word', function () {
     });
 
     expect(converted($path))->toContain('Slide');
+});
+
+it('writes a free shape back as the free shape it is, with its box and its colour', function () {
+    // The inverse of the renderer: a shape the deck placed itself comes back as the
+    // directive that draws it, with the box it was given and the colour it was painted.
+    $path = writtenDeck(
+        "# One\n\nText.\n\n::roundrect{left=10% top=40% width=30% height=20% fill=accent1}\n",
+    );
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->toContain('::roundrect{left=10% top=40% width=30% height=20% fill=4472C4}');
+});
+
+it('writes a free text block back with the words it holds', function () {
+    $path = writtenDeck(
+        "# One\n\nText.\n\n:::content{left=50% top=40% width=30% height=20%}\nWords.\n:::\n",
+    );
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->toContain(':::content{left=50% top=40% width=30% height=20%}' . "\n" . 'Words.' . "\n" . ':::');
+});
+
+it('writes a shape that runs off the edge as one that bleeds', function () {
+    // A shape off the edge is refused by the renderer unless it says so, so a shape that
+    // was off the edge has to say so when it comes back.
+    $path = writtenDeck(
+        "# One\n\nText.\n\n::roundrect{left=90% top=40% width=30% height=20% fill=accent1 bleed=true}\n",
+    );
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->toContain('bleed=true');
+});
+
+it('draws the same deck again from the Markdown it reads one into', function () {
+    // The claim the whole of it is for: a deck taken apart and put back together is the
+    // deck it was.
+    $path = writtenDeck(
+        "# One\n\nText.\n\n::roundrect{left=10% top=40% width=30% height=20% fill=accent1}\n",
+    );
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    $again = Scratch::file('again.pptx', '');
+
+    (new PresentationRenderer())->render((new DeckParser())->parse($markdown), $again);
+
+    $shape = static function (string $path): ?array {
+        $zip = new ZipArchive();
+        $zip->open($path);
+        $slide = (string) $zip->getFromName('ppt/slides/slide1.xml');
+        $zip->close();
+
+        if (preg_match('#name="roundrect".*?<a:off x="(-?\d+)" y="(-?\d+)"/>.*?<a:ext cx="(\d+)" cy="(\d+)"#s', $slide, $found) !== 1) {
+            return null;
+        }
+
+        return [(int) $found[1], (int) $found[2], (int) $found[3], (int) $found[4]];
+    };
+
+    expect($shape($again))->toBe($shape($path));
 });
 
 it('leaves a shape that is none of the three kinds out', function () {

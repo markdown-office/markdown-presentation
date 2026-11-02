@@ -141,6 +141,7 @@ final class ThemeLoader
     private function read(array $manifest, string $name, string $written, ?FileFinder $files): LoadedTheme
     {
         return new LoadedTheme(
+            $name,
             dirname($manifest['path']),
             Theme::fromArray(
                 $this->mapping($manifest, 'a theme'),
