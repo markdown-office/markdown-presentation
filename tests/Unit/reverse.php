@@ -1043,7 +1043,12 @@ it('writes a free text block back with the words it holds', function () {
         preserveGeometry: true,
     )))->convert();
 
-    expect($markdown)->toContain(':::content{left=50% top=40% width=30% height=20%}' . "\n" . 'Words.' . "\n" . ':::');
+    // The block's own type travels with it, because it is an attribute of the directive
+    // rather than of the words in it.
+    expect($markdown)->toContain(
+        ':::content{left=50% top=40% width=30% height=20% color=000000 font-size=16}'
+        . "\n" . 'Words.' . "\n" . ':::',
+    );
 });
 
 it('writes a shape that runs off the edge as one that bleeds', function () {
@@ -1108,6 +1113,68 @@ it('reads a deck whose theme part names nothing', function () {
 
     expect($theme)->toContain('<a:theme')
         ->and(converted($path))->not->toContain('theme:');
+});
+
+it('writes a rule back with the colour it was drawn in', function () {
+    // A rule is a stroke and not a fill, and a rule that comes back with no colour is a rule
+    // nobody can see.
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n::line{left=6% top=50% width=88% height=0.3% stroke=accent1 stroke-width=2}\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('::line{')
+        ->and($markdown)->toContain('stroke=4472C4')
+        ->and($markdown)->toContain('stroke-width=2.25');
+});
+
+it('writes no stroke for a shape that was drawn without one', function () {
+    // A border is born black, and a reader cannot tell a border that was never given a
+    // colour from one that was given black.
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n::rectangle{left=6% top=40% width=88% height=30% fill=panel}\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('::rectangle{')
+        ->and($markdown)->not->toContain('stroke=');
+});
+
+it('writes the alignment of a free text block back in the middle of it', function () {
+    foreach (['align=right' => 'align=right', 'align=justify' => 'align=justify'] as $written => $expected) {
+        $markdown = (new PowerPointToMarkdown(writtenDeck(
+            "# One\n\nText.\n\n:::content{left=6% top=40% width=88% height=30% " . $written . "}\nWords.\n:::\n",
+        ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+        expect($markdown)->toContain($expected);
+    }
+});
+
+it('writes a free text block back at the bottom of its box', function () {
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n:::content{left=6% top=40% width=88% height=30% vertical-align=bottom}\nWords.\n:::\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('vertical-align=bottom');
+});
+
+it('writes the stroke of a shape the reader gives as an autoshape', function () {
+    // An autoshape's outline says whether it has a stroke at all, so a shape that was drawn
+    // without one comes back without one.
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n::roundrect{left=6% top=40% width=88% height=30% fill=panel stroke=accent1 stroke-width=2}\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('::roundrect{')
+        ->and($markdown)->toContain('stroke=4472C4')
+        ->and($markdown)->toContain('stroke-width=2.25');
+});
+
+it('writes the alignment of a free text block back', function () {
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n:::content{left=6% top=40% width=88% height=30% align=center vertical-align=middle}\nWords.\n:::\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('align=center')
+        ->and($markdown)->toContain('vertical-align=middle');
 });
 
 it('writes a shape with no fill without one, and a turned shape with its turn', function () {

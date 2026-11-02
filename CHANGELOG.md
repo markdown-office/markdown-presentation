@@ -49,9 +49,16 @@ All notable changes to this project are documented here. The format follows
   written with `bleed=true`, because a shape off the edge is refused by the renderer unless
   it says so.
 
-  What still does not travel is what a shape is besides its box and its colour: the theme
+  **The paint travels with the box.** A shape comes back with the colour it was filled with and
+  the colour it was stroked in, and a free text block comes back with the colour and the size
+  of the type in it. A rule is a stroke and not a fill, and a rule that comes back with no
+  colour is a rule nobody can see.
+
+  What still does not travel is what a shape is besides its box and its paint: the theme
   slot a colour came from, the shadow it casts, the corner radius of a rounded rectangle,
-  the layer it was drawn on and the anchor of its box.
+  the layer it was drawn on and the anchor of its box. And one thing the format cannot say: a
+  border is born black, and a reader cannot tell a border that was never given a colour from
+  one that was given black — so a stroke of pure black comes back as no stroke at all.
 
 - **A deck records the theme it was drawn in.** A `.pptx` carried the theme's colours and its
   fonts and nothing else about it: the name a deck's `theme:` names was a property of the

@@ -14,9 +14,11 @@ use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
 use PhpOffice\PhpPresentation\Shape\RichText;
 use PhpOffice\PhpPresentation\Shape\RichText\BreakElement;
 use PhpOffice\PhpPresentation\Shape\RichText\Paragraph;
+use PhpOffice\PhpPresentation\Shape\RichText\Run;
 use PhpOffice\PhpPresentation\Shape\RichText\TextElement;
 use PhpOffice\PhpPresentation\Shape\Table;
 use PhpOffice\PhpPresentation\Style\Bullet;
+use PhpOffice\PhpPresentation\Style\Color;
 use PhpOffice\PhpPresentation\Style\Fill;
 use PhpOffice\PhpPresentation\Style\Font;
 
@@ -107,24 +109,26 @@ final class ShapeMapper
             return [];
         }
 
-        $kind = $this->kindOf($shape);
+        $found = $this->kindOf($shape);
 
-        if ($kind === null) {
+        if ($found === null) {
             return [];
         }
 
-        return [Block::shape($this->freeShape($shape, $kind))];
+        return [Block::shape($this->freeShape($found['shape'], $found['kind']))];
     }
 
     /**
      * The free shape a shape is, or null where it is not one this library draws.
+     *
+     * @return ?array{kind: ShapeKind, shape: AutoShape|RichText}
      */
-    private function kindOf(AbstractShape $shape): ?ShapeKind
+    private function kindOf(AbstractShape $shape): ?array
     {
         if ($shape instanceof AutoShape) {
             foreach (ShapeKind::cases() as $kind) {
                 if ($kind->autoShape() === $shape->getType()) {
-                    return $kind;
+                    return ['kind' => $kind, 'shape' => $shape];
                 }
             }
 
@@ -144,7 +148,7 @@ final class ShapeMapper
         // reader that wants the formatting keeps the text shape.
         foreach (ShapeKind::cases() as $kind) {
             if ($kind->value === $shape->getName()) {
-                return $kind;
+                return ['kind' => $kind, 'shape' => $shape];
             }
         }
 
@@ -154,7 +158,7 @@ final class ShapeMapper
     /**
      * The free shape, with the box it was given and the colour it was painted.
      */
-    private function freeShape(AbstractShape $shape, ShapeKind $kind): Shape
+    private function freeShape(AutoShape|RichText $shape, ShapeKind $kind): Shape
     {
         $box = $this->box($shape);
         $attributes = [
@@ -168,6 +172,16 @@ final class ShapeMapper
 
         if ($fill !== null) {
             $attributes['fill'] = $fill;
+        }
+
+        // A line is a stroke and not a fill, and a rule that comes back with no colour is a
+        // rule nobody can see.
+        $stroke = $this->stroke($shape);
+
+        if ($stroke !== null) {
+            $attributes['stroke'] = $stroke;
+
+            $attributes['stroke-width'] = $this->strokeWidth($shape);
         }
 
         $rotation = $shape->getRotation();
@@ -188,6 +202,12 @@ final class ShapeMapper
         $body = $kind === ShapeKind::Content && $shape instanceof RichText
             ? $this->prose(array_values($shape->getParagraphs()))
             : [];
+
+        // The type of the words in a free text block is the block's, not the prose's, and it
+        // travels because it is an attribute of the directive rather than of the words in it.
+        if ($kind === ShapeKind::Content && $shape instanceof RichText) {
+            $attributes += $this->typeOf($shape);
+        }
 
         // A label is the words an ink shape holds. A free text block holds its body
         // instead, and a shape with both is a shape with two places for its words.
@@ -252,6 +272,121 @@ final class ShapeMapper
         }
 
         return strtoupper($fill->getStartColor()->getRGB());
+    }
+
+    /**
+     * The type of the words in a free text block, as the attributes that carry it.
+     *
+     * A free text block holds Markdown, and the Markdown's own formatting — a word in bold,
+     * a word in italic — travels with it. The block's *type* is a different thing: it belongs
+     * to the box rather than to the words, and it is an attribute of the directive, so it
+     * travels too.
+     *
+     * @return array<string, string>
+     */
+    private function typeOf(RichText $shape): array
+    {
+        $attributes = [];
+
+        // The first paragraph, and only the first: the type of a block is one thing, and a
+        // block with paragraphs of different types is a block whose type the file does not
+        // say. The loop is the way of saying "the first one" without saying what happens
+        // when there is none, which a text shape with no paragraph in it never is.
+        foreach (\array_slice(array_values($shape->getParagraphs()), 0, 1) as $paragraph) {
+            // The run's font and not the paragraph's: the block's type is written into every
+            // run, and the paragraph keeps the type a word would have without one.
+            $font = $paragraph->getFont();
+
+            foreach ($paragraph->getRichTextElements() as $element) {
+                if ($element instanceof Run) {
+                    $font = $element->getFont();
+
+                    break;
+                }
+            }
+
+            $attributes['color'] = strtoupper($font->getColor()->getRGB());
+            $attributes['font-size'] = (string) $font->getSize();
+
+            $align = match ($paragraph->getAlignment()->getHorizontal()) {
+                'ctr' => 'center',
+                'r' => 'right',
+                'just' => 'justify',
+                default => 'left',
+            };
+
+            if ($align !== 'left') {
+                $attributes['align'] = $align;
+            }
+
+            $vertical = match ($paragraph->getAlignment()->getVertical()) {
+                'ctr' => 'middle',
+                'b' => 'bottom',
+                default => 'top',
+            };
+
+            if ($vertical !== 'top') {
+                $attributes['vertical-align'] = $vertical;
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * The colour a shape is stroked in, or null where it is stroked with none.
+     *
+     * An autoshape carries its stroke on its outline and a text shape on its border, because
+     * that is where the format keeps them: the file has one element and the reader gives it
+     * to a shape of one kind or the other.
+     */
+    private function stroke(AutoShape|RichText $shape): ?string
+    {
+        if ($shape instanceof AutoShape) {
+            return $this->colourOf($shape->getOutline()->getFill());
+        }
+
+        // A border is born black, and a reader cannot tell a border that was never given a
+        // colour from one that was given black: a shape drawn without a stroke and a shape
+        // drawn with a black one come back the same. The colour is therefore the signal, and
+        // a black stroke is the one that does not travel.
+        $colour = $this->colourOf($shape->getBorder()->getColor());
+
+        return $colour === '000000' ? null : $colour;
+    }
+
+    /**
+     * How wide a shape is stroked, in points, or null where it is not stroked.
+     *
+     * The width is written in whole pixels and the directive writes it in points, so the
+     * number that comes back is a fraction: a stroke of two points is three pixels, and
+     * three pixels are two and a quarter points. The file is the same either way.
+     */
+    private function strokeWidth(AutoShape|RichText $shape): string
+    {
+        $width = $shape instanceof AutoShape
+            ? $shape->getOutline()->getWidth()
+            : $shape->getBorder()->getLineWidth();
+
+        $points = round($width / SlideGeometry::PIXELS_PER_POINT, 2);
+
+        return rtrim(rtrim(number_format($points, 2, '.', ''), '0'), '.');
+    }
+
+    /**
+     * The colour of a fill or of a colour, or null where there is none.
+     */
+    private function colourOf(Fill|Color|null $paint): ?string
+    {
+        if ($paint instanceof Color) {
+            return strtoupper($paint->getRGB());
+        }
+
+        if ($paint === null || $paint->getFillType() !== Fill::FILL_SOLID) {
+            return null;
+        }
+
+        return strtoupper($paint->getStartColor()->getRGB());
     }
 
     /**

@@ -2229,10 +2229,17 @@ The box is written as a percentage of the slide, because a shape is placed relat
 slide rather than in the pixels of one page size. A shape that runs off the edge is written
 with `bleed=true`, because a shape off the edge is refused by the renderer unless it says so.
 
-What still does not travel is what a shape is besides its box and its colour: the theme slot
-a colour came from (the colour is written as the colour it resolved to), the shadow it casts,
-the corner radius of a rounded rectangle, the layer it was drawn on and the anchor of its
-box. A free text block's body travels; the size of the type in it does not.
+**The paint travels with the box.** A shape comes back with the colour it was filled with and
+the colour it was stroked in, and a free text block comes back with the colour and the size of
+the type in it. A rule is a stroke and not a fill, and a rule that comes back with no colour is
+a rule nobody can see.
+
+What still does not travel is what a shape is besides its box and its paint: the theme slot a
+colour came from (the colour is written as the colour it resolved to), the shadow it casts, the
+corner radius of a rounded rectangle, the layer it was drawn on and the anchor of its box. And
+one thing the format cannot say: a border is born black, and a reader cannot tell a border that
+was never given a colour from one that was given black — so a stroke of pure black comes back as
+no stroke at all. A free text block's body travels; the size of the type in it does not.
 
 ### What the round trip does not keep
 
