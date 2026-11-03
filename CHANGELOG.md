@@ -142,9 +142,9 @@ All notable changes to this project are documented here. The format follows
   ---
   ```
 
-  A slide's values are laid over the template's, and the template's over the theme's, and one
-  value laid over another leaves the rest alone: a slide that names one colour leaves the
-  other eleven as they were.
+  A slide's values are laid over the template's, the template's over the deck's and the deck's
+  over the theme's, and one value laid over another leaves the rest alone: a slide that names
+  one colour leaves the other eleven as they were.
 
   The four roles the theme has — the page, the ink, the subtle ink and the panel — sit on
   **four different slots**, so overriding a slot moves exactly one of them and `dark:` says
@@ -174,6 +174,34 @@ All notable changes to this project are documented here. The format follows
   now a slide that names a template and nothing but its own settings, as it was before the
   settings arrived, and a template defined twice is refused rather than left to win
   quietly.
+
+- **A deck may name its own settings.** There was no layer for the deck: a deck's frontmatter
+  is its first slide's, and `theme-variables:` is read per slide, so a deck that named an
+  accent in its frontmatter painted the first slide in that accent and left every other slide
+  in the theme's own.
+
+  A deck's frontmatter may now carry `deck-settings:`, and every slide of the deck is drawn
+  with it:
+
+  ```markdown
+  ---
+  theme: corporate-dark
+  deck-settings:
+    background: "#101014"
+    theme-variables:
+      colors:
+        accent1: "#123456"
+  ---
+  ```
+
+  The ordinary keys mean the **slide's** own everywhere, so the deck's settings are named as
+  the deck's, the way a template's are named as the template's. The precedence is
+  **slide → template → deck → theme**: a slide's own settings are laid over the template's,
+  the template's over the deck's and the deck's over the theme's, and one value laid over
+  another leaves the rest alone.
+
+  It belongs in slide 1's front matter, which is the deck's own, and it is refused on any
+  other slide — the way `theme:` is.
 
 ### Fixed
 

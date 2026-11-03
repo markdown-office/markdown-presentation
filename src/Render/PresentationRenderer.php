@@ -104,12 +104,12 @@ final class PresentationRenderer
     */
     public const DIRECTIVES = [
         'title', 'name', 'level', 'layout', 'theme', 'author', 'description', 'template', 'templates-file',
-        'template-settings',
+        'template-settings', 'deck-settings',
         ...Settings::KEYS,
     ];
 
     /** The keys that describe the deck rather than a slide, and so belong to slide 1's block. */
-    public const DECK_DIRECTIVES = ['theme', 'author', 'description', 'templates-file'];
+    public const DECK_DIRECTIVES = ['theme', 'author', 'description', 'templates-file', 'deck-settings'];
 
     /** The theme a deck that names none gets. */
     public const DEFAULT_THEME = DeckTheme::DEFAULT_THEME;
@@ -657,9 +657,9 @@ final class PresentationRenderer
     /**
      * How each slide is drawn.
      *
-     * The deck's theme with the values the slide names laid over it — the values of the
-     * templates it names first, and its own over them — and the background the slide names
-     * or the template it names gave it.
+     * The deck's theme with the values laid over it: the deck's own first, the template's
+     * over them and the slide's over both. The background is the first of the three that
+     * names one.
      *
      * The background's colour is resolved against the slide's own theme, so a background
      * that names a slot is painted in the colour that slot has on that slide.
@@ -685,10 +685,11 @@ final class PresentationRenderer
         array $boxes,
     ): array {
         $appearance = [];
+        $deckSettings = $this->deckSettings($deck);
 
         foreach ($deck->slides() as $slide) {
             $settings = Settings::merge(
-                $this->furniture->settings($this->templates, $slide),
+                Settings::merge($deckSettings, $this->furniture->settings($this->templates, $slide)),
                 Settings::read($slide->frontmatter(), $slide->index() + 1),
             );
 
@@ -715,6 +716,27 @@ final class PresentationRenderer
         }
 
         return $appearance;
+    }
+
+    /**
+     * The settings the deck carries, or none where it names none.
+     *
+     * The deck's frontmatter is its first slide's, so the settings are read from there and
+     * the slide they are named in is slide 1 — which is where a deck directive belongs.
+     *
+     * @return array{background?: array<string, mixed>, variables?: array<string, mixed>}
+     *
+     * @throws MalformedFrontmatter
+     */
+    private function deckSettings(Deck $deck): array
+    {
+        $frontmatter = $deck->frontmatter();
+
+        if (!array_key_exists('deck-settings', $frontmatter)) {
+            return [];
+        }
+
+        return Settings::readDeck(1, $frontmatter['deck-settings']);
     }
 
     /**

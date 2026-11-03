@@ -71,17 +71,29 @@ final class MalformedFrontmatter extends InvalidInput
     }
 
     /**
-     * A setting of a template that is not one.
+     * A setting that is not one.
      *
-     * The settings of a template are the definition's, and a definition is not a slide of
-     * the deck and has no number.
+     * The slide number is null where the settings are a template definition's: a
+     * definition is not a slide of the deck and has no number, and naming one would name a
+     * slide that has nothing to do with it. The deck's settings are the first slide's, and
+     * that slide has a number.
      *
      * @param list<string> $known
      */
-    public static function unknownSetting(string $where, string $key, array $known): self
+    public static function unknownSetting(?int $slide, string $where, string $key, array $known): self
     {
+        if ($slide === null) {
+            return new self(sprintf(
+                'The "%s" of a template definition names "%s", which is not a setting. The settings are: %s.',
+                $where,
+                $key,
+                implode(', ', $known),
+            ));
+        }
+
         return new self(sprintf(
-            'The "%s" of a template definition names "%s", which is not a setting. The settings are: %s.',
+            'The frontmatter of slide %d has a "%s" that names "%s", which is not a setting. The settings are: %s.',
+            $slide,
             $where,
             $key,
             implode(', ', $known),

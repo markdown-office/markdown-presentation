@@ -14,7 +14,8 @@ use MarkdownPresentation\Theme\ThemeVariables;
  * @phpstan-type Shape array{background?: array<string, mixed>, variables?: array<string, mixed>}
  *
  * A template definition holds them too, and the two are read the same way, because a
- * template's settings are the settings of the slides that draw it.
+ * template's settings are the settings of the slides that draw it. The deck holds them as
+ * well, and every slide of the deck is drawn with them.
  *
  * The settings are carried as they were written and read where they are drawn, because a
  * colour is resolved against the theme the slide is drawn in, and a background of one theme
@@ -115,17 +116,62 @@ final class Settings
             );
         }
 
-        foreach (array_keys($written) as $key) {
-            if (!in_array((string) $key, self::KEYS, true)) {
-                throw MalformedFrontmatter::unknownSetting(
-                    'template-settings',
-                    (string) $key,
-                    self::KEYS,
-                );
-            }
+        return self::readNamed(null, 'template-settings', $written);
+    }
+
+    /**
+     * The settings the deck carries, as its frontmatter named them.
+     *
+     * The deck's settings are the deck's, and they are named as the deck's:
+     * `deck-settings:` holds the same keys a slide's own settings are written in, so that
+     * the ordinary keys mean the slide's own everywhere. Every slide of the deck is drawn
+     * with them, and a slide's own settings are laid over them.
+     *
+     * @return Shape
+     *
+     * @throws MalformedFrontmatter
+     */
+    public static function readDeck(int $slide, mixed $written): array
+    {
+        // A list is not a mapping of settings, and an empty one is a key that is there with
+        // nothing under it: both are mistakes rather than settings.
+        if (!is_array($written) || $written === [] || array_is_list($written)) {
+            throw MalformedFrontmatter::wrongType(
+                $slide,
+                'deck-settings',
+                'a mapping of the settings the deck carries',
+            );
         }
 
-        return self::read($written, null);
+        return self::readNamed($slide, 'deck-settings', $written);
+    }
+
+    /**
+     * The settings a block of somebody else's names, under the names they are known by.
+     *
+     * A name that is not one of the settings is refused rather than left out, so that a
+     * typo in a deck's or a template's settings is a failure rather than a setting that
+     * does nothing.
+     *
+     * @param array<array-key, mixed> $written
+     *
+     * @return Shape
+     *
+     * @throws MalformedFrontmatter
+     */
+    private static function readNamed(?int $slide, string $where, array $written): array
+    {
+        $settings = [];
+
+        foreach ($written as $key => $value) {
+            if (!is_string($key) || !in_array($key, self::KEYS, true)) {
+                throw MalformedFrontmatter::unknownSetting($slide, $where, (string) $key, self::KEYS);
+            }
+
+            $settings[$key] = $value;
+        }
+
+        return self::read($settings, $slide);
     }
 
     /**

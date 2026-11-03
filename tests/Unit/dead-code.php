@@ -414,6 +414,11 @@ it('does not claim again what the code does not do', function (string $claim) {
     // background of a slide was the master's. A slide may name its own background now, so
     // the phrase below is the old rule's own wording, and no comment or page may say it.
     'a slide wanting its own colour carries the colour as a shape' => 'so a slide wanting its own colour carries the colour as a shape',
+    // The deck's settings are between the template's and the theme's, so a sentence that put
+    // the template's straight over the theme's left a layer out. The phrase below is what
+    // the changelog and the tests said while the deck had no settings of its own, and no
+    // page or comment may say it now.
+    'the template\'s settings are laid over the theme\'s' => 'the template\'s over the theme\'s',
 
     // A manifest was named by the file the path resolved to rather than by the name the deck
     // wrote, so a `theme.yml` that was a link to a file of another name was refused for the

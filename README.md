@@ -1595,6 +1595,10 @@ background: accent2
 
 The second slide draws the template and paints its own page over the template's.
 
+The deck's own settings are named as the deck's, under `deck-settings:`, and every slide of
+the deck is drawn with them — see [A slide's background, and its own
+values](#a-slides-background-and-its-own-values).
+
 A slide may name several templates, and the chrome of each of them is drawn on it:
 
 ```markdown
@@ -2127,7 +2131,7 @@ try {
 ```
 
 ```text
-The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file, template-settings, background, background-gradient, background-angle, background-radial, theme-variables.
+The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file, template-settings, deck-settings, background, background-gradient, background-angle, background-radial, theme-variables.
 ```
 
 Slidev accepts dozens of directives this library does not read, so a deck written for it will
@@ -2138,7 +2142,8 @@ looking for what is missing.
 `theme`, `author` and `description` describe the deck rather than a slide, so they belong in
 slide 1's front matter. On any other slide they are a failure that says so, because two
 slides that both name a theme is a deck that renders one of them and says nothing about the
-other.
+other. `deck-settings:` is the deck's in the same way, and it belongs in slide 1's front
+matter for the same reason.
 
 Every slide is checked before anything is built, so a deck whose fourth slide names a
 directive nobody reads fails before it has written a byte rather than leaving a half-finished
@@ -2176,6 +2181,7 @@ theme-variables:
 | `background-angle` | the angle in degrees |
 | `background-radial` | the background runs from the middle outwards |
 | `template-settings` | the settings of the **template** a definition names, under the same keys |
+| `deck-settings` | the settings of the **deck**, under the same keys, in slide 1's front matter |
 
 The background of a slide is the slide's own: the master keeps the theme's page colour for
 the slides that name no background. A background is one colour or one gradient, and the two
@@ -2184,13 +2190,37 @@ together are refused. A background of a colour has neither an angle nor a radial
 
 `theme-variables:` is a **`theme.yml`**: the same keys, the same names, the same spelling,
 read by the reader that reads the theme's own file — `dark:`, `colors:`, `fonts:` and
-`style:`. A slide's values are laid over the template's, and the template's over the
-theme's, and one value laid over another leaves the rest alone: a slide that names one
-colour leaves the other eleven as they were.
+`style:`. A slide's values are laid over the template's, the template's over the deck's and
+the deck's over the theme's, and one value laid over another leaves the rest alone: a slide
+that names one colour leaves the other eleven as they were.
 
 `template-settings:` holds the same keys, for the **template** rather than the slide: a
 definition carries them, and every slide that draws that template gets them. See
 [Slide templates](#slide-templates).
+
+`deck-settings:` holds the same keys again, for the **deck** rather than the slide. It is
+written in slide 1's front matter — which is the deck's own — and every slide of the deck is
+drawn with it:
+
+```markdown
+---
+theme: corporate-dark
+deck-settings:
+  background: "#101014"
+  theme-variables:
+    colors:
+      accent1: "#123456"
+---
+```
+
+The ordinary keys mean the **slide's** own everywhere, which is what the rule wants: a key
+that holds somebody else's settings says whose. So the precedence is **slide → template →
+deck → theme** — a slide's own settings are laid over the template's, the template's over
+the deck's, and the deck's over the theme's. A slide that names a background of its own is
+painted on it, and a slide that names a value of its own is drawn in it.
+
+`deck-settings:` on any other slide is a failure that says so, like `theme:`: it is the
+deck's, and the deck's frontmatter is the first slide's.
 
 The four roles the theme has — the page, the ink, the subtle ink and the panel — sit on
 **four different slots**, so overriding a slot moves exactly one of them, and `dark:` says
@@ -2415,6 +2445,10 @@ themes/corporate-dark/
 ├── README.md        optional   attribution
 └── LICENSE          optional
 ```
+
+A theme holds the values a deck is drawn with, and a deck's own settings are laid over
+them: a slide's own values, the values of the template it draws, and the deck's — in that
+order. See [A slide's background, and its own values](#a-slides-background-and-its-own-values).
 
 The tools that come with the library are in `tools/`:
 

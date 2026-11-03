@@ -1909,7 +1909,7 @@ it('refuses a frontmatter key nobody acts on, and lists the ones there are', fun
             UnknownDirective::class,
             'The frontmatter of slide 1 names "transition", which is not a directive. '
             . 'The directives are: title, name, level, layout, theme, author, description, template, templates-file, '
-            . 'template-settings, background, background-gradient, background-angle, background-radial, theme-variables.',
+            . 'template-settings, deck-settings, background, background-gradient, background-angle, background-radial, theme-variables.',
         );
 });
 

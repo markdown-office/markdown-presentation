@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Tests\Support\Doctest;
+use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 
 pest()->afterEach(function (): void {
@@ -53,6 +54,31 @@ const SLIDE_ONE = 'ppt/slides/slide1.xml';
 const TWO_SLIDES = "# One\n\n---\n\n# Two\n";
 
 const TITLE_AND_CONTENT = 'Title and Content';
+
+/**
+ * The colours the words of a slide are drawn in, in the order the file lists them.
+ */
+function inkOf(Pptx $pptx, int $slide = 1): array
+{
+    $xml = $pptx->part(sprintf('ppt/slides/slide%d.xml', $slide));
+    preg_match_all('#<a:rPr[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="([0-9A-F]{6})"#', $xml, $matches);
+
+    return $matches[1];
+}
+
+/**
+ * The colour the page behind a slide is painted with, or null where it has none of its own.
+ */
+function pageOf(Pptx $pptx, int $slide = 1): ?string
+{
+    $xml = $pptx->part(sprintf('ppt/slides/slide%d.xml', $slide));
+
+    if (preg_match('#<p:bg>.*?<a:srgbClr val="([0-9A-F]{6})"#s', $xml, $matches) !== 1) {
+        return null;
+    }
+
+    return $matches[1];
+}
 
 /**
  * Skips the test where the machine cannot run the validator.
