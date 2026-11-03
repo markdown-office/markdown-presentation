@@ -103,4 +103,28 @@ A gradient that runs from the middle outwards.
 
 :::content{left=8% top=42% width=84% height=20% font-size=13 color=lt1 align=center vertical-align=middle}
 A radial gradient has no angle, and naming one is refused.
+---
+template: brand
+template-settings:
+  background: "#1E1E2E"
+  theme-variables:
+    dark: true
+    colors:
+      lt1: "#F5F5F7"
+---
+
+::rectangle{left=0 top=0 width=100% height=0.7% fill=accent1}
+
+---
+layout: blank
+template: brand
+title: A template with settings of its own
+---
+
+:::content{left=8% top=12% width=84% height=26% font-size=20 align=center vertical-align=middle}
+A template may carry settings of its own.
+:::
+
+:::content{left=8% top=42% width=84% height=20% font-size=13 align=center vertical-align=middle}
+They are named as the template's, under `template-settings:`, and every slide that draws it gets them.
 :::

@@ -1564,12 +1564,36 @@ template: brand
 ---
 ```
 
-A template's frontmatter names the template and **its own settings** — `background:`,
-`background-gradient:`, `background-angle:`, `background-radial:` and `theme-variables:` —
-and nothing else, and that is what tells a definition from a slide that draws one: a
-definition has no `layout:`, because it is not drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
+A template's frontmatter names the template and nothing else, and that is what tells a
+definition from a slide that draws one: a definition has no `layout:`, because it is not
+drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
 and it does not count towards the number of slides — which is what makes one definition and
 many slides add up to one slide each.
+
+A definition may carry settings of its own, and they are **the template's**: every slide that
+draws the template gets them. They are named as the template's, under `template-settings:`,
+so that the ordinary keys mean the slide's own everywhere — a slide that draws a template and
+names a `background:` of its own is a slide, and is drawn:
+
+```markdown
+---
+template: brand
+template-settings:
+  background: accent1
+  theme-variables:
+    dark: true
+---
+```
+
+```markdown
+---
+layout: blank
+template: brand
+background: accent2
+---
+```
+
+The second slide draws the template and paints its own page over the template's.
 
 A slide may name several templates, and the chrome of each of them is drawn on it:
 
@@ -2103,7 +2127,7 @@ try {
 ```
 
 ```text
-The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file, background, background-gradient, background-angle, background-radial, theme-variables.
+The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file, template-settings, background, background-gradient, background-angle, background-radial, theme-variables.
 ```
 
 Slidev accepts dozens of directives this library does not read, so a deck written for it will
@@ -2151,6 +2175,7 @@ theme-variables:
 | `background-gradient` | the background's stops, as a shape's are |
 | `background-angle` | the angle in degrees |
 | `background-radial` | the background runs from the middle outwards |
+| `template-settings` | the settings of the **template** a definition names, under the same keys |
 
 The background of a slide is the slide's own: the master keeps the theme's page colour for
 the slides that name no background. A background is one colour or one gradient, and the two
@@ -2162,6 +2187,10 @@ read by the reader that reads the theme's own file — `dark:`, `colors:`, `font
 `style:`. A slide's values are laid over the template's, and the template's over the
 theme's, and one value laid over another leaves the rest alone: a slide that names one
 colour leaves the other eleven as they were.
+
+`template-settings:` holds the same keys, for the **template** rather than the slide: a
+definition carries them, and every slide that draws that template gets them. See
+[Slide templates](#slide-templates).
 
 The four roles the theme has — the page, the ink, the subtle ink and the panel — sit on
 **four different slots**, so overriding a slot moves exactly one of them, and `dark:` says

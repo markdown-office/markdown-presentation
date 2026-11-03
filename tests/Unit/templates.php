@@ -82,12 +82,61 @@ it('reads a slide that names a template with another directive as a slide', func
     expect($deck->slides()[0]->frontmatter())->toBe(['layout' => 'blank', 'template' => 'brand']);
 });
 
-it('refuses a template that is defined twice', function () {
-    // A slide that draws a template and names its own settings, with no layout, is read as a
-    // definition of that template -- so a deck with such a slide and the template itself has
-    // two definitions of the same name, and the second one would be the one drawn.
+it('reads a slide that draws a template and names its own settings as a slide', function () {
+    // The two cases are the same text: a template with settings of its own, and a slide
+    // that draws a template with settings of its own. So the ordinary keys are the slide's
+    // own everywhere, and a template's own settings are named as the template's — and a
+    // slide that names a background of its own is a slide, and is drawn.
+    $deck = (new DeckParser())->parse(
+        "---\ntemplate: brand\nbackground: accent1\n---\n\n::line{}\n",
+    );
+
+    expect($deck->count())->toBe(1)
+        ->and($deck->definitions())->toHaveCount(0)
+        ->and($deck->slides()[0]->frontmatter())->toBe(['template' => 'brand', 'background' => 'accent1']);
+});
+
+it('reads a definition with the settings of the template as a definition', function () {
+    $deck = (new DeckParser())->parse(
+        "---\ntemplate: brand\ntemplate-settings:\n  background: accent1\n---\n\n::line{}\n",
+    );
+
+    expect($deck->count())->toBe(0)
+        ->and($deck->definitions())->toHaveCount(1)
+        ->and($deck->definitions()[0]->settings())->toBe(['background' => ['background' => 'accent1']]);
+});
+
+it('refuses the settings of a template on a slide that is not one', function () {
+    // A slide that draws a template names its own settings in the ordinary keys, so the
+    // settings of a template on such a slide are a mistake rather than a setting.
     expect(fn () => (new DeckParser())->parse(
-        "---\ntemplate: brand\n---\n\n::line{}\n\n---\ntemplate: brand\nbackground: accent1\n---\n\n::line{}\n",
+        "---\ntemplate: brand\nlayout: blank\ntemplate-settings:\n  background: accent1\n---\n\n::line{}\n",
+    ))->toThrow(MalformedFrontmatter::class, 'which are the settings of a template, and the slide is not one');
+});
+
+it('refuses the settings of a template where there is no template', function () {
+    expect(fn () => (new DeckParser())->parse(
+        "---\ntemplate-settings:\n  background: accent1\n---\n\n# One\n",
+    ))->toThrow(MalformedFrontmatter::class, 'which are the settings of a template, and the slide is not one');
+});
+
+it('refuses a setting of a template that is not a setting', function () {
+    expect(fn () => (new DeckParser())->parse(
+        "---\ntemplate: brand\ntemplate-settings:\n  backgroun: accent1\n---\n\n::line{}\n",
+    ))->toThrow(MalformedFrontmatter::class, 'which is not a setting');
+});
+
+it('refuses the settings of a template that are not a mapping', function () {
+    expect(fn () => (new DeckParser())->parse(
+        "---\ntemplate: brand\ntemplate-settings: accent1\n---\n\n::line{}\n",
+    ))->toThrow(MalformedFrontmatter::class, 'has a "template-settings" that is not a mapping');
+});
+
+it('refuses a template that is defined twice', function () {
+    // Two definitions of the same name are a mistake, and the second one is the one that
+    // would be drawn — so it is refused rather than left to win quietly.
+    expect(fn () => (new DeckParser())->parse(
+        "---\ntemplate: brand\n---\n\n::line{}\n\n---\ntemplate: brand\n---\n\n::line{}\n",
     ))->toThrow(MalformedFrontmatter::class, 'The template "brand" is defined twice');
 });
 

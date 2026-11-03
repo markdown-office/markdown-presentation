@@ -91,6 +91,42 @@ final class Settings
     }
 
     /**
+     * The settings a template definition carries, as the frontmatter named them.
+     *
+     * A definition's settings are the template's, and they are named as the template's:
+     * `template-settings:` holds the same keys a slide's own settings are written in, so
+     * that the ordinary keys mean the slide's own everywhere. A slide that draws a template
+     * may therefore name a background of its own, and is a slide for it.
+     *
+     * @return Shape
+     *
+     * @throws MalformedFrontmatter
+     */
+    public static function readTemplate(int $slide, mixed $written): array
+    {
+        if (!is_array($written) || ($written !== [] && array_is_list($written))) {
+            throw MalformedFrontmatter::wrongType(
+                $slide,
+                'template-settings',
+                'a mapping of the settings a template carries',
+            );
+        }
+
+        foreach (array_keys($written) as $key) {
+            if (!in_array((string) $key, self::KEYS, true)) {
+                throw MalformedFrontmatter::unknownSetting(
+                    $slide,
+                    'template-settings',
+                    (string) $key,
+                    self::KEYS,
+                );
+            }
+        }
+
+        return self::read($written, $slide);
+    }
+
+    /**
      * The settings of both, with the one laid over the other winning.
      *
      * The background is **one** setting: a slide that names a gradient over a template's

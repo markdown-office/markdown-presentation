@@ -242,6 +242,14 @@ final class DeckParser
         $definition = self::definition($slide);
 
         if ($definition === null) {
+            // The settings of a template belong to its definition, and they are named as the
+            // template's: a slide that draws a template names its own settings in the
+            // ordinary keys. So a slide that is not a definition and carries them anyway is
+            // a mistake, and is refused rather than left to be read as nothing at all.
+            if (array_key_exists('template-settings', $slide->frontmatter())) {
+                throw MalformedFrontmatter::templateSettingsOnASlide($slide->index() + 1);
+            }
+
             $slides[] = $slide;
 
             return;
@@ -263,10 +271,14 @@ final class DeckParser
      * The template a slide defines, or null where the slide draws one rather than
      * defines it.
      *
-     * A slide whose frontmatter names a template and the template's own settings and nothing
-     * else defines it; a slide that names a template along with anything else draws it. The
-     * name is what tells the two apart, because a definition is not a slide of the deck and
-     * has no layout to be drawn in.
+     * A slide whose frontmatter names a template and nothing else defines it; a slide that
+     * names a template along with anything else draws it. The name is what tells the two
+     * apart, because a definition is not a slide of the deck and has no layout to be drawn
+     * in.
+     *
+     * A definition's own settings are named as the template's, under `template-settings:`,
+     * so that the ordinary keys mean the slide's own everywhere: a slide that draws a
+     * template and names a background of its own is a slide, and is drawn.
      *
      * @throws MalformedFrontmatter
      */
@@ -279,7 +291,7 @@ final class DeckParser
         }
 
         foreach (array_keys($frontmatter) as $key) {
-            if ($key !== 'template' && !in_array((string) $key, Settings::KEYS, true)) {
+            if ($key !== 'template' && $key !== 'template-settings') {
                 return null;
             }
         }
@@ -293,7 +305,10 @@ final class DeckParser
         return new Definition(
             trim($name),
             $slide->content(),
-            Settings::read($frontmatter, $slide->index() + 1),
+            Settings::readTemplate(
+                $slide->index() + 1,
+                $frontmatter['template-settings'] ?? [],
+            ),
         );
     }
 

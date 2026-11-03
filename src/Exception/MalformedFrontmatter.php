@@ -56,6 +56,39 @@ final class MalformedFrontmatter extends InvalidInput
     }
 
     /**
+     * A setting a slide names that is not one.
+     *
+     * @param list<string> $known
+     */
+    public static function unknownSetting(int $slide, string $where, string $key, array $known): self
+    {
+        return new self(sprintf(
+            'The "%s" of the frontmatter of slide %d names "%s", which is not a setting. The settings are: %s.',
+            $where,
+            $slide,
+            $key,
+            implode(', ', $known),
+        ));
+    }
+
+    /**
+     * The settings of a template, on a slide that is not one.
+     *
+     * The settings of a template belong to its definition, and they are named as the
+     * template's: a slide that draws a template names its own settings in the ordinary
+     * keys, and the ordinary keys mean the slide's own everywhere.
+     */
+    public static function templateSettingsOnASlide(int $slide): self
+    {
+        return new self(sprintf(
+            'The frontmatter of slide %d names "template-settings", which are the settings of a template, '
+            . 'and the slide is not one: write "template: name" beside it to define a template with them, '
+            . 'or name the settings in the ordinary keys, which are the slide\'s own.',
+            $slide,
+        ));
+    }
+
+    /**
      * The name of a template, in the frontmatter of the slide that defines it.
      *
      * Without a slide number, because a template definition is not a slide of the deck and

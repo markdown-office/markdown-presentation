@@ -86,8 +86,11 @@ it('leaves the page of a slide alone where its own theme paints the same one', f
 });
 
 it('takes the values of the template it names', function () {
+    // The values of a template are named as the template's, under `template-settings:`, so
+    // that the ordinary keys mean the slide's own everywhere.
     $pptx = variablesDeck(
-        "---\ntemplate: brand\ntheme-variables:\n  colors:\n    dk1: \"#123456\"\n---\n::line{}\n\n"
+        "---\ntemplate: brand\ntemplate-settings:\n  theme-variables:\n    colors:\n      dk1: \"#123456\"\n"
+        . "---\n::line{}\n\n"
         . "---\nlayout: content\ntemplate: brand\n---\n\nWords.\n",
     );
 
@@ -96,7 +99,8 @@ it('takes the values of the template it names', function () {
 
 it('lays a slide\'s values over the template\'s', function () {
     $pptx = variablesDeck(
-        "---\ntemplate: brand\ntheme-variables:\n  colors:\n    dk1: \"#123456\"\n---\n::line{}\n\n"
+        "---\ntemplate: brand\ntemplate-settings:\n  theme-variables:\n    colors:\n      dk1: \"#123456\"\n"
+        . "---\n::line{}\n\n"
         . "---\nlayout: content\ntemplate: brand\n---\n\nWords.\n\n"
         . "---\nlayout: content\ntemplate: brand\ntheme-variables:\n  colors:\n    dk1: \"#654321\"\n---\n\n"
         . "Words.\n",

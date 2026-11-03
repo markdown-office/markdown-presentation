@@ -154,6 +154,26 @@ All notable changes to this project are documented here. The format follows
   **A slide's background does not change the colour its text is drawn in.** The library does
   not judge, and `theme-variables:` is the way to change the text's colour with it.
 
+- **A template's own settings are named as the template's.** A template's settings are the
+  settings of the slides that draw it, and they are written under `template-settings:`:
+
+  ```markdown
+  ---
+  template: brand
+  template-settings:
+    background: accent1
+    theme-variables:
+      dark: true
+  ---
+  ```
+
+  The ordinary keys mean the **slide's** own everywhere, which is what the rule wants: a
+  slide that draws a template and names a `background:` of its own is a slide, and is drawn
+  with it. It was read as a definition of the template before, and was not drawn at all —
+  and the two cases were the same text, so nothing could tell them apart. A definition is
+  now a slide that names a template and nothing else, as it always was, and a template
+  defined twice is refused rather than left to win quietly.
+
 ### Fixed
 
 - **The anchor of a template's placeholder is read and written.** The renderer read a

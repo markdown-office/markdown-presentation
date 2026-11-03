@@ -104,6 +104,7 @@ final class PresentationRenderer
     */
     public const DIRECTIVES = [
         'title', 'name', 'level', 'layout', 'theme', 'author', 'description', 'template', 'templates-file',
+        'template-settings',
         ...Settings::KEYS,
     ];
 
