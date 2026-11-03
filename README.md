@@ -64,8 +64,8 @@ The patch adds these to PHPPresentation:
 | `RichText::setDescription` | the writer and the reader | the description a shape carries: the writer sets it, the reader reads it back |
 | `PowerPoint2007::zipPath` | the reader | the path a picture was read from, inside the package |
 | `Gd::setContents` | the reader | the bytes a picture was read from, as the package holds them |
-| `Fill::getGradientStops` | the writer | the stops a gradient is painted with, so that a gradient may have a colour in the middle of it |
-| `GradientStop::getPosition` | the writer | where one stop of a gradient sits, so that the stops need not be spread evenly |
+| `Fill::getGradientStops` | the writer and the reader | the stops a gradient is painted with, so that a gradient may have a colour in the middle of it |
+| `GradientStop::getPosition` | the writer and the reader | where one stop of a gradient sits, so that the stops need not be spread evenly |
 | `BackgroundGradient::getFill` | the writer and the reader | the gradient a background is painted with, which is the same fill a shape is painted with |
 
 The writer is the direction that writes a `.pptx`; the reader is the direction that takes one
