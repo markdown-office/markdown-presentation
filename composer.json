@@ -39,9 +39,9 @@
         "patches": {
             "phpoffice/phppresentation": [
                 {
-                    "description": "PHPPresentation 1.2.0 brought up to upstream's master, with the fixes that give a picture the path, the bytes and the name it was read from, that find the folder of a part of a package with the slashes of the package, that write a chart series in the order the schema names it, that write the data points of a series and the fill of the series itself, and that give a category axis a tick label skip of its own",
-                    "url": "https://raw.githubusercontent.com/markdown-office/PHPPresentation/605bc7c9724ac4a0781cc1692ff7ae279a33bb8a/patches/phpoffice-phppresentation-1.2.0-to-master.patch",
-                    "sha256": "46862cef4470ae8e755a03f1f8afd94c7e772cc1ee4ab0a39441c2cb392d5146"
+                    "description": "PHPPresentation 1.2.0 brought up to upstream's master, with the fixes that give a picture the path, the bytes and the name it was read from, that find the folder of a part of a package with the slashes of the package, that write a chart series in the order the schema names it, that write the data points of a series and the fill of the series itself, and that give a category axis a tick label skip of its own, and that write a gradient of more than two stops and a background painted with a gradient",
+                    "url": "https://raw.githubusercontent.com/markdown-office/PHPPresentation/c6de3987c9019a1d60876b4aa1964f15e1abc132/patches/phpoffice-phppresentation-1.2.0-to-master.patch",
+                    "sha256": "bb422f73ad2211948835cf9c5f1aed7ec993c3e4595d6e11bd9836e2f9a5f8d5"
                 }
             ]
         }
