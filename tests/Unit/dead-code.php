@@ -404,6 +404,16 @@ it('does not claim again what the code does not do', function (string $claim) {
     // is a list written with the wrong separator rather than a value of its own. The failure
     // says so now; the phrase below is the old reading, and no comment or page may say it.
     'the attributes of a directive may be separated by commas' => 'separated by commas',
+    // A template's frontmatter named the template and nothing else, and a slide that names
+    // a template and its own settings and nothing else defined it. That held for one
+    // release candidate and was wrong for the next, and it is wrong again now: a definition
+    // names the template and nothing *but its own settings*, so the phrase below is not the
+    // rule's wording and no page may say it.
+    'a template definition names the template and nothing else' => 'names the template and nothing else',
+    // A slide wanting a colour of its own carried the colour as a shape, because the
+    // background of a slide was the master's. A slide may name its own background now, so
+    // the phrase below is the old rule's own wording, and no comment or page may say it.
+    'a slide wanting its own colour carries the colour as a shape' => 'so a slide wanting its own colour carries the colour as a shape',
 
     // A manifest was named by the file the path resolved to rather than by the name the deck
     // wrote, so a `theme.yml` that was a link to a file of another name was refused for the

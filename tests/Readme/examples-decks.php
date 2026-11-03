@@ -189,7 +189,29 @@ it('converts each deck that is not the rejected one', function (string $name) {
     '15-inline-styles.md',
     '16-templates.md',
     '17-corporate-template.md',
+    '18-bleeding-shapes.md',
+    '19-gradient-background.md',
 ]);
+
+it('gives every slide that draws a template the settings of that template', function () {
+    // The deck's last two slides draw a template that carries settings of its own, and
+    // neither slide names a background or a theme of its own: what they are painted with is
+    // the template's. The slide before them names its own, and is painted differently, which
+    // is what says the settings came from where the slide says they did.
+    [$pptx] = builtDeck('19-gradient-background.md');
+
+    $page = static function (int $slide) use ($pptx): ?string {
+        $xml = $pptx->part("ppt/slides/slide{$slide}.xml");
+
+        return preg_match('#<p:bg>.*?<a:srgbClr val="([0-9A-F]{6})"#s', $xml, $matches) === 1
+            ? $matches[1]
+            : null;
+    };
+
+    expect($page(6))->toBe('123456')
+        ->and($page(7))->toBe('123456')
+        ->and($page(4))->toBe('1E1E2E');
+});
 
 it('refuses the deck whose conversion is the failure it exists to demonstrate', function () use ($root) {
     $source = (string) file_get_contents($root . '/examples/markdown/10-rejected.md');

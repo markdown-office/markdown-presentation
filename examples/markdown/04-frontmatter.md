@@ -8,9 +8,10 @@ templates-file: ./templates/templates.md
 
 # Every frontmatter key
 
-Nine keys: `title`, `name`, `level`, `layout`, `theme`, `author`, `description`,
-`template` and `templates-file`. A block naming a tenth is a failure that names
-these nine, and this slide carries the first four.
+Fifteen keys: `title`, `name`, `level`, `layout`, `theme`, `author`, `description`,
+`template`, `templates-file`, `template-settings`, `background`, `background-gradient`,
+`background-angle`, `background-radial` and `theme-variables`. A block naming a sixteenth is
+a failure that names these fifteen, and this slide carries the first four.
 
 ---
 name: A title that is not a heading
@@ -64,7 +65,11 @@ This slide names two templates. `wordmark` is the one this deck defines below,
 and `page` is the one `templates/templates.md` — the file this deck's frontmatter
 names — holds.
 
-A template's frontmatter names the template and nothing else, which is what
-tells a definition from a slide that draws one, and a definition is not a slide
-of the deck: it is not drawn, it has no number, and it does not count towards
-the number of slides.
+A template's frontmatter names the template and nothing but its own settings, which is what
+tells a definition from a slide that draws one, and a definition is not a slide of the deck: it
+is not drawn, it has no number, and it does not count towards the number of slides.
+
+A definition may carry settings of its own, and they are the template's: they are named as
+the template's, under `template-settings:`, so that the ordinary keys mean the slide's own
+everywhere. A slide that draws a template and names a `background:` of its own is a slide,
+and is drawn.

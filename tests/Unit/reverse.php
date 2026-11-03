@@ -15,6 +15,7 @@ use MarkdownPresentation\Reverse\Image;
 use MarkdownPresentation\Reverse\Inline;
 use MarkdownPresentation\Reverse\Options;
 use MarkdownPresentation\Reverse\Shape;
+use MarkdownPresentation\Reverse\SlideReader;
 use MarkdownPresentation\Reverse\ShapeMapper;
 use MarkdownPresentation\Reverse\Slide;
 use MarkdownPresentation\Tests\Support\Scratch;
@@ -29,6 +30,7 @@ use PhpOffice\PhpPresentation\Style\Fill;
 use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
 use PhpOffice\PhpPresentation\Shape\Placeholder;
 use PhpOffice\PhpPresentation\Shape\Table as TableShape;
+use PhpOffice\PhpPresentation\Slide\Background\Color as BackgroundColour;
 use PhpOffice\PhpPresentation\Slide\AbstractSlide;
 
 /**
@@ -71,6 +73,77 @@ function deckWithShapes(callable $build, ?callable $properties = null): string
 
     return $path;
 }
+
+it('reads a background of a colour back as one', function () {
+    $deck = writtenDeck("---\nbackground: accent1\n---\n\n# One\n");
+
+    $markdown = (new PowerPointToMarkdown($deck))->convert();
+
+    expect($markdown)->toContain('background: "#4472C4"');
+});
+
+it('reads a background of a gradient back as one', function () {
+    $deck = writtenDeck("---\nbackground-gradient: \"accent1,lt2\"\nbackground-angle: 45\n---\n\n# One\n");
+
+    $markdown = (new PowerPointToMarkdown($deck))->convert();
+
+    expect($markdown)->toContain('background-gradient: "#4472C4,#E7E6E6"')
+        ->and($markdown)->toContain('background-angle: 45');
+});
+
+it('reads the places of a background gradient back as one', function () {
+    $deck = writtenDeck("---\nbackground-gradient: \"accent1,dk1@50,lt2\"\n---\n\n# One\n");
+
+    $markdown = (new PowerPointToMarkdown($deck))->convert();
+
+    expect($markdown)->toContain('background-gradient: "#4472C4,#000000@50,#E7E6E6"');
+});
+
+it('reads a background of a radial gradient back as one', function () {
+    $deck = writtenDeck("---\nbackground-gradient: \"accent1,lt2\"\nbackground-radial: true\n---\n\n# One\n");
+
+    $markdown = (new PowerPointToMarkdown($deck))->convert();
+
+    expect($markdown)->toContain('background-gradient: "#4472C4,#E7E6E6"')
+        ->and($markdown)->toContain('background-radial: true');
+});
+
+it('reads the background of a slide that is not the first back as one', function () {
+    $deck = writtenDeck("---\ntitle: One\n---\n\n# One\n\n---\nbackground: accent1\n---\n\n# Two\n");
+
+    $markdown = (new PowerPointToMarkdown($deck))->convert();
+
+    expect($markdown)->toContain('background: "#4472C4"');
+});
+
+it('leaves a background of no colour out', function () {
+    // The writer refuses a background of no colour, so it is read rather than written.
+    $presentation = new PhpPresentation();
+    $slide = $presentation->getActiveSlide();
+    $slide->setBackground(new BackgroundColour());
+
+    $read = (new SlideReader(new ShapeMapper(new Options())))->read($slide, 0);
+
+    expect($read->frontmatter)->toBe([]);
+});
+
+it('reads the gradient of a shape back as one', function () {
+    $deck = writtenDeck("---\nlayout: blank\n---\n\n::rectangle{gradient=\"accent1,dk1@50,lt2\" gradient-angle=45}\n");
+
+    $markdown = (new PowerPointToMarkdown($deck, new Options(preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('gradient="#4472C4,#000000@50,#E7E6E6"')
+        ->and($markdown)->toContain('gradient-angle=45');
+});
+
+it('reads the gradient of a radial shape back as one', function () {
+    $deck = writtenDeck("---\nlayout: blank\n---\n\n::rectangle{gradient=\"accent1,lt2\" gradient-radial}\n");
+
+    $markdown = (new PowerPointToMarkdown($deck, new Options(preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('gradient="#4472C4,#E7E6E6"')
+        ->and($markdown)->toContain('gradient-radial=true');
+});
 
 it('keeps the paragraphs of a title apart', function () {
     // A title is one line in Markdown, so only its first paragraph is the

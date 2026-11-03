@@ -7,6 +7,10 @@ namespace MarkdownPresentation\Reverse;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Shape\RichText;
 use PhpOffice\PhpPresentation\Slide as PowerPointSlide;
+use PhpOffice\PhpPresentation\Slide\Background\Color as BackgroundColour;
+use PhpOffice\PhpPresentation\Slide\Background\Gradient as BackgroundGradient;
+use PhpOffice\PhpPresentation\Style\Fill;
+use PhpOffice\PhpPresentation\Style\GradientStop;
 
 /**
  * One slide read back out of a deck.
@@ -79,7 +83,101 @@ final class SlideReader
             $image++;
         }
 
-        return new Slide($index, $title, $blocks, $this->note($slide));
+        return new Slide($index, $title, $blocks, $this->note($slide), $this->background($slide));
+    }
+
+    /**
+     * The background of the slide, as the frontmatter that names it.
+     *
+     * A background of a colour is named as the colour it resolved to, and a background of a
+     * gradient as the stops it is painted with — the slot a colour came from is in the theme,
+     * and the theme is not in the deck.
+     *
+     * @return array<string, string|int|bool>
+     */
+    private function background(PowerPointSlide $slide): array
+    {
+        $background = $slide->getBackground();
+
+        if ($background instanceof BackgroundColour) {
+            return $this->coloured($background);
+        }
+
+        if (!$background instanceof BackgroundGradient) {
+            return [];
+        }
+
+        return $this->graduated($background);
+    }
+
+    /**
+     * The background of a colour, as the frontmatter that names it.
+     *
+     * Nothing where the background carries no colour: a background of no colour is one the
+     * deck cannot draw again.
+     *
+     * @return array<string, string|int|bool>
+     */
+    private function coloured(BackgroundColour $background): array
+    {
+        $colour = $background->getColor();
+
+        if ($colour === null) {
+            return [];
+        }
+
+        return ['background' => '#' . strtoupper($colour->getRGB())];
+    }
+
+    /**
+     * The background of a gradient, as the frontmatter that names it.
+     *
+     * The stops are written as the colours they resolved to and the places they are at, so
+     * that a gradient read back is the gradient that was written.
+     *
+     * @return array<string, string|int|bool>
+     */
+    private function graduated(BackgroundGradient $background): array
+    {
+        $fill = $background->getFill();
+        $stops = [];
+
+        foreach ($fill->getGradientStops() as $stop) {
+            $stops[] = self::stop($stop);
+        }
+
+        if ($fill->getFillType() === Fill::FILL_GRADIENT_PATH) {
+            return [
+                'background-gradient' => implode(',', $stops),
+                'background-radial' => true,
+            ];
+        }
+
+        return [
+            'background-gradient' => implode(',', $stops),
+            // The format counts its angles from the right and CSS from the top, so the one is
+            // the other less ninety degrees.
+            'background-angle' => (((int) $fill->getRotation() + 90) % 360),
+        ];
+    }
+
+    /**
+     * One stop of a gradient, as the colour it is and the place it is at.
+     *
+     * The place is written where it is not one of the two ends, which are where a stop
+     * without one is spread to — so a gradient that is read back is the gradient that was
+     * written.
+     */
+    private static function stop(GradientStop $stop): string
+    {
+        $colour = '#' . strtoupper($stop->getColor()->getRGB());
+        $position = $stop->getPosition();
+
+        if ($position === GradientStop::POSITION_START || $position === GradientStop::POSITION_END) {
+            return $colour;
+        }
+
+        return $colour . '@' . (int) round($position / 1000);
     }
 
     /**

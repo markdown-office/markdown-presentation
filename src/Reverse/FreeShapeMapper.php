@@ -13,6 +13,7 @@ use PhpOffice\PhpPresentation\Shape\RichText\Run;
 use PhpOffice\PhpPresentation\Shape\RichText\TextElement;
 use PhpOffice\PhpPresentation\Style\Color;
 use PhpOffice\PhpPresentation\Style\Fill;
+use PhpOffice\PhpPresentation\Style\GradientStop;
 
 /**
  * The free shape a shape the deck placed itself becomes.
@@ -139,21 +140,7 @@ final class FreeShapeMapper
             'height' => $this->percentage($box['height'], SlideGeometry::HEIGHT),
         ];
 
-        $fill = $this->fill($shape);
-
-        if ($fill !== null) {
-            $attributes['fill'] = $fill;
-        }
-
-        // A line is a stroke and not a fill, and a rule that comes back with no colour is a
-        // rule nobody can see.
-        $stroke = $this->stroke($shape);
-
-        if ($stroke !== null) {
-            $attributes['stroke'] = $stroke;
-
-            $attributes['stroke-width'] = $this->strokeWidth($shape);
-        }
+        $attributes += $this->paint($shape);
 
         $rotation = $shape->getRotation();
 
@@ -189,6 +176,50 @@ final class FreeShapeMapper
         }
 
         return new Shape($kind->value, $attributes, $body);
+    }
+
+    /**
+     * The attributes the paint of a shape is written as.
+     *
+     * The colour it is filled with or the gradient it is painted with, and the colour of its
+     * line with the width of it. A shape is filled with a colour or with a gradient and not
+     * with both, and a line is a stroke of its own rather than a fill.
+     *
+     * @return array<string, string>
+     */
+    private function paint(AutoShape|RichText $shape): array
+    {
+        $attributes = [];
+
+        $fill = $this->fill($shape);
+
+        if ($fill !== null) {
+            $attributes['fill'] = $fill;
+        }
+
+        $gradient = $this->gradient($shape);
+
+        if ($gradient !== null) {
+            $attributes['gradient'] = $gradient['stops'];
+
+            if ($gradient['radial']) {
+                $attributes['gradient-radial'] = 'true';
+            } else {
+                $attributes['gradient-angle'] = (string) $gradient['angle'];
+            }
+        }
+
+        // A line is a stroke and not a fill, and a rule that comes back with no colour is a
+        // rule nobody can see.
+        $stroke = $this->stroke($shape);
+
+        if ($stroke !== null) {
+            $attributes['stroke'] = $stroke;
+
+            $attributes['stroke-width'] = $this->strokeWidth($shape);
+        }
+
+        return $attributes;
     }
 
     /**
@@ -243,6 +274,55 @@ final class FreeShapeMapper
         }
 
         return strtoupper($fill->getStartColor()->getRGB());
+    }
+
+    /**
+     * The gradient a shape is painted with, or null where it is painted with none.
+     *
+     * The stops are written as the colours they resolved to, and the angle is written in the
+     * degrees CSS counts them in — the format counts its own from the right, ninety degrees
+     * out of step.
+     *
+     * @return null|array{stops: string, radial: bool, angle: int}
+     */
+    private function gradient(AbstractShape $shape): ?array
+    {
+        $fill = $shape->getFill();
+
+        if (!in_array($fill->getFillType(), [Fill::FILL_GRADIENT_LINEAR, Fill::FILL_GRADIENT_PATH], true)) {
+            return null;
+        }
+
+        $stops = [];
+
+        foreach ($fill->getGradientStops() as $stop) {
+            $stops[] = self::stop($stop);
+        }
+
+        return [
+            'stops' => '"' . implode(',', $stops) . '"',
+            'radial' => $fill->getFillType() === Fill::FILL_GRADIENT_PATH,
+            'angle' => (((int) $fill->getRotation() + 90) % 360),
+        ];
+    }
+
+    /**
+     * One stop of a gradient, as the colour it is and the place it is at.
+     *
+     * The place is written where it is not one of the two ends, which are where a stop
+     * without one is spread to — so a gradient that is read back is the gradient that was
+     * written.
+     */
+    private static function stop(GradientStop $stop): string
+    {
+        $colour = '#' . strtoupper($stop->getColor()->getRGB());
+        $position = $stop->getPosition();
+
+        if ($position === GradientStop::POSITION_START || $position === GradientStop::POSITION_END) {
+            return $colour;
+        }
+
+        return $colour . '@' . (int) round($position / 1000);
     }
 
     /**

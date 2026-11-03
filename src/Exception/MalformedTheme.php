@@ -37,6 +37,24 @@ final class MalformedTheme extends InvalidInput
         return new self(self::in($file, sprintf('A theme needs a "%s".', $key)));
     }
 
+    /**
+     * A key that is not one of the values a theme holds.
+     *
+     * Its own message, because a slide's override is not a theme's file and the theme's own
+     * keys — `name`, `description` and `author` — are the identity of a theme and not values
+     * a slide may lay over one.
+     *
+     * @param list<string> $valid
+     */
+    public static function unknownVariable(string $file, string $key, array $valid): self
+    {
+        return new self(self::in($file, sprintf(
+            '"%s" is not a value a theme holds. Valid keys: %s.',
+            $key,
+            implode(', ', $valid),
+        )));
+    }
+
     public static function wrongType(string $file, string $key, string $wanted): self
     {
         return new self(self::in($file, sprintf('"%s" is not %s.', $key, $wanted)));

@@ -55,7 +55,7 @@ Without that line the install stops with Composer's own message naming
 `MarkdownPresentation\Exception\UnpatchedDependency`, whose message names the plugin as
 well.
 
-The patch adds five methods to PHPPresentation:
+The patch adds these to PHPPresentation:
 
 | Method | Needed by | What it is for |
 | --- | --- | --- |
@@ -64,10 +64,13 @@ The patch adds five methods to PHPPresentation:
 | `RichText::setDescription` | the writer and the reader | the description a shape carries: the writer sets it, the reader reads it back |
 | `PowerPoint2007::zipPath` | the reader | the path a picture was read from, inside the package |
 | `Gd::setContents` | the reader | the bytes a picture was read from, as the package holds them |
+| `Fill::getGradientStops` | the writer and the reader | the stops a gradient is painted with, so that a gradient may have a colour in the middle of it |
+| `GradientStop::getPosition` | the writer and the reader | where one stop of a gradient sits, so that the stops need not be spread evenly |
+| `BackgroundGradient::getFill` | the writer and the reader | the gradient a background is painted with, which is the same fill a shape is painted with |
 
 The writer is the direction that writes a `.pptx`; the reader is the direction that takes one
 apart, and it reads a deck through the patched `PowerPoint2007` reader. The check asks for
-all five of them, in either direction, and a package that carries only some is refused
+all of them, in either direction, and a package that carries only some is refused
 rather than half-worked. What is missing either fails somewhere else — naming a method
 rather than the reason — or is quietly left out of the deck that comes back.
 
@@ -1307,11 +1310,48 @@ E7E6E6 on 4472C4
 
 An unrecognised name is refused, never quietly black.
 
+#### A gradient
+
+A shape may be painted with a gradient instead of a colour, and the gradient is written as
+its stops:
+
+```markdown
+::rectangle{gradient="accent1,dk1@50,lt2" gradient-angle=45}
+
+::circle{gradient="accent2,accent1" gradient-radial}
+```
+
+| Attribute | |
+| --- | --- |
+| `gradient` | the stops, one after another with a comma between them |
+| `gradient-angle` | the angle in degrees; 180° is top to bottom |
+| `gradient-radial` | the gradient runs from the middle of the shape outwards |
+
+A stop is a colour in the [vocabulary above](#colour), and it may carry the position it is
+at as a percentage of the gradient: `accent1@50` is that stop at half of the way. A stop
+that carries none is spread evenly among the ones that do, and a gradient of fewer than two
+stops is refused — the format asks for two at the very least.
+
+The stops have to move forward. Two stops at the same place are refused, because a gradient
+whose stops do not move forward is one the reader cannot draw.
+
+**There is a ceiling on a gradient**: at most **100 stops**, and at most **8192 characters**
+of them. A hundred stops is already more than a picture can show, and the stops are read
+apart before they are counted, so the length is the bound and the count is the second one.
+
+The angle is CSS's: **0° is to the top, 90° to the right, 180° to the bottom**. A radial
+gradient runs from the middle outwards and has no angle, so `gradient-angle` with
+`gradient-radial` is refused.
+
+A shape is filled with a colour **or** with a gradient, and `fill` together with `gradient`
+is refused rather than one of them being dropped.
+
 #### The rest of the attributes
 
 | Attribute | On | |
 | --- | --- | --- |
 | `fill`, `stroke` | the ten ink shapes, `::content`, `::slide-number` | |
+| `gradient`, `gradient-angle`, `gradient-radial` | the ten ink shapes, `::content`, `::slide-number` | see [A gradient](#a-gradient) |
 | `alpha` | the ten ink shapes, `::content`, `::slide-number` | 0–100 for the whole shape; one percentage, written on every colour it has |
 | `stroke-width` | the ten ink shapes, `::content`, `::slide-number` | in points; `0` is a hairline |
 | `border-radius` | `::roundrect` only | in pixels |
@@ -1524,11 +1564,36 @@ template: brand
 ---
 ```
 
-A template's frontmatter names the template and **nothing else**, and that is what tells a
-definition from a slide that draws one: a definition has no `layout:`, because it is not
-drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
+A template's frontmatter names the template and nothing but its own settings, and that is
+what tells a definition from a slide that draws one: a definition has no `layout:`, because
+it is not drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
 and it does not count towards the number of slides — which is what makes one definition and
 many slides add up to one slide each.
+
+A definition may carry settings of its own, and they are **the template's**: every slide that
+draws the template gets them. They are named as the template's, under `template-settings:`,
+so that the ordinary keys mean the slide's own everywhere — a slide that draws a template and
+names a `background:` of its own is a slide, and is drawn:
+
+```markdown
+---
+template: brand
+template-settings:
+  background: accent1
+  theme-variables:
+    dark: true
+---
+```
+
+```markdown
+---
+layout: blank
+template: brand
+background: accent2
+---
+```
+
+The second slide draws the template and paints its own page over the template's.
 
 A slide may name several templates, and the chrome of each of them is drawn on it:
 
@@ -2062,7 +2127,7 @@ try {
 ```
 
 ```text
-The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file.
+The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file, template-settings, background, background-gradient, background-angle, background-radial, theme-variables.
 ```
 
 Slidev accepts dozens of directives this library does not read, so a deck written for it will
@@ -2078,6 +2143,68 @@ other.
 Every slide is checked before anything is built, so a deck whose fourth slide names a
 directive nobody reads fails before it has written a byte rather than leaving a half-finished
 file where a whole one was expected.
+
+### A slide's background, and its own values
+
+A slide may name the background it is drawn on, and it may name the theme's values for
+itself.
+
+```markdown
+---
+layout: blank
+background: accent1
+---
+
+---
+layout: blank
+background-gradient: "accent1,dk1@50,lt2"
+background-angle: 45
+---
+
+---
+layout: blank
+theme-variables:
+  colors:
+    accent1: "#7AA2F7"
+---
+```
+
+| Key | |
+| --- | --- |
+| `background` | the slide's background: one colour |
+| `background-gradient` | the background's stops, as a shape's are |
+| `background-angle` | the angle in degrees |
+| `background-radial` | the background runs from the middle outwards |
+| `template-settings` | the settings of the **template** a definition names, under the same keys |
+
+The background of a slide is the slide's own: the master keeps the theme's page colour for
+the slides that name no background. A background is one colour or one gradient, and the two
+together are refused. A background of a colour has neither an angle nor a radial flag, so
+`background-angle` or `background-radial` with `background` is refused as well.
+
+`theme-variables:` is a **`theme.yml`**: the same keys, the same names, the same spelling,
+read by the reader that reads the theme's own file — `dark:`, `colors:`, `fonts:` and
+`style:`. A slide's values are laid over the template's, and the template's over the
+theme's, and one value laid over another leaves the rest alone: a slide that names one
+colour leaves the other eleven as they were.
+
+`template-settings:` holds the same keys, for the **template** rather than the slide: a
+definition carries them, and every slide that draws that template gets them. See
+[Slide templates](#slide-templates).
+
+The four roles the theme has — the page, the ink, the subtle ink and the panel — sit on
+**four different slots**, so overriding a slot moves exactly one of them, and `dark:` says
+which way round they go. There is no `ink:` and no `panel:` to add: the theme's own model
+says which is which.
+
+**A slide's background does not change the colour its text is drawn in.** The library does
+not judge, and a dark slide with dark text is a slide the author wrote. `theme-variables:`
+is the way to change the text's colour with it.
+
+**A template's chrome is drawn in the theme's colours, not the slide's.** The chrome of a
+template is read once, before the slides are drawn, and every slide that draws that template
+draws the same shapes — so a slide that overrides a colour gets the deck's colour in the
+template's wordmark and its rule. The shapes the slide places itself are the slide's.
 
 ### In the body of a slide
 
@@ -2193,6 +2320,8 @@ deck. A `.pptx` records what is on a slide, not how it was drawn.
 | a picture | an image, written out beside the deck |
 | a table | a Markdown table |
 | the speaker's note | a `::note` block |
+| the background of a slide | the frontmatter that names it: `background:`, or `background-gradient:` with its angle |
+| the gradient of a shape | the `gradient` attribute, with the places its stops are at |
 | the date, the footer and the slide number | nothing |
 | a free shape | nothing, unless `preserveGeometry` says otherwise |
 
@@ -2265,6 +2394,11 @@ These are the distinctions a `.pptx` does not record, and what comes back in the
 - **a link inside a run.** A shape whose text is a link comes back as a link; a word inside
   a paragraph that is a link does not.
 - **a chart.** A chart is a drawing, not prose. It is left out rather than half-read.
+- **a slide's own theme values.** A slide that names the theme's values for itself has them
+  resolved into literal colours on the way out, and the slot a colour came from is in the
+  theme — so a deck read back says what the colours are and not which slots they were.
+  The background of a slide is not lost this way: it is written as the frontmatter that names
+  it, and the places a gradient's stops are at travel with it.
 
 ## Themes
 

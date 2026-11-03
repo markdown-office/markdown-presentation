@@ -86,6 +86,95 @@ All notable changes to this project are documented here. The format follows
   has is a deck that cannot be drawn again. Another program writes `Office Theme` there, and
   that is not a name a deck can use.
 
+- **A slide may be painted with a gradient, and a background may be one too.** A shape was
+  filled with one colour, and a slide's background was the theme's page colour for every
+  slide of the deck.
+
+  A shape now takes a `gradient` of its own, and the stops of it may be any number:
+
+  ```markdown
+  ::rectangle{gradient="accent1,dk1@50,lt2" gradient-angle=45}
+
+  ::circle{gradient="accent2,accent1" gradient-radial}
+  ```
+
+  A stop is a colour in the vocabulary a fill is written in, and it may carry the place it
+  is at as a percentage of the gradient — `accent1@50` is that stop at half of the way. A
+  stop that carries none is spread evenly among the ones that do, which is what a gradient in
+  CSS does with the ones it leaves out. The stops have to move forward, so two at the same
+  place are refused, and a gradient holds at most **100 stops** and at most **8192
+  characters** of them.
+
+  The angle is CSS's: **0° is to the top, 90° to the right, 180° to the bottom**. A gradient
+  that runs from the middle of the shape outwards is `gradient-radial`, and it has no angle,
+  so naming one is refused.
+
+  A slide's background is named in its frontmatter, and it is the slide's own — the master
+  keeps the theme's page colour for the slides that name no background:
+
+  ```markdown
+  ---
+  layout: blank
+  background-gradient: "accent1,dk1@40,lt2"
+  background-angle: 45
+  ---
+  ```
+
+  A shape is filled with a colour **or** with a gradient, and a background is one colour or
+  one gradient, and the two together are refused rather than one of them being dropped. A
+  background of a colour has neither an angle nor a radial flag, so naming one with it is
+  refused too.
+
+- **A slide may name the theme's values for itself.** A theme was set once for a deck, and
+  every slide was drawn in it.
+
+  A slide's frontmatter may now carry `theme-variables:`, and what it carries is a
+  `theme.yml` — the same keys, the same names, the same spelling, read by the reader that
+  reads the theme's own file:
+
+  ```markdown
+  ---
+  layout: blank
+  theme-variables:
+    dark: true
+    colors:
+      accent1: "#7AA2F7"
+  ---
+  ```
+
+  A slide's values are laid over the template's, and the template's over the theme's, and one
+  value laid over another leaves the rest alone: a slide that names one colour leaves the
+  other eleven as they were.
+
+  The four roles the theme has — the page, the ink, the subtle ink and the panel — sit on
+  **four different slots**, so overriding a slot moves exactly one of them and `dark:` says
+  which way round they go. There is no `ink:` and no `panel:` to add: the theme's own model
+  says which is which.
+
+  **A slide's background does not change the colour its text is drawn in.** The library does
+  not judge, and `theme-variables:` is the way to change the text's colour with it.
+
+- **A template's own settings are named as the template's.** A template's settings are the
+  settings of the slides that draw it, and they are written under `template-settings:`:
+
+  ```markdown
+  ---
+  template: brand
+  template-settings:
+    background: accent1
+    theme-variables:
+      dark: true
+  ---
+  ```
+
+  The ordinary keys mean the **slide's** own everywhere, which is what the rule wants: a
+  slide that draws a template and names a `background:` of its own is a slide, and is drawn
+  with it. It was read as a definition of the template before, and was not drawn at all —
+  and the two cases were the same text, so nothing could tell them apart. A definition is
+  now a slide that names a template and nothing but its own settings, as it was before the
+  settings arrived, and a template defined twice is refused rather than left to win
+  quietly.
+
 ### Fixed
 
 - **The anchor of a template's placeholder is read and written.** The renderer read a

@@ -234,15 +234,38 @@ final class DeckParser
      *
      * @param list<Slide>      $slides
      * @param list<Definition> $definitions
+     *
+     * @throws MalformedFrontmatter
      */
     private static function add(array &$slides, array &$definitions, Slide $slide): void
     {
         $definition = self::definition($slide);
 
         if ($definition === null) {
+            // The settings of a template belong to its definition, and they are named as the
+            // template's: a slide that draws a template names its own settings in the
+            // ordinary keys. So a slide that is not a definition and carries them anyway is
+            // a mistake, and is refused rather than left to be read as nothing at all.
+            if (array_key_exists('template-settings', $slide->frontmatter())) {
+                if (array_key_exists('template', $slide->frontmatter())) {
+                    throw MalformedFrontmatter::templateSettingsOnASlide($slide->index() + 1);
+                }
+
+                throw MalformedFrontmatter::templateSettingsWithoutATemplate($slide->index() + 1);
+            }
+
             $slides[] = $slide;
 
             return;
+        }
+
+        // A template is defined once. Two definitions of the same name are a mistake, and
+        // the second one is the one that would be drawn — so it is refused here rather than
+        // left to win quietly, which is what it used to do.
+        foreach ($definitions as $defined) {
+            if ($defined->name() === $definition->name()) {
+                throw MalformedFrontmatter::duplicateTemplate($definition->name());
+            }
         }
 
         $definitions[] = $definition;
@@ -252,10 +275,14 @@ final class DeckParser
      * The template a slide defines, or null where the slide draws one rather than
      * defines it.
      *
-     * A slide whose frontmatter names a template and nothing else defines it; a slide
-     * that names a template along with anything else draws it. The name is what tells
-     * the two apart, because a definition is not a slide of the deck and has no layout
+     * A slide whose frontmatter names a template and nothing but its own settings defines
+     * it; a slide that names a template along with anything else draws it. The name is what
+     * tells the two apart, because a definition is not a slide of the deck and has no layout
      * to be drawn in.
+     *
+     * A definition's own settings are named as the template's, under `template-settings:`,
+     * so that the ordinary keys mean the slide's own everywhere: a slide that draws a
+     * template and names a background of its own is a slide, and is drawn.
      *
      * @throws MalformedFrontmatter
      */
@@ -263,8 +290,14 @@ final class DeckParser
     {
         $frontmatter = $slide->frontmatter();
 
-        if (!array_key_exists('template', $frontmatter) || count($frontmatter) > 1) {
+        if (!array_key_exists('template', $frontmatter)) {
             return null;
+        }
+
+        foreach (array_keys($frontmatter) as $key) {
+            if ($key !== 'template' && $key !== 'template-settings') {
+                return null;
+            }
         }
 
         $name = $frontmatter['template'];
@@ -273,7 +306,15 @@ final class DeckParser
             throw MalformedFrontmatter::notATemplateName();
         }
 
-        return new Definition(trim($name), $slide->content());
+        return new Definition(
+            trim($name),
+            $slide->content(),
+            Settings::readTemplate(
+                array_key_exists('template-settings', $frontmatter)
+                    ? $frontmatter['template-settings']
+                    : [],
+            ),
+        );
     }
 
     /**
