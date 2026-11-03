@@ -11,6 +11,8 @@ use MarkdownPresentation\Theme\ThemeVariables;
  * The settings a slide names for itself: the background it is drawn on, and the theme's
  * values for it.
  *
+ * @phpstan-type Shape array{background?: array<string, mixed>, variables?: array<string, mixed>}
+ *
  * A template definition holds them too, and the two are read the same way, because a
  * template's settings are the settings of the slides that draw it.
  *
@@ -52,7 +54,7 @@ final class Settings
      *
      * @param array<string, mixed> $frontmatter
      *
-     * @return array{background?: array<string, mixed>, variables?: array<string, mixed>}
+     * @return Shape
      *
      * @throws MalformedFrontmatter
      */
@@ -97,10 +99,10 @@ final class Settings
      * The theme's values are merged name by name, so that a slide that names one colour
      * leaves the other eleven alone.
      *
-     * @param array{background?: array<string, mixed>, variables?: array<string, mixed>} $under
-     * @param array{background?: array<string, mixed>, variables?: array<string, mixed>} $over
+     * @param Shape $under
+     * @param Shape $over
      *
-     * @return array{background?: array<string, mixed>, variables?: array<string, mixed>}
+     * @return Shape
      */
     public static function merge(array $under, array $over): array
     {

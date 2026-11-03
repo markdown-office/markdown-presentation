@@ -120,7 +120,7 @@ final class Furniture
      * of the templates are merged with the earlier ones laid over the later, which is the
      * other way round from the slide's own settings, which are laid over the templates'.
      *
-     * @return array<string, mixed>
+     * @return array{background?: array<string, mixed>, variables?: array<string, mixed>}
      *
      * @throws MalformedFrontmatter
      * @throws UnknownTemplate

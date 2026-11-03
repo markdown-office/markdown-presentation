@@ -10,15 +10,16 @@ namespace MarkdownPresentation\Template;
  * The body is kept as written rather than read into shapes here, because the shapes a
  * template draws are read against a theme and a directory, and neither is known while the
  * deck is being split.
+ *
+ * @phpstan-import-type Shape from \MarkdownPresentation\Document\Settings
  */
 final class Definition
 {
     /**
      * @param string               $name     The name a slide names this template by.
      * @param string               $body     The Markdown the template draws.
-     * @param array<string, mixed> $settings The settings the template names for itself: the
-     *                                        background it is drawn on and the theme's values
-     *                                        for the slides that draw it.
+     * @param Shape $settings The settings the template names for itself: the background it is
+     *                         drawn on and the theme's values for the slides that draw it.
      */
     public function __construct(
         private readonly string $name,
@@ -42,7 +43,7 @@ final class Definition
     /**
      * The settings the template names for itself.
      *
-     * @return array<string, mixed>
+     * @return Shape
      */
     public function settings(): array
     {

@@ -11,6 +11,7 @@ use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\MalformedGradient;
 use MarkdownPresentation\Exception\MalformedShape;
 use MarkdownPresentation\Exception\MalformedTemplate;
 use MarkdownPresentation\Exception\MalformedTemplatesFile;
@@ -103,6 +104,7 @@ it('reports what a deck author can fix under the class that says so', function (
         ImageNotFound::class,
         MalformedChrome::class,
         MalformedFrontmatter::class,
+        MalformedGradient::class,
         MalformedShape::class,
         MalformedTemplate::class,
         MalformedTemplatesFile::class,

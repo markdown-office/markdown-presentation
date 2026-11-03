@@ -20,6 +20,7 @@ use MarkdownPresentation\Render\Free\FreeText;
 use MarkdownPresentation\Render\Free\Pictures;
 use MarkdownPresentation\Render\Free\ShapeKind;
 use MarkdownPresentation\Render\Free\TextStyle;
+use MarkdownPresentation\Render\Gradient;
 use MarkdownPresentation\Theme\Theme;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Shape\AutoShape;
@@ -652,8 +653,8 @@ final class ShapeWriter
             $written->setRoundRectCorner($paint->radius);
         }
 
-        $this->filled($written->getFill(), $paint->fill);
-        $this->filled($written->getOutline()->getFill(), $paint->stroke);
+        $this->filled($written->getFill(), $paint->fill, $paint->gradient);
+        $this->filled($written->getOutline()->getFill(), $paint->stroke, null);
         $written->getOutline()->setWidth($this->lineWidth($paint->strokeWidth));
 
         $box = $shape->placement->box;
@@ -687,8 +688,17 @@ final class ShapeWriter
      * layout where there is nothing behind it to inherit from. `a:noFill` is the only way to
      * mean "nothing".
      */
-    private function filled(Fill $fill, ?Color $colour): void
+    private function filled(Fill $fill, ?Color $colour, ?Gradient $gradient): void
     {
+        if ($gradient !== null) {
+            $written = $gradient->fill();
+            $fill->setFillType($written->getFillType());
+            $fill->setRotation($written->getRotation());
+            $fill->setGradientStops($written->getGradientStops());
+
+            return;
+        }
+
         $fill->setFillType($colour === null ? Fill::FILL_NONE : Fill::FILL_SOLID);
 
         if ($colour !== null) {
@@ -797,7 +807,7 @@ final class ShapeWriter
         $paint = $shape->paint;
         $style = $shape->style;
 
-        $this->filled($written->getFill(), $paint->fill);
+        $this->filled($written->getFill(), $paint->fill, $paint->gradient);
 
         // A border left alone writes `LINE_SINGLE` in PHPPresentation's default, so the absence
         // of one has to be said rather than left.

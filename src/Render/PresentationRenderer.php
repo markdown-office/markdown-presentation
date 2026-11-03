@@ -11,12 +11,15 @@ use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\InvalidInput;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
+use MarkdownPresentation\Exception\MalformedGradient;
 use MarkdownPresentation\Exception\MalformedTemplate;
+use MarkdownPresentation\Exception\MalformedTheme;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\TooManySlides;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
+use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Exception\UnsupportedColumn;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
 use MarkdownPresentation\Files\FileFinder;
@@ -500,18 +503,18 @@ final class PresentationRenderer
         $geometry = (new SlideGeometry(style: $this->theme->style()))->with($boxes);
         $layouts = MasterLayouts::build($presentation, $deck, $loaded, $used, $this->blocks->inline());
 
-        // The theme each slide is drawn in: the deck's theme with the values the slide names
-        // laid over it. Read before the blocks are parsed, because a block's colours are
-        // resolved against the theme its slide is drawn in, and a colour resolved against
-        // another theme is a colour the slide does not have.
-        $themes = $this->themes($deck);
+        // The theme and the background each slide is drawn with. Read before the blocks are
+        // parsed, because a block's colours are resolved against the theme its slide is
+        // drawn in, and a colour resolved against another theme is a colour the slide does
+        // not have.
+        $appearance = $this->appearance($deck);
 
-        foreach ($themes as $theme) {
-            $this->faces->theme($theme, $metric);
+        foreach ($appearance as $one) {
+            $this->faces->theme($one['theme'], $metric);
         }
 
         $writer = new ShapeWriter($this->theme, $geometry, $metric, $this->fonts);
-        $blocks = $this->blocks($deck, $themes);
+        $blocks = $this->blocks($deck, $appearance);
 
         // The faces the deck named, asked about once the deck has been read and before
         // anything is built: a box with a `font-family` of its own is drawn in it, and a box
@@ -526,7 +529,7 @@ final class PresentationRenderer
         $builds = [];
 
         foreach ($deck->slides() as $slide) {
-            $theme = $themes[$slide->index()];
+            $theme = $appearance[$slide->index()]['theme'];
 
             // A slide with a theme of its own is drawn with a writer and a geometry of its
             // own, and the pictures are still the deck's: the writer keeps the storage of
@@ -549,6 +552,7 @@ final class PresentationRenderer
                 $shapes,
                 $blocks[$slide->index()],
                 $theme,
+                $appearance[$slide->index()]['background'],
             );
         }
 
@@ -619,7 +623,12 @@ final class PresentationRenderer
      * @throws UnknownMarker
      * @throws UnsupportedImageFormat
      */
-    private function blocks(Deck $deck, array $themes): array
+    /**
+     * @param array<int, array{theme: Theme, background: Background|null}> $appearance
+     *
+     * @return array<int, SlideBlocks>
+     */
+    private function blocks(Deck $deck, array $appearance): array
     {
         $blocks = [];
 
@@ -629,7 +638,7 @@ final class PresentationRenderer
                 $source->index() + 1,
                 $this->directory,
                 $this->scope,
-                $themes[$source->index()],
+                $appearance[$source->index()]['theme'],
                 $this->files,
             );
         }
@@ -638,20 +647,25 @@ final class PresentationRenderer
     }
 
     /**
-     * The theme each slide is drawn in.
+     * The theme and the background each slide is drawn with.
      *
-     * The deck's theme with the values the slide names laid over it: the values of the
-     * templates it names first, and its own over them.
+     * The deck's theme with the values the slide names laid over it — the values of the
+     * templates it names first, and its own over them — and the background the slide names
+     * or the template it names gave it.
      *
-     * @return array<int, Theme>
+     * The background's colour is resolved against the slide's own theme, so a background
+     * that names a slot is painted in the colour that slot has on that slide.
+     *
+     * @return array<int, array{theme: Theme, background: Background|null}>
      *
      * @throws MalformedFrontmatter
+     * @throws MalformedGradient
      * @throws MalformedTheme
      * @throws UnknownTemplate
      */
-    private function themes(Deck $deck): array
+    private function appearance(Deck $deck): array
     {
-        $themes = [];
+        $appearance = [];
 
         foreach ($deck->slides() as $slide) {
             $settings = Settings::merge(
@@ -659,16 +673,23 @@ final class PresentationRenderer
                 Settings::read($slide->frontmatter(), $slide->index() + 1),
             );
 
-            $themes[$slide->index()] = isset($settings['variables'])
+            $theme = isset($settings['variables'])
                 ? ThemeVariables::apply(
                     $this->theme,
                     $settings['variables'],
                     sprintf('the frontmatter of slide %d', $slide->index() + 1),
                 )
                 : $this->theme;
+
+            $appearance[$slide->index()] = [
+                'theme' => $theme,
+                'background' => isset($settings['background'])
+                    ? Background::read($slide->index() + 1, $settings['background'], $theme)
+                    : null,
+            ];
         }
 
-        return $themes;
+        return $appearance;
     }
 
     /**
@@ -725,6 +746,7 @@ final class PresentationRenderer
         SlideShapes $shapes,
         SlideBlocks $content,
         Theme $theme,
+        ?Background $background,
     ): array {
         $level = $this->depth($source->frontmatterValue('level'), $source->index() + 1);
         $title = $shapes->title($role, $level);
@@ -742,6 +764,12 @@ final class PresentationRenderer
         $slide = $presentation->createSlide();
         $slide->setSlideLayout($layouts[$role->value]);
         $slide->setName($source->title() === null ? null : sprintf('slide %d', $source->index() + 1));
+
+        // The background of the slide, which is the slide's own and not the master's: the
+        // master keeps the theme's page colour for the slides that name no background.
+        if ($background !== null) {
+            $slide->setBackground($background->written());
+        }
 
         if ($source->note() !== null) {
             $this->note($slide, $source->note());

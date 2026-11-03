@@ -55,7 +55,7 @@ Without that line the install stops with Composer's own message naming
 `MarkdownPresentation\Exception\UnpatchedDependency`, whose message names the plugin as
 well.
 
-The patch adds five methods to PHPPresentation:
+The patch adds these to PHPPresentation:
 
 | Method | Needed by | What it is for |
 | --- | --- | --- |
@@ -64,10 +64,12 @@ The patch adds five methods to PHPPresentation:
 | `RichText::setDescription` | the writer and the reader | the description a shape carries: the writer sets it, the reader reads it back |
 | `PowerPoint2007::zipPath` | the reader | the path a picture was read from, inside the package |
 | `Gd::setContents` | the reader | the bytes a picture was read from, as the package holds them |
+| `Fill::getGradientStops` | the writer | the stops a gradient is painted with, so that a gradient may have a colour in the middle of it |
+| `GradientStop::getPosition` | the writer | where one stop of a gradient sits, so that the stops need not be spread evenly |
 
 The writer is the direction that writes a `.pptx`; the reader is the direction that takes one
 apart, and it reads a deck through the patched `PowerPoint2007` reader. The check asks for
-all five of them, in either direction, and a package that carries only some is refused
+all of them, in either direction, and a package that carries only some is refused
 rather than half-worked. What is missing either fails somewhere else — naming a method
 rather than the reason — or is quietly left out of the deck that comes back.
 

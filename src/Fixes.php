@@ -10,14 +10,16 @@ use PhpOffice\PhpPresentation\Shape\AutoShape;
 use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
 use PhpOffice\PhpPresentation\Shape\RichText;
 use PhpOffice\PhpPresentation\Shape\Table;
+use PhpOffice\PhpPresentation\Style\Fill;
+use PhpOffice\PhpPresentation\Style\GradientStop;
 
 /**
  * The fixes the library needs from PHPPresentation, and the check that they are there.
  *
  * The library writes a few things a released PHPPresentation cannot: a table that says
  * which row is its header, a shape that says how round its corners are, a run of text
- * that says what it is, and a picture that says where it was read from. It gets them
- * from a patch applied to the installed package.
+ * that says what it is, a picture that says where it was read from, and a gradient of
+ * more than two stops. It gets them from a patch applied to the installed package.
  *
  * The check is made once per conversion because the alternative is a fatal error in the
  * middle of the work naming a method rather than the reason. A reader of that error
@@ -43,6 +45,8 @@ final class Fixes
         AutoShape::class => 'setRoundRectCorner',
         RichText::class => 'setDescription',
         Gd::class => 'setContents',
+        Fill::class => 'getGradientStops',
+        GradientStop::class => 'getPosition',
     ];
 
     /**

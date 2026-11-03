@@ -50,8 +50,14 @@ enum ShapeKind: string
      */
     private const PLACEMENT = ['left', 'top', 'width', 'height', 'anchor', 'layer', 'rotate', 'bleed'];
 
-    /** What a shape is painted with. */
-    private const PAINT = ['fill', 'alpha', 'stroke', 'stroke-width'];
+    /**
+     * What a shape is painted with.
+     *
+     * The gradient's three attributes are here and not beside the fill, because they are
+     * another way of being painted rather than another thing to paint with: a shape is
+     * filled with a colour **or** with a gradient, and the two together are refused.
+     */
+    private const PAINT = ['fill', 'alpha', 'stroke', 'stroke-width', 'gradient', 'gradient-angle', 'gradient-radial'];
 
     /**
      * The shadow a shape is drawn with, where the shape is a box to cast one.
