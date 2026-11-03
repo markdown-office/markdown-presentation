@@ -64,6 +64,26 @@ it('names the theme a deck was drawn in', function () {
     expect($theme)->toContain('<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="pitch"');
 });
 
+it('writes a name that looks like a backreference as itself', function () {
+    // The name is a directory name, and a directory may be called `sale$1`. A replacement
+    // string reads `$1` as the group it captured and `\1` as the same, and the group would
+    // have been written into the theme part in the name's place — which is not well-formed
+    // XML, and a deck carrying it is a deck PowerPoint repairs.
+    $xml = '<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Theme32"/>';
+
+    foreach (['sale$1', 'sale$2', 'sale\\1', 'sale$0'] as $name) {
+        $renamed = ThemeNamePass::rename($xml, $name);
+
+        expect($renamed)->toContain(sprintf('name="%s"', $name));
+
+        $document = new DOMDocument();
+
+        libxml_use_internal_errors(true);
+
+        expect($document->loadXML($renamed))->toBeTrue();
+    }
+});
+
 it('leaves a package with no theme part alone', function () {
     // A package this library did not write has no theme part, and a name it does not
     // carry is a name that is not written.

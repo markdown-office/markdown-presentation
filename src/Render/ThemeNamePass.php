@@ -26,9 +26,9 @@ use ZipArchive;
  * `theme.yml` says it is called, and a deck that says `theme: pitch` means the directory
  * called `pitch` — so the name that travels is the one a deck can use again.
  *
- * Only the slide master's theme is named. A deck carries a second theme for its notes master,
- * which is a copy of the first, and a name on the copy would say the notes master was drawn
- * in a theme of its own.
+ * Only the slide master's own theme part is named. The notes master has a theme of its own,
+ * a copy of this one, and the copy is made after this pass has run — so it is a copy of a
+ * named theme and carries the name with it.
  */
 final class ThemeNamePass
 {
@@ -95,7 +95,16 @@ final class ThemeNamePass
     {
         $escaped = htmlspecialchars($name, ENT_QUOTES | ENT_XML1);
 
-        $renamed = preg_replace(self::NAME, '$1' . $escaped . '$2', $xml, 1);
+        // A callback rather than a replacement string, because a replacement string reads
+        // `$1` and `\1` as a reference to a captured group. The name is a directory name and
+        // a directory may be called `sale$1`, and the group it named would have been written
+        // into the theme part in its place.
+        $renamed = preg_replace_callback(
+            self::NAME,
+            static fn (array $found): string => $found[1] . $escaped . $found[2],
+            $xml,
+            1,
+        );
 
         return $renamed ?? $xml;
     }

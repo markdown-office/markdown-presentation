@@ -27,7 +27,8 @@ use ZipArchive;
  * - The same method writes an *empty* `<a:bodyPr/>` for a placeholder, dropping the
  *   `normAutofit` and the insets {@see ShapeWriter::textBox()} sets. On a slide that hands
  *   the shape back to the reader to resize, which is the one failure a layout cannot recover
- *   from; on a layout an empty one is right, and this writes a layout's own either way.
+ *   from; on a layout an empty one is right unless the template said where its text sits,
+ *   and this writes a layout's own either way.
  *
  * Both sides are written by hand below, and the body a slide's title is drawn in is the one
  * the layout's placeholder is written at — so *Reset* restores the geometry the slide already

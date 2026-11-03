@@ -4,23 +4,12 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Reverse;
 
-use MarkdownPresentation\Exception\UnreadableDeck;
-use MarkdownPresentation\Render\Free\ShapeKind;
-use MarkdownPresentation\Render\SlideGeometry;
 use PhpOffice\PhpPresentation\AbstractShape;
-use PhpOffice\PhpPresentation\Shape\AutoShape;
 use PhpOffice\PhpPresentation\Shape\Drawing\Base64;
 use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
 use PhpOffice\PhpPresentation\Shape\RichText;
-use PhpOffice\PhpPresentation\Shape\RichText\BreakElement;
 use PhpOffice\PhpPresentation\Shape\RichText\Paragraph;
-use PhpOffice\PhpPresentation\Shape\RichText\Run;
-use PhpOffice\PhpPresentation\Shape\RichText\TextElement;
 use PhpOffice\PhpPresentation\Shape\Table;
-use PhpOffice\PhpPresentation\Style\Bullet;
-use PhpOffice\PhpPresentation\Style\Color;
-use PhpOffice\PhpPresentation\Style\Fill;
-use PhpOffice\PhpPresentation\Style\Font;
 
 /**
  * A shape read out of a slide, turned into the blocks a deck is written in.
@@ -42,6 +31,9 @@ use PhpOffice\PhpPresentation\Style\Font;
  * free shape it is when {@see Options::$preserveGeometry} says to. That is the
  * inverse of the renderer: the box it was given, the colour it was painted and
  * the words in it travel, and the rest of what a shape is does not.
+ *
+ * The two halves of the work are held by two others: {@see ProseReader} reads the
+ * words of a shape, and {@see FreeShapeMapper} reads the shape a deck placed itself.
  */
 final class ShapeMapper
 {
@@ -53,8 +45,14 @@ final class ShapeMapper
      */
     private const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp', 'svg'];
 
+    private readonly ProseReader $reader;
+
+    private readonly FreeShapeMapper $free;
+
     public function __construct(private readonly Options $options)
     {
+        $this->reader = new ProseReader();
+        $this->free = new FreeShapeMapper($options, $this->reader);
     }
 
     /**
@@ -74,7 +72,7 @@ final class ShapeMapper
     {
         // A free shape is asked about first, because a free text block is a text box and
         // would otherwise be read as the prose it happens to hold.
-        $placed = $this->placed($shape);
+        $placed = $this->free->placed($shape);
 
         if ($placed !== []) {
             return $placed;
@@ -83,7 +81,7 @@ final class ShapeMapper
         return match (true) {
             $shape instanceof Table => $this->table($shape),
             $shape instanceof Gd || $shape instanceof Base64 => $this->picture($shape, $slide, $image),
-            $shape instanceof RichText => $this->prose(
+            $shape instanceof RichText => $this->reader->prose(
                 array_values($shape->getParagraphs()),
                 $outline,
                 $this->linkOf($shape),
@@ -93,346 +91,19 @@ final class ShapeMapper
     }
 
     /**
-     * The free shape a shape becomes, or nothing where it is not one.
+     * The blocks a shape's paragraphs become.
      *
-     * A shape the deck placed itself is an autoshape, or a text box the library
-     * wrote under the name of the directive that draws it. The autoshape is
-     * recognised by its own geometry, which is the true inverse: the name is
-     * what this library writes, and a deck written by another program has
-     * names of its own.
+     * @param list<Paragraph> $paragraphs
+     * @param bool            $outline Whether the shape is a body placeholder,
+     *        whose paragraphs are an outline whether or not the slide says so.
+     * @param string          $url The address the shape's text is a link to, or
+     *        an empty string when it is not one.
      *
      * @return list<Block>
      */
-    private function placed(AbstractShape $shape): array
+    public function prose(array $paragraphs, bool $outline = false, string $url = ''): array
     {
-        if (!$this->options->preserveGeometry) {
-            return [];
-        }
-
-        $found = $this->kindOf($shape);
-
-        if ($found === null) {
-            return [];
-        }
-
-        return [Block::shape($this->freeShape($found['shape'], $found['kind']))];
-    }
-
-    /**
-     * The free shape a shape is, or null where it is not one this library draws.
-     *
-     * @return ?array{kind: ShapeKind, shape: AutoShape|RichText}
-     */
-    private function kindOf(AbstractShape $shape): ?array
-    {
-        // A placeholder is the layout's own, and the layout is not in the deck.
-        if ($shape->isPlaceholder()) {
-            return null;
-        }
-
-        $kinds = ShapeKind::cases();
-
-        if ($shape instanceof AutoShape || $shape instanceof RichText) {
-            // The name the library gave the shape is the directive that drew it, and it is
-            // more precise than the geometry: a circle and an ellipse are the same preset,
-            // and only the name says which one the deck wrote.
-            //
-            // It is also the only way to tell a rectangle at all, because a rectangle is read
-            // as a text shape and not as an autoshape — PowerPoint keeps most of its
-            // formatted text in one, and a reader that wants the formatting keeps the text
-            // shape.
-            foreach ($kinds as $kind) {
-                if ($kind->value === $shape->getName()) {
-                    return ['kind' => $kind, 'shape' => $shape];
-                }
-            }
-        }
-
-        // A deck written by another program has names of its own, and its geometry is what
-        // says what it drew.
-        if ($shape instanceof AutoShape) {
-            foreach ($kinds as $kind) {
-                if ($kind->autoShape() === $shape->getType()) {
-                    return ['kind' => $kind, 'shape' => $shape];
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * The free shape, with the box it was given and the colour it was painted.
-     */
-    private function freeShape(AutoShape|RichText $shape, ShapeKind $kind): Shape
-    {
-        $box = $this->box($shape);
-
-        // A circle's two sides are one number, and its percentages resolve against the height
-        // either way: a circle is the one shape whose width is a fraction of the slide's
-        // height rather than of its width, so that `width=14% height=14%` is the square the
-        // author wrote rather than 134 by 76.
-        $across = $kind->isCircle() ? SlideGeometry::HEIGHT : SlideGeometry::WIDTH;
-
-        $attributes = [
-            'left' => $this->percentage($box['x'], SlideGeometry::WIDTH),
-            'top' => $this->percentage($box['y'], SlideGeometry::HEIGHT),
-            'width' => $this->percentage($box['width'], $across),
-            'height' => $this->percentage($box['height'], SlideGeometry::HEIGHT),
-        ];
-
-        $fill = $this->fill($shape);
-
-        if ($fill !== null) {
-            $attributes['fill'] = $fill;
-        }
-
-        // A line is a stroke and not a fill, and a rule that comes back with no colour is a
-        // rule nobody can see.
-        $stroke = $this->stroke($shape);
-
-        if ($stroke !== null) {
-            $attributes['stroke'] = $stroke;
-
-            $attributes['stroke-width'] = $this->strokeWidth($shape);
-        }
-
-        $rotation = $shape->getRotation();
-
-        if ($rotation !== 0) {
-            $attributes['rotate'] = (string) $rotation;
-        }
-
-        // A shape that runs off the edge is refused by the renderer unless it says so, and
-        // the shape it was read from ran off the edge.
-        if ($box['x'] < 0 || $box['y'] < 0 || $box['x'] + $box['width'] > SlideGeometry::WIDTH
-            || $box['y'] + $box['height'] > SlideGeometry::HEIGHT) {
-            $attributes['bleed'] = 'true';
-        }
-
-        // A free text block holds its body; the page number holds the number the renderer
-        // wrote into it, which is not the author's to write back.
-        $body = $kind === ShapeKind::Content && $shape instanceof RichText
-            ? $this->prose(array_values($shape->getParagraphs()))
-            : [];
-
-        // The type of the words in a free text block is the block's, not the prose's, and it
-        // travels because it is an attribute of the directive rather than of the words in it.
-        if ($kind === ShapeKind::Content && $shape instanceof RichText) {
-            $attributes += $this->typeOf($shape);
-        }
-
-        // A label is the words an ink shape holds. A free text block holds its body
-        // instead, and a shape with both is a shape with two places for its words.
-        $label = $kind->isContent() ? null : $this->label($shape);
-
-        if ($label !== null) {
-            $attributes['label'] = '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $label) . '"';
-        }
-
-        return new Shape($kind->value, $attributes, $body);
-    }
-
-    /**
-     * The box a shape occupies, in the pixels the library counts in.
-     *
-     * The pixels are the reader's own: PHPPresentation converts the EMU of the file into
-     * pixels when it reads a shape, and a pixel is 9525 EMU at the 96 dpi the library
-     * converts at, so the two count the same grid.
-     *
-     * @return array{x: int, y: int, width: int, height: int}
-     */
-    private function box(AbstractShape $shape): array
-    {
-        return [
-            'x' => (int) round($shape->getOffsetX()),
-            'y' => (int) round($shape->getOffsetY()),
-            'width' => (int) round($shape->getWidth()),
-            'height' => (int) round($shape->getHeight()),
-        ];
-    }
-
-    /**
-     * A measurement as a percentage of the slide, as the free shapes write it.
-     *
-     * Four decimals and no more: a shape at a third of the way across a 960-pixel slide is
-     * 33.3333%, and that is the nearest a percentage gets to it. A percentage rather than a
-     * number of pixels because a shape is placed relative to the slide, and a deck read on a
-     * page of another size is the same deck.
-     */
-    private function percentage(int $pixels, int $of): string
-    {
-        $percentage = round($pixels / $of * 100, 4);
-
-        $written = rtrim(rtrim(number_format($percentage, 4, '.', ''), '0'), '.');
-
-        return ($written === '' || $written === '-' ? '0' : $written) . '%';
-    }
-
-    /**
-     * The colour a shape is painted, or null where it is painted with none.
-     *
-     * The colour a theme slot resolved to and not the slot itself: the slot is in the theme,
-     * and the theme is not in the deck. A shape painted with a gradient or a pattern is left
-     * without a colour, because one colour is not what it is painted with.
-     */
-    private function fill(AbstractShape $shape): ?string
-    {
-        $fill = $shape->getFill();
-
-        if ($fill->getFillType() !== Fill::FILL_SOLID) {
-            return null;
-        }
-
-        return strtoupper($fill->getStartColor()->getRGB());
-    }
-
-    /**
-     * The type of the words in a free text block, as the attributes that carry it.
-     *
-     * A free text block holds Markdown, and the Markdown's own formatting — a word in bold,
-     * a word in italic — travels with it. The block's *type* is a different thing: it belongs
-     * to the box rather than to the words, and it is an attribute of the directive, so it
-     * travels too.
-     *
-     * @return array<string, string>
-     */
-    private function typeOf(RichText $shape): array
-    {
-        $attributes = [];
-
-        // The first paragraph, and only the first: the type of a block is one thing, and a
-        // block with paragraphs of different types is a block whose type the file does not
-        // say. The loop is the way of saying "the first one" without saying what happens
-        // when there is none, which a text shape with no paragraph in it never is.
-        foreach (\array_slice(array_values($shape->getParagraphs()), 0, 1) as $paragraph) {
-            // The run's font and not the paragraph's: the block's type is written into every
-            // run, and the paragraph keeps the type a word would have without one.
-            $font = $paragraph->getFont();
-
-            foreach ($paragraph->getRichTextElements() as $element) {
-                if ($element instanceof Run) {
-                    $font = $element->getFont();
-
-                    break;
-                }
-            }
-
-            $attributes['color'] = strtoupper($font->getColor()->getRGB());
-            $attributes['font-size'] = (string) $font->getSize();
-
-            $align = match ($paragraph->getAlignment()->getHorizontal()) {
-                'ctr' => 'center',
-                'r' => 'right',
-                'just' => 'justify',
-                default => 'left',
-            };
-
-            if ($align !== 'left') {
-                $attributes['align'] = $align;
-            }
-
-            $vertical = match ($paragraph->getAlignment()->getVertical()) {
-                'ctr' => 'middle',
-                'b' => 'bottom',
-                default => 'top',
-            };
-
-            if ($vertical !== 'top') {
-                $attributes['vertical-align'] = $vertical;
-            }
-        }
-
-        return $attributes;
-    }
-
-    /**
-     * The colour a shape is stroked in, or null where it is stroked with none.
-     *
-     * An autoshape carries its stroke on its outline and a text shape on its border, because
-     * that is where the format keeps them: the file has one element and the reader gives it
-     * to a shape of one kind or the other.
-     */
-    private function stroke(AutoShape|RichText $shape): ?string
-    {
-        if ($shape instanceof AutoShape) {
-            return $this->colourOf($shape->getOutline()->getFill());
-        }
-
-        // A border is born black, and a reader cannot tell a border that was never given a
-        // colour from one that was given black: a shape drawn without a stroke and a shape
-        // drawn with a black one come back the same. The colour is therefore the signal, and
-        // a black stroke is the one that does not travel.
-        $colour = $this->colourOf($shape->getBorder()->getColor());
-
-        return $colour === '000000' ? null : $colour;
-    }
-
-    /**
-     * How wide a shape is stroked, in points, or null where it is not stroked.
-     *
-     * The width is written in whole pixels and the directive writes it in points, so the
-     * number that comes back is a fraction: a stroke of two points is three pixels, and
-     * three pixels are two and a quarter points. The file is the same either way.
-     */
-    private function strokeWidth(AutoShape|RichText $shape): string
-    {
-        $width = $shape instanceof AutoShape
-            ? $shape->getOutline()->getWidth()
-            : $shape->getBorder()->getLineWidth();
-
-        $points = round($width / SlideGeometry::PIXELS_PER_POINT, 2);
-
-        return rtrim(rtrim(number_format($points, 2, '.', ''), '0'), '.');
-    }
-
-    /**
-     * The colour of a fill or of a colour, or null where there is none.
-     */
-    private function colourOf(Fill|Color|null $paint): ?string
-    {
-        if ($paint instanceof Color) {
-            return strtoupper($paint->getRGB());
-        }
-
-        if ($paint === null || $paint->getFillType() !== Fill::FILL_SOLID) {
-            return null;
-        }
-
-        return strtoupper($paint->getStartColor()->getRGB());
-    }
-
-    /**
-     * The words an ink shape holds, or null where it holds none.
-     *
-     * A label is the shape's own text, and it is plain: a label is one run of text, and a
-     * free text block holds its words as a body rather than as a label.
-     */
-    private function label(AbstractShape $shape): ?string
-    {
-        if ($shape instanceof AutoShape) {
-            $text = trim($shape->getText());
-
-            return $text === '' ? null : $text;
-        }
-
-        $paragraphs = $shape instanceof RichText ? array_values($shape->getParagraphs()) : [];
-
-        if (count($paragraphs) !== 1) {
-            return null;
-        }
-
-        $text = '';
-
-        foreach ($paragraphs[0]->getRichTextElements() as $element) {
-            if ($element instanceof TextElement) {
-                $text .= $element->getText();
-            }
-        }
-
-        $text = trim($text);
-
-        return $text === '' ? null : $text;
+        return $this->reader->prose($paragraphs, $outline, $url);
     }
 
     /**
@@ -459,193 +130,6 @@ final class ShapeMapper
     }
 
     /**
-     * The blocks a shape's paragraphs become.
-     *
-     * A paragraph is a list item when it carries a bullet, when it is nested
-     * deeper than the first level, or when it sits in a body placeholder. The
-     * last of those is a rule about the shape rather than the paragraph,
-     * because PowerPoint inherits the bullet from the master instead of
-     * writing it into the slide: a body placeholder is an outline, and an
-     * outline is a list whether or not the slide says so.
-     *
-     * @param list<Paragraph> $paragraphs
-     * @param bool            $outline Whether the shape is a body placeholder,
-     *        whose paragraphs are an outline whether or not the slide says so.
-     * @param string          $url The address the shape's text is a link to, or
-     *        an empty string when it is not one.
-     *
-     * @return list<Block>
-     */
-    public function prose(array $paragraphs, bool $outline = false, string $url = ''): array
-    {
-        $items = [];
-        $blocks = [];
-
-        foreach ($paragraphs as $paragraph) {
-            $inlines = $this->inlines($paragraph);
-
-            if ($inlines === []) {
-                continue;
-            }
-
-            if ($url !== '') {
-                $inlines = [Inline::link($url, $inlines)];
-            }
-
-            if (! $this->isItem($paragraph, $outline)) {
-                $blocks[] = Block::paragraph($inlines);
-
-                continue;
-            }
-
-            $items[] = [
-                'level' => $paragraph->getAlignment()->getLevel(),
-                'ordered' => $paragraph->getBulletStyle()?->getBulletType() === Bullet::TYPE_NUMERIC,
-                'inlines' => $inlines,
-            ];
-        }
-
-        if ($items !== []) {
-            $blocks[] = $this->list($items);
-        }
-
-        return $blocks;
-    }
-
-    /**
-     * A list of items, nested by the level each one is written at.
-     *
-     * The levels are relative to each other and not to anything else, which is
-     * what Markdown's indentation is too, so the shallowest level in the shape
-     * is the top of the list whichever level the shape started at.
-     *
-     * @param list<array{level: int, ordered: bool, inlines: list<Inline>}> $items
-     */
-    private function list(array $items): Block
-    {
-        $shallowest = $items[0]['level'];
-
-        foreach ($items as $item) {
-            $shallowest = min($shallowest, $item['level']);
-        }
-
-        foreach ($items as $index => $item) {
-            $items[$index]['level'] = $item['level'] - $shallowest;
-        }
-
-        $position = 0;
-
-        return Block::list(
-            $this->items($items, $position, 0),
-            $items[0]['ordered'],
-        );
-    }
-
-    /**
-     * The items at one level, and the items nested under them.
-     *
-     * @param list<array{level: int, ordered: bool, inlines: list<Inline>}> $items
-     * @param int $position How far through the list this has got.
-     *
-     * @return list<Block>
-     */
-    private function items(array $items, int &$position, int $level): array
-    {
-        $blocks = [];
-
-        if ($level > Options::MAX_NESTING) {
-            throw UnreadableDeck::nestedTooDeep(Options::MAX_NESTING);
-        }
-
-        while (isset($items[$position]) && $items[$position]['level'] >= $level) {
-            if ($items[$position]['level'] > $level) {
-                // The item is deeper than this level, so it belongs to the item
-                // before it rather than beside it. The walk is pointed at the
-                // item it is about and takes the level that item has, so what
-                // comes back may be at a level between the two — a list whose
-                // levels jump from 0 to 2 and back to 1 leaves the walk at level
-                // 1, which is deeper than this level and so is read as the next
-                // item of this list, holding a nested list of its own.
-                $ordered = $items[$position]['ordered'];
-
-                $nested = $this->items($items, $position, $items[$position]['level']);
-
-                $blocks[] = Block::item([Block::list($nested, $ordered)]);
-
-                continue;
-            }
-
-            $item = $items[$position];
-            $position++;
-
-            $children = [Block::paragraph($item['inlines'])];
-
-            if (isset($items[$position]) && $items[$position]['level'] > $level) {
-                // The flag is read before the walk moves on: the position is past
-                // the last item by the time it comes back.
-                $ordered = $items[$position]['ordered'];
-
-                $nested = $this->items($items, $position, $items[$position]['level']);
-
-                if ($nested !== []) {
-                    $children[] = Block::list($nested, $ordered);
-                }
-            }
-
-            $blocks[] = Block::item($children);
-        }
-
-        return $blocks;
-    }
-
-    /**
-     * Whether a paragraph is a list item rather than a line of prose.
-     */
-    private function isItem(Paragraph $paragraph, bool $outline): bool
-    {
-        $bullet = $paragraph->getBulletStyle()?->getBulletType();
-
-        if ($bullet !== null && $bullet !== Bullet::TYPE_NONE) {
-            return true;
-        }
-
-        if ($paragraph->getAlignment()->getLevel() > 0) {
-            return true;
-        }
-
-        return $outline;
-    }
-
-    /**
-     * The inline runs of a paragraph.
-     *
-     * @return list<Inline>
-     */
-    private function inlines(Paragraph $paragraph): array
-    {
-        $inlines = [];
-
-        foreach ($paragraph->getRichTextElements() as $element) {
-            if ($element instanceof BreakElement) {
-                $inlines[] = Inline::break();
-
-                continue;
-            }
-
-            $font = $element instanceof TextElement ? $element->getFont() : null;
-
-            $inlines[] = Inline::text(
-                $element instanceof TextElement ? $element->getText() : '',
-                bold: $font?->isBold() ?? false,
-                italic: $font?->isItalic() ?? false,
-                strike: ($font?->getStrikethrough() ?? Font::STRIKE_NONE) !== Font::STRIKE_NONE,
-            );
-        }
-
-        return $inlines;
-    }
-
-    /**
      * The blocks a table becomes.
      *
      * @return list<Block>
@@ -658,7 +142,7 @@ final class ShapeMapper
             $cells = [];
 
             foreach ($row->getCells() as $cell) {
-                $cells[] = Block::cell($this->prose(array_values($cell->getParagraphs())));
+                $cells[] = Block::cell($this->reader->prose(array_values($cell->getParagraphs())));
             }
 
             $rows[] = Block::row($cells);

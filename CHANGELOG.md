@@ -39,7 +39,7 @@ All notable changes to this project are documented here. The format follows
   ```markdown
   ::roundrect{left=10% top=40% width=30% height=20% fill=4472C4}
 
-  :::content{left=50% top=40% width=30% height=20%}
+  :::content{left=50% top=40% width=30% height=20% color=000000 font-size=16}
   Text in a free box.
   :::
   ```

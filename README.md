@@ -1123,7 +1123,7 @@ text has to be written before the text.
 
 #### Placement
 
-Seven attributes, on every name:
+Eight attributes, on every name:
 
 | Attribute | Default | |
 | --- | --- | --- |
@@ -2220,7 +2220,7 @@ colour it was painted:
 ```markdown
 ::roundrect{left=10% top=40% width=30% height=20% fill=4472C4}
 
-:::content{left=50% top=40% width=30% height=20%}
+:::content{left=50% top=40% width=30% height=20% color=000000 font-size=16}
 Text in a free box.
 :::
 ```
@@ -2244,7 +2244,7 @@ no stroke at all.
 **Two things are the design and do not travel.** The `layout:` of a slide is not in the file:
 the role is a thing the deck said, and what the file holds is a layout part, which is the
 design. And a picture the deck placed comes back as a picture — its bytes and its alt text —
-because where a picture sits is part of the design and not part of the picture. A free text block's body travels; the size of the type in it does not.
+because where a picture sits is part of the design and not part of the picture.
 
 ### What the round trip does not keep
 

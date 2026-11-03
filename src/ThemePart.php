@@ -77,11 +77,7 @@ final class ThemePart
             return null;
         }
 
-        if (preg_match(self::NAME, $xml, $found) !== 1) {
-            return null;
-        }
-
-        return $found[1];
+        return preg_match(self::NAME, $xml, $found) === 1 ? $found[1] : null;
     }
 
     /**
