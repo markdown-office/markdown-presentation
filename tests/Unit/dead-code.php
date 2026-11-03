@@ -561,6 +561,13 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a theme without a layouts file says so in the failure' => 'the theme has no layouts.yml',
     'a styles file beside a theme is read and not used' => '`styles.yml` is not read',
     'a styles file beside a theme is read and not used, in a page' => '`styles.yml` is **not** read',
+    // The refusal for a file of the old format named one step where the reader has to take
+    // two: the content goes into a section and the file goes with it, because the refusal
+    // is about the file being there rather than about what is in it. A reader who followed
+    // the message as it was moved the content and left the file beside the theme, and the
+    // next render failed the same way. The phrase is the end of that message, so it cannot
+    // come back.
+    'a retired theme file only has to have its content moved' => 'of its "theme.yml".',
     // The sentence about a role the mapping leaves out was about the template and read as
     // being about the theme, and the two are different: a theme's `layouts:` section is the
     // whole mapping, while a template that has no layout for a role leaves the role where

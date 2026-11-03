@@ -228,15 +228,15 @@ All notable changes to this project are documented here. The format follows
 
   **What a theme that exists has to do.** Move the contents of `layouts.yml` into a
   `layouts:` section of the `theme.yml` beside it, and the contents of `text-styles.yml`
-  into a `textStyles:` section of it. A `styles.yml` is the Word half's file and this
-  half does not read it, so it goes.
+  into a `textStyles:` section of it, and delete both files. A `styles.yml` is the Word
+  half's file and this half does not read it, so it goes.
 
   The three files are **refused** when they are beside a theme, each with a message
-  naming the section its content goes into:
+  saying what the reader has to do with the file:
 
-  > The theme "acme" has a "layouts.yml" beside it. A theme is one file: move its content into the "layouts:" section of its "theme.yml".
+  > The theme "acme" has a "layouts.yml" beside it. A theme is one file: move its content into the "layouts:" section of its "theme.yml", and delete the file.
 
-  > The theme "acme" has a "text-styles.yml" beside it. A theme is one file: move its content into the "textStyles:" section of its "theme.yml".
+  > The theme "acme" has a "text-styles.yml" beside it. A theme is one file: move its content into the "textStyles:" section of its "theme.yml", and delete the file.
 
   > The theme "acme" has a "styles.yml" beside it. That file is the Word half's, and this half does not read it: its slots name Word styles, which a deck of slides has no use for. Delete it, and the theme is read again.
 

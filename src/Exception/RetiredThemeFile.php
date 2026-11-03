@@ -23,12 +23,16 @@ final class RetiredThemeFile extends InvalidInput
     /**
      * A file whose content has become a section of the theme's own file.
      *
+     * The refusal is about the file being there rather than about what is in it, so the
+     * message names both steps: the content goes into the section it became, and the file
+     * goes with it.
+     *
      * @param string $section The section the content goes into, without its colon.
      */
     public static function moved(string $theme, string $file, string $section): self
     {
         return new self(sprintf(
-            'The theme "%s" has a "%s" beside it. A theme is one file: move its content into the "%s:" section of its "theme.yml".',
+            'The theme "%s" has a "%s" beside it. A theme is one file: move its content into the "%s:" section of its "theme.yml", and delete the file.',
             $theme,
             $file,
             $section,

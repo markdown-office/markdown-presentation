@@ -118,13 +118,28 @@ it('refuses a layouts.yml beside a theme, and names the section to move it into'
     ThemeDirectory::load(ThemeDirectory::acme([
         'layouts.yml' => "layouts:\n  title: Title Slide\n",
     ]));
-})->throws(RetiredThemeFile::class, 'has a "layouts.yml" beside it. A theme is one file: move its content into the "layouts:" section of its "theme.yml".');
+})->throws(RetiredThemeFile::class, 'has a "layouts.yml" beside it. A theme is one file: move its content into the "layouts:" section of its "theme.yml", and delete the file.');
 
 it('refuses a text-styles.yml beside a theme, and names the section to move it into', function () {
     ThemeDirectory::load(ThemeDirectory::acme([
         'text-styles.yml' => "brand:\n  color: accent1\n",
     ]));
-})->throws(RetiredThemeFile::class, 'has a "text-styles.yml" beside it. A theme is one file: move its content into the "textStyles:" section of its "theme.yml".');
+})->throws(RetiredThemeFile::class, 'has a "text-styles.yml" beside it. A theme is one file: move its content into the "textStyles:" section of its "theme.yml", and delete the file.');
+
+it('refuses the file beside a theme, not the content it holds', function () {
+    // The message asks for two things — the content moved and the file deleted — because
+    // the refusal is about the file being there: a theme that already carries the section
+    // is read, and the same theme with the file beside it is refused as well.
+    $manifest = "name: Acme\nlayouts:\n  title: Title Slide\n";
+
+    $read = ThemeDirectory::load(ThemeDirectory::withManifest($manifest));
+
+    expect($read->layouts())->toBe(['title' => 'Title Slide']);
+
+    expect(fn () => ThemeDirectory::load(ThemeDirectory::withManifest($manifest, [
+        'layouts.yml' => "layouts:\n  title: Title Slide\n",
+    ])))->toThrow(RetiredThemeFile::class, 'has a "layouts.yml" beside it.');
+});
 
 it('refuses a styles.yml beside a theme, and says which half the file belongs to', function () {
     // The file is the Word half's, and this half has never drawn a slide with it: the

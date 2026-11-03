@@ -2864,7 +2864,7 @@ and a heading's air above it follows whatever that theme's `headings` scale says
 
 A theme was a directory of up to five files, and three of them have become sections of the
 one file that is left. They are **refused** when they are beside a theme, each with a message
-naming where its content goes:
+saying what the reader has to do with the file:
 
 ```php
 use MarkdownPresentation\Exception\RetiredThemeFile;
@@ -2884,9 +2884,9 @@ foreach (['with-layouts', 'with-text-styles', 'with-styles'] as $theme) {
 ```
 
 ```text
-The theme "with-layouts" has a "layouts.yml" beside it. A theme is one file: move its content into the "layouts:" section of its "theme.yml".
+The theme "with-layouts" has a "layouts.yml" beside it. A theme is one file: move its content into the "layouts:" section of its "theme.yml", and delete the file.
 
-The theme "with-text-styles" has a "text-styles.yml" beside it. A theme is one file: move its content into the "textStyles:" section of its "theme.yml".
+The theme "with-text-styles" has a "text-styles.yml" beside it. A theme is one file: move its content into the "textStyles:" section of its "theme.yml", and delete the file.
 
 The theme "with-styles" has a "styles.yml" beside it. That file is the Word half's, and this half does not read it: its slots name Word styles, which a deck of slides has no use for. Delete it, and the theme is read again.
 ```

@@ -25,8 +25,9 @@ use Symfony\Component\Yaml\Yaml;
  * the deck rather than to the loader that found it.
  *
  * The files a theme used to be made of — `styles.yml`, `layouts.yml` and
- * `text-styles.yml` — are refused when they are beside it, each with a message naming the
- * section its content goes into.
+ * `text-styles.yml` — are refused when they are beside it, each with a message saying
+ * what the reader has to do: move the content into the section it became and delete the
+ * file, or delete the file that belongs to the other half.
  *
  * The finder is asked by name — `house/theme.yml`, `house/template.pptx` — because the
  * library composes names and a finder answers them. A theme that never had a directory
