@@ -1309,11 +1309,41 @@ E7E6E6 on 4472C4
 
 An unrecognised name is refused, never quietly black.
 
+#### A gradient
+
+A shape may be painted with a gradient instead of a colour, and the gradient is written as
+its stops:
+
+```markdown
+::rectangle{gradient="accent1,dk1@50,lt2" gradient-angle=45}
+
+::circle{gradient="accent2,accent1" gradient-radial}
+```
+
+| Attribute | |
+| --- | --- |
+| `gradient` | the stops, one after another with a comma between them |
+| `gradient-angle` | the angle in degrees; 180° is top to bottom |
+| `gradient-radial` | the gradient runs from the middle of the shape outwards |
+
+A stop is a colour in the [vocabulary above](#colour), and it may carry the position it is
+at as a percentage of the gradient: `accent1@50` is that stop at half of the way. A stop
+that carries none is spread evenly among the ones that do, and a gradient of fewer than two
+stops is refused — the format asks for two at the very least.
+
+The angle is CSS's: **0° is to the top, 90° to the right, 180° to the bottom**. A radial
+gradient runs from the middle outwards and has no angle, so `gradient-angle` with
+`gradient-radial` is refused.
+
+A shape is filled with a colour **or** with a gradient, and `fill` together with `gradient`
+is refused rather than one of them being dropped.
+
 #### The rest of the attributes
 
 | Attribute | On | |
 | --- | --- | --- |
 | `fill`, `stroke` | the ten ink shapes, `::content`, `::slide-number` | |
+| `gradient`, `gradient-angle`, `gradient-radial` | the ten ink shapes, `::content`, `::slide-number` | see [A gradient](#a-gradient) |
 | `alpha` | the ten ink shapes, `::content`, `::slide-number` | 0–100 for the whole shape; one percentage, written on every colour it has |
 | `stroke-width` | the ten ink shapes, `::content`, `::slide-number` | in points; `0` is a hairline |
 | `border-radius` | `::roundrect` only | in pixels |
@@ -1526,9 +1556,10 @@ template: brand
 ---
 ```
 
-A template's frontmatter names the template and **nothing else**, and that is what tells a
-definition from a slide that draws one: a definition has no `layout:`, because it is not
-drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
+A template's frontmatter names the template and **its own settings** — `background:`,
+`background-gradient:`, `background-angle:`, `background-radial:` and `theme-variables:` —
+and nothing else, and that is what tells a definition from a slide that draws one: a
+definition has no `layout:`, because it is not drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
 and it does not count towards the number of slides — which is what makes one definition and
 many slides add up to one slide each.
 
@@ -2080,6 +2111,57 @@ other.
 Every slide is checked before anything is built, so a deck whose fourth slide names a
 directive nobody reads fails before it has written a byte rather than leaving a half-finished
 file where a whole one was expected.
+
+### A slide's background, and its own values
+
+A slide may name the background it is drawn on, and it may name the theme's values for
+itself.
+
+```markdown
+---
+layout: blank
+background: accent1
+---
+
+---
+layout: blank
+background-gradient: "accent1,dk1@50,lt2"
+background-angle: 45
+---
+
+---
+layout: blank
+theme-variables:
+  colors:
+    accent1: "#7AA2F7"
+---
+```
+
+| Key | |
+| --- | --- |
+| `background` | the slide's background: one colour |
+| `background-gradient` | the background's stops, as a shape's are |
+| `background-angle` | the angle in degrees |
+| `background-radial` | the background runs from the middle outwards |
+
+The background of a slide is the slide's own: the master keeps the theme's page colour for
+the slides that name no background. A background is one colour or one gradient, and the two
+together are refused.
+
+`theme-variables:` is a **`theme.yml`**: the same keys, the same names, the same spelling,
+read by the reader that reads the theme's own file — `dark:`, `colors:`, `fonts:` and
+`style:`. A slide's values are laid over the template's, and the template's over the
+theme's, and one value laid over another leaves the rest alone: a slide that names one
+colour leaves the other eleven as they were.
+
+The four roles the theme has — the page, the ink, the subtle ink and the panel — sit on
+**four different slots**, so overriding a slot moves exactly one of them, and `dark:` says
+which way round they go. There is no `ink:` and no `panel:` to add: the theme's own model
+says which is which.
+
+**A slide's background does not change the colour its text is drawn in.** The library does
+not judge, and a dark slide with dark text is a slide the author wrote. `theme-variables:`
+is the way to change the text's colour with it.
 
 ### In the body of a slide
 

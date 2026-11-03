@@ -34,6 +34,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `15-inline-styles.md` | `15-inline-styles.pptx` | A word in a style of the theme inside a box with a colour of its own, the raw form that needs no style of the theme's, an attribute laid over a named style for one property only, the seven attributes this half draws, and the three it refuses — a name the theme does not have, a label holding Markdown, and the `highlight` it cannot write. The company is invented |
 | `16-templates.md` | `16-templates.pptx` | The furniture of a deck, written once: a template defined in the deck, a slide that names one, a slide that names two, a slide that names three, a template imported from `templates/templates.md`, and a template of the deck's own of the same name as one the file holds — the one that is drawn. The company is invented |
 | `18-bleeding-shapes.md` | `18-bleeding-shapes.pptx` | Shapes that run off the edge of the slide: a circle cut off by the right edge, a panel running under the foot of the page, and the refusal that names `bleed=true` as the way out. The Word half has the same rule for a text box that hangs off the edge of the page |
+| `19-gradient-background.md` | `19-gradient-background.pptx` | A gradient on a shape — two stops, three stops with the middle one at half, a radial one, and an angle of 0° — a background painted with a colour, with a gradient and with a radial gradient, and a slide that names the theme's values for itself |
 | `17-corporate-template.md` | `17-corporate-template.pptx` | A whole corporate template: a theme of the company's own, a brand mark in two colours — one for a light page and one for a dark one — and the furniture of a deck written once and named by every slide that wants it. Eight slides of the kinds a company deck is made of: a cover, an agenda, a headline, two columns with a chart, a quote, a table, a divider and a closing. The company is invented |
 
 ## The deck that is not anybody's business
@@ -120,8 +121,8 @@ A few of these are here because the render is the only honest evidence:
   slide's five hundred and forty.
 - **`13`, the cover and the sign-off.** Neither dark slide is a layout: each
   is a full-bleed `::rectangle{fill=dk1 layer=back}` with everything else drawn
-  over it. The background is set once on the master, so a slide wanting its own
-  colour carries the colour as a shape.
+  over it. A slide may name its own background now, and this deck was written
+  before it could.
 - **`13`, the pricing slide.** The table is rectangles and text boxes rather
   than a Markdown table, because this one has a filled header, zebra rows and a
   right-aligned price column in the accent — and a Markdown table takes its
