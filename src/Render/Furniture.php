@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Document\Settings;
 use MarkdownPresentation\Document\Slide as SourceSlide;
 use MarkdownPresentation\Exception\MalformedChrome;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
@@ -109,6 +110,30 @@ final class Furniture
         }
 
         return $drawn;
+    }
+
+    /**
+     * The settings the templates a slide names carry.
+     *
+     * A slide may want more than one piece of furniture, and the **first** template that
+     * names a setting is the one that sets it: the rest are drawn as usual. So the settings
+     * of the templates are merged with the earlier ones laid over the later, which is the
+     * other way round from the slide's own settings, which are laid over the templates'.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws MalformedFrontmatter
+     * @throws UnknownTemplate
+     */
+    public function settings(Templates $templates, SourceSlide $slide): array
+    {
+        $settings = [];
+
+        foreach ($this->names($templates, $slide) as $name) {
+            $settings = Settings::merge($templates->all()[$name]->settings(), $settings);
+        }
+
+        return $settings;
     }
 
     /**

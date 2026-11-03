@@ -100,6 +100,24 @@ final class ShapeWriter
     }
 
     /**
+     * A writer for a slide with a theme of its own.
+     *
+     * The pictures are the deck's: the storage of them is the one piece of state this class
+     * holds, and it is what makes a template's picture one media part for the whole deck.
+     *
+     * A new writer is made rather than a copy of this one, because the theme and the
+     * geometry are readonly and a readonly property cannot be given a new value on a copy
+     * before PHP 8.3, and `composer.json` promises 8.2.
+     */
+    public function withTheme(Theme $theme, SlideGeometry $geometry): self
+    {
+        $writer = new self($theme, $geometry, $this->metric, $this->fonts);
+        $writer->drawings = $this->drawings;
+
+        return $writer;
+    }
+
+    /**
      *
      * How tall a shape is, in pixels. `$room` is how much of its box is left, which only an
      * image consults: an image takes what a paragraph and a table would not.

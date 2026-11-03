@@ -13,9 +13,17 @@ namespace MarkdownPresentation\Template;
  */
 final class Definition
 {
+    /**
+     * @param string               $name     The name a slide names this template by.
+     * @param string               $body     The Markdown the template draws.
+     * @param array<string, mixed> $settings The settings the template names for itself: the
+     *                                        background it is drawn on and the theme's values
+     *                                        for the slides that draw it.
+     */
     public function __construct(
         private readonly string $name,
         private readonly string $body,
+        private readonly array $settings = [],
     ) {
     }
 
@@ -29,5 +37,15 @@ final class Definition
     public function body(): string
     {
         return $this->body;
+    }
+
+    /**
+     * The settings the template names for itself.
+     *
+     * @return array<string, mixed>
+     */
+    public function settings(): array
+    {
+        return $this->settings;
     }
 }

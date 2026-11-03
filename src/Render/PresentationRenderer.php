@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Document\Deck;
+use MarkdownPresentation\Document\Settings;
 use MarkdownPresentation\Document\Slide as SourceSlide;
 use MarkdownPresentation\Exception\ContentOverflow;
 use MarkdownPresentation\Exception\ImageNotFound;
@@ -39,6 +40,7 @@ use MarkdownPresentation\Theme\LoadedTheme;
 use MarkdownPresentation\Theme\Master;
 use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeResolver;
+use MarkdownPresentation\Theme\ThemeVariables;
 use PhpOffice\PhpPresentation\PhpPresentation;
 use PhpOffice\PhpPresentation\Slide as WrittenSlide;
 use PhpOffice\PhpPresentation\Slide\Note;
@@ -92,9 +94,13 @@ final class PresentationRenderer
      * Closed on purpose. Slidev accepts dozens more, so refusing one is a real cost, and
      * the whole of what makes it affordable is that {@see UnknownDirective} names this list
      * in the failure itself.
+     *
+     * The settings a slide names for itself are spread from {@see Settings::KEYS}, so that a
+     * key which is a setting is a key the frontmatter accepts.
     */
     public const DIRECTIVES = [
         'title', 'name', 'level', 'layout', 'theme', 'author', 'description', 'template', 'templates-file',
+        ...Settings::KEYS,
     ];
 
     /** The keys that describe the deck rather than a slide, and so belong to slide 1's block. */
@@ -490,12 +496,22 @@ final class PresentationRenderer
         // is PHP 8.4 syntax, and `composer.json` promises 8.2, where it does not parse. Written
         // without them this file cannot be loaded at all, so every test that renders a deck
         // fails on the 8.2 job and nothing local says why.
-        $geometry = (new SlideGeometry(style: $this->theme->style()))->with($this->deckTheme->template($loaded, $used));
+        $boxes = $this->deckTheme->template($loaded, $used);
+        $geometry = (new SlideGeometry(style: $this->theme->style()))->with($boxes);
         $layouts = MasterLayouts::build($presentation, $deck, $loaded, $used, $this->blocks->inline());
 
+        // The theme each slide is drawn in: the deck's theme with the values the slide names
+        // laid over it. Read before the blocks are parsed, because a block's colours are
+        // resolved against the theme its slide is drawn in, and a colour resolved against
+        // another theme is a colour the slide does not have.
+        $themes = $this->themes($deck);
+
+        foreach ($themes as $theme) {
+            $this->faces->theme($theme, $metric);
+        }
+
         $writer = new ShapeWriter($this->theme, $geometry, $metric, $this->fonts);
-        $shapes = new SlideShapes($geometry, $this->overflows);
-        $blocks = $this->blocks($deck, $this->theme);
+        $blocks = $this->blocks($deck, $themes);
 
         // The faces the deck named, asked about once the deck has been read and before
         // anything is built: a box with a `font-family` of its own is drawn in it, and a box
@@ -510,6 +526,17 @@ final class PresentationRenderer
         $builds = [];
 
         foreach ($deck->slides() as $slide) {
+            $theme = $themes[$slide->index()];
+
+            // A slide with a theme of its own is drawn with a writer and a geometry of its
+            // own, and the pictures are still the deck's: the writer keeps the storage of
+            // them, so a template's picture stays one media part for the whole deck.
+            $slideGeometry = $theme === $this->theme
+                ? $geometry
+                : (new SlideGeometry(style: $theme->style()))->with($boxes);
+            $slideWriter = $theme === $this->theme ? $writer : $writer->withTheme($theme, $slideGeometry);
+            $shapes = new SlideShapes($slideGeometry, $this->overflows);
+
             // Keyed by the slide's own number, which is the number of the part it is written
             // to: one slide out per source slide in, in order, with the constructor's empty
             // one removed below.
@@ -518,9 +545,10 @@ final class PresentationRenderer
                 $slide,
                 $roles[$slide->index()],
                 $layouts,
-                $writer,
+                $slideWriter,
                 $shapes,
                 $blocks[$slide->index()],
+                $theme,
             );
         }
 
@@ -591,7 +619,7 @@ final class PresentationRenderer
      * @throws UnknownMarker
      * @throws UnsupportedImageFormat
      */
-    private function blocks(Deck $deck, Theme $theme): array
+    private function blocks(Deck $deck, array $themes): array
     {
         $blocks = [];
 
@@ -601,12 +629,46 @@ final class PresentationRenderer
                 $source->index() + 1,
                 $this->directory,
                 $this->scope,
-                $theme,
+                $themes[$source->index()],
                 $this->files,
             );
         }
 
         return $blocks;
+    }
+
+    /**
+     * The theme each slide is drawn in.
+     *
+     * The deck's theme with the values the slide names laid over it: the values of the
+     * templates it names first, and its own over them.
+     *
+     * @return array<int, Theme>
+     *
+     * @throws MalformedFrontmatter
+     * @throws MalformedTheme
+     * @throws UnknownTemplate
+     */
+    private function themes(Deck $deck): array
+    {
+        $themes = [];
+
+        foreach ($deck->slides() as $slide) {
+            $settings = Settings::merge(
+                $this->furniture->settings($this->templates, $slide),
+                Settings::read($slide->frontmatter(), $slide->index() + 1),
+            );
+
+            $themes[$slide->index()] = isset($settings['variables'])
+                ? ThemeVariables::apply(
+                    $this->theme,
+                    $settings['variables'],
+                    sprintf('the frontmatter of slide %d', $slide->index() + 1),
+                )
+                : $this->theme;
+        }
+
+        return $themes;
     }
 
     /**
@@ -662,6 +724,7 @@ final class PresentationRenderer
         ShapeWriter $writer,
         SlideShapes $shapes,
         SlideBlocks $content,
+        Theme $theme,
     ): array {
         $level = $this->depth($source->frontmatterValue('level'), $source->index() + 1);
         $title = $shapes->title($role, $level);
@@ -671,6 +734,7 @@ final class PresentationRenderer
             $source,
             $title !== null,
             $level,
+            $theme,
         );
 
         $content = $this->furniture->on($this->templates, $this->drawn, $content, $source);
@@ -690,7 +754,7 @@ final class PresentationRenderer
         if ($title !== null && $source->title() !== null) {
             $writer->title(
                 $slide,
-                $this->blocks->inline()->runsIn($source->title(), $source->index() + 1, $this->theme),
+                $this->blocks->inline()->runsIn($source->title(), $source->index() + 1, $theme),
                 $title['box'],
                 $title['size'],
                 $title['alignment'],
@@ -736,10 +800,10 @@ final class PresentationRenderer
      * heading that became the title: `level: 1` is the top of what a body can draw and every
      * level below it is the size a heading of that depth is drawn at.
      */
-    private function titleHeading(string $title, int $slide, ?int $depth): Heading
+    private function titleHeading(string $title, int $slide, ?int $depth, Theme $theme): Heading
     {
         return new Heading(
-            $this->blocks->inline()->runsIn($title, $slide, $this->theme),
+            $this->blocks->inline()->runsIn($title, $slide, $theme),
             $depth === null ? 1 : max(1, $depth - 1),
             self::FIRST_STEP,
         );
@@ -777,7 +841,13 @@ final class PresentationRenderer
      *
      * @param ?int $depth What `level:` named.
      */
-    private function underTitle(SlideBlocks $content, SourceSlide $source, bool $hasTitleBox, ?int $depth): SlideBlocks
+    private function underTitle(
+        SlideBlocks $content,
+        SourceSlide $source,
+        bool $hasTitleBox,
+        ?int $depth,
+        Theme $theme,
+    ): SlideBlocks
     {
         $title = $source->title();
 
@@ -803,7 +873,7 @@ final class PresentationRenderer
 
         if (
             $heading === null
-            || InlineTranslator::text($heading->runs) !== $this->blocks->inline()->plain($title, $source->index() + 1, $this->theme)
+            || InlineTranslator::text($heading->runs) !== $this->blocks->inline()->plain($title, $source->index() + 1, $theme)
         ) {
             // A role with no title box has nothing but its body to draw a title in, and a
             // title it does not draw is the silence this library refuses everywhere else —
@@ -812,7 +882,7 @@ final class PresentationRenderer
             // blank slide's title already is.
             return $hasTitleBox
                 ? $content
-                : new SlideBlocks([$this->titleHeading($title, $source->index() + 1, $depth), ...$blocks], [0, ...$columns], $markers, $shapes);
+                : new SlideBlocks([$this->titleHeading($title, $source->index() + 1, $depth, $theme), ...$blocks], [0, ...$columns], $markers, $shapes);
         }
 
         $drawn = $heading;

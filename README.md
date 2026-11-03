@@ -2062,7 +2062,7 @@ try {
 ```
 
 ```text
-The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file.
+The frontmatter of slide 1 names "transition", which is not a directive. The directives are: title, name, level, layout, theme, author, description, template, templates-file, background, background-gradient, background-angle, background-radial, theme-variables.
 ```
 
 Slidev accepts dozens of directives this library does not read, so a deck written for it will

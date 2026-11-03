@@ -252,10 +252,10 @@ final class DeckParser
      * The template a slide defines, or null where the slide draws one rather than
      * defines it.
      *
-     * A slide whose frontmatter names a template and nothing else defines it; a slide
-     * that names a template along with anything else draws it. The name is what tells
-     * the two apart, because a definition is not a slide of the deck and has no layout
-     * to be drawn in.
+     * A slide whose frontmatter names a template and the template's own settings and nothing
+     * else defines it; a slide that names a template along with anything else draws it. The
+     * name is what tells the two apart, because a definition is not a slide of the deck and
+     * has no layout to be drawn in.
      *
      * @throws MalformedFrontmatter
      */
@@ -263,8 +263,14 @@ final class DeckParser
     {
         $frontmatter = $slide->frontmatter();
 
-        if (!array_key_exists('template', $frontmatter) || count($frontmatter) > 1) {
+        if (!array_key_exists('template', $frontmatter)) {
             return null;
+        }
+
+        foreach (array_keys($frontmatter) as $key) {
+            if ($key !== 'template' && !in_array((string) $key, Settings::KEYS, true)) {
+                return null;
+            }
         }
 
         $name = $frontmatter['template'];
@@ -273,7 +279,11 @@ final class DeckParser
             throw MalformedFrontmatter::notATemplateName();
         }
 
-        return new Definition(trim($name), $slide->content());
+        return new Definition(
+            trim($name),
+            $slide->content(),
+            Settings::read($frontmatter, $slide->index() + 1),
+        );
     }
 
     /**
