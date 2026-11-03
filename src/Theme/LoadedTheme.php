@@ -39,7 +39,7 @@ final class LoadedTheme
      * It is here because the deck has to be able to say which theme it was drawn in — the
      * name travels into the `.pptx` and comes back out of it, so that a deck read back into
      * Markdown can be drawn again in the theme it was drawn in.
-    */
+     */
     public function name(): string
     {
         return $this->name;

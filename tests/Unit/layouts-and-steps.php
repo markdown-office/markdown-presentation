@@ -150,7 +150,9 @@ it('takes a role\'s title and body from a template where one covers it', functio
 
 it('leaves the roles a template says nothing about where the library puts them', function () {
     // A template that maps only some layouts is a theme that works, not one that fails on
-    // the three its deck never asked for — the rule a theme's `layouts:` section follows.
+    // the three its deck never asked for. A theme's `layouts:` section is the other rule
+    // entirely: it is the whole mapping, so a role it does not name is a role the theme
+    // does not map.
     $geometry = (new SlideGeometry())->with(['content' => ['body' => [new Box(0, 0, 10, 10)]]]);
 
     expect($geometry->body(LayoutRole::TwoColumn))->toHaveCount(2)

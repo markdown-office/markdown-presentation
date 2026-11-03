@@ -1,8 +1,8 @@
 # A theme that ships a template of its own, which is what `templates.pptx` is for.
 #
-# The layouts below name the ones `template.pptx` carries. Only three of the five roles are
-# mapped, and that is deliberate: a template that covers part of the vocabulary is a theme
-# that works, not one that fails on the roles its deck never asked for.
+# The layouts below name the ones `template.pptx` carries, and they name every role: a
+# `layouts:` section is the whole mapping, so a role it leaves out is a role the theme does
+# not map and a deck that asks for one is refused.
 name: Templated
 description: A theme whose geometry comes from its own PowerPoint template.
 author: markdown-office
@@ -28,8 +28,9 @@ fonts:
 # The layout names this theme's own `template.pptx` gives each role.
 #
 # `section` is mapped to a layout the template does not have, and `blank` to one it has with
-# nothing in it. Both are deliberate: a template that covers part of the vocabulary is a theme
-# that works, and the roles it says nothing about keep the geometry the library puts them at.
+# nothing in it. Both are deliberate: a template fills in the roles it covers and leaves the
+# rest where the library puts them, so the two roles keep the geometry the library gives
+# them rather than the template's.
 layouts:
   title: Title Slide
   content: Title and Content

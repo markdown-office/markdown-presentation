@@ -184,6 +184,25 @@ it('overrides the named style\'s value for the property it names, and for that o
     ]);
 });
 
+it('draws a named style on a slide that lays values over the theme', function () {
+    // The named styles are the theme's own and not among the values a slide may lay over
+    // it, so a slide that lays values over the theme keeps them: they travel beside the
+    // round trip rather than among the values it carries. The colour the style names is
+    // resolved against the slide's own theme, so the accent the slide moved is the accent
+    // the word is drawn in.
+    $directory = textStyleTheme("brand:\n  color: accent1\n");
+
+    $deck = sprintf(
+        "---\ntheme: ./theme.yml\ntheme-variables:\n  colors:\n    accent1: \"#123456\"\n---\n\n:::content{%s}\nResilience :brand[Bakery]\n:::\n",
+        WORDMARK_BOX,
+    );
+
+    expect(runColours(styledDeck($deck, $directory)))->toBe([
+        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Bakery' => ['colour' => '123456', 'size' => 11],
+    ]);
+});
+
 it('sets the weight a style names, and leaves the rest of the run to the box', function () {
     [$deck, $directory] = wordmark("brand:\n  color: accent1\n  bold: true\n", ':brand[Bakery]');
 

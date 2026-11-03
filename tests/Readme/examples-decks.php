@@ -191,7 +191,26 @@ it('converts each deck that is not the rejected one', function (string $name) {
     '17-corporate-template.md',
     '18-bleeding-shapes.md',
     '19-gradient-background.md',
+    '20-deck-settings.md',
 ]);
+
+it('draws every slide of the deck with the deck\'s own settings', function () {
+    [$pptx] = builtDeck('20-deck-settings.md');
+
+    // The deck's page reaches every slide that does not name one of its own, and so does
+    // the deck's ink. The slide that names a background of its own is painted on it, and
+    // the slide that names an ink of its own is written in it and is still painted on the
+    // deck's page — one value laid over another leaves the rest alone.
+    expect(pageOf($pptx, 1))->toBe('F4F1E9')
+        ->and(pageOf($pptx, 2))->toBe('F4F1E9')
+        ->and(pageOf($pptx, 3))->toBe('CFE0F0')
+        ->and(pageOf($pptx, 4))->toBe('F4F1E9')
+        ->and(inkOf($pptx, 1))->toContain('3A2E22')
+        ->and(inkOf($pptx, 2))->toContain('3A2E22')
+        ->and(inkOf($pptx, 3))->toContain('3A2E22')
+        ->and(inkOf($pptx, 4))->toContain('1E3A5F')
+        ->and(inkOf($pptx, 4))->not->toContain('3A2E22');
+});
 
 it('gives every slide that draws a template the settings of that template', function () {
     // The deck's last two slides draw a template that carries settings of its own, and

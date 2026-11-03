@@ -203,6 +203,10 @@ All notable changes to this project are documented here. The format follows
   It belongs in slide 1's front matter, which is the deck's own, and it is refused on any
   other slide — the way `theme:` is.
 
+  `examples/markdown/20-deck-settings.md` is the deck that shows it: the deck's page and
+  ink on every slide of it, and the two slides that name a setting of their own — one that
+  wins over the deck's, and one that leaves the deck's other settings standing.
+
 ### Changed
 
 - **A theme is one file.** A theme was a directory of up to five files: `theme.yml` for

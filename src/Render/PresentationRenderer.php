@@ -65,10 +65,10 @@ use PhpOffice\PhpPresentation\Style\Color;
  *   directive, not a fallback from a directive that failed — a named theme that does not
  *   resolve is still {@see ThemeNotFound}.
  * - A `styles.yml` beside a theme is refused rather than read. Its slots are the Word
- *   half's vocabulary and the shipped themes write `.docx` style ids, which a `.pptx` has
- *   no use for; mapping them onto shapes would be inventing a vocabulary nobody wrote
- *   down. The refusal is at {@see \MarkdownPresentation\Theme\ThemeLoader} time, so a
- *   theme that carries one is never rendered as though it had said nothing.
+ *   half's vocabulary — a slot names a Word style — and a `.pptx` has no use for them;
+ *   mapping them onto shapes would be inventing a vocabulary nobody wrote down. The
+ *   refusal is at {@see \MarkdownPresentation\Theme\ThemeLoader} time, so a theme that
+ *   carries one is never rendered as though it had said nothing.
  *
  * And one it does: a directive in the body of a slide it cannot draw — a `v-*` element, a
  * `:::` fence, an HTML comment, an unclosed `::note` — is a
@@ -658,8 +658,9 @@ final class PresentationRenderer
      * How each slide is drawn.
      *
      * The deck's theme with the values laid over it: the deck's own first, the template's
-     * over them and the slide's over both. The background is the first of the three that
-     * names one.
+     * over them and the slide's over both. The background is the last of the three that
+     * names one: a slide's own background is painted over the template's, and the template's
+     * over the deck's.
      *
      * The background's colour is resolved against the slide's own theme, so a background
      * that names a slot is painted in the colour that slot has on that slide.

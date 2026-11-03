@@ -952,8 +952,9 @@ Three rules decide what a template is allowed to change:
 
 - **A template fills in the roles it covers and says nothing about the rest.** A layout it
   does not have, and a layout it has with no placeholders in it — Office's own *Blank* — leave
-  that role where `SlideGeometry` puts it. This is the same rule a theme's `layouts:` section
-  follows, where a theme mapping some of the roles is a theme that works.
+  that role where `SlideGeometry` puts it. A theme's `layouts:` section is the other rule
+  entirely: it is the whole mapping, so a role the section does not name is a role the theme
+  does not map.
 - **A template places; it does not typeset.** Sizes and alignments stay with `SlideGeometry`,
   because a template states them in a *master*'s `p:txStyles` — a whole typographic system,
   not a layout — and adopting one would resize the type of every deck that shipped a template.

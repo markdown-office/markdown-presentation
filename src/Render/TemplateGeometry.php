@@ -104,10 +104,9 @@ final class TemplateGeometry
      * A layout with nothing this library can draw in it contributes nothing: Office's own
      * *Blank* has no placeholders at all, and a role that maps to one keeps the geometry
      * {@see SlideGeometry} puts it at. That is the precedence — a template fills in the roles
-     * it covers and says nothing about the rest — and it is the rule a theme's `layouts:`
-     * section already
-     * follows, where a theme that maps two roles is a theme that works rather
-     * than one that fails on the three.
+     * it covers and says nothing about the rest. A theme's `layouts:` section is the other
+     * rule entirely: it is the whole mapping, so a role it does not name is a role the theme
+     * does not map, and a deck that asks for one is told which roles the theme does map.
      *
      * Two layouts with the same name would collide; the last one in the archive wins, which
      * is what a reader of the file would see too. A layout that carries no name is filed

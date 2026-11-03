@@ -566,6 +566,33 @@ it('does not claim again what the code does not do', function (string $claim) {
     // whole mapping, while a template that has no layout for a role leaves the role where
     // the library puts it.
     'a role the mapping leaves out keeps the library geometry' => 'A role left out keeps this library\'s own geometry rather than failing',
+
+    // The background of a slide is the last of the settings to say one and not the first:
+    // the slide's own is painted over the template's, and the template's over the deck's.
+    // The phrase is the sentence the docblock gave, and it said the opposite of what the
+    // merge does — and of what the next clause of the same paragraph said.
+    'a background is the first of the three that names one' => 'The background is the first of the three that',
+
+    // A `styles.yml` beside a theme is refused, and the reason was given in terms of the
+    // themes that used to ship one. None of them does now, and none can: the file is
+    // refused at loader time, so a theme this library ships cannot carry one. The phrase
+    // is the claim as it was made — the history in `CHANGELOG.md` names the same thing
+    // across a line break, so it is not caught by it.
+    'the shipped themes write the docx style ids' => 'the shipped themes write `.docx` style ids',
+
+    // A template and a theme's `layouts:` section are two different rules, and five
+    // sentences said they were the same one: a template fills in the roles it covers and
+    // leaves the rest where the library puts them, while a `layouts:` section is the whole
+    // mapping — a role it does not name is a role the theme does not map. The phrases are
+    // the words the sentences used, one line of each.
+    'a template\'s rule is the rule a theme\'s `layouts:` section follows' => 'rule a theme\'s `layouts:`',
+    'a theme\'s `layouts:` section follows a template\'s rule' => 'a theme\'s `layouts:` section follows',
+    // The other half of the same wrong claim, in three spellings: a theme that maps some
+    // of the roles is a theme that works. It is a template that fills in the roles it
+    // covers; a theme's section is all or nothing.
+    'a theme that maps two of them is a theme that works' => 'a theme that maps two of them is a theme',
+    'a theme that maps two roles is a theme that works' => 'a theme that maps two roles is a theme that works',
+    'a theme mapping some of the roles is a theme that works' => 'a theme mapping some of the roles is a theme that works',
 ]);
 
 it('has no decorative dividers in it', function () {
