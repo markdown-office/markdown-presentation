@@ -140,33 +140,7 @@ final class FreeShapeMapper
             'height' => $this->percentage($box['height'], SlideGeometry::HEIGHT),
         ];
 
-        $fill = $this->fill($shape);
-
-        if ($fill !== null) {
-            $attributes['fill'] = $fill;
-        }
-
-        $gradient = $this->gradient($shape);
-
-        if ($gradient !== null) {
-            $attributes['gradient'] = $gradient['stops'];
-
-            if ($gradient['radial']) {
-                $attributes['gradient-radial'] = 'true';
-            } else {
-                $attributes['gradient-angle'] = (string) $gradient['angle'];
-            }
-        }
-
-        // A line is a stroke and not a fill, and a rule that comes back with no colour is a
-        // rule nobody can see.
-        $stroke = $this->stroke($shape);
-
-        if ($stroke !== null) {
-            $attributes['stroke'] = $stroke;
-
-            $attributes['stroke-width'] = $this->strokeWidth($shape);
-        }
+        $attributes += $this->paint($shape);
 
         $rotation = $shape->getRotation();
 
@@ -202,6 +176,50 @@ final class FreeShapeMapper
         }
 
         return new Shape($kind->value, $attributes, $body);
+    }
+
+    /**
+     * The attributes the paint of a shape is written as.
+     *
+     * The colour it is filled with or the gradient it is painted with, and the colour of its
+     * line with the width of it. A shape is filled with a colour or with a gradient and not
+     * with both, and a line is a stroke of its own rather than a fill.
+     *
+     * @return array<string, string>
+     */
+    private function paint(AutoShape|RichText $shape): array
+    {
+        $attributes = [];
+
+        $fill = $this->fill($shape);
+
+        if ($fill !== null) {
+            $attributes['fill'] = $fill;
+        }
+
+        $gradient = $this->gradient($shape);
+
+        if ($gradient !== null) {
+            $attributes['gradient'] = $gradient['stops'];
+
+            if ($gradient['radial']) {
+                $attributes['gradient-radial'] = 'true';
+            } else {
+                $attributes['gradient-angle'] = (string) $gradient['angle'];
+            }
+        }
+
+        // A line is a stroke and not a fill, and a rule that comes back with no colour is a
+        // rule nobody can see.
+        $stroke = $this->stroke($shape);
+
+        if ($stroke !== null) {
+            $attributes['stroke'] = $stroke;
+
+            $attributes['stroke-width'] = $this->strokeWidth($shape);
+        }
+
+        return $attributes;
     }
 
     /**

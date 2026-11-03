@@ -504,17 +504,16 @@ final class PresentationRenderer
         $geometry = (new SlideGeometry(style: $this->theme->style()))->with($boxes);
         $layouts = MasterLayouts::build($presentation, $deck, $loaded, $used, $this->blocks->inline());
 
-        // The theme and the background each slide is drawn with. Read before the blocks are
-        // parsed, because a block's colours are resolved against the theme its slide is
-        // drawn in, and a colour resolved against another theme is a colour the slide does
-        // not have.
-        $appearance = $this->appearance($deck);
+        // How each slide is drawn. Read before the blocks are parsed, because a block's
+        // colours are resolved against the theme its slide is drawn in, and a colour
+        // resolved against another theme is a colour the slide does not have.
+        $writer = new ShapeWriter($this->theme, $geometry, $metric, $this->fonts);
+        $appearance = $this->appearance($deck, $writer, $geometry, $boxes);
 
         foreach ($appearance as $one) {
-            $this->faces->theme($one['theme'], $metric);
+            $this->faces->theme($one->theme(), $metric);
         }
 
-        $writer = new ShapeWriter($this->theme, $geometry, $metric, $this->fonts);
         $blocks = $this->blocks($deck, $appearance);
 
         // The faces the deck named, asked about once the deck has been read and before
@@ -530,17 +529,6 @@ final class PresentationRenderer
         $builds = [];
 
         foreach ($deck->slides() as $slide) {
-            $theme = $appearance[$slide->index()]['theme'];
-
-            // A slide with a theme of its own is drawn with a writer and a geometry of its
-            // own, and the pictures are still the deck's: the writer keeps the storage of
-            // them, so a template's picture stays one media part for the whole deck.
-            $slideGeometry = $theme === $this->theme
-                ? $geometry
-                : (new SlideGeometry(style: $theme->style()))->with($boxes);
-            $slideWriter = $theme === $this->theme ? $writer : $writer->withTheme($theme, $slideGeometry);
-            $shapes = new SlideShapes($slideGeometry, $this->overflows);
-
             // Keyed by the slide's own number, which is the number of the part it is written
             // to: one slide out per source slide in, in order, with the constructor's empty
             // one removed below.
@@ -549,11 +537,8 @@ final class PresentationRenderer
                 $slide,
                 $roles[$slide->index()],
                 $layouts,
-                $slideWriter,
-                $shapes,
                 $blocks[$slide->index()],
-                $theme,
-                $appearance[$slide->index()]['background'],
+                $appearance[$slide->index()],
             );
         }
 
@@ -617,7 +602,7 @@ final class PresentationRenderer
      * shape exists would be too late to have written no file. Each slide is read with the
      * theme it is drawn in, which is the deck's with the slide's own values laid over it.
      *
-     * @param array<int, array{theme: Theme, background: Background|null}> $appearance
+     * @param array<int, Appearance> $appearance How each slide is drawn.
      *
      * @return array<int, SlideBlocks>
      *
@@ -637,7 +622,7 @@ final class PresentationRenderer
                 $source->index() + 1,
                 $this->directory,
                 $this->scope,
-                $appearance[$source->index()]['theme'],
+                $appearance[$source->index()]->theme(),
                 $this->files,
             );
         }
@@ -669,7 +654,7 @@ final class PresentationRenderer
     }
 
     /**
-     * The theme and the background each slide is drawn with.
+     * How each slide is drawn.
      *
      * The deck's theme with the values the slide names laid over it — the values of the
      * templates it names first, and its own over them — and the background the slide names
@@ -678,15 +663,26 @@ final class PresentationRenderer
      * The background's colour is resolved against the slide's own theme, so a background
      * that names a slot is painted in the colour that slot has on that slide.
      *
-     * @return array<int, array{theme: Theme, background: Background|null}>
+     * A slide with a theme of its own is drawn with a writer and a geometry of its own, and
+     * the pictures are still the deck's: the writer keeps the storage of them, so a
+     * template's picture stays one media part for the whole deck.
+     *
+     * @param array<string, array{title?: Box, body?: non-empty-list<Box>}> $boxes The boxes a
+     *        template gives the roles.
+     *
+     * @return array<int, Appearance>
      *
      * @throws MalformedFrontmatter
      * @throws MalformedGradient
      * @throws MalformedTheme
      * @throws UnknownTemplate
      */
-    private function appearance(Deck $deck): array
-    {
+    private function appearance(
+        Deck $deck,
+        ShapeWriter $writer,
+        SlideGeometry $geometry,
+        array $boxes,
+    ): array {
         $appearance = [];
 
         foreach ($deck->slides() as $slide) {
@@ -703,12 +699,18 @@ final class PresentationRenderer
                 )
                 : $this->theme;
 
-            $appearance[$slide->index()] = [
-                'theme' => $theme,
-                'background' => isset($settings['background'])
+            $own = $theme === $this->theme
+                ? $geometry
+                : (new SlideGeometry(style: $theme->style()))->with($boxes);
+
+            $appearance[$slide->index()] = new Appearance(
+                $theme,
+                isset($settings['background'])
                     ? Background::read($slide->index() + 1, $settings['background'], $theme)
                     : $this->pageOf($theme),
-            ];
+                $theme === $this->theme ? $writer : $writer->withTheme($theme, $own),
+                new SlideShapes($own, $this->overflows),
+            );
         }
 
         return $appearance;
@@ -752,11 +754,9 @@ final class PresentationRenderer
      *
      * @param SlideBlocks             $content The slide's blocks and the column each was written for.
      * @param array<string, SlideLayout> $layouts
-     * @param SlideShapes             $shapes  Writes everything below the title, in the order
-     *                                      a `layer` decides.
-     * @param Theme                   $theme   The theme the slide is drawn in.
-     * @param Background|null          $background The background the slide is drawn on, or null
-     *                                      where it is the one the master keeps.
+     * @param Appearance              $appearance The theme the slide is drawn in, the
+     *                                      background it is drawn on, and the writers that
+     *                                      put its shapes there.
      *
      * @return array<int, int> Shape id to the step it appears on, in write order.
      *
@@ -767,12 +767,14 @@ final class PresentationRenderer
         SourceSlide $source,
         LayoutRole $role,
         array $layouts,
-        ShapeWriter $writer,
-        SlideShapes $shapes,
         SlideBlocks $content,
-        Theme $theme,
-        ?Background $background,
+        Appearance $appearance,
     ): array {
+        $theme = $appearance->theme();
+        $writer = $appearance->writer();
+        $shapes = $appearance->shapes();
+        $background = $appearance->background();
+
         $level = $this->depth($source->frontmatterValue('level'), $source->index() + 1);
         $title = $shapes->title($role, $level);
 

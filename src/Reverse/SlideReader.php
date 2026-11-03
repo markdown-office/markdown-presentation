@@ -100,19 +100,45 @@ final class SlideReader
         $background = $slide->getBackground();
 
         if ($background instanceof BackgroundColour) {
-            $colour = $background->getColor();
-
-            if ($colour === null) {
-                return [];
-            }
-
-            return ['background' => '#' . strtoupper($colour->getRGB())];
+            return $this->coloured($background);
         }
 
         if (!$background instanceof BackgroundGradient) {
             return [];
         }
 
+        return $this->graduated($background);
+    }
+
+    /**
+     * The background of a colour, as the frontmatter that names it.
+     *
+     * Nothing where the background carries no colour: a background of no colour is one the
+     * deck cannot draw again.
+     *
+     * @return array<string, string|int|bool>
+     */
+    private function coloured(BackgroundColour $background): array
+    {
+        $colour = $background->getColor();
+
+        if ($colour === null) {
+            return [];
+        }
+
+        return ['background' => '#' . strtoupper($colour->getRGB())];
+    }
+
+    /**
+     * The background of a gradient, as the frontmatter that names it.
+     *
+     * The stops are written as the colours they resolved to and the places they are at, so
+     * that a gradient read back is the gradient that was written.
+     *
+     * @return array<string, string|int|bool>
+     */
+    private function graduated(BackgroundGradient $background): array
+    {
         $fill = $background->getFill();
         $stops = [];
 
