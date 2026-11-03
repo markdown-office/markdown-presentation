@@ -7,6 +7,9 @@ namespace MarkdownPresentation\Reverse;
 use PhpOffice\PhpPresentation\AbstractShape;
 use PhpOffice\PhpPresentation\Shape\RichText;
 use PhpOffice\PhpPresentation\Slide as PowerPointSlide;
+use PhpOffice\PhpPresentation\Slide\Background\Color as BackgroundColour;
+use PhpOffice\PhpPresentation\Slide\Background\Gradient as BackgroundGradient;
+use PhpOffice\PhpPresentation\Style\Fill;
 
 /**
  * One slide read back out of a deck.
@@ -79,7 +82,56 @@ final class SlideReader
             $image++;
         }
 
-        return new Slide($index, $title, $blocks, $this->note($slide));
+        return new Slide($index, $title, $blocks, $this->note($slide), $this->background($slide));
+    }
+
+    /**
+     * The background of the slide, as the frontmatter that names it.
+     *
+     * A background of a colour is named as the colour it resolved to, and a background of a
+     * gradient as the stops it is painted with — the slot a colour came from is in the theme,
+     * and the theme is not in the deck.
+     *
+     * @return array<string, string|int|bool>
+     */
+    private function background(PowerPointSlide $slide): array
+    {
+        $background = $slide->getBackground();
+
+        if ($background instanceof BackgroundColour) {
+            $colour = $background->getColor();
+
+            if ($colour === null) {
+                return [];
+            }
+
+            return ['background' => '#' . strtoupper($colour->getRGB())];
+        }
+
+        if (!$background instanceof BackgroundGradient) {
+            return [];
+        }
+
+        $fill = $background->getFill();
+        $stops = [];
+
+        foreach ($fill->getGradientStops() as $stop) {
+            $stops[] = '#' . strtoupper($stop->getColor()->getRGB());
+        }
+
+        if ($fill->getFillType() === Fill::FILL_GRADIENT_PATH) {
+            return [
+                'background-gradient' => implode(',', $stops),
+                'background-radial' => true,
+            ];
+        }
+
+        return [
+            'background-gradient' => implode(',', $stops),
+            // The format counts its angles from the right and CSS from the top, so the one is
+            // the other less ninety degrees.
+            'background-angle' => (((int) $fill->getRotation() + 90) % 360),
+        ];
     }
 
     /**

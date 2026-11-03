@@ -47,23 +47,53 @@ final class DeckWriter
             $body = $this->slide($slide);
 
             if ($index === 0) {
-                $frontmatter = $this->frontmatter($properties, $theme);
+                // The deck's own frontmatter is the first slide's, so the first slide's own
+                // settings are written into it rather than beside it.
+                $frontmatter = $this->frontmatter($properties, $theme, $slide->frontmatter);
 
                 if ($frontmatter !== '') {
                     $body = $frontmatter . "\n" . $body;
                 }
+            } else {
+                $body = $this->settings($slide->frontmatter) . $body;
             }
 
             $out[] = $body;
         }
 
-        $markdown = implode("\n---\n\n", $out);
+        // A slide that carries a frontmatter opens with the delimiter: the block after it is
+        // the slide's, and a blank line after it would put the block out of the slide's reach.
+        $markdown = implode("\n---\n", $out);
 
         if ($this->options->lineEnding === "\n") {
             return $markdown . "\n";
         }
 
         return str_replace("\n", $this->options->lineEnding, $markdown) . $this->options->lineEnding;
+    }
+
+    /**
+     * The settings a slide carries back, as the block that names them.
+     *
+     * The block opens with the delimiter, which is the same line that separates the slides,
+     * and closes with one of its own: a slide's settings are a frontmatter block, and a
+     * block that is not closed is not read.
+     *
+     * @param array<string, string|int|bool> $settings
+     */
+    private function settings(array $settings): string
+    {
+        if ($settings === []) {
+            return "\n";
+        }
+
+        $lines = [];
+
+        foreach ($settings as $key => $value) {
+            $lines[] = sprintf('%s: %s', $key, $this->value($value));
+        }
+
+        return implode("\n", $lines) . "\n---\n\n";
     }
 
     /**
@@ -75,14 +105,20 @@ final class DeckWriter
      *
      * @param string|null $theme The name of the theme the deck was drawn in, when it is one
      *                           a deck can name again.
+     * @param array<string, string|int|bool> $own The first slide's own settings, which are
+     *                           written into the deck's own block with them.
      */
-    private function frontmatter(DocumentProperties $properties, ?string $theme = null): string
-    {
+    private function frontmatter(
+        DocumentProperties $properties,
+        ?string $theme = null,
+        array $own = [],
+    ): string {
         $values = [
             'title' => $properties->getTitle(),
             'theme' => $theme,
             'author' => $properties->getCreator(),
             'description' => $properties->getDescription(),
+            ...$own,
         ];
 
         $lines = [];
@@ -94,13 +130,15 @@ final class DeckWriter
                 continue;
             }
 
-            $value = trim($value);
+            if (is_string($value)) {
+                $value = trim($value);
 
-            if ($value === '') {
-                continue;
+                if ($value === '') {
+                    continue;
+                }
             }
 
-            $lines[] = sprintf('%s: %s', $key, $this->quote($value));
+            $lines[] = sprintf('%s: %s', $key, $this->value($value));
         }
 
         if ($lines === []) {
@@ -108,6 +146,26 @@ final class DeckWriter
         }
 
         return "---\n" . implode("\n", $lines) . "\n---\n";
+    }
+
+    /**
+     * A YAML scalar, quoted so that a colon or a hash in the value is not read
+     * as syntax.
+     *
+     * A number and a flag are not quoted: a quoted number is a string, and the value a
+     * slide's own settings hold is read as the number and the flag it is.
+     */
+    private function value(string|int|bool $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_int($value)) {
+            return (string) $value;
+        }
+
+        return $this->quote($value);
     }
 
     /**
