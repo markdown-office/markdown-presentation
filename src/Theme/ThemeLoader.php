@@ -6,9 +6,9 @@ namespace MarkdownPresentation\Theme;
 
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\MalformedTheme;
+use MarkdownPresentation\Exception\RetiredThemeFile;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
-use MarkdownPresentation\Exception\UnknownStyleSlot;
 use MarkdownPresentation\Exception\UnservedTemplate;
 use MarkdownPresentation\Files\FileFinder;
 use MarkdownPresentation\Filesystem\PathScope;
@@ -18,19 +18,23 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Reads a theme out of a finder: the `theme.yml` and the files beside it.
  *
- * Only `theme.yml` is required. `styles.yml`, `layouts.yml` and `text-styles.yml` are
- * read when they are there, and `template.pptx` is the theme's master: it is opened as a
- * file, so a source that holds only its bytes has them staged into one, and nothing here
- * reads what is inside it — a theme's master belongs to whoever renders the deck rather
- * than to the loader that found it.
+ * A theme is one file. `theme.yml` carries the look, the roles the theme maps and the
+ * named styles a deck may write in, and `template.pptx` beside it is the theme's master:
+ * it is opened as a file, so a source that holds only its bytes has them staged into one,
+ * and nothing here reads what is inside it — a theme's master belongs to whoever renders
+ * the deck rather than to the loader that found it.
  *
- * The finder is asked by name — `house/theme.yml`, `house/styles.yml` — because the
+ * The files a theme used to be made of — `styles.yml`, `layouts.yml` and
+ * `text-styles.yml` — are refused when they are beside it, each with a message naming the
+ * section its content goes into.
+ *
+ * The finder is asked by name — `house/theme.yml`, `house/template.pptx` — because the
  * library composes names and a finder answers them. A theme that never had a directory
  * is read the same way as one that did.
  *
  * Each of the theme's own files is resolved and held to the scope the loader was given
  * before it is read, and the scope is asked of the file rather than of the directory it
- * was found in: a `styles.yml` that is a symlink pointing out of the scope is read just
+ * was found in: a file that is a symlink pointing out of the scope is read just
  * as readily as one inside it, and the `author:` the manifest carries is copied into
  * `docProps/core.xml` of the deck — a way to get the contents of a file out through a
  * download.
@@ -43,8 +47,24 @@ final class ThemeLoader
     public const TEXT_STYLES_FILE = 'text-styles.yml';
     public const TEMPLATE_FILE = 'template.pptx';
 
-    /** The only key a layouts file may put around its mappings. */
-    private const LAYOUTS_KEY = 'layouts';
+    /**
+     * The sections a theme's file may carry beside the theme's own values.
+     *
+     * The theme's own keys are {@see ThemeMapping::KEYS}, and a key that is neither one
+     * nor a section is refused: the typo-catching is the point of a closed vocabulary.
+     */
+    private const SECTIONS = ['layouts', 'textStyles'];
+
+    /**
+     * The files whose content has become a section of the theme's own file.
+     *
+     * The `styles.yml` is not among them: it is the Word half's, and this half has no
+     * section for it.
+     */
+    private const MOVED = [
+        self::LAYOUTS_FILE => 'layouts',
+        self::TEXT_STYLES_FILE => 'textStyles',
+    ];
 
     /** The smallest a size of type may be, in points. */
     private const MINIMUM_POINTS = 0.5;
@@ -67,8 +87,8 @@ final class ThemeLoader
      *
      * @throws ThemeNotFound  when the theme has no `theme.yml`, so it is not a theme
      * @throws MalformedTheme  when a file in it does not describe a theme
-     * @throws UnknownStyleSlot when `styles.yml` names a slot that does not exist
-     * @throws UnknownLayoutRole when `layouts.yml` names a role that does not exist
+     * @throws RetiredThemeFile when a file of the old format is beside the theme
+     * @throws UnknownLayoutRole when the `layouts:` section names a role that does not exist
      * @throws UnservedTemplate when the theme carries a master the source cannot serve
      * @throws Exception      when a file in it cannot be read or parsed, or resolves out
      *                        of the scope
@@ -91,7 +111,7 @@ final class ThemeLoader
      * the manifest.
      *
      * The name the deck wrote is what makes the file the manifest rather than one of the
-     * theme's other files: a `styles.yml` named as the theme is a file the theme's own
+     * theme's other files: a `theme.yml` named as the theme is the file the theme's own
      * directory holds, not the theme.
      *
      * The Word half's loader asks the same question the same way, and the two have to
@@ -104,8 +124,8 @@ final class ThemeLoader
      * @throws ThemeNotFound  when the file is not there, or is not a `theme.yml` and so
      *                        is not a manifest
      * @throws MalformedTheme  when the file does not describe a theme
-     * @throws UnknownStyleSlot when `styles.yml` names a slot that does not exist
-     * @throws UnknownLayoutRole when `layouts.yml` names a role that does not exist
+     * @throws RetiredThemeFile when a file of the old format is beside the theme
+     * @throws UnknownLayoutRole when the `layouts:` section names a role that does not exist
      * @throws UnservedTemplate when the theme carries a master the source cannot serve
      * @throws Exception      when a file in it cannot be read or parsed, or resolves out
      *                        of the scope
@@ -130,28 +150,89 @@ final class ThemeLoader
     /**
      * The theme a manifest describes, with the rest of it read from beside the manifest.
      *
+     * The files the old format had beside the manifest are refused first: a theme that
+     * carries one is a theme whose shape is wrong whatever its manifest says.
+     *
      * @param array{contents: string, path: string} $manifest
      *
      * @throws MalformedTheme
      * @throws ThemeNotFound
      * @throws UnknownLayoutRole
-     * @throws UnknownStyleSlot
+     * @throws RetiredThemeFile
      * @throws Exception
      */
     private function read(array $manifest, string $name, string $written, ?FileFinder $files): LoadedTheme
     {
+        $this->refuseRetired($name, $written, $files);
+
+        $data = $this->mapping($manifest, 'a theme');
+        $file = $manifest['path'];
+
         return new LoadedTheme(
             $name,
-            dirname($manifest['path']),
+            dirname($file),
             Theme::fromArray(
-                $this->mapping($manifest, 'a theme'),
-                $manifest['path'],
-                $this->textStyles($name, $written, $files),
+                $this->values($data, $file),
+                $file,
+                $this->textStyles($data, $file),
             ),
-            $this->styles($name, $written, $files),
-            $this->layouts($name, $written, $files),
+            $this->layouts($data, $file),
             $this->template($name, $written, $files),
         );
+    }
+
+    /**
+     * The files of the old format, refused when they are beside the theme.
+     *
+     * Each is asked of the finder and held to the scope like every other file of the
+     * theme, so that a file resolving out of the roots is refused for that before it is
+     * refused for what it is.
+     *
+     * @throws RetiredThemeFile
+     * @throws ThemeNotFound
+     * @throws Exception
+     */
+    private function refuseRetired(string $name, string $written, ?FileFinder $files): void
+    {
+        foreach (self::MOVED as $file => $section) {
+            if ($this->file($files, $name, $file, $written) !== null) {
+                throw RetiredThemeFile::moved($written, $file, $section);
+            }
+        }
+
+        if ($this->file($files, $name, self::STYLES_FILE, $written) !== null) {
+            throw RetiredThemeFile::otherHalf($written, self::STYLES_FILE);
+        }
+    }
+
+    /**
+     * The theme's own values, and the refusal of a key that is neither one nor a section.
+     *
+     * @param array<array-key, mixed> $data
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws MalformedTheme
+     */
+    private function values(array $data, string $file): array
+    {
+        $values = [];
+
+        foreach ($data as $key => $value) {
+            $key = (string) $key;
+
+            if (in_array($key, self::SECTIONS, true)) {
+                continue;
+            }
+
+            if (!in_array($key, ThemeMapping::KEYS, true)) {
+                throw MalformedTheme::unknownKey($file, $key, [...ThemeMapping::KEYS, ...self::SECTIONS]);
+            }
+
+            $values[$key] = $value;
+        }
+
+        return $values;
     }
 
     /**
@@ -306,69 +387,29 @@ final class ThemeLoader
     }
 
     /**
-     * The Word style slot overrides, every slot checked against the slots the Word
-     * half really has.
+     * The role mappings the theme's file carries, or the library's own.
      *
-     * @return array<string, mixed>
+     * A theme with a `layouts:` section has the whole mapping: a role the section does
+     * not name is a role the theme does not map, and the failure names the roles it does
+     * map. A theme with no section is drawn with the library's own mapping, which is the
+     * one every theme shipping with this library carried in a file of its own.
      *
-     * @throws ThemeNotFound
-     * @throws Exception
-     */
-    private function styles(string $name, string $written, ?FileFinder $files): array
-    {
-        $file = $this->file($files, $name, self::STYLES_FILE, $written);
-
-        if ($file === null) {
-            return [];
-        }
-
-        $styles = [];
-
-        foreach ($this->mapping($file, 'a mapping of style slots to styles') as $slot => $style) {
-            $slot = (string) $slot;
-
-            if (!in_array($slot, StyleSlots::names(), true)) {
-                throw UnknownStyleSlot::named($file['path'], $slot, StyleSlots::names());
-            }
-
-            $styles[$slot] = $style;
-        }
-
-        return $styles;
-    }
-
-    /**
-     * The role mappings, every role checked against the portable roles. The mappings may
-     * stand on their own or under a `layouts:` key, because the concept draft writes the
-     * second and a bare mapping is what a person types.
+     * @param array<array-key, mixed> $data
      *
      * @return array<string, string>
      *
-     * @throws ThemeNotFound
-     * @throws Exception
+     * @throws UnknownLayoutRole
      */
-    private function layouts(string $name, string $written, ?FileFinder $files): array
+    private function layouts(array $data, string $file): array
     {
-        $file = $this->file($files, $name, self::LAYOUTS_FILE, $written);
-
-        if ($file === null) {
-            return [];
+        if (!array_key_exists('layouts', $data)) {
+            return LayoutRole::defaults();
         }
 
-        $mapping = $this->mapping($file, 'a mapping of layout roles to layout names');
+        $mapping = $data['layouts'];
 
-        if (isset($mapping[self::LAYOUTS_KEY])) {
-            foreach (array_keys($mapping) as $key) {
-                if ((string) $key !== self::LAYOUTS_KEY) {
-                    throw UnknownLayoutRole::unknownKey($file['path'], (string) $key, [self::LAYOUTS_KEY]);
-                }
-            }
-
-            $mapping = $mapping[self::LAYOUTS_KEY];
-        }
-
-        if (!is_array($mapping)) {
-            throw UnknownLayoutRole::notTheMappings($file['path']);
+        if (!is_array($mapping) || ($mapping !== [] && array_is_list($mapping))) {
+            throw UnknownLayoutRole::notTheMappings($file);
         }
 
         $layouts = [];
@@ -381,7 +422,7 @@ final class ThemeLoader
             }
 
             if (!is_string($layout) || trim($layout) === '') {
-                throw UnknownLayoutRole::notALayoutName($file['path'], $role);
+                throw UnknownLayoutRole::notALayoutName($file, $role);
             }
 
             $layouts[$role] = trim($layout);
@@ -391,48 +432,51 @@ final class ThemeLoader
     }
 
     /**
-     * The named text styles a theme carries, read from its `text-styles.yml`.
+     * The named text styles the theme's file carries.
      *
-     * The file is optional: a theme without one has no named styles, and every named form
-     * in a deck drawn with it is then a name the theme does not have. It is held to the
-     * scope like every other file of the theme, because it is one of them.
+     * A theme without a `textStyles:` section has none, and every named form in a deck
+     * drawn with it is then a name the theme does not have.
      *
      * A style named twice is refused by {@see TextStyles} itself rather than here, because
      * the styles may also be built in code and the rule belongs to them.
      *
-     * @throws ThemeNotFound
-     * @throws Exception
+     * @param array<array-key, mixed> $data
+     *
      * @throws MalformedTheme
      */
-    private function textStyles(string $name, string $written, ?FileFinder $files): TextStyles
+    private function textStyles(array $data, string $file): TextStyles
     {
-        $file = $this->file($files, $name, self::TEXT_STYLES_FILE, $written);
-
-        if ($file === null) {
+        if (!array_key_exists('textStyles', $data)) {
             return new TextStyles();
         }
 
-        $styles = [];
+        $styles = $data['textStyles'];
 
-        foreach ($this->mapping($file, 'a mapping of style names to text styles') as $style => $properties) {
+        if (!is_array($styles) || ($styles !== [] && array_is_list($styles))) {
+            throw MalformedTheme::wrongType($file, 'textStyles', 'a mapping of style names to text styles');
+        }
+
+        $read = [];
+
+        foreach ($styles as $style => $properties) {
             $style = (string) $style;
 
             if (TextStyle::isReserved($style)) {
-                throw MalformedTheme::reservedStyle($file['path'], $style);
+                throw MalformedTheme::reservedStyle($file, $style);
             }
 
             if (!is_array($properties) || ($properties !== [] && array_is_list($properties))) {
-                throw MalformedTheme::wrongType($file['path'], $style, 'a mapping of attributes to values');
+                throw MalformedTheme::wrongType($file, $style, 'a mapping of attributes to values');
             }
 
             if ($properties === []) {
-                throw MalformedTheme::emptyStyle($file['path'], $style);
+                throw MalformedTheme::emptyStyle($file, $style);
             }
 
-            $styles[$style] = $this->textStyle($file['path'], $style, $properties);
+            $read[$style] = $this->textStyle($file, $style, $properties);
         }
 
-        return new TextStyles($styles, $file['path']);
+        return new TextStyles($read, $file);
     }
 
     /**

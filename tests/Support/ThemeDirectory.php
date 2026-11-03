@@ -101,6 +101,19 @@ final class ThemeDirectory
     }
 
     /**
+     * A theme directory whose own manifest says what the test needs it to say.
+     *
+     * The manifest is the one file of a theme that says what the theme is, so a test about
+     * anything else in it writes the manifest itself.
+     *
+     * @param array<string, string> $beside Files beside `theme.yml`, keyed by name.
+     */
+    public static function withManifest(string $manifest, array $beside = [], string $prefix = 'theme'): string
+    {
+        return self::create(['theme.yml' => $manifest] + $beside, $prefix);
+    }
+
+    /**
      * A theme read out of a directory, the way the loader reads one.
      *
      * A theme is read by name: the finder is told where the themes are and the loader

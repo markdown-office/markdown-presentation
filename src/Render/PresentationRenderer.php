@@ -64,11 +64,11 @@ use PhpOffice\PhpPresentation\Style\Color;
  * - A deck that names no theme gets the built-in `default`. That is the absence of a
  *   directive, not a fallback from a directive that failed — a named theme that does not
  *   resolve is still {@see ThemeNotFound}.
- * - `styles.yml` is not read. {@see \MarkdownPresentation\Theme\StyleSlots} is the Word
+ * - A `styles.yml` beside a theme is refused rather than read. Its slots are the Word
  *   half's vocabulary and the shipped themes write `.docx` style ids, which a `.pptx` has
- *   no use for; mapping them onto shapes would be inventing a vocabulary nobody wrote down.
- *   A slot that does not exist still fails at {@see \MarkdownPresentation\Theme\ThemeLoader}
- *   time, so a typo in a `styles.yml` is never rendered as silence.
+ *   no use for; mapping them onto shapes would be inventing a vocabulary nobody wrote
+ *   down. The refusal is at {@see \MarkdownPresentation\Theme\ThemeLoader} time, so a
+ *   theme that carries one is never rendered as though it had said nothing.
  *
  * And one it does: a directive in the body of a slide it cannot draw — a `v-*` element, a
  * `:::` fence, an HTML comment, an unclosed `::note` — is a
@@ -301,8 +301,8 @@ final class PresentationRenderer
      * @throws \MarkdownPresentation\Exception\MalformedTheme When the theme's own files do
      *     not describe a theme.
      * @throws UnknownLayoutRole When the theme names a layout role that does not exist.
-     * @throws \MarkdownPresentation\Exception\UnknownStyleSlot When the theme names a
-     *     style slot that does not exist.
+     * @throws \MarkdownPresentation\Exception\RetiredThemeFile When a file of the old
+     *     format is beside the theme.
      * @throws \MarkdownPresentation\Exception\UnservedTemplate When the theme carries a
      *     master the source of the theme cannot serve.
      * @throws \MarkdownPresentation\Exception\Exception When one of the theme's files

@@ -111,6 +111,15 @@ it('refuses a key that is not a value a theme holds', function () {
         ->toThrow(MalformedTheme::class, '"name" is not a value a theme holds');
 });
 
+it('refuses the sections of a theme\'s own file in a slide\'s values', function () {
+    // The values are the values: the layout roles and the named styles are the theme's own
+    // shape, and a slide has none of them to lay over it.
+    expect(fn () => variablesDeck("---\ntheme-variables:\n  layouts:\n    content: Body Text\n---\n\n# One\n"))
+        ->toThrow(MalformedTheme::class, '"layouts" is not a value a theme holds')
+        ->and(fn () => variablesDeck("---\ntheme-variables:\n  textStyles:\n    brand:\n      color: accent1\n---\n\n# One\n"))
+        ->toThrow(MalformedTheme::class, '"textStyles" is not a value a theme holds');
+});
+
 it('refuses a colour that is not a colour', function () {
     expect(fn () => variablesDeck("---\ntheme-variables:\n  colors:\n    accent1: red\n---\n\n# One\n"))
         ->toThrow(MalformedTheme::class, 'which is not a colour');

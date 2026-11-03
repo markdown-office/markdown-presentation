@@ -7,25 +7,23 @@ namespace MarkdownPresentation\Theme;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 
 /**
- * A theme directory, read: the colours and fonts, the Word style slots it
- * overrides, the layout roles it maps, and the template that goes with it.
+ * A theme read: the colours and fonts, the layout roles it maps, and the template that
+ * goes with it.
  *
- * A theme is a directory, and only `theme.yml` is required. The rest are read when
- * they are there and are absent when they are not — except a `styles.yml` that
- * names a slot which does not exist and a `layouts.yml` that maps a role which is
- * not one, which are mistakes rather than absences and are refused.
+ * A theme is one file, and only `theme.yml` is required. The master beside it is read
+ * when it is there and is absent when it is not, and a `layouts:` section that names a
+ * role which is not one is refused when the theme is read, while a role the section does
+ * not map is refused when a deck asks for it.
 */
 final class LoadedTheme
 {
     /**
      * @param array<string, string> $layouts Role name to the template's own layout name.
-     * @param array<string, mixed>  $styles  Word style slot to styleId or inline style array.
     */
     public function __construct(
         private readonly string $name,
         private readonly string $directory,
         private readonly Theme $theme,
-        private readonly array $styles,
         private readonly array $layouts,
         private readonly ?Master $template,
     ) {
@@ -41,7 +39,7 @@ final class LoadedTheme
      * It is here because the deck has to be able to say which theme it was drawn in — the
      * name travels into the `.pptx` and comes back out of it, so that a deck read back into
      * Markdown can be drawn again in the theme it was drawn in.
-     */
+    */
     public function name(): string
     {
         return $this->name;
@@ -55,16 +53,6 @@ final class LoadedTheme
     public function theme(): Theme
     {
         return $this->theme;
-    }
-
-    /**
-     * The theme's Word style slot overrides, in the order the file listed them.
-     *
-     * @return array<string, mixed>
-    */
-    public function styles(): array
-    {
-        return $this->styles;
     }
 
     /**

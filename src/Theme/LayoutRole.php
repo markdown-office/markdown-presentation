@@ -36,6 +36,33 @@ enum LayoutRole: string
     }
 
     /**
+     * The layout names the library's own mapping gives each role.
+     *
+     * The eight Office names that every theme shipping with this library carried in a
+     * `layouts.yml` of its own, byte for byte: a theme with no `layouts:` section is
+     * drawn with these.
+     *
+     * The names and the roles have to stay in step — a role here without a name is a role
+     * the library cannot draw, and a name here for a role that does not exist is a layout
+     * no deck asks for.
+     *
+     * @return array<string, string>
+     */
+    public static function defaults(): array
+    {
+        return [
+            self::Title->value => 'Title Slide',
+            self::Content->value => 'Title and Content',
+            self::TwoColumn->value => 'Two Content',
+            self::Section->value => 'Section Header',
+            self::Blank->value => 'Blank',
+            self::ImageText->value => 'Picture Left',
+            self::ImageTitle->value => 'Picture with Caption',
+            self::ImageSlide->value => 'Full Bleed Picture',
+        ];
+    }
+
+    /**
      * Whether a slide on this role has a title box of its own.
      *
      * `blank` and `image-slide` do not, and for the same reason: a layout whose content is

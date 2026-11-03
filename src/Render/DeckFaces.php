@@ -42,8 +42,9 @@ final class DeckFaces
      * where to change it.
      *
      * The faces the theme's text styles name are asked about here too, because
-     * `text-styles.yml` is a file of the theme and a style in it is a face the theme
-     * names — a face a word written in that style is drawn in, and therefore measured in.
+     * a theme's `textStyles:` section is a part of the theme and a style in it is a face
+     * the theme names — a face a word written in that style is drawn in, and therefore
+     * measured in.
      * A style that names one of the theme's own slots is that slot's face and is not a
      * finding: the theme has already said it.
      */

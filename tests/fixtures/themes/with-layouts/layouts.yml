@@ -1,0 +1,6 @@
+# Which of the eight layout roles gets which layout. This file is beside the theme and is
+# no longer part of the format: its content belongs in the "layouts:" section of the
+# theme's own file.
+layouts:
+  title: Title Slide
+  content: Title and Content

@@ -60,8 +60,8 @@ mkdir -p "$WORK" "$CONTAINER"
 cp -f "$PICTURE" "$CONTAINER/logo.png"
 
 # The English names are the ones PowerPoint writes on an English installation, and the layout
-# name is what a `layouts.yml` has to match. This machine's PowerPoint is otherwise German,
-# which it would otherwise be for the whole run.
+# name is what a theme's `layouts:` section has to match. This machine's PowerPoint is
+# otherwise German, which it would otherwise be for the whole run.
 LANGUAGE=(--args -AppleLanguages "(en)")
 
 author () {

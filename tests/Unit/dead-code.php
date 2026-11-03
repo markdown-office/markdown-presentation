@@ -551,6 +551,21 @@ it('does not claim again what the code does not do', function (string $claim) {
     // The placement table names eight attributes, and a count of them in prose is wrong the
     // moment one is added. The phrase is the heading the page carried when it was one short.
     'the placement table names seven attributes' => 'Seven attributes, on every name',
+
+    // A theme is one file now, and the three files beside it that this format no longer has
+    // are refused rather than ignored. The phrases are the claims the pages and the comments
+    // made about them; the changelog has to be able to name what a theme used to be made
+    // of, so the phrases are the claims rather than the file names.
+    'a theme reads the named styles from a file of their own' => 'read from a file of their own',
+    'a theme without a layouts file maps no role at all' => 'maps no role at all',
+    'a theme without a layouts file says so in the failure' => 'the theme has no layouts.yml',
+    'a styles file beside a theme is read and not used' => '`styles.yml` is not read',
+    'a styles file beside a theme is read and not used, in a page' => '`styles.yml` is **not** read',
+    // The sentence about a role the mapping leaves out was about the template and read as
+    // being about the theme, and the two are different: a theme's `layouts:` section is the
+    // whole mapping, while a template that has no layout for a role leaves the role where
+    // the library puts it.
+    'a role the mapping leaves out keeps the library geometry' => 'A role left out keeps this library\'s own geometry rather than failing',
 ]);
 
 it('has no decorative dividers in it', function () {

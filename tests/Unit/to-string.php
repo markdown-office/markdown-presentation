@@ -79,7 +79,6 @@ it('leaves nothing on the disk behind it, master and all', function () {
 
     $finder = new MemoryFinder([
         'house/theme.yml' => (string) file_get_contents(masterTheme() . '/theme.yml'),
-        'house/layouts.yml' => (string) file_get_contents(masterTheme() . '/layouts.yml'),
         'house/template.pptx' => (string) file_get_contents(masterTheme() . '/template.pptx'),
     ]);
 

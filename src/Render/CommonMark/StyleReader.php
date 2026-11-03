@@ -205,16 +205,16 @@ final class StyleReader
     /**
      * The way out of a label that holds Markdown.
      *
-     * Two, and they are in two different files: a named style is given its weight in the
-     * theme's own `text-styles.yml`, and the raw form carries it as an attribute — the raw
-     * form has no theme file, because `style` is the one name a theme may not give a style
-     * of its own.
+     * Two, and they are in two different places: a named style is given its weight in the
+     * theme's own `textStyles:` section, and the raw form carries it as an attribute — the
+     * raw form has no theme to ask, because `style` is the one name a theme may not give a
+     * style of its own.
      */
     private static function wayOut(string $name): string
     {
         return TextStyle::isReserved($name)
             ? 'give the style the weight as an attribute ("bold=true")'
-            : sprintf('give the style the weight in the theme\'s "text-styles.yml" ("%s: { bold: true }")', $name);
+            : sprintf('give the style the weight in the theme\'s "textStyles:" section ("%s: { bold: true }")', $name);
     }
 
     /**

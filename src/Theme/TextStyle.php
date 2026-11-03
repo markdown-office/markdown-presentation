@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Theme;
 
 /**
- * One named style's properties, as a theme's `text-styles.yml` writes them.
+ * One named style's properties, as a theme's `textStyles:` section writes them.
  *
  * A property that is null is one the style does not set, and a run it is applied to
  * inherits that property from the block it is in — a colour from the `:::content` box, a
@@ -14,7 +14,7 @@ namespace MarkdownPresentation\Theme;
  *
  * The colours are as they were written rather than as they resolve, because a role and a
  * theme slot are only a colour once the theme they belong to is known — and the theme
- * that reads this file is the one that resolves them.
+ * that reads this style is the one that resolves them.
  */
 final class TextStyle
 {

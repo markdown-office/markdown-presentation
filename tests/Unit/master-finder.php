@@ -85,7 +85,7 @@ final class MasterlessSource implements FileFinder
 
     public function files(string $theme): array
     {
-        return ['layouts.yml', 'template.pptx', 'theme.yml'];
+        return ['template.pptx', 'theme.yml'];
     }
 }
 
@@ -122,7 +122,7 @@ final class UnmountedSource implements FileFinder
 
     public function files(string $theme): array
     {
-        return ['layouts.yml', 'template.pptx', 'theme.yml'];
+        return ['template.pptx', 'theme.yml'];
     }
 }
 
@@ -139,7 +139,6 @@ function unmountedTheme(string $prefix = 'mounted'): string
     mkdir($directory . '/house');
 
     file_put_contents($directory . '/house/theme.yml', (string) file_get_contents(masterTheme() . '/theme.yml'));
-    file_put_contents($directory . '/house/layouts.yml', (string) file_get_contents(masterTheme() . '/layouts.yml'));
 
     return $directory;
 }
@@ -165,7 +164,6 @@ it('draws a deck in the geometry of a master the source holds as bytes', functio
     // staged into one — and the deck is drawn in the same geometry all the same.
     $finder = new MemoryFinder([
         'house/theme.yml' => (string) file_get_contents(masterTheme() . '/theme.yml'),
-        'house/layouts.yml' => (string) file_get_contents(masterTheme() . '/layouts.yml'),
         'house/template.pptx' => (string) file_get_contents(masterTheme() . '/template.pptx'),
     ]);
 
@@ -188,7 +186,6 @@ it('leaves nothing behind when it stages a master', function () {
 
     $finder = new MemoryFinder([
         'house/theme.yml' => (string) file_get_contents(masterTheme() . '/theme.yml'),
-        'house/layouts.yml' => (string) file_get_contents(masterTheme() . '/layouts.yml'),
         'house/template.pptx' => (string) file_get_contents(masterTheme() . '/template.pptx'),
     ]);
 
@@ -209,7 +206,6 @@ it('leaves nothing behind when the render fails', function () {
 
     $finder = new MemoryFinder([
         'house/theme.yml' => (string) file_get_contents(masterTheme() . '/theme.yml'),
-        'house/layouts.yml' => (string) file_get_contents(masterTheme() . '/layouts.yml'),
         'house/template.pptx' => (string) file_get_contents(masterTheme() . '/template.pptx'),
     ]);
 
@@ -230,7 +226,6 @@ it('refuses a master the source cannot serve, by name', function () {
     // refused — and the deck is not drawn at all.
     $finder = new MasterlessSource([
         'house/theme.yml' => (string) file_get_contents(masterTheme() . '/theme.yml'),
-        'house/layouts.yml' => (string) file_get_contents(masterTheme() . '/layouts.yml'),
     ]);
 
     $path = Scratch::file('master-unserved.pptx', '');
@@ -285,7 +280,6 @@ it('draws a deck in a theme that carries no master, and says nothing', function 
     // this library puts it at, and nothing is said about a master that was never there.
     $finder = new MemoryFinder([
         'house/theme.yml' => (string) file_get_contents(masterTheme() . '/theme.yml'),
-        'house/layouts.yml' => (string) file_get_contents(masterTheme() . '/layouts.yml'),
     ]);
 
     $path = Scratch::file('no-master.pptx', '');
@@ -305,7 +299,6 @@ it('draws a deck in a theme the caller named, again', function () {
     // it is given back at the end of the render, and the render after that writes it again.
     $finder = new MemoryFinder([
         'house/theme.yml' => (string) file_get_contents(masterTheme() . '/theme.yml'),
-        'house/layouts.yml' => (string) file_get_contents(masterTheme() . '/layouts.yml'),
         'house/template.pptx' => (string) file_get_contents(masterTheme() . '/template.pptx'),
     ]);
 

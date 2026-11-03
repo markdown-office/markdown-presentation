@@ -39,7 +39,7 @@ function deckScope(string $directory, array $roots = []): PathScope
 
 /**
  * The part every test about the first slide's contents reads, the deck two of them
- * convert, and the layout a `layouts.yml` maps a content slide to.
+ * convert, and the layout a theme's `layouts:` section maps a content slide to.
  *
  * `TWO_SLIDES` is the smallest deck there is two slides of. Every test about where a split
  * falls needs one where falling it somewhere else is visible, and the two titles are the

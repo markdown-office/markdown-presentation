@@ -299,7 +299,8 @@ it('binds each picture layout to the layout part its theme names for it', functi
     [$pptx] = builtDeck(PICTURE_DECK);
 
     // A role is portable and the layout part is not: the deck wrote `image-text` and the
-    // file carries a part called `Picture Left`, which is what `layouts.yml` is for.
+    // file carries a part called `Picture Left`, which is what a theme's `layouts:` section
+    // is for.
     expect($pptx->layoutNames())->toContain('Picture Left', 'Picture with Caption', FULL_BLEED_LAYOUT);
 });
 

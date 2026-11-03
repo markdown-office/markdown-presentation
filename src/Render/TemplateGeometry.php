@@ -104,14 +104,15 @@ final class TemplateGeometry
      * A layout with nothing this library can draw in it contributes nothing: Office's own
      * *Blank* has no placeholders at all, and a role that maps to one keeps the geometry
      * {@see SlideGeometry} puts it at. That is the precedence — a template fills in the roles
-     * it covers and says nothing about the rest — and it is the rule `layouts.yml` already
+     * it covers and says nothing about the rest — and it is the rule a theme's `layouts:`
+     * section already
      * follows, where a theme that maps two roles is a theme that works rather
      * than one that fails on the three.
      *
      * Two layouts with the same name would collide; the last one in the archive wins, which
      * is what a reader of the file would see too. A layout that carries no name is filed
      * under the empty string, which no theme can ask for: `ThemeLoader` refuses an empty
-     * layout name in a `layouts.yml`.
+     * layout name in a theme's own file.
      *
      * @return array<string, array{title?: Box, body?: non-empty-list<Box>}>
      *

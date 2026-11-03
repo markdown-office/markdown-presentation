@@ -157,7 +157,8 @@ final class DeckTheme
      * A theme ships one or ships none, and this is where that decides anything: the roles a
      * template covers are drawn in the template's geometry and the rest keep
      * {@see SlideGeometry}'s, which is the precedence — a template fills in what it has and
-     * says nothing about what it does not, the same rule `layouts.yml` follows. Read before
+     * says nothing about what it does not, the same rule a theme's `layouts:` section
+     * follows. Read before
      * anything is built, so a template that cannot be read fails while there is still no file
      * on disk to clean up.
      *

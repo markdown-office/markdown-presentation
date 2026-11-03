@@ -26,7 +26,7 @@ final class UnknownTextStyle extends InvalidInput
             $slide,
             $name,
             $styles === []
-                ? 'The theme has no text styles; a theme names them in its "text-styles.yml".'
+                ? 'The theme has no text styles; a theme names them in its "textStyles:" section.'
                 : sprintf('The styles are: %s.', implode(', ', $styles)),
         ));
     }

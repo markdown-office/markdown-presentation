@@ -26,12 +26,6 @@ use MarkdownPresentation\Theme\ThemeLoader;
 const TEXT_STYLE_THEME = "name: Acme\ncolors:\n  accent1: \"#00B4D8\"\n";
 
 /**
- * The layouts the theme needs, because a theme that maps no `content` role cannot draw a
- * slide at all.
- */
-const TEXT_STYLE_LAYOUTS = "layouts:\n  content: Title and Content\n  blank: Blank\n";
-
-/**
  * The box the wordmark is drawn in, which has a colour of its own.
  *
  * The size and the position are the review's deck's own, because the claim is about the
@@ -41,20 +35,17 @@ const TEXT_STYLE_LAYOUTS = "layouts:\n  content: Title and Content\n  blank: Bla
 const WORDMARK_BOX = 'left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11';
 
 /**
- * A theme directory with the named styles beside it, or without the file at all.
+ * A theme directory whose own file carries the named styles, or carries none at all.
  */
 function textStyleTheme(?string $styles): string
 {
-    $files = [
-        'theme.yml' => TEXT_STYLE_THEME,
-        'layouts.yml' => TEXT_STYLE_LAYOUTS,
-    ];
+    $theme = TEXT_STYLE_THEME;
 
     if ($styles !== null) {
-        $files['text-styles.yml'] = $styles;
+        $theme .= "textStyles:\n" . preg_replace('/^/m', '  ', rtrim($styles, "\n")) . "\n";
     }
 
-    return ThemeDirectory::create($files, 'text-style');
+    return ThemeDirectory::create(['theme.yml' => $theme], 'text-style');
 }
 
 /**
@@ -311,7 +302,7 @@ it('names the way out of a label that holds Markdown, and it depends on the form
     [$raw, $rawDirectory] = wordmark("brand:\n  color: accent1\n", ':style[**Bakery**]{bold=true}');
 
     expect(fn () => styledDeck($named, $namedDirectory))
-        ->toThrow(MalformedTextStyle::class, 'give the style the weight in the theme\'s "text-styles.yml" ("brand: { bold: true }")')
+        ->toThrow(MalformedTextStyle::class, 'give the style the weight in the theme\'s "textStyles:" section ("brand: { bold: true }")')
         ->and(fn () => styledDeck($raw, $rawDirectory))
         ->toThrow(MalformedTextStyle::class, 'give the style the weight as an attribute ("bold=true")');
 });

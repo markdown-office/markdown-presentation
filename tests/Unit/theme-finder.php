@@ -48,26 +48,23 @@ it('reads a theme through the finder', function () {
     // and never had a directory to hand over. The theme comes back the same way it
     // would from a directory.
     $finder = new MemoryFinder([
-        'house/theme.yml' => "name: House\n",
-        'house/styles.yml' => "heading.1: ReportTitle\n",
-        'house/layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'house/theme.yml' => "name: House\nlayouts:\n  content: Title and Content\n",
     ]);
 
     $theme = (new ThemeLoader())->load('house', 'house', $finder);
 
     expect($theme->theme()->name())->toBe('House')
-        ->and($theme->styles())->toBe(['heading.1' => 'ReportTitle'])
         ->and($theme->layouts())->toBe(['content' => 'Title and Content'])
         // A finder with no path has no directory, and the theme's name stands in.
         ->and($theme->directory())->toBe('house');
 });
 
 it('asks the finder for the theme\'s files by name', function () {
-    // The names are the library's own: a theme's manifest is `<theme>/theme.yml` and
-    // the files beside it are `<theme>/styles.yml` and the rest.
+    // The names are the library's own: a theme's manifest is `<theme>/theme.yml`, the
+    // master beside it is `<theme>/template.pptx`, and the files of the old format are
+    // asked for as well — the loader has to find out whether a theme carries one.
     $finder = new MemoryFinder([
         'house/theme.yml' => "name: House\n",
-        'house/styles.yml' => "heading.1: ReportTitle\n",
     ]);
 
     (new ThemeLoader())->load('house', 'house', $finder);
@@ -88,13 +85,11 @@ it('asks the finder for the theme\'s files by name', function () {
 it('resolves a theme the source holds and no directory has', function () {
     $finder = new MemoryFinder([
         'house/theme.yml' => "name: House\n",
-        'house/styles.yml' => "heading.1: ReportTitle\n",
     ]);
 
     $theme = finderResolver($finder)->resolve('house');
 
-    expect($theme->theme()->name())->toBe('House')
-        ->and($theme->styles())->toBe(['heading.1' => 'ReportTitle']);
+    expect($theme->theme()->name())->toBe('House');
 });
 
 it('refuses a theme file that resolves outside the scope, in the library\'s words', function () {
@@ -216,7 +211,6 @@ it('resolves the theme the caller named once', function () {
     // not once for the name and once for the deck.
     $finder = new MemoryFinder([
         'house/theme.yml' => "name: House\n",
-        'house/layouts.yml' => "layouts:\n  content: Title and Content\n",
     ]);
 
     $renderer = (new PresentationRenderer(themes: finderResolver($finder)))->withTheme('house');

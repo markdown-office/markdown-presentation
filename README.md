@@ -604,15 +604,18 @@ drawn in the theme's `hlink`, and a link written in a text style is drawn in the
 colour instead: the style is the more particular of the two statements. It keeps its
 underline either way, so it still reads as a link.
 
-The named styles come from the theme's `text-styles.yml`, which is optional:
+The named styles come from the theme's own file, under a `textStyles:` section, which is
+optional:
 
 ```yaml
-# themes/resilience-bakery/text-styles.yml
-brand:
-  color: accent1
-  bold: true
-muted:
-  color: lt2
+# themes/resilience-bakery/theme.yml
+name: Resilience Bakery
+textStyles:
+  brand:
+    color: accent1
+    bold: true
+  muted:
+    color: lt2
 ```
 
 **A style's name is a word, and a word does not care about case.** A theme that spells a
@@ -621,8 +624,8 @@ package folds the names of the directives themselves. The refusal for a name the
 not have spells the styles it does have the way the theme wrote them, because that is the
 spelling the author has to change.
 
-Ten mistakes in a `text-styles.yml` are refused when the theme is read rather than
-reaching the slide:
+Ten mistakes in a theme's `textStyles:` section are refused when the theme is read rather
+than reaching the slide:
 
 | Refused | Why |
 | --- | --- |
@@ -637,8 +640,8 @@ reaching the slide:
 | a font that is not a name | a font is a family name |
 | a flag that is not `true` or `false` | `yes` is a YAML truthy string rather than the flag |
 
-Every one of them names what would have worked instead, so a mistake in a
-`text-styles.yml` is never rendered as silence.
+Every one of them names what would have worked instead, so a mistake in a theme's
+`textStyles:` section is never rendered as silence.
 
 A name the theme does not have is refused when the deck is read, and the message names the
 styles the theme does have:
@@ -659,13 +662,13 @@ try {
 ```
 
 ```text
-Slide 1 has the text style ":brand", which is not a style this theme has. The theme has no text styles; a theme names them in its "text-styles.yml".
+Slide 1 has the text style ":brand", which is not a style this theme has. The theme has no text styles; a theme names them in its "textStyles:" section.
 ```
 
 **The label is plain text.** The label of a directive is a string rather than Markdown, so
 `:brand[**Bakery**]` would be drawn as `**Bakery**` — a deck that renders and shows
 something the author did not write. It is refused instead, and the message says the two
-ways out: give the style the weight — in the theme's own `text-styles.yml` for a named
+ways out: give the style the weight — in the theme's own `textStyles:` section for a named
 style, as an attribute for the raw form — or write the emphasis in the paragraph around it. A
 bare `*` or `_` is a character and not an intent, so `2 * 3` and `snake_case` are drawn as
 they are. So is a construct CommonMark does not call emphasis: `__ Bakery__` and
@@ -913,7 +916,7 @@ shows a deck's titles and still shows no bullets.
 
 ### Templates
 
-A theme may ship a `template.pptx` beside its `layouts.yml`, and a deck written against it is
+A theme may ship a `template.pptx` beside its `theme.yml`, and a deck written against it is
 laid out in *that template's* geometry rather than in this library's. The template is read for
 the placeholder boxes its own layouts carry, and both the slides and the layout parts this
 renderer writes are placed at them:
@@ -921,7 +924,7 @@ renderer writes are placed at them:
 ```php
 use MarkdownPresentation\Render\TemplateGeometry;
 
-// The one theme in this repository that ships a template; see its layouts.yml.
+// The one theme in this repository that ships a template; see its theme.yml.
 $boxes = (new TemplateGeometry((string) getenv('MARKDOWN_PRESENTATION_ROOT') . '/tests/fixtures/themes/templated/template.pptx'))->boxes();
 
 printf(
@@ -949,8 +952,8 @@ Three rules decide what a template is allowed to change:
 
 - **A template fills in the roles it covers and says nothing about the rest.** A layout it
   does not have, and a layout it has with no placeholders in it — Office's own *Blank* — leave
-  that role where `SlideGeometry` puts it. This is the same rule `layouts.yml` follows, where a
-  theme mapping some of the roles is a theme that works.
+  that role where `SlideGeometry` puts it. This is the same rule a theme's `layouts:` section
+  follows, where a theme mapping some of the roles is a theme that works.
 - **A template places; it does not typeset.** Sizes and alignments stay with `SlideGeometry`,
   because a template states them in a *master*'s `p:txStyles` — a whole typographic system,
   not a layout — and adopting one would resize the type of every deck that shipped a template.
@@ -970,7 +973,7 @@ part really holds rather than what the archive says it is.
 #### Using your own deck as the template
 
 Any deck will do — it does not have to be a `.potx` or come from PowerPoint's gallery. Copy it
-into the theme directory as `template.pptx`, next to the `layouts.yml` that names which of its
+into the theme directory as `template.pptx`, next to the `theme.yml` that names which of its
 layouts each role gets. The deck this library was tested against is carried in the repository,
 authored and saved by PowerPoint itself, so this is a real file rather than a description of
 one:
@@ -1011,18 +1014,19 @@ The number of placeholders is also the number of columns a role has, whatever th
 called: map `content` onto *Two Content* and a `::column` on a content slide splits it, because
 that is how many boxes the layout has.
 
-So the theme directory is the template plus the two files that name it:
+So the theme directory is the template plus the one file that names it:
 
 ```
 themes/harbour/
-├── theme.yml          name: Harbour
-├── layouts.yml        which of your deck's layouts each role gets
+├── theme.yml          name: Harbour, and which of your deck's layouts each role gets
 └── template.pptx      your deck, copied in
 ```
 
 ```yaml
-# The layout names are your deck's, verbatim — check them in PowerPoint's slide master view.
-# A role left out keeps this library's own geometry rather than failing.
+# The `layouts:` section of the theme's own file. The layout names are your deck's,
+# verbatim — check them in PowerPoint's slide master view. A role the section does not
+# name is a role the theme does not map, and a deck that asks for one is told so; a
+# layout your template does not have leaves the role where this library puts it.
 layouts:
   title: Title Slide
   content: Title and Content
@@ -1609,7 +1613,7 @@ template: [brand, page-number]
 ```
 
 `layout:` and `template:` are independent. `layout:` chooses the geometry — the role the
-theme's `layouts.yml` maps onto a box on the page — and `template:` adds furniture on top of
+theme's `layouts:` section maps onto a box on the page — and `template:` adds furniture on top of
 it. `layout: blank` with `template: brand` is therefore a slide with no furniture of its own
 and the wordmark and the rule drawn where the template puts them.
 
@@ -2101,15 +2105,16 @@ slides. The colour map the master writes says which slot each of `bg1`, `tx1`, `
 independently of them — but it is the theme that decides, not the map: a shape's colour is
 resolved here and written out as hex, and the map is never consulted for it again.
 
-`styles.yml` is **not** read. Its slots are the Word half's vocabulary and the shipped themes
-write `.docx` style ids, which a `.pptx` has no use for; mapping them onto shapes would be
-inventing a vocabulary nobody wrote down. A slot that does not exist still fails when the
-theme is loaded, so a typo in a `styles.yml` is never rendered as silence.
+A `styles.yml` beside a theme is **refused**. Its slots are the Word half's vocabulary and
+the shipped themes wrote `.docx` style ids, which a `.pptx` has no use for; mapping them onto
+shapes would be inventing a vocabulary nobody wrote down. It is refused rather than ignored,
+because a file that is quietly not read is a theme that looks like the one its author wrote
+and is not — see [The files a theme used to be made of](#the-files-a-theme-used-to-be-made-of).
 
-`text-styles.yml` **is** read, and it is the one file of a theme that says something about
-the words inside a box rather than about the box — see [Inline styles](#inline-styles). A
-style that sets an attribute nobody reads still fails when the theme is loaded, so a typo in
-a `text-styles.yml` is never rendered as silence either.
+A theme's `textStyles:` section **is** read, and it is the one part of a theme that says
+something about the words inside a box rather than about the box — see
+[Inline styles](#inline-styles). A style that sets an attribute nobody reads still fails when
+the theme is loaded, so a typo in it is never rendered as silence either.
 
 ### Frontmatter
 
@@ -2437,14 +2442,36 @@ instead of the directory holding it. Nothing is compiled and nothing is a PHP cl
 
 ```
 themes/corporate-dark/
-├── theme.yml        required   colours, fonts, type scale, metadata
-├── styles.yml       optional   Word style-slot overrides
-├── layouts.yml      optional   semantic role → template layout name
-├── text-styles.yml  optional   named text styles: the words inside a box
+├── theme.yml        required   the look, the layout roles, the named text styles
 ├── template.pptx    optional   PowerPoint template: where the layouts put their boxes
 ├── README.md        optional   attribution
 └── LICENSE          optional
 ```
+
+The theme's own file carries two sections beside its values, and both are optional:
+
+| Section | What it holds |
+| --- | --- |
+| `layouts:` | which layout of the theme's master each of the eight roles gets |
+| `textStyles:` | the named text styles: the words inside a box |
+
+A theme with no `layouts:` section is drawn with the library's own mapping — the eight
+Office names that every theme shipping with this library carried in a file of its own:
+
+| Role | Layout |
+| --- | --- |
+| `title` | Title Slide |
+| `content` | Title and Content |
+| `two-column` | Two Content |
+| `section` | Section Header |
+| `blank` | Blank |
+| `image-text` | Picture Left |
+| `image-title` | Picture with Caption |
+| `image-slide` | Full Bleed Picture |
+
+A theme **with** a `layouts:` section has the whole mapping: a role the section does not
+name is a role the theme does not map, and a deck that asks for one is told which roles the
+theme does map.
 
 A theme holds the values a deck is drawn with, and a deck's own settings are laid over
 them: a slide's own values, the values of the template it draws, and the deck's — in that
@@ -2502,13 +2529,7 @@ style:
   leading: 1.32
   heading-weight: bold
   heading-ink: accent
-```
 
-**One of them brings the named styles.** `corporate-dark` carries a `text-styles.yml` with a
-`brand` and a `muted`, so a deck can write `:brand[Bakery]` against a theme that ships with
-the library rather than against one of its own:
-
-```yaml path=themes/corporate-dark/text-styles.yml
 # Named text styles: the words inside a box, written in a deck as `:brand[Bakery]`.
 # The properties are the same eight the inline style attributes have, and a size is in
 # points as it is everywhere else.
@@ -2516,13 +2537,18 @@ the library rather than against one of its own:
 # The brand is the theme's own accent, which is what the headings are painted in, and the
 # muted style is the quiet ink a caption is written in — a step down from the body, which
 # is what a caption is on a slide rather than in a document.
-brand:
-  color: accent1
-  bold: true
-muted:
-  color: lt2
-  size: 14
+textStyles:
+  brand:
+    color: accent1
+    bold: true
+  muted:
+    color: lt2
+    size: 14
 ```
+
+**One of them brings the named styles.** `corporate-dark` carries a `textStyles:` section
+with a `brand` and a `muted`, so a deck can write `:brand[Bakery]` against a theme that
+ships with the library rather than against one of its own.
 
 The colours are DrawingML's twelve. The longer spellings an earlier draft of the
 concept used — `dark1`, `light1`, `dark2`, `light2`, `hyperlink`,
@@ -2683,10 +2709,10 @@ Minimal
 <root>/themes/minimal
 ```
 
-Only a `theme.yml` is a manifest, so a `styles.yml` named as the theme is one of a theme's
-own files rather than the theme itself. The name the deck wrote is what decides that, not
-the name the file carries once it has been resolved — so a `theme.yml` that is a link to a
-file of another name is still the manifest, and the roots below still hold the file it
+Only a `theme.yml` is a manifest, so a file of another name named as the theme is a file
+beside a theme rather than the theme itself. The name the deck wrote is what decides that,
+not the name the file carries once it has been resolved — so a `theme.yml` that is a link to
+a file of another name is still the manifest, and the roots below still hold the file it
 reaches.
 
 **A theme path has to land inside the deck's own directory, the working directory, the
@@ -2704,10 +2730,10 @@ The theme "../secrets" is at "/srv/decks/../secrets" rather than one this render
 
 **The files inside a theme are held to the same roots.** A directory that is inside them
 may hold a `theme.yml` that is a link out of them, and the file the link reaches is read
-as readily as one beside it — the `theme.yml`, the `styles.yml`, the `layouts.yml` and the
-`template.pptx` are each resolved and held before they are used, and the refusal names the
-file it found and the roots it may read. A link that resolves *inside* the roots is a file
-like any other, so a theme laid out with links still reads.
+as readily as one beside it — the `theme.yml` and the `template.pptx` are each resolved and
+held before they are used, and the refusal names the file it found and the roots it may
+read. A link that resolves *inside* the roots is a file like any other, so a theme laid out
+with links still reads.
 
 A shared library of themes beside the project is a real case and is reachable, as a
 constructor argument — `new ThemeResolver($root, roots: ['/srv/themes'])` — because that is
@@ -2833,54 +2859,45 @@ size, it follows a theme's type scale rather than standing still while the type 
 and a heading's air above it follows whatever that theme's `headings` scale says. The two
 `11-type-scale` decks exist to be looked at side by side for exactly that reason.
 
-### Style slots
+### The files a theme used to be made of
 
-`styles.yml` overrides Word style slots. A slot that does not exist is a typo, and a
-typo here would otherwise be ignored at render time and produce a document with none
-of the styling the theme asked for:
+A theme was a directory of up to five files, and three of them have become sections of the
+one file that is left. They are **refused** when they are beside a theme, each with a message
+naming where its content goes:
 
 ```php
-use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Exception\RetiredThemeFile;
 use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Theme\ThemeLoader;
 
 $root = (string) getenv('MARKDOWN_PRESENTATION_ROOT');
+$finder = new DiskFinder(theme: [$root . '/tests/fixtures/themes']);
 
-try {
-    (new ThemeLoader())->load(
-        'broken',
-        'broken',
-        new DiskFinder(theme: [$root . '/tests/fixtures/themes']),
-    );
-} catch (UnknownStyleSlot $failure) {
-    echo $failure->getMessage(), "\n";
+foreach (['with-layouts', 'with-text-styles', 'with-styles'] as $theme) {
+    try {
+        (new ThemeLoader())->load($theme, $theme, $finder);
+    } catch (RetiredThemeFile $failure) {
+        echo $failure->getMessage(), "\n\n";
+    }
 }
 ```
 
 ```text
-In "<root>/tests/fixtures/themes/broken/styles.yml": "blockquote" is not a style slot. The slots are: heading.1, heading.2, heading.3, heading.4, heading.5, heading.6, paragraph, blockQuote, codeBlock, thematicBreak, htmlFallback, listParagraph, codeFont, linkFont, bulletList, orderedList, table, tableHeaderRow, tableCell.
+The theme "with-layouts" has a "layouts.yml" beside it. A theme is one file: move its content into the "layouts:" section of its "theme.yml".
+
+The theme "with-text-styles" has a "text-styles.yml" beside it. A theme is one file: move its content into the "textStyles:" section of its "theme.yml".
+
+The theme "with-styles" has a "styles.yml" beside it. That file is the Word half's, and this half does not read it: its slots name Word styles, which a deck of slides has no use for. Delete it, and the theme is read again.
 ```
 
-A value is either a styleId from a `.docx` template — `Heading1`, not `Heading 1` —
-or an inline style array:
+**A file that is quietly not read is a theme that looks like the one its author wrote and
+is not.** The author renames a layout in the file beside the theme, the deck is drawn with
+the old mapping, and nothing in the output says so — which is why the files are refused
+rather than ignored.
 
-```yaml path=themes/corporate-dark/styles.yml
-# Word style slots, by the names in a .docx template's styles. A value is either a
-# styleId — "Heading1", not "Heading 1" — or an inline style array.
-heading.1: Heading1
-heading.2: Heading2
-paragraph: BodyText
-blockQuote: PullQuote
-codeFont:
-  name: JetBrains Mono
-  size: 9
-linkFont:
-  color: 89B4FA
-  underline: single
-```
-
-References to theme tokens — `{accent1}`, `{fonts.mono}` — are **not** resolved yet,
-so a `styles.yml` written with them carries the braces through untouched.
+The third of them is the Word half's, and this half loaded it for years without ever using
+it. Its slots name Word styles, and a deck of slides has no use for them, so the file
+belongs to a theme of the other half — a theme directory serves one half.
 
 ### Where a deck's files come from
 

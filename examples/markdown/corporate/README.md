@@ -9,9 +9,7 @@ decks have, and every part of it is a file you edit.
 
 | | |
 | --- | --- |
-| `theme.yml` | the design — the twelve colour slots, the faces, the type scale and the rhythm |
-| `layouts.yml` | which layout each of the eight roles gets |
-| `text-styles.yml` | the named text styles a deck writes words in |
+| `theme.yml` | the design — the twelve colour slots, the faces, the type scale, the rhythm and the named text styles a deck writes words in |
 | `templates.md` | the furniture of a deck: the wordmark, the rule, the footer |
 | `logo.png`, `logo-light.png` | the mark, for a light page and for a dark one |
 | `make-logo.php` | draws the two marks from the theme's colours |
@@ -20,7 +18,7 @@ The deck that uses all of it is `../17-corporate-template.md`.
 
 ## Changing it to your company
 
-Three things, and each is one file.
+Four things, and each of them is a file or a section of one.
 
 **The name.** `templates.md` holds the wordmark, and the name is in it twice — once in the
 light template and once in the dark one. The dark one is the same named style with the
@@ -30,12 +28,19 @@ colour laid over it:
 :wordmark[Halden Instruments]{color=lt1}
 ```
 
-So the name is two edits, and the style behind it is one: `text-styles.yml`.
+So the name is two edits, and the style behind it is one: the `textStyles:` section of
+`theme.yml`.
 
 **The mark.** Drop your own `logo.png` and `logo-light.png` in beside the theme — same
 names, same 512 × 512 — and nothing else changes. To draw the mark that is here instead,
 `php make-logo.php` reads the theme's colours and writes both files, so the logo and the
 theme cannot drift apart.
+
+**The layouts.** A theme that ships no `template.pptx` has no layouts of its own, so the
+library's own mapping stands and the names are labels: the boxes behind them are the ones
+the theme computes from its own margins and type scale. A company that has a PowerPoint
+template of its own drops the file in beside the theme and writes the `layouts:` section of
+`theme.yml`, and the names become real.
 
 **The colours.** `theme.yml`, and nothing else. The names are the format's: `lt1` is the
 page, `dk1` the ink, `lt2` the quiet ink a caption is written in, `dk2` the panel a dark
