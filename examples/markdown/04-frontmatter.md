@@ -65,9 +65,9 @@ This slide names two templates. `wordmark` is the one this deck defines below,
 and `page` is the one `templates/templates.md` — the file this deck's frontmatter
 names — holds.
 
-A template's frontmatter names the template and nothing else, which is what tells a
-definition from a slide that draws one, and a definition is not a slide of the deck: it is not
-drawn, it has no number, and it does not count towards the number of slides.
+A template's frontmatter names the template and nothing but its own settings, which is what
+tells a definition from a slide that draws one, and a definition is not a slide of the deck: it
+is not drawn, it has no number, and it does not count towards the number of slides.
 
 A definition may carry settings of its own, and they are the template's: they are named as
 the template's, under `template-settings:`, so that the ordinary keys mean the slide's own

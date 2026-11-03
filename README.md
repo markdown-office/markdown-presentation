@@ -1564,9 +1564,9 @@ template: brand
 ---
 ```
 
-A template's frontmatter names the template and nothing else, and that is what tells a
-definition from a slide that draws one: a definition has no `layout:`, because it is not
-drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
+A template's frontmatter names the template and nothing but its own settings, and that is
+what tells a definition from a slide that draws one: a definition has no `layout:`, because
+it is not drawn in one. A definition is **not a slide of the deck**. It is not drawn, it has no number,
 and it does not count towards the number of slides — which is what makes one definition and
 many slides add up to one slide each.
 

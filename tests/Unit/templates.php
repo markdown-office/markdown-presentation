@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use MarkdownPresentation\Document\Deck;
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Document\Slide;
 use MarkdownPresentation\Exception\Exception as MarkdownException;
 use MarkdownPresentation\Exception\MalformedFrontmatter;
 use MarkdownPresentation\Exception\UnknownFont;
+use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Files\FileFinder;
@@ -111,19 +113,35 @@ it('refuses the settings of a template on a slide that is not one', function () 
     // settings of a template on such a slide are a mistake rather than a setting.
     expect(fn () => (new DeckParser())->parse(
         "---\ntemplate: brand\nlayout: blank\ntemplate-settings:\n  background: accent1\n---\n\n::line{}\n",
-    ))->toThrow(MalformedFrontmatter::class, 'which are the settings of a template, and the slide is not one');
+    ))->toThrow(MalformedFrontmatter::class, 'a definition names a template and nothing but its own settings');
 });
 
 it('refuses the settings of a template where there is no template', function () {
     expect(fn () => (new DeckParser())->parse(
         "---\ntemplate-settings:\n  background: accent1\n---\n\n# One\n",
-    ))->toThrow(MalformedFrontmatter::class, 'which are the settings of a template, and the slide is not one');
+    ))->toThrow(MalformedFrontmatter::class, 'and names no template: write "template: name" beside them');
+});
+
+it('refuses the settings of a template that are not there', function () {
+    // A block that says nothing under the key is a block that says nothing, and the
+    // refusal says so rather than reading it as a template with no settings.
+    expect(fn () => (new DeckParser())->parse(
+        "---\ntemplate: brand\ntemplate-settings:\n---\n\n::line{}\n",
+    ))->toThrow(MalformedFrontmatter::class, 'has a "template-settings" that is not a mapping');
 });
 
 it('refuses a setting of a template that is not a setting', function () {
     expect(fn () => (new DeckParser())->parse(
         "---\ntemplate: brand\ntemplate-settings:\n  backgroun: accent1\n---\n\n::line{}\n",
     ))->toThrow(MalformedFrontmatter::class, 'which is not a setting');
+});
+
+it('names no slide for a failure in the settings of a definition', function () {
+    // A definition is not a slide of the deck and has no number, so naming one would name a
+    // slide that has nothing to do with it.
+    expect(fn () => (new DeckParser())->parse(
+        "---\ntemplate: brand\ntemplate-settings:\n  theme-variables: accent1\n---\n\n::line{}\n",
+    ))->toThrow(MalformedFrontmatter::class, 'The frontmatter of a template definition has a "theme-variables"');
 });
 
 it('refuses the settings of a template that are not a mapping', function () {
@@ -138,6 +156,16 @@ it('refuses a template that is defined twice', function () {
     expect(fn () => (new DeckParser())->parse(
         "---\ntemplate: brand\n---\n\n::line{}\n\n---\ntemplate: brand\n---\n\n::line{}\n",
     ))->toThrow(MalformedFrontmatter::class, 'The template "brand" is defined twice');
+});
+
+it('refuses the settings of a template on a slide built by hand', function () {
+    // The parser refuses this before a deck is ever rendered; this is the line behind it,
+    // for a deck a caller built without the parser.
+    $deck = new Deck('', [new Slide(0, '# One', '# One', ['template-settings' => ['background' => 'accent1']], 'One', 1, null, 0, 1)]);
+    $path = Scratch::file('deck.pptx', '');
+
+    expect(fn () => (new PresentationRenderer())->render($deck, $path))
+        ->toThrow(UnknownDirective::class, 'which belongs to the definition of a template');
 });
 
 it('refuses a template definition whose name is not a name', function () {

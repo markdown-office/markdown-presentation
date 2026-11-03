@@ -46,6 +46,23 @@ final class UnknownDirective extends InvalidInput
      * slide 1 as well, because two slides that both name a theme is a deck that renders
      * one of them and says nothing about the other.
     */
+    /**
+     * A key that belongs to a template's definition, on a slide of the deck.
+     *
+     * The settings of a template are the definition's, and a definition is not a slide of
+     * the deck: so a slide that carries them is a mistake, and is refused rather than left
+     * to be read as nothing at all.
+     */
+    public static function notOnASlide(int $slide, string $key): self
+    {
+        return new self(sprintf(
+            'The frontmatter of slide %d names "%s", which belongs to the definition of a template '
+            . 'and not to a slide of the deck.',
+            $slide,
+            $key,
+        ));
+    }
+
     public static function misplaced(int $slide, string $key): self
     {
         return new self(sprintf(

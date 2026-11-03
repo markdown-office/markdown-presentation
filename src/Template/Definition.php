@@ -18,8 +18,8 @@ final class Definition
     /**
      * @param string               $name     The name a slide names this template by.
      * @param string               $body     The Markdown the template draws.
-     * @param Shape $settings The settings the template names for itself: the background it is
-     *                         drawn on and the theme's values for the slides that draw it.
+     * @param Shape $settings The settings the template names for itself: the background and
+     *                         the theme's values of the slides that draw it.
      */
     public function __construct(
         private readonly string $name,

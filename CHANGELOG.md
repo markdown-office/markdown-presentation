@@ -171,8 +171,9 @@ All notable changes to this project are documented here. The format follows
   slide that draws a template and names a `background:` of its own is a slide, and is drawn
   with it. It was read as a definition of the template before, and was not drawn at all —
   and the two cases were the same text, so nothing could tell them apart. A definition is
-  now a slide that names a template and nothing else, as it always was, and a template
-  defined twice is refused rather than left to win quietly.
+  now a slide that names a template and nothing but its own settings, as it was before the
+  settings arrived, and a template defined twice is refused rather than left to win
+  quietly.
 
 ### Fixed
 

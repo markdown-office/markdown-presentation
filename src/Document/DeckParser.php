@@ -247,7 +247,11 @@ final class DeckParser
             // ordinary keys. So a slide that is not a definition and carries them anyway is
             // a mistake, and is refused rather than left to be read as nothing at all.
             if (array_key_exists('template-settings', $slide->frontmatter())) {
-                throw MalformedFrontmatter::templateSettingsOnASlide($slide->index() + 1);
+                if (array_key_exists('template', $slide->frontmatter())) {
+                    throw MalformedFrontmatter::templateSettingsOnASlide($slide->index() + 1);
+                }
+
+                throw MalformedFrontmatter::templateSettingsWithoutATemplate($slide->index() + 1);
             }
 
             $slides[] = $slide;
@@ -271,10 +275,10 @@ final class DeckParser
      * The template a slide defines, or null where the slide draws one rather than
      * defines it.
      *
-     * A slide whose frontmatter names a template and nothing else defines it; a slide that
-     * names a template along with anything else draws it. The name is what tells the two
-     * apart, because a definition is not a slide of the deck and has no layout to be drawn
-     * in.
+     * A slide whose frontmatter names a template and nothing but its own settings defines
+     * it; a slide that names a template along with anything else draws it. The name is what
+     * tells the two apart, because a definition is not a slide of the deck and has no layout
+     * to be drawn in.
      *
      * A definition's own settings are named as the template's, under `template-settings:`,
      * so that the ordinary keys mean the slide's own everywhere: a slide that draws a
@@ -306,8 +310,9 @@ final class DeckParser
             trim($name),
             $slide->content(),
             Settings::readTemplate(
-                $slide->index() + 1,
-                $frontmatter['template-settings'] ?? [],
+                array_key_exists('template-settings', $frontmatter)
+                    ? $frontmatter['template-settings']
+                    : [],
             ),
         );
     }

@@ -53,12 +53,15 @@ final class Settings
      * theme resolves, and the theme that resolves it is the one the slide is drawn in.
      *
      * @param array<string, mixed> $frontmatter
+     * @param int|null             $slide    The slide the frontmatter is of, or null where it
+     *                                       is a template definition's — a definition is not a
+     *                                       slide of the deck and has no number.
      *
      * @return Shape
      *
      * @throws MalformedFrontmatter
      */
-    public static function read(array $frontmatter, int $slide): array
+    public static function read(array $frontmatter, ?int $slide): array
     {
         $settings = [];
 
@@ -102,11 +105,11 @@ final class Settings
      *
      * @throws MalformedFrontmatter
      */
-    public static function readTemplate(int $slide, mixed $written): array
+    public static function readTemplate(mixed $written): array
     {
         if (!is_array($written) || ($written !== [] && array_is_list($written))) {
             throw MalformedFrontmatter::wrongType(
-                $slide,
+                null,
                 'template-settings',
                 'a mapping of the settings a template carries',
             );
@@ -115,7 +118,6 @@ final class Settings
         foreach (array_keys($written) as $key) {
             if (!in_array((string) $key, self::KEYS, true)) {
                 throw MalformedFrontmatter::unknownSetting(
-                    $slide,
                     'template-settings',
                     (string) $key,
                     self::KEYS,
@@ -123,7 +125,7 @@ final class Settings
             }
         }
 
-        return self::read($written, $slide);
+        return self::read($written, null);
     }
 
     /**

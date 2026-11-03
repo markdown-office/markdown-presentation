@@ -734,6 +734,13 @@ final class PresentationRenderer
             if ($slide->index() !== 0 && in_array($key, self::DECK_DIRECTIVES, true)) {
                 throw UnknownDirective::misplaced($slide->index() + 1, $key);
             }
+
+            // The settings of a template belong to its definition, and a definition is not a
+            // slide of the deck. The parser refuses this before a deck is ever rendered; this
+            // is the line behind it, for a deck built by hand.
+            if ($key === 'template-settings') {
+                throw UnknownDirective::notOnASlide($slide->index() + 1, $key);
+            }
         }
     }
 

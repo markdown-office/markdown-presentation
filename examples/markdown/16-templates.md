@@ -44,7 +44,7 @@ template: [wordmark, page]
 
 This slide names two templates, and both of them are defined in this file.
 The two blocks between the cover and this slide are the definitions.
-A block whose frontmatter names a template and nothing else is a definition.
+A block whose frontmatter names a template and nothing but its own settings is a definition.
 A block that names a template and something else is a slide that draws it, which is why
 this one carries a `layout:` and a `name:` as well.
 A definition's own settings are named as the template's, under `template-settings:`, so that

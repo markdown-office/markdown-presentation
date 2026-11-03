@@ -406,10 +406,10 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the attributes of a directive may be separated by commas' => 'separated by commas',
     // A template's frontmatter named the template and nothing else, and a slide that names
     // a template and its own settings and nothing else defined it. That held for one
-    // release candidate and was wrong for the next, and it is the rule's own wording again
-    // now: a definition's own settings are named as the template's, under `template-settings:`,
-    // so the ordinary keys mean the slide's own and a template is still named and nothing
-    // else. The phrase is the rule, so it is not banned.
+    // release candidate and was wrong for the next, and it is wrong again now: a definition
+    // names the template and nothing *but its own settings*, so the phrase below is not the
+    // rule's wording and no page may say it.
+    'a template definition names the template and nothing else' => 'names the template and nothing else',
     // A slide wanting a colour of its own carried the colour as a shape, because the
     // background of a slide was the master's. A slide may name its own background now, so
     // the phrase below is the old rule's own wording, and no comment or page may say it.
