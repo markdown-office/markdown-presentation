@@ -82,6 +82,15 @@ it('reads a slide that names a template with another directive as a slide', func
     expect($deck->slides()[0]->frontmatter())->toBe(['layout' => 'blank', 'template' => 'brand']);
 });
 
+it('refuses a template that is defined twice', function () {
+    // A slide that draws a template and names its own settings, with no layout, is read as a
+    // definition of that template -- so a deck with such a slide and the template itself has
+    // two definitions of the same name, and the second one would be the one drawn.
+    expect(fn () => (new DeckParser())->parse(
+        "---\ntemplate: brand\n---\n\n::line{}\n\n---\ntemplate: brand\nbackground: accent1\n---\n\n::line{}\n",
+    ))->toThrow(MalformedFrontmatter::class, 'The template "brand" is defined twice');
+});
+
 it('refuses a template definition whose name is not a name', function () {
     expect(fn () => (new DeckParser())->parse("---\ntemplate: [a, b]\n---\n"))
         ->toThrow(MalformedFrontmatter::class, 'A template definition names the template it defines');

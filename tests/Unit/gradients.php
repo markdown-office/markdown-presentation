@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\MalformedGradient;
+use MarkdownPresentation\Exception\MalformedShape;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
@@ -41,10 +42,67 @@ it('writes a shape\'s gradient with every stop of it', function () {
 });
 
 it('spreads a stop that names no position among the ones that do', function () {
+    // The stop in the middle names no position, so it is spread over the gap between the
+    // one that does and the one before it.
+    $pptx = gradientDeck("::rectangle{gradient=\"accent1,lt1,dk1@50\"}\n");
+
+    expect(gradientStops($pptx->part('ppt/slides/slide1.xml')))
+        ->toBe([['0', '4472C4'], ['25000', 'FFFFFF'], ['50000', '000000']]);
+});
+
+it('spreads the stops that name no position over the whole gradient', function () {
     $pptx = gradientDeck("::rectangle{gradient=\"accent1,lt1,lt2\"}\n");
 
     expect(gradientStops($pptx->part('ppt/slides/slide1.xml')))
         ->toBe([['0', '4472C4'], ['50000', 'FFFFFF'], ['100000', 'E7E6E6']]);
+});
+
+it('refuses a flag that is neither true nor false', function () {
+    expect(fn () => gradientDeck("::rectangle{gradient=\"accent1,lt2\" gradient-radial=maybe}\n"))
+        ->toThrow(MalformedShape::class, 'A flag is true or false');
+});
+
+it('refuses stops that do not move forward', function () {
+    expect(fn () => gradientDeck("::rectangle{gradient=\"accent1@80,lt2@10\"}\n"))
+        ->toThrow(MalformedGradient::class, 'The stops of a gradient move forward');
+});
+
+it('refuses two stops at the same place', function () {
+    expect(fn () => gradientDeck("::rectangle{gradient=\"accent1@50,lt2@50\"}\n"))
+        ->toThrow(MalformedGradient::class, 'The stops of a gradient move forward');
+});
+
+it('refuses a flag written as a word', function () {
+    // The word is the flag's value, and it is read as one.
+    expect(fn () => gradientDeck("::rectangle{gradient=\"accent1,lt2\" gradient-radial=perhaps}\n"))
+        ->toThrow(MalformedShape::class, 'A flag is true or false');
+});
+
+it('takes a flag written as false', function () {
+    $pptx = gradientDeck("::rectangle{gradient=\"accent1,lt2\" gradient-radial=false}\n");
+    $xml = $pptx->part('ppt/slides/slide1.xml');
+
+    expect($xml)->toContain('<a:lin')
+        ->and($xml)->not->toContain('<a:path');
+});
+
+it('refuses a gradient of more stops than it will hold', function () {
+    $stops = implode(',', array_fill(0, 101, 'accent1'));
+
+    expect(fn () => gradientDeck("::rectangle{gradient=\"{$stops}\"}\n"))
+        ->toThrow(MalformedGradient::class, 'A gradient is at most 100 stops');
+});
+
+it('refuses a gradient longer than it will hold', function () {
+    $stops = implode(',', array_fill(0, 2000, 'accent1'));
+
+    expect(fn () => gradientDeck("::rectangle{gradient=\"{$stops}\"}\n"))
+        ->toThrow(MalformedGradient::class, 'A gradient is at most 8192 characters long');
+});
+
+it('refuses a background with an angle', function () {
+    expect(fn () => gradientDeck("---\nbackground: accent1\nbackground-angle: 45\n---\n\n# One\n"))
+        ->toThrow(MalformedGradient::class, 'a background and a background-angle');
 });
 
 it('writes the angle the deck named', function () {

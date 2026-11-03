@@ -25,6 +25,24 @@ final class Gradient
     /** The angle a gradient runs at when the deck names none: top to bottom. */
     public const DEFAULT_ANGLE = 180;
 
+    /**
+     * The most stops a gradient may have.
+     *
+     * A gradient of a hundred stops is already more than a picture can show, and the stops
+     * are read into objects before they are written, so the number of them is a bound on
+     * what a deck can ask for.
+     */
+    public const MAX_STOPS = 100;
+
+    /**
+     * The most characters the stops of a gradient may take.
+     *
+     * The stops are read apart before they are counted, and a list of a million commas
+     * would be read into a million pieces before anything could refuse it — so the length is
+     * the bound, and the count is the second one.
+     */
+    private const MAX_LENGTH = 8192;
+
     /** How far the format's angle is out of step with CSS's. */
     private const OFFSET = 90;
 
@@ -114,6 +132,14 @@ final class Gradient
      */
     private static function stops(string $where, string $written, Theme $theme): array
     {
+        if (strlen($written) > self::MAX_LENGTH) {
+            throw MalformedGradient::written(
+                $where,
+                $written,
+                sprintf('A gradient is at most %d characters long.', self::MAX_LENGTH),
+            );
+        }
+
         $parts = explode(',', $written);
 
         if (count($parts) < 2) {
@@ -124,8 +150,16 @@ final class Gradient
             );
         }
 
-        $stops = [];
-        $spread = count($parts) - 1;
+        if (count($parts) > self::MAX_STOPS) {
+            throw MalformedGradient::written(
+                $where,
+                $written,
+                sprintf('A gradient is at most %d stops.', self::MAX_STOPS),
+            );
+        }
+
+        $colours = [];
+        $named = [];
 
         foreach ($parts as $index => $part) {
             $part = trim($part);
@@ -140,13 +174,106 @@ final class Gradient
 
             [$colour, $position] = self::stop($where, $written, $part, $theme);
 
-            $stops[] = new GradientStop(
-                $position ?? (int) round($index / $spread * GradientStop::POSITION_END),
-                $colour,
-            );
+            $colours[] = $colour;
+            $named[] = $position;
+        }
+
+        $positions = self::spread($where, $written, $named);
+
+        $stops = [];
+
+        foreach ($colours as $index => $colour) {
+            $stops[] = new GradientStop($positions[$index], $colour);
         }
 
         return $stops;
+    }
+
+    /**
+     * Where each stop of the gradient sits.
+     *
+     * A stop that names a position is at it, and a stop that names none is spread evenly
+     * among the ones that do — which is what a gradient in CSS does, and what a reader of
+     * the deck expects. The ends are the boundaries: a stop before the first that names a
+     * position is spread from the start of the gradient, and a stop after the last is spread
+     * to its end.
+     *
+     * The positions are then checked, because a gradient whose stops do not move forward is
+     * a gradient the reader cannot draw.
+     *
+     * @param list<int|null> $named The position each stop named, or null where it named none.
+     *
+     * @return list<int>
+     *
+     * @throws MalformedGradient
+     */
+    private static function spread(string $where, string $written, array $named): array
+    {
+        $count = count($named);
+        $fixed = [];
+
+        // The first stop of a gradient is at its start and the last at its end, whatever
+        // they name — which is what a gradient in CSS does with the ones it leaves out.
+        if ($named[0] === null) {
+            $fixed[0] = GradientStop::POSITION_START;
+        }
+
+        if ($named[$count - 1] === null) {
+            $fixed[$count - 1] = GradientStop::POSITION_END;
+        }
+
+        foreach ($named as $index => $position) {
+            if ($position !== null) {
+                $fixed[$index] = $position;
+            }
+        }
+
+        ksort($fixed);
+
+        $positions = $fixed;
+        $anchors = array_keys($fixed);
+
+        foreach ($anchors as $number => $anchor) {
+            $next = $anchors[$number + 1] ?? null;
+
+            if ($next === null) {
+                break;
+            }
+
+            // The stops between two fixed ones are spread over the gap between them, at
+            // equal intervals: the gap is divided by the number of intervals, which is one
+            // more than the number of stops in it.
+            $between = $next - $anchor - 1;
+
+            if ($between < 1) {
+                continue;
+            }
+
+            $gap = $fixed[$next] - $fixed[$anchor];
+
+            for ($i = 1; $i <= $between; $i++) {
+                $positions[$anchor + $i] = (int) round($fixed[$anchor] + $gap * $i / ($between + 1));
+            }
+        }
+
+        ksort($positions);
+
+        $previous = -1;
+
+        foreach ($positions as $position) {
+            if ($position <= $previous) {
+                throw MalformedGradient::written(
+                    $where,
+                    $written,
+                    'The stops of a gradient move forward: a stop at '
+                    . $previous . '% and one at ' . $position . '% are the same place.',
+                );
+            }
+
+            $previous = $position;
+        }
+
+        return array_values($positions);
     }
 
     /**
@@ -186,7 +313,9 @@ final class Gradient
     }
 
     /**
-     * The position of a stop, as the percentage the deck wrote it as.
+     * The position of a stop, in the scale the format counts them in.
+     *
+     * The deck writes it as a percentage, and the format counts from 0 to 100000.
      *
      * @throws MalformedGradient
      */

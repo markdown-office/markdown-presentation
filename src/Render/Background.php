@@ -74,6 +74,18 @@ final class Background
         }
 
         if (array_key_exists('background', $background)) {
+            // An angle and a radial flag belong to a gradient, and a colour has neither: the
+            // two are one setting, and one of them with the other is a mistake.
+            foreach (['background-angle', 'background-radial'] as $key) {
+                if (array_key_exists($key, $background)) {
+                    throw MalformedGradient::refused(
+                        $where,
+                        'a background and a ' . $key . ', and a background of a colour has '
+                        . 'neither an angle nor a radial flag.',
+                    );
+                }
+            }
+
             return self::colour(self::readColour($slide, $background['background'], $theme));
         }
 

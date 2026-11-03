@@ -404,6 +404,11 @@ it('does not claim again what the code does not do', function (string $claim) {
     // is a list written with the wrong separator rather than a value of its own. The failure
     // says so now; the phrase below is the old reading, and no comment or page may say it.
     'the attributes of a directive may be separated by commas' => 'separated by commas',
+    // A template's frontmatter named the template and nothing else, and a slide that names
+    // a template and its own settings and nothing else defines it. The template's own
+    // settings are a setting of its own now, so the phrase below is the old rule's own
+    // wording, and no comment or page may say it.
+    'a template definition names the template and nothing else' => 'names the template and nothing else',
     // A slide wanting a colour of its own carried the colour as a shape, because the
     // background of a slide was the master's. A slide may name its own background now, so
     // the phrase below is the old rule's own wording, and no comment or page may say it.

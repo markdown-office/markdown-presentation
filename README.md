@@ -66,6 +66,7 @@ The patch adds these to PHPPresentation:
 | `Gd::setContents` | the reader | the bytes a picture was read from, as the package holds them |
 | `Fill::getGradientStops` | the writer | the stops a gradient is painted with, so that a gradient may have a colour in the middle of it |
 | `GradientStop::getPosition` | the writer | where one stop of a gradient sits, so that the stops need not be spread evenly |
+| `BackgroundGradient::getFill` | the writer and the reader | the gradient a background is painted with, which is the same fill a shape is painted with |
 
 The writer is the direction that writes a `.pptx`; the reader is the direction that takes one
 apart, and it reads a deck through the patched `PowerPoint2007` reader. The check asks for
@@ -2163,6 +2164,11 @@ says which is which.
 not judge, and a dark slide with dark text is a slide the author wrote. `theme-variables:`
 is the way to change the text's colour with it.
 
+**A template's chrome is drawn in the theme's colours, not the slide's.** The chrome of a
+template is read once, before the slides are drawn, and every slide that draws that template
+draws the same shapes — so a slide that overrides a colour gets the deck's colour in the
+template's wordmark and its rule. The shapes the slide places itself are the slide's.
+
 ### In the body of a slide
 
 This format is Markdown and pairs of colons. Slidev nests content in a step comment, a
@@ -2277,6 +2283,8 @@ deck. A `.pptx` records what is on a slide, not how it was drawn.
 | a picture | an image, written out beside the deck |
 | a table | a Markdown table |
 | the speaker's note | a `::note` block |
+| the background of a slide | the frontmatter that names it: `background:`, or `background-gradient:` with its angle |
+| the gradient of a shape | the `gradient` attribute, with the places its stops are at |
 | the date, the footer and the slide number | nothing |
 | a free shape | nothing, unless `preserveGeometry` says otherwise |
 
@@ -2349,6 +2357,11 @@ These are the distinctions a `.pptx` does not record, and what comes back in the
 - **a link inside a run.** A shape whose text is a link comes back as a link; a word inside
   a paragraph that is a link does not.
 - **a chart.** A chart is a drawing, not prose. It is left out rather than half-read.
+- **a slide's own theme values.** A slide that names the theme's values for itself has them
+  resolved into literal colours on the way out, and the slot a colour came from is in the
+  theme — so a deck read back says what the colours are and not which slots they were.
+  The background of a slide is not lost this way: it is written as the frontmatter that names
+  it, and the places a gradient's stops are at travel with it.
 
 ## Themes
 

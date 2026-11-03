@@ -10,6 +10,7 @@ use PhpOffice\PhpPresentation\Slide as PowerPointSlide;
 use PhpOffice\PhpPresentation\Slide\Background\Color as BackgroundColour;
 use PhpOffice\PhpPresentation\Slide\Background\Gradient as BackgroundGradient;
 use PhpOffice\PhpPresentation\Style\Fill;
+use PhpOffice\PhpPresentation\Style\GradientStop;
 
 /**
  * One slide read back out of a deck.
@@ -116,7 +117,7 @@ final class SlideReader
         $stops = [];
 
         foreach ($fill->getGradientStops() as $stop) {
-            $stops[] = '#' . strtoupper($stop->getColor()->getRGB());
+            $stops[] = self::stop($stop);
         }
 
         if ($fill->getFillType() === Fill::FILL_GRADIENT_PATH) {
@@ -132,6 +133,25 @@ final class SlideReader
             // the other less ninety degrees.
             'background-angle' => (((int) $fill->getRotation() + 90) % 360),
         ];
+    }
+
+    /**
+     * One stop of a gradient, as the colour it is and the place it is at.
+     *
+     * The place is written where it is not one of the two ends, which are where a stop
+     * without one is spread to — so a gradient that is read back is the gradient that was
+     * written.
+     */
+    private static function stop(GradientStop $stop): string
+    {
+        $colour = '#' . strtoupper($stop->getColor()->getRGB());
+        $position = $stop->getPosition();
+
+        if ($position === GradientStop::POSITION_START || $position === GradientStop::POSITION_END) {
+            return $colour;
+        }
+
+        return $colour . '@' . (int) round($position / 1000);
     }
 
     /**

@@ -13,6 +13,7 @@ use PhpOffice\PhpPresentation\Shape\RichText\Run;
 use PhpOffice\PhpPresentation\Shape\RichText\TextElement;
 use PhpOffice\PhpPresentation\Style\Color;
 use PhpOffice\PhpPresentation\Style\Fill;
+use PhpOffice\PhpPresentation\Style\GradientStop;
 
 /**
  * The free shape a shape the deck placed itself becomes.
@@ -277,7 +278,7 @@ final class FreeShapeMapper
         $stops = [];
 
         foreach ($fill->getGradientStops() as $stop) {
-            $stops[] = '#' . strtoupper($stop->getColor()->getRGB());
+            $stops[] = self::stop($stop);
         }
 
         return [
@@ -285,6 +286,25 @@ final class FreeShapeMapper
             'radial' => $fill->getFillType() === Fill::FILL_GRADIENT_PATH,
             'angle' => (((int) $fill->getRotation() + 90) % 360),
         ];
+    }
+
+    /**
+     * One stop of a gradient, as the colour it is and the place it is at.
+     *
+     * The place is written where it is not one of the two ends, which are where a stop
+     * without one is spread to — so a gradient that is read back is the gradient that was
+     * written.
+     */
+    private static function stop(GradientStop $stop): string
+    {
+        $colour = '#' . strtoupper($stop->getColor()->getRGB());
+        $position = $stop->getPosition();
+
+        if ($position === GradientStop::POSITION_START || $position === GradientStop::POSITION_END) {
+            return $colour;
+        }
+
+        return $colour . '@' . (int) round($position / 1000);
     }
 
     /**

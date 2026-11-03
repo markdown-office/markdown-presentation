@@ -110,13 +110,13 @@ public static function none(): self
         if ($fill !== null) {
             throw MalformedGradient::written(
                 $where,
-                'fill',
+                (string) $attributes->getString('fill'),
                 'A shape is filled with a colour or with a gradient, and not with both: '
                 . 'fill="accent1" or gradient="accent1,lt2".',
             );
         }
 
-        $radial = $attributes->getBool('gradient-radial');
+        $radial = self::flag($slide, $name, $attributes, 'gradient-radial');
         $angle = null;
 
         if ($attributes->has('gradient-angle')) {
@@ -140,6 +140,38 @@ public static function none(): self
             $radial,
             $angle,
         );
+    }
+
+    /**
+     * A flag an attribute holds, refused where it holds something else.
+     *
+     * A bare attribute is the flag set, and `true` and `false` are the two words it may be
+     * written as — anything else is a mistake in the value rather than in the flag, and the
+     * failure says so.
+     *
+     * @throws MalformedShape
+     */
+    private static function flag(
+        int $slide,
+        string $name,
+        DirectiveAttributes $attributes,
+        string $attribute,
+    ): bool {
+        if (!$attributes->has($attribute)) {
+            return false;
+        }
+
+        $written = $attributes->get($attribute);
+
+        if ($written === true) {
+            return true;
+        }
+
+        if (is_string($written) && in_array(strtolower($written), ['true', 'false'], true)) {
+            return strtolower($written) === 'true';
+        }
+
+        throw MalformedShape::flag($slide, $name, $attribute, is_string($written) ? $written : '');
     }
 
     /**

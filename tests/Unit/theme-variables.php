@@ -35,6 +35,18 @@ function inkOf(Pptx $pptx, int $slide = 1): array
     return $matches[1];
 }
 
+/** The colour the page behind a slide is painted with, or null where it has none of its own. */
+function pageOf(Pptx $pptx, int $slide = 1): ?string
+{
+    $xml = $pptx->part(sprintf('ppt/slides/slide%d.xml', $slide));
+
+    if (preg_match('#<p:bg>.*?<a:srgbClr val="([0-9A-F]{6})"#s', $xml, $matches) !== 1) {
+        return null;
+    }
+
+    return $matches[1];
+}
+
 it('writes a slide in the colour it names', function () {
     $pptx = variablesDeck("---\ntheme-variables:\n  colors:\n    dk1: \"#123456\"\n---\n\n# One\n");
 
@@ -56,6 +68,21 @@ it('takes the ink from the slot the theme paints it on', function () {
     $pptx = variablesDeck("---\ntheme-variables:\n  dark: true\n---\n\n# One\n");
 
     expect(inkOf($pptx))->toContain('FFFFFF');
+});
+
+it('paints the page of a slide whose own theme paints another', function () {
+    // The master keeps the theme's page for every slide, so a slide that says the theme is
+    // dark is painted on the dark page of its own.
+    $pptx = variablesDeck("---\ntheme-variables:\n  dark: true\n---\n\n# One\n");
+
+    expect(pageOf($pptx))->toBe('000000')
+        ->and(inkOf($pptx))->toContain('FFFFFF');
+});
+
+it('leaves the page of a slide alone where its own theme paints the same one', function () {
+    $pptx = variablesDeck("---\ntheme-variables:\n  colors:\n    dk1: \"#123456\"\n---\n\n# One\n");
+
+    expect(pageOf($pptx))->toBeNull();
 });
 
 it('takes the values of the template it names', function () {

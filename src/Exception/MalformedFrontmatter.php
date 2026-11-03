@@ -42,6 +42,20 @@ final class MalformedFrontmatter extends InvalidInput
     }
 
     /**
+     * Two definitions of the same template.
+     *
+     * A template is defined once. Two of them are a mistake, and the second one is the one
+     * that would be drawn — so it is refused rather than left to win.
+     */
+    public static function duplicateTemplate(string $name): self
+    {
+        return new self(sprintf(
+            'The template "%s" is defined twice: a template is defined once.',
+            $name,
+        ));
+    }
+
+    /**
      * The name of a template, in the frontmatter of the slide that defines it.
      *
      * Without a slide number, because a template definition is not a slide of the deck and

@@ -91,6 +91,14 @@ it('reads a background of a gradient back as one', function () {
         ->and($markdown)->toContain('background-angle: 45');
 });
 
+it('reads the places of a background gradient back as one', function () {
+    $deck = writtenDeck("---\nbackground-gradient: \"accent1,dk1@50,lt2\"\n---\n\n# One\n");
+
+    $markdown = (new PowerPointToMarkdown($deck))->convert();
+
+    expect($markdown)->toContain('background-gradient: "#4472C4,#000000@50,#E7E6E6"');
+});
+
 it('reads a background of a radial gradient back as one', function () {
     $deck = writtenDeck("---\nbackground-gradient: \"accent1,lt2\"\nbackground-radial: true\n---\n\n# One\n");
 
@@ -124,7 +132,7 @@ it('reads the gradient of a shape back as one', function () {
 
     $markdown = (new PowerPointToMarkdown($deck, new Options(preserveGeometry: true)))->convert();
 
-    expect($markdown)->toContain('gradient="#4472C4,#000000,#E7E6E6"')
+    expect($markdown)->toContain('gradient="#4472C4,#000000@50,#E7E6E6"')
         ->and($markdown)->toContain('gradient-angle=45');
 });
 

@@ -234,6 +234,8 @@ final class DeckParser
      *
      * @param list<Slide>      $slides
      * @param list<Definition> $definitions
+     *
+     * @throws MalformedFrontmatter
      */
     private static function add(array &$slides, array &$definitions, Slide $slide): void
     {
@@ -243,6 +245,15 @@ final class DeckParser
             $slides[] = $slide;
 
             return;
+        }
+
+        // A template is defined once. Two definitions of the same name are a mistake, and
+        // the second one is the one that would be drawn — so it is refused here rather than
+        // left to win quietly, which is what it used to do.
+        foreach ($definitions as $defined) {
+            if ($defined->name() === $definition->name()) {
+                throw MalformedFrontmatter::duplicateTemplate($definition->name());
+            }
         }
 
         $definitions[] = $definition;

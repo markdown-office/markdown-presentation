@@ -48,6 +48,7 @@ use PhpOffice\PhpPresentation\PhpPresentation;
 use PhpOffice\PhpPresentation\Slide as WrittenSlide;
 use PhpOffice\PhpPresentation\Slide\Note;
 use PhpOffice\PhpPresentation\Slide\SlideLayout;
+use PhpOffice\PhpPresentation\Style\Color;
 
 /**
  * A deck and the theme it names, written out as a `.pptx`.
@@ -613,7 +614,10 @@ final class PresentationRenderer
      *
      * The theme comes with the deck because a free shape may be written in its colours, and
      * resolving `fill=panel` needs the theme the deck named. Refusing `fill=chartreuse` once a
-     * shape exists would be too late to have written no file.
+     * shape exists would be too late to have written no file. Each slide is read with the
+     * theme it is drawn in, which is the deck's with the slide's own values laid over it.
+     *
+     * @param array<int, array{theme: Theme, background: Background|null}> $appearance
      *
      * @return array<int, SlideBlocks>
      *
@@ -622,11 +626,6 @@ final class PresentationRenderer
      * @throws UnknownDirective
      * @throws UnknownMarker
      * @throws UnsupportedImageFormat
-     */
-    /**
-     * @param array<int, array{theme: Theme, background: Background|null}> $appearance
-     *
-     * @return array<int, SlideBlocks>
      */
     private function blocks(Deck $deck, array $appearance): array
     {
@@ -644,6 +643,29 @@ final class PresentationRenderer
         }
 
         return $blocks;
+    }
+
+    /**
+     * The colour behind a slide whose own theme paints a different page.
+     *
+     * The page of the theme is one of the four roles, and `dark:` says which way round they
+     * go — so a slide that says the theme is dark, or that names the slot the page plays on,
+     * is drawn on a different page from the one the master keeps. The master is the deck's
+     * and every slide on it, so the page the slide paints is the slide's own.
+     *
+     * Null where the slide's page is the deck's, which is the ordinary case: the master
+     * keeps it and the slide inherits it.
+     */
+    private function pageOf(Theme $theme): ?Background
+    {
+        $deck = $this->theme->colour($this->theme->page());
+        $own = $theme->colour($theme->page());
+
+        if ($deck === null || $own === null || $deck === $own) {
+            return null;
+        }
+
+        return Background::colour(new Color(ltrim($own, '#')));
     }
 
     /**
@@ -685,7 +707,7 @@ final class PresentationRenderer
                 'theme' => $theme,
                 'background' => isset($settings['background'])
                     ? Background::read($slide->index() + 1, $settings['background'], $theme)
-                    : null,
+                    : $this->pageOf($theme),
             ];
         }
 
@@ -732,6 +754,9 @@ final class PresentationRenderer
      * @param array<string, SlideLayout> $layouts
      * @param SlideShapes             $shapes  Writes everything below the title, in the order
      *                                      a `layer` decides.
+     * @param Theme                   $theme   The theme the slide is drawn in.
+     * @param Background|null          $background The background the slide is drawn on, or null
+     *                                      where it is the one the master keeps.
      *
      * @return array<int, int> Shape id to the step it appears on, in write order.
      *

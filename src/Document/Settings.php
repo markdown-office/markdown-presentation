@@ -25,7 +25,7 @@ final class Settings
     /**
      * The keys a slide's own settings are made of.
      *
-     * The list is one, and {@see \MarkdownPresentation\Render\PresentationRenderer::DIRECTIVES}
+     * The list is the settings' own, and {@see \MarkdownPresentation\Render\PresentationRenderer::DIRECTIVES}
      * is built from it, so that a key which is a setting is a key the frontmatter accepts.
      *
      * @var list<string>

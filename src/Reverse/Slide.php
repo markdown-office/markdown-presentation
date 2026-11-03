@@ -21,8 +21,9 @@ final class Slide
      *        when the slide has none.
      * @param list<Block> $blocks The slide's content, in the order it is read.
      * @param string|null $note The speaker's note, or null when there is none.
-     * @param array<string, string|int|bool> $frontmatter The settings the slide carries
-     *        back: the background it is drawn on, as the frontmatter that names it.
+     * @param array<string, string|int|bool> $frontmatter The settings the slide carries back:
+     *        the background it is drawn on and the way of it, as the frontmatter that names
+     *        them.
      */
     public function __construct(
         public readonly int $index,

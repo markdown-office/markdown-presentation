@@ -63,6 +63,7 @@ final class DeckWriter
 
         // A slide that carries a frontmatter opens with the delimiter: the block after it is
         // the slide's, and a blank line after it would put the block out of the slide's reach.
+        // The settings of a slide supply the rest of the block — see {@see self::settings()}.
         $markdown = implode("\n---\n", $out);
 
         if ($this->options->lineEnding === "\n") {
@@ -75,9 +76,10 @@ final class DeckWriter
     /**
      * The settings a slide carries back, as the block that names them.
      *
-     * The block opens with the delimiter, which is the same line that separates the slides,
-     * and closes with one of its own: a slide's settings are a frontmatter block, and a
-     * block that is not closed is not read.
+     * The block is closed with a delimiter of its own and opened by the one that separates
+     * the slides: a slide's settings are a frontmatter block, a block that is not closed is
+     * not read, and a delimiter with a blank line after it opens nothing — so the two are one
+     * arrangement, and the separator in {@see self::write()} must stay as it is.
      *
      * @param array<string, string|int|bool> $settings
      */
