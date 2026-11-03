@@ -1332,6 +1332,13 @@ at as a percentage of the gradient: `accent1@50` is that stop at half of the way
 that carries none is spread evenly among the ones that do, and a gradient of fewer than two
 stops is refused — the format asks for two at the very least.
 
+The stops have to move forward. Two stops at the same place are refused, because a gradient
+whose stops do not move forward is one the reader cannot draw.
+
+**There is a ceiling on a gradient**: at most **100 stops**, and at most **8192 characters**
+of them. A hundred stops is already more than a picture can show, and the stops are read
+apart before they are counted, so the length is the bound and the count is the second one.
+
 The angle is CSS's: **0° is to the top, 90° to the right, 180° to the bottom**. A radial
 gradient runs from the middle outwards and has no angle, so `gradient-angle` with
 `gradient-radial` is refused.
@@ -2147,7 +2154,8 @@ theme-variables:
 
 The background of a slide is the slide's own: the master keeps the theme's page colour for
 the slides that name no background. A background is one colour or one gradient, and the two
-together are refused.
+together are refused. A background of a colour has neither an angle nor a radial flag, so
+`background-angle` or `background-radial` with `background` is refused as well.
 
 `theme-variables:` is a **`theme.yml`**: the same keys, the same names, the same spelling,
 read by the reader that reads the theme's own file — `dark:`, `colors:`, `fonts:` and

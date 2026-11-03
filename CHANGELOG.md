@@ -101,7 +101,9 @@ All notable changes to this project are documented here. The format follows
   A stop is a colour in the vocabulary a fill is written in, and it may carry the place it
   is at as a percentage of the gradient — `accent1@50` is that stop at half of the way. A
   stop that carries none is spread evenly among the ones that do, which is what a gradient in
-  CSS does with the ones it leaves out.
+  CSS does with the ones it leaves out. The stops have to move forward, so two at the same
+  place are refused, and a gradient holds at most **100 stops** and at most **8192
+  characters** of them.
 
   The angle is CSS's: **0° is to the top, 90° to the right, 180° to the bottom**. A gradient
   that runs from the middle of the shape outwards is `gradient-radial`, and it has no angle,
@@ -119,7 +121,9 @@ All notable changes to this project are documented here. The format follows
   ```
 
   A shape is filled with a colour **or** with a gradient, and a background is one colour or
-  one gradient, and the two together are refused rather than one of them being dropped.
+  one gradient, and the two together are refused rather than one of them being dropped. A
+  background of a colour has neither an angle nor a radial flag, so naming one with it is
+  refused too.
 
 - **A slide may name the theme's values for itself.** A theme was set once for a deck, and
   every slide was drawn in it.
