@@ -14,14 +14,18 @@ use MarkdownPresentation\Reverse\Escaping;
 use MarkdownPresentation\Reverse\Image;
 use MarkdownPresentation\Reverse\Inline;
 use MarkdownPresentation\Reverse\Options;
+use MarkdownPresentation\Reverse\Shape;
 use MarkdownPresentation\Reverse\ShapeMapper;
 use MarkdownPresentation\Reverse\Slide;
 use MarkdownPresentation\Tests\Support\Scratch;
 use PhpOffice\PhpPresentation\DocumentProperties;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
+use MarkdownPresentation\Render\Free\ShapeKind;
+use PhpOffice\PhpPresentation\Shape\AutoShape;
 use PhpOffice\PhpPresentation\Shape\Hyperlink;
 use PhpOffice\PhpPresentation\Style\Bullet;
+use PhpOffice\PhpPresentation\Style\Fill;
 use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
 use PhpOffice\PhpPresentation\Shape\Placeholder;
 use PhpOffice\PhpPresentation\Shape\Table as TableShape;
@@ -265,6 +269,48 @@ function converted(string $path, ?Options $options = null): string
 }
 
 /**
+ * The free shapes of a deck, by slide and by name, with the box and the paint each has.
+ *
+ * The names the library gives its free shapes are the names of the directives that draw
+ * them, so a shape whose name is one of those is a shape the deck placed itself.
+ *
+ * @return array<int, array<string, array{box: string, paint: string}>>
+ */
+function freeShapesOf(string $path): array
+{
+    $deck = (new IOFactory())->createReader('PowerPoint2007')->load($path);
+    $kinds = array_column(ShapeKind::cases(), 'value');
+    $shapes = [];
+
+    foreach ($deck->getAllSlides() as $index => $slide) {
+        foreach ($slide->getShapeCollection() as $shape) {
+            $name = $shape->getName();
+
+            if (!in_array($name, $kinds, true)) {
+                continue;
+            }
+
+            $fill = $shape->getFill();
+
+            $shapes[$index][$name] = [
+                'box' => sprintf(
+                    '%d,%d %dx%d',
+                    $shape->getOffsetX(),
+                    $shape->getOffsetY(),
+                    $shape->getWidth(),
+                    $shape->getHeight(),
+                ),
+                'paint' => $fill->getFillType() === Fill::FILL_SOLID
+                    ? $fill->getStartColor()->getRGB()
+                    : $fill->getFillType(),
+            ];
+        }
+    }
+
+    return $shapes;
+}
+
+/**
  * The words of a text, in the order they come.
  *
  * @return list<string>
@@ -363,6 +409,47 @@ function slideTexts(string $path): array
 
     return $slides;
 }
+
+it('names the theme a deck was drawn in, so that it can be drawn in it again', function () {
+    // A deck carries the theme's colours and its fonts and nothing else about it: the name a
+    // deck's `theme:` names is a property of the Markdown it was written from, and nothing in
+    // the package said which directory it came from. So a deck read back into Markdown came
+    // back in the library's own theme rather than the one it was drawn in.
+    $path = writtenDeck("---\ntitle: Themed\ntheme: pitch\n---\n\n# One\n\nText.\n");
+
+    $zip = new ZipArchive();
+    $zip->open($path);
+    $theme = (string) $zip->getFromName('ppt/theme/theme1.xml');
+    $zip->close();
+
+    expect($theme)->toContain('name="pitch"');
+});
+
+it('writes the theme back into the Markdown it reads a deck into', function () {
+    $markdown = converted(writtenDeck("---\ntitle: Themed\ntheme: pitch\n---\n\n# One\n\nText.\n"));
+
+    expect($markdown)->toContain('theme: "pitch"');
+});
+
+it('writes no theme into the Markdown of a deck drawn in the default one', function () {
+    // A deck that names the default theme names nothing in particular, and a line saying so
+    // is a line the reader has to read past.
+    $markdown = converted(writtenDeck("# One\n\nText.\n"));
+
+    expect($markdown)->not->toContain('theme:');
+});
+
+it('writes no theme into the Markdown of a deck another program wrote', function () {
+    // The name in the theme part is the name a deck's `theme:` names only when this library
+    // wrote the deck. Another program writes `Office Theme` there, and a deck that names a
+    // theme nobody has is a deck that cannot be drawn again.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->createText('Text');
+    });
+
+    expect(converted($path))->not->toContain('theme:');
+});
 
 it('reads a deck back into a deck', function () {
     $markdown = <<<'MD'
@@ -973,6 +1060,318 @@ it('leaves a field out, which is a number and not a word', function () {
     });
 
     expect(converted($path))->toContain('Slide');
+});
+
+it('writes a free shape back as the free shape it is, with its box and its colour', function () {
+    // The inverse of the renderer: a shape the deck placed itself comes back as the
+    // directive that draws it, with the box it was given and the colour it was painted.
+    $path = writtenDeck(
+        "# One\n\nText.\n\n::roundrect{left=10% top=40% width=30% height=20% fill=accent1}\n",
+    );
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->toContain('::roundrect{left=10% top=40% width=30% height=20% fill=4472C4}');
+});
+
+it('writes a free text block back with the words it holds', function () {
+    $path = writtenDeck(
+        "# One\n\nText.\n\n:::content{left=50% top=40% width=30% height=20%}\nWords.\n:::\n",
+    );
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    // The block's own type travels with it, because it is an attribute of the directive
+    // rather than of the words in it.
+    expect($markdown)->toContain(
+        ':::content{left=50% top=40% width=30% height=20% color=000000 font-size=16}'
+        . "\n" . 'Words.' . "\n" . ':::',
+    );
+});
+
+it('writes a shape that runs off the edge as one that bleeds', function () {
+    // A shape off the edge is refused by the renderer unless it says so, so a shape that
+    // was off the edge has to say so when it comes back.
+    $path = writtenDeck(
+        "# One\n\nText.\n\n::roundrect{left=90% top=40% width=30% height=20% fill=accent1 bleed=true}\n",
+    );
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->toContain('bleed=true');
+});
+
+it('draws the same deck again from the Markdown it reads one into', function () {
+    // The claim the whole of it is for: a deck taken apart and put back together is the
+    // deck it was.
+    $path = writtenDeck(
+        "# One\n\nText.\n\n::roundrect{left=10% top=40% width=30% height=20% fill=accent1}\n",
+    );
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    $again = Scratch::file('again.pptx', '');
+
+    (new PresentationRenderer())->render((new DeckParser())->parse($markdown), $again);
+
+    $shape = static function (string $path): ?array {
+        $zip = new ZipArchive();
+        $zip->open($path);
+        $slide = (string) $zip->getFromName('ppt/slides/slide1.xml');
+        $zip->close();
+
+        if (preg_match('#name="roundrect".*?<a:off x="(-?\d+)" y="(-?\d+)"/>.*?<a:ext cx="(\d+)" cy="(\d+)"#s', $slide, $found) !== 1) {
+            return null;
+        }
+
+        return [(int) $found[1], (int) $found[2], (int) $found[3], (int) $found[4]];
+    };
+
+    expect($shape($again))->toBe($shape($path));
+});
+
+it('reads a deck whose theme part names nothing', function () {
+    // The name is whatever the writer put there. A deck that names no theme has no name to
+    // write back, and a deck that names something else is not one this library wrote.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->createText('Text');
+    });
+
+    $zip = new ZipArchive();
+    $zip->open($path);
+    $theme = (string) $zip->getFromName('ppt/theme/theme1.xml');
+    $zip->close();
+
+    expect($theme)->toContain('<a:theme')
+        ->and(converted($path))->not->toContain('theme:');
+});
+
+it('writes a rule back with the colour it was drawn in', function () {
+    // A rule is a stroke and not a fill, and a rule that comes back with no colour is a rule
+    // nobody can see.
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n::line{left=6% top=50% width=88% height=0.3% stroke=accent1 stroke-width=2}\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('::line{')
+        ->and($markdown)->toContain('stroke=4472C4')
+        ->and($markdown)->toContain('stroke-width=2.25');
+});
+
+it('writes no stroke for a shape that was drawn without one', function () {
+    // A border is born black, and a reader cannot tell a border that was never given a
+    // colour from one that was given black.
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n::rectangle{left=6% top=40% width=88% height=30% fill=panel}\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('::rectangle{')
+        ->and($markdown)->not->toContain('stroke=');
+});
+
+it('writes the alignment of a free text block back in the middle of it', function () {
+    foreach (['align=right' => 'align=right', 'align=justify' => 'align=justify'] as $written => $expected) {
+        $markdown = (new PowerPointToMarkdown(writtenDeck(
+            "# One\n\nText.\n\n:::content{left=6% top=40% width=88% height=30% " . $written . "}\nWords.\n:::\n",
+        ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+        expect($markdown)->toContain($expected);
+    }
+});
+
+it('writes a free text block back at the bottom of its box', function () {
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n:::content{left=6% top=40% width=88% height=30% vertical-align=bottom}\nWords.\n:::\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('vertical-align=bottom');
+});
+
+it('writes the stroke of a shape the reader gives as an autoshape', function () {
+    // An autoshape's outline says whether it has a stroke at all, so a shape that was drawn
+    // without one comes back without one.
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n::roundrect{left=6% top=40% width=88% height=30% fill=panel stroke=accent1 stroke-width=2}\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('::roundrect{')
+        ->and($markdown)->toContain('stroke=4472C4')
+        ->and($markdown)->toContain('stroke-width=2.25');
+});
+
+it('writes the alignment of a free text block back', function () {
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n:::content{left=6% top=40% width=88% height=30% align=center vertical-align=middle}\nWords.\n:::\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('align=center')
+        ->and($markdown)->toContain('vertical-align=middle');
+});
+
+it('writes a shape with no fill without one, and a turned shape with its turn', function () {
+    // A shape with no fill is drawn with none, and a shape turned is drawn turned. Both
+    // are things the deck asked for, so both travel.
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n::rectangle{left=10% top=40% width=30% height=20% rotate=45}\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('rotate=45')
+        ->and($markdown)->not->toContain('fill=');
+});
+
+it('writes the words an ink shape holds as its label', function () {
+    $markdown = (new PowerPointToMarkdown(writtenDeck(
+        "# One\n\nText.\n\n::rectangle{left=10% top=40% width=30% height=20% label=\"A word\"}\n",
+    ), new Options(mediaDirectory: null, preserveGeometry: true)))->convert();
+
+    expect($markdown)->toContain('label="A word"');
+});
+
+it('leaves a shape it does not draw out, because it cannot draw it back', function () {
+    // A star is a shape PowerPoint draws and this library does not, so there is no
+    // directive to write it back as.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createAutoShape(AutoShape::TYPE_5_POINT_STAR);
+        $shape->setOffsetX(10);
+        $shape->setOffsetY(10);
+        $shape->setWidth(100);
+        $shape->setHeight(100);
+    });
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->not->toContain('::');
+});
+
+it('leaves a placeholder out, because the layout put it there', function () {
+    // A placeholder is the layout's own, and the layout is not in the deck.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('content');
+        $shape->createText('Words');
+        $shape->setPlaceHolder(new Placeholder('body'));
+    });
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->not->toContain('::content');
+});
+
+it('writes no label for a shape whose words are more than one paragraph', function () {
+    // A label is one run of text. A shape with paragraphs in it is a body, and a body is
+    // not a label.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createRichTextShape();
+        $shape->setName('rectangle');
+        $shape->createText('One.');
+        $shape->createParagraph()->createTextRun()->setText('Two.');
+    });
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->toContain('::rectangle{')
+        ->and($markdown)->not->toContain('label=');
+});
+
+it('writes nothing for a shape it was handed without one', function () {
+    // The writer is public API: a caller can hand it a block of a kind it does not know,
+    // and it writes nothing rather than a shape that is not there.
+    $writer = new DeckWriter(new Options(mediaDirectory: null));
+    $properties = new DocumentProperties();
+    $properties->setTitle('');
+    $properties->setCreator('');
+
+    expect($writer->write([new Slide(0, null, [new Block(Block::SHAPE)], null)], $properties))
+        ->not->toContain('::');
+});
+
+it('brings the free shapes of a gallery deck back with the same boxes and the same paint', function () {
+    // The gallery's own deck and not one the test wrote: the claim is about the decks the
+    // library ships, and a deck a test made is a deck nobody else has.
+    $source = dirname(__DIR__, 2) . '/examples/markdown/12-free-shapes.md';
+
+    $first = Scratch::file('gallery.pptx', '');
+    $second = Scratch::file('gallery-again.pptx', '');
+
+    $renderer = new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown');
+    $renderer->render((new DeckParser())->parse((string) file_get_contents($source)), $first);
+
+    $markdown = (new PowerPointToMarkdown($first, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    (new PresentationRenderer(dirname(__DIR__, 2) . '/examples/markdown'))->render(
+        (new DeckParser())->parse($markdown),
+        $second,
+    );
+
+    $before = freeShapesOf($first);
+    $after = freeShapesOf($second);
+
+    expect($before)->not->toBe([]);
+
+    foreach ($before as $slide => $shapes) {
+        foreach ($shapes as $name => $shape) {
+            // A picture placed by the deck comes back as a picture — its bytes and its alt
+            // text — and not as a placed picture, because where a picture sits is part of the
+            // design and not part of the picture.
+            if ($name === ShapeKind::Image->value) {
+                expect($after[$slide][$name] ?? null)->toBeNull();
+
+                continue;
+            }
+
+            expect($after[$slide][$name] ?? null)->toBe($shape, sprintf(
+                'The "%s" of slide %d came back differently.',
+                $name,
+                $slide + 1,
+            ));
+        }
+    }
+});
+
+it('reads a shape of another program by its geometry', function () {
+    // A deck written by another program has names of its own, and its geometry is what says
+    // what it drew.
+    $path = deckWithShapes(static function (AbstractSlide $slide): void {
+        $shape = $slide->createAutoShape();
+        $shape->setType(AutoShape::TYPE_OVAL);
+        $shape->setName('A shape of somebody else');
+        $shape->setOffsetX(10);
+        $shape->setOffsetY(20);
+        $shape->setWidth(100);
+        $shape->setHeight(80);
+    });
+
+    $markdown = (new PowerPointToMarkdown($path, new Options(
+        mediaDirectory: null,
+        preserveGeometry: true,
+    )))->convert();
+
+    expect($markdown)->toContain('::ellipse{');
 });
 
 it('leaves a shape that is none of the three kinds out', function () {

@@ -39,32 +39,43 @@ final class Options
      *        nothing about how much room its contents will take up.
      * @param int         $maxEntries The largest number of parts the package may
      *        have, read from its central directory and costing no decompression.
+     * @param bool        $preserveGeometry Whether the shapes a deck places itself are
+     *        written back out as the free shapes they are. Off by default, because
+     *        the design of a deck is in its theme and its master and not in the
+     *        Markdown: a deck read back with this on is a deck that has been taken
+     *        apart rather than edited.
      */
     public function __construct(
         public readonly ?string $mediaDirectory = 'media',
         public readonly string $lineEnding = "\n",
         public readonly int $maxPartBytes = 268435456,
         public readonly int $maxEntries = 4096,
+        public readonly bool $preserveGeometry = false,
     ) {
     }
 
     public function withMediaDirectory(?string $directory): self
     {
-        return new self($directory, $this->lineEnding, $this->maxPartBytes, $this->maxEntries);
+        return new self($directory, $this->lineEnding, $this->maxPartBytes, $this->maxEntries, $this->preserveGeometry);
     }
 
     public function withLineEnding(string $ending): self
     {
-        return new self($this->mediaDirectory, $ending, $this->maxPartBytes, $this->maxEntries);
+        return new self($this->mediaDirectory, $ending, $this->maxPartBytes, $this->maxEntries, $this->preserveGeometry);
     }
 
     public function withMaxPartBytes(int $bytes): self
     {
-        return new self($this->mediaDirectory, $this->lineEnding, $bytes, $this->maxEntries);
+        return new self($this->mediaDirectory, $this->lineEnding, $bytes, $this->maxEntries, $this->preserveGeometry);
     }
 
     public function withMaxEntries(int $entries): self
     {
-        return new self($this->mediaDirectory, $this->lineEnding, $this->maxPartBytes, $entries);
+        return new self($this->mediaDirectory, $this->lineEnding, $this->maxPartBytes, $entries, $this->preserveGeometry);
+    }
+
+    public function withPreserveGeometry(bool $preserve = true): self
+    {
+        return new self($this->mediaDirectory, $this->lineEnding, $this->maxPartBytes, $this->maxEntries, $preserve);
     }
 }

@@ -75,11 +75,16 @@ final class MalformedShape extends InvalidInput
 
     /**
      * A flag whose value is neither true nor false.
+     *
+     * "writes ... with ... set to" rather than "gives ... a ... of", because the article
+     * before the attribute's name depends on the attribute: `a "bleed"` and `an "of"` are
+     * not the same word, and a message that has to be right about both is a message about
+     * the grammar rather than about the mistake.
      */
     public static function flag(int $slide, string $name, string $attribute, string $written): self
     {
         return new self(sprintf(
-            'Slide %d gives "%s" an "%s" of "%s". A flag is true or false: %s=true, %s=false.',
+            'Slide %d writes "%s" with "%s" set to "%s". A flag is true or false: %s=true, %s=false.',
             $slide,
             $name,
             $attribute,
@@ -103,12 +108,29 @@ final class MalformedShape extends InvalidInput
     {
         return new self(sprintf(
             'Slide %d places "%s" %s. A free shape lies within the %dpx %s slide: write left=0 width=100%% for '
-            . 'one that reaches the edge.',
+            . 'one that reaches the edge — or write bleed=true if it is meant to run off it.',
             $slide,
             $name,
             $where,
             $measure,
             $measureWord,
+        ));
+    }
+
+    /**
+     * A shape that bleeds off the edge and is not on the slide at all.
+     *
+     * A different failure from {@see self::offSlide()} and a different sentence: crossing an
+     * edge is what a bleeding shape does, and being somewhere else is what a mistake is.
+     */
+    public static function offSlideEntirely(int $slide, string $name, string $where): self
+    {
+        return new self(sprintf(
+            'Slide %d places "%s" %s, which is off the slide. A shape that bleeds off the edge still has to be on '
+            . 'the slide: a shape whose whole box is past the edge is one nobody will ever see.',
+            $slide,
+            $name,
+            $where,
         ));
     }
 

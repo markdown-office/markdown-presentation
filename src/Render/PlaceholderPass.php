@@ -27,7 +27,8 @@ use ZipArchive;
  * - The same method writes an *empty* `<a:bodyPr/>` for a placeholder, dropping the
  *   `normAutofit` and the insets {@see ShapeWriter::textBox()} sets. On a slide that hands
  *   the shape back to the reader to resize, which is the one failure a layout cannot recover
- *   from; on a layout an empty one is right, and this writes a layout's own either way.
+ *   from; on a layout an empty one is right unless the template said where its text sits,
+ *   and this writes a layout's own either way.
  *
  * Both sides are written by hand below, and the body a slide's title is drawn in is the one
  * the layout's placeholder is written at — so *Reset* restores the geometry the slide already
@@ -225,7 +226,7 @@ final class PlaceholderPass
             . "          </a:prstGeom>\n"
             . "        </p:spPr>\n"
             . "        <p:txBody>\n"
-            . "          <a:bodyPr/>\n"
+            . '          %s' . "\n"
             . "          <a:lstStyle/>\n"
             . "          <a:p>\n"
             . '            <a:endParaRPr lang="en-US"/>' . "\n"
@@ -239,6 +240,22 @@ final class PlaceholderPass
             (int) CommonDrawing::pixelsToEmu($box->y),
             (int) CommonDrawing::pixelsToEmu($box->width),
             (int) CommonDrawing::pixelsToEmu($box->height),
+            self::bodyProperties($box),
         );
+    }
+
+    /**
+     * The body properties of a placeholder, with the anchor a template gave it.
+     *
+     * Empty where the template said nothing, and carrying the anchor where it did: a
+     * placeholder whose text is anchored in the middle of its box and a placeholder whose
+     * text is anchored at the top draw the same box and different documents, and a slide's
+     * own placeholder inherits this one because it states no anchor of its own.
+     */
+    private static function bodyProperties(Box $box): string
+    {
+        return $box->textAnchor === null
+            ? '<a:bodyPr/>'
+            : sprintf('<a:bodyPr anchor="%s"/>', $box->textAnchor);
     }
 }

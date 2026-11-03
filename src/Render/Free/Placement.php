@@ -101,22 +101,31 @@ final class Placement
     }
 
     /**
+     * @param bool $bleed Whether the shape is written to bleed: to run off the edge of the
+     *                     slide. A shape that bleeds is still a shape on the slide, so it has
+     *                     to be on it.
+     *
      * @throws MalformedShape
      */
-    public static function read(int $slide, string $name, DirectiveAttributes $attributes, ShapeKind $kind): self
-    {
+    public static function read(
+        int $slide,
+        string $name,
+        DirectiveAttributes $attributes,
+        ShapeKind $kind,
+        bool $bleed = false,
+    ): self {
         $anchor = self::anchor($slide, $name, $attributes);
         [$width, $height] = self::sizes($slide, $name, $attributes, $kind);
 
-        $left = Length::pixels($slide, $name, 'left', Length::written($slide, $name, 'left', $attributes, '0'), SlideGeometry::WIDTH);
-        $top = Length::pixels($slide, $name, 'top', Length::written($slide, $name, 'top', $attributes, '0'), SlideGeometry::HEIGHT);
+        $left = Length::pixels($slide, $name, 'left', Length::written($slide, $name, 'left', $attributes, '0'), SlideGeometry::WIDTH, bleed: $bleed);
+        $top = Length::pixels($slide, $name, 'top', Length::written($slide, $name, 'top', $attributes, '0'), SlideGeometry::HEIGHT, bleed: $bleed);
 
         [$across, $down] = self::ANCHORS[$anchor];
 
         $x = self::justified($left, $width, $across);
         $y = self::justified($top, $height, $down);
 
-        self::withinSlide($slide, $name, $left, $top, new Box($x, $y, $width, $height));
+        self::withinSlide($slide, $name, $left, $top, new Box($x, $y, $width, $height), $bleed);
 
         return new self(
             new Box($x, $y, $width, $height),
@@ -333,22 +342,34 @@ final class Placement
     }
 
     /**
- * Refuse a box that does not lie within the slide.
- *
- * Clamped instead, this is the shape quietly drawn somewhere the author did not ask for, with
- * nothing in the file to say so — the outcome the whole refusal exists to prevent. The four
- * edges are told apart rather than tested as one inequality because each gets a different
- * sentence: "before the left edge" and "reaches 1020px" are different failures, and a message
- * that named the wrong one would send the author looking in the wrong place.
- *
- * @param int $left Where the deck put the box's left edge, which `$box->x` is not: an anchored
- *                  box's edge is at `$left` and the box starts somewhere else.
- * @param int $top  The same for the top edge.
- *
- * @throws MalformedShape
- */
-    private static function withinSlide(int $slide, string $name, int $left, int $top, Box $box): void
+     * Refuse a box that does not lie within the slide.
+     *
+     * Clamped instead, this is the shape quietly drawn somewhere the author did not ask for, with
+     * nothing in the file to say so — the outcome the whole refusal exists to prevent. The four
+     * edges are told apart rather than tested as one inequality because each gets a different
+     * sentence: "before the left edge" and "reaches 1020px" are different failures, and a message
+     * that named the wrong one would send the author looking in the wrong place.
+     *
+     * A shape written to bleed crosses an edge on purpose, and the crossing is not the failure.
+     * What is still a failure is a shape that is not on the slide at all: bleeding off the left
+     * edge is a shape whose right part is visible, and a shape that starts past the right edge
+     * is one nobody will ever see.
+     *
+     * @param int $left Where the deck put the box's left edge, which `$box->x` is not: an anchored
+     *                  box's edge is at `$left` and the box starts somewhere else.
+     * @param int $top  The same for the top edge.
+     * @param bool $bleed Whether the shape is written to bleed.
+     *
+     * @throws MalformedShape
+     */
+    private static function withinSlide(int $slide, string $name, int $left, int $top, Box $box, bool $bleed): void
     {
+        if ($bleed) {
+            self::onSlide($slide, $name, $left, $top, $box);
+
+            return;
+        }
+
         $x = $box->x;
         $y = $box->y;
         $width = $box->width;
@@ -378,6 +399,40 @@ final class Placement
             $where,
             $wide ? SlideGeometry::WIDTH : SlideGeometry::HEIGHT,
             $wide ? 'wide' : 'tall',
+        );
+    }
+
+    /**
+     * Refuse a bleeding shape that is not on the slide at all.
+     *
+     * Bleeding is a shape crossing an edge, and a shape that crosses every edge is a shape
+     * that is somewhere else. The check is on the box rather than on the position, because an
+     * anchored box is placed by its edge and can end up on the far side of the slide from where
+     * the author wrote it.
+     *
+     * @throws MalformedShape
+     */
+    private static function onSlide(int $slide, string $name, int $left, int $top, Box $box): void
+    {
+        $on = $box->x < SlideGeometry::WIDTH
+            && $box->x + $box->width > 0
+            && $box->y < SlideGeometry::HEIGHT
+            && $box->y + $box->height > 0;
+
+        if ($on) {
+            return;
+        }
+
+        throw MalformedShape::offSlideEntirely(
+            $slide,
+            $name,
+            sprintf(
+                'at left %dpx and top %dpx with a width of %dpx and a height of %dpx',
+                $left,
+                $top,
+                $box->width,
+                $box->height,
+            ),
         );
     }
 }

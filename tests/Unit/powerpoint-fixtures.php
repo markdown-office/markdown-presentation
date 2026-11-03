@@ -102,7 +102,22 @@ it('reads a layout whose placeholders are all left where the master put them', f
     // Content* unplaced too. A reader that wanted them would inherit three boxes it cannot draw
     // in; a reader that takes them anyway would put a date where nothing asked for one.
     expect((new TemplateGeometry(harbourLights()))->boxes()[TITLE_AND_CONTENT]['title'])
-        ->toEqual(new Box(53, 48, 677, 104));
+        ->toEqual(new Box(53, 48, 677, 104, 't'));
+});
+
+it('reads the anchor a template gives its placeholders', function () {
+    // Harbour Lights anchors the title of *Title and Content* at the top of its box, the
+    // title of *Title Slide* at the bottom of its own and the title of *Title and Caption*
+    // in the middle of it. The anchor is how a designer says where the text sits inside the
+    // box they drew, and a reader that drops it draws every one of them at the top of
+    // whatever box it was given.
+    $boxes = (new TemplateGeometry(harbourLights()))->boxes();
+
+    expect($boxes[TITLE_AND_CONTENT]['title']->textAnchor)->toBe('t')
+        ->and($boxes['Title Slide']['title']->textAnchor)->toBe('b')
+        ->and($boxes['Title and Caption']['title']->textAnchor)->toBe('ctr')
+        ->and($boxes['Title and Caption']['body'][0]->textAnchor)->toBe('ctr')
+        ->and($boxes['Title Only']['title']->textAnchor)->toBeNull();
 });
 
 it('leaves a layout out that carries nothing it can draw in', function () {

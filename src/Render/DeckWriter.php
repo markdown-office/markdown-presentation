@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Exception\FileNotWritable;
 use MarkdownPresentation\Theme\LayoutRole;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
@@ -49,6 +50,7 @@ final class DeckWriter
         SlideGeometry $geometry,
         array $roles,
         array $builds = [],
+        ?string $theme = null,
     ): string {
         $directory = dirname($path);
 
@@ -56,7 +58,22 @@ final class DeckWriter
             throw new Exception(sprintf('There is no directory at "%s" to write "%s" into.', $directory, basename($path)));
         }
 
+        // A path that names something that is not a file is refused here rather than by the
+        // writer, which would open it and report an empty file or a deprecation instead of
+        // a sentence that says what was wrong.
+        if (file_exists($path) && !is_file($path)) {
+            throw FileNotWritable::notAFile($path);
+        }
+
         IOFactory::createWriter($presentation, 'PowerPoint2007')->save($path);
+
+        // The theme's name, in the theme part, so that a deck read back into Markdown knows
+        // which theme it was drawn in. Before the notes master is given its own copy of the
+        // theme, so that the copy carries the name too: it is a copy of the deck's theme, and
+        // a copy of a named theme is named.
+        if ($theme !== null) {
+            ThemeNamePass::applyTo($path, $theme);
+        }
 
         NotesColourMapPass::applyTo($path);
         NotesChainPass::applyTo($path);

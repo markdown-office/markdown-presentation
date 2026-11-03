@@ -122,24 +122,55 @@ it('reports how many parts it changed, and nothing for a deck it has already rou
     // measures are whole numbers rather than one that found nothing to do for another reason.
     expect(MeasureRoundingPass::applyTo($path))->toBe(0);
 
-    $before = array_map('md5', Pptx::open($path)->parts());
+    $before = partsByName($path);
     $zip = new ZipArchive();
     $zip->open($path);
 
     for ($index = 0, $count = $zip->numFiles; $index < $count; $index++) {
         $name = (string) $zip->getNameIndex($index);
 
-        if (str_starts_with($name, 'ppt/slides/slide')) {
-            $zip->deleteName($name);
-            $zip->addFromString($name, (string) $zip->getFromIndex($index));
+        if (!str_starts_with($name, 'ppt/slides/slide')) {
+            continue;
         }
+
+        // The contents are read before the part is deleted: `deleteName()` is deferred but
+        // `addFromString()` is not, so a part added here moves the parts after it and the
+        // index the loop is on is no longer the one it was.
+        $contents = (string) $zip->getFromIndex($index);
+        $zip->deleteName($name);
+        $zip->addFromString($name, $contents);
     }
 
     $zip->close();
 
     expect(MeasureRoundingPass::applyTo($path))->toBe(0)
-        ->and(array_map('md5', Pptx::open($path)->parts()))->toBe($before);
+        ->and(partsByName($path))->toBe($before);
 });
+
+/**
+ * Every part of a package, by name, with a hash of its contents.
+ *
+ * By name rather than in the order the archive holds them: the test above re-adds parts on
+ * purpose, and an archive's order is not a property of the package the format cares about.
+ *
+ * @return array<string, string>
+ */
+function partsByName(string $path): array
+{
+    $zip = new ZipArchive();
+    $zip->open($path);
+
+    $parts = [];
+
+    for ($index = 0, $count = $zip->numFiles; $index < $count; $index++) {
+        $name = (string) $zip->getNameIndex($index);
+        $parts[$name] = md5((string) $zip->getFromIndex($index));
+    }
+
+    $zip->close();
+
+    return $parts;
+}
 
 it('rewrites a part that carries a fraction, and says how many', function () {
     $path = Scratch::file('measured-round.pptx', '');

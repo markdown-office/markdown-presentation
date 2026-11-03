@@ -8,6 +8,7 @@ use MarkdownPresentation\Exception\UnreadableDeck;
 use MarkdownPresentation\Exception\UnpatchedDependency;
 use MarkdownPresentation\Fixes;
 use MarkdownPresentation\Render\ImageConverter;
+use MarkdownPresentation\ThemePart;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
 use ZipArchive;
@@ -32,15 +33,45 @@ final class Package
 {
     private ?string $scratchPath = null;
 
-    private function __construct(private readonly PhpPresentation $deck)
+    private function __construct(
+        private readonly PhpPresentation $deck,
+        private readonly ?string $theme = null,
+        private readonly string $path = '',
+    ) {
+    }
+
+    /**
+     * The name of the theme the deck was drawn in, or null where the package says nothing.
+     *
+     * The name is the theme part's own, and it is the name a deck's `theme:` names only when
+     * this library wrote the deck: another program writes `Office Theme` there, or nothing.
+     * A caller that means to use the name has to be ready for both.
+     */
+    public function theme(): ?string
     {
+        return $this->theme;
     }
 
     public static function open(string $path, Options $options = new Options()): self
     {
-        self::bounds($path, $options);
+        // One archive for the bounding and the reading: the file is opened once and the
+        // theme's name is taken out of the same reading, rather than the two disagreeing
+        // about a file that changed between them.
+        $zip = new ZipArchive();
 
-        return new self(self::load($path));
+        if ($zip->open($path) !== true) {
+            throw UnreadableDeck::cannotOpen($path);
+        }
+
+        try {
+            self::bounds($path, $options, $zip);
+
+            $theme = ThemePart::nameOf($zip);
+        } finally {
+            $zip->close();
+        }
+
+        return new self(self::load($path), $theme, $path);
     }
 
     public static function fromString(string $bytes, Options $options = new Options()): self
@@ -65,6 +96,17 @@ final class Package
     public function deck(): PhpPresentation
     {
         return $this->deck;
+    }
+
+    /**
+     * The directory the deck is in, which is where its theme is looked for.
+     *
+     * A deck and its theme are one thing, and the theme the deck was drawn in is usually
+     * beside it.
+     */
+    public function directory(): string
+    {
+        return dirname($this->scratchPath ?? $this->path);
     }
 
     /**
@@ -94,36 +136,26 @@ final class Package
      * downward is caught by the reader's own consistency check, and one that
      * lies upward is caught here.
      */
-    private static function bounds(string $path, Options $options): void
+    private static function bounds(string $path, Options $options, ZipArchive $zip): void
     {
-        $zip = new ZipArchive();
-
-        if ($zip->open($path) !== true) {
-            throw UnreadableDeck::cannotOpen($path);
+        if ($zip->numFiles > $options->maxEntries) {
+            throw UnreadableDeck::tooManyParts($path, $zip->numFiles, $options->maxEntries);
         }
 
-        try {
-            if ($zip->numFiles > $options->maxEntries) {
-                throw UnreadableDeck::tooManyParts($path, $zip->numFiles, $options->maxEntries);
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $stat = $zip->statIndex($index) ?: ['name' => '', 'size' => 0];
+            $name = (string) $stat['name'];
+
+            if ((int) $stat['size'] > $options->maxPartBytes) {
+                throw UnreadableDeck::partTooLarge(
+                    $path,
+                    $name,
+                    (int) $stat['size'],
+                    $options->maxPartBytes,
+                );
             }
 
-            for ($index = 0; $index < $zip->numFiles; $index++) {
-                $stat = $zip->statIndex($index) ?: ['name' => '', 'size' => 0];
-                $name = (string) $stat['name'];
-
-                if ((int) $stat['size'] > $options->maxPartBytes) {
-                    throw UnreadableDeck::partTooLarge(
-                        $path,
-                        $name,
-                        (int) $stat['size'],
-                        $options->maxPartBytes,
-                    );
-                }
-
-                self::boundsPicture($path, $name, $zip);
-            }
-        } finally {
-            $zip->close();
+            self::boundsPicture($path, $name, $zip);
         }
     }
 

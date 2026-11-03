@@ -8,12 +8,14 @@ use MarkdownPresentation\Exception\FileNotWritable;
 use MarkdownPresentation\Exception\NothingToConvert;
 use MarkdownPresentation\Exception\UnpatchedDependency;
 use MarkdownPresentation\Exception\UnreadableDeck;
+use MarkdownPresentation\Render\DeckTheme;
 use MarkdownPresentation\Reverse\Block;
 use MarkdownPresentation\Reverse\DeckReader;
 use MarkdownPresentation\Reverse\DeckWriter;
 use MarkdownPresentation\Reverse\Options;
 use MarkdownPresentation\Reverse\Package;
 use MarkdownPresentation\Reverse\Slide;
+use MarkdownPresentation\Theme\ThemeResolver;
 use PhpOffice\PhpPresentation\PhpPresentation;
 
 /**
@@ -48,6 +50,7 @@ final class PowerPointToMarkdown
     public function __construct(
         private readonly ?string $source = null,
         private readonly Options $options = new Options(),
+        private readonly ThemeResolver $themes = new ThemeResolver(),
     ) {
     }
 
@@ -156,7 +159,11 @@ final class PowerPointToMarkdown
         $deck = $package->deck();
         $slides = (new DeckReader($this->options))->read($deck);
 
-        $markdown = (new DeckWriter($this->options))->write($slides, $deck->getDocumentProperties());
+        $markdown = (new DeckWriter($this->options))->write(
+            $slides,
+            $deck->getDocumentProperties(),
+            $this->themeOf($package),
+        );
 
         $this->writeMedia($slides, $target);
 
@@ -165,6 +172,28 @@ final class PowerPointToMarkdown
         }
 
         return $markdown;
+    }
+
+    /**
+     * The name of the theme the deck was drawn in, when it is one a deck can name again.
+     *
+     * The name in the package is the name a deck's `theme:` names only when this library
+     * wrote the deck: another program writes `Office Theme` there, or nothing at all. A deck
+     * that names a theme nobody has is a deck that cannot be drawn again, so a name the
+     * resolver does not offer is not written — and the default theme is not written either,
+     * because a deck that names it is a deck that names nothing in particular.
+     */
+    private function themeOf(Package $package): ?string
+    {
+        $name = $package->theme();
+
+        if ($name === null || $name === DeckTheme::DEFAULT_THEME) {
+            return null;
+        }
+
+        $offered = $this->themes->beside($package->directory())->available();
+
+        return in_array($name, $offered, true) ? $name : null;
     }
 
     /**

@@ -36,8 +36,10 @@ final class DeckWriter
      * The deck, as Markdown.
      *
      * @param list<Slide> $slides
+     * @param string|null  $theme The name of the theme the deck was drawn in, when it is one
+     *                            a deck can name again.
      */
-    public function write(array $slides, DocumentProperties $properties): string
+    public function write(array $slides, DocumentProperties $properties, ?string $theme = null): string
     {
         $out = [];
 
@@ -45,7 +47,7 @@ final class DeckWriter
             $body = $this->slide($slide);
 
             if ($index === 0) {
-                $frontmatter = $this->frontmatter($properties);
+                $frontmatter = $this->frontmatter($properties, $theme);
 
                 if ($frontmatter !== '') {
                     $body = $frontmatter . "\n" . $body;
@@ -66,11 +68,19 @@ final class DeckWriter
 
     /**
      * The deck's own properties, as a frontmatter block.
+     *
+     * The theme is one of them: a deck read back into Markdown and drawn again comes back in
+     * the theme it was drawn in rather than in the library's own, and the design of a deck is
+     * most of what a deck is.
+     *
+     * @param string|null $theme The name of the theme the deck was drawn in, when it is one
+     *                           a deck can name again.
      */
-    private function frontmatter(DocumentProperties $properties): string
+    private function frontmatter(DocumentProperties $properties, ?string $theme = null): string
     {
         $values = [
             'title' => $properties->getTitle(),
+            'theme' => $theme,
             'author' => $properties->getCreator(),
             'description' => $properties->getDescription(),
         ];
@@ -78,6 +88,12 @@ final class DeckWriter
         $lines = [];
 
         foreach ($values as $key => $value) {
+            // A theme the deck does not name is not written: the line would say `theme:` and
+            // name nothing, which is a theme of the library's own rather than of the deck's.
+            if ($value === null) {
+                continue;
+            }
+
             $value = trim($value);
 
             if ($value === '') {
@@ -145,8 +161,49 @@ final class DeckWriter
             Block::LIST => $this->list($block),
             Block::TABLE => $this->table($block),
             Block::IMAGE => $this->image($block),
+            Block::SHAPE => $this->shape($block),
             default => [],
         };
+    }
+
+    /**
+     * A free shape, as the directive that draws it.
+     *
+     * A free text block is a fence rather than a line: its body goes between the fences and
+     * the closing fence is on a line of its own.
+     *
+     * @return list<string>
+     */
+    private function shape(Block $block): array
+    {
+        $shape = $block->shape;
+
+        if (!$shape instanceof Shape) {
+            return [];
+        }
+
+        $attributes = [];
+
+        foreach ($shape->attributes as $name => $value) {
+            $attributes[] = sprintf('%s=%s', $name, $value);
+        }
+
+        // A free text block is a fence of three colons, because it holds a body rather than
+        // being one line.
+        $colons = $shape->hasBody() ? ':::' : '::';
+        $written = sprintf('%s%s{%s}', $colons, $shape->directive, implode(' ', $attributes));
+
+        if (!$shape->hasBody()) {
+            return [$written];
+        }
+
+        $body = [];
+
+        foreach ($shape->body as $block) {
+            $body = [...$body, ...$this->block($block)];
+        }
+
+        return [sprintf("%s\n%s\n:::", $written, implode("\n", $body))];
     }
 
     /**

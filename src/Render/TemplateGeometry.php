@@ -44,6 +44,15 @@ final class TemplateGeometry
 
     private const PRESENTATIONML = 'http://schemas.openxmlformats.org/presentationml/2006/main';
     private const DRAWINGML = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+
+    /**
+     * The anchors a placeholder's text may sit at.
+     *
+     * The five the format names. `t` is the top and `ctr` the middle and `b` the bottom;
+     * `just` is justified and `dist` distributed, which are about the space between the
+     * lines rather than about where the block sits.
+     */
+    private const ANCHORS = ['t', 'ctr', 'b', 'just', 'dist'];
     private const RELATIONSHIPS = 'http://schemas.openxmlformats.org/package/2006/relationships';
 
     /**
@@ -172,6 +181,7 @@ final class TemplateGeometry
                 );
 
                 $placeholders[$key]['box'] = $inherited[$key]['box'] ?? null;
+                $placeholders[$key]['anchor'] ??= $inherited[$key]['anchor'] ?? null;
             }
 
             $cover = $this->cover($placeholders);
@@ -210,7 +220,7 @@ final class TemplateGeometry
      *
      * @param array{cx: int, cy: int} $page
      *
-     * @return array<string, array{type: string, idx: int, box: ?Box}>
+     * @return array<string, array{type: string, idx: int, box: ?Box, anchor: ?string}>
      */
     private function placeholders(DOMDocument $document, array $page): array
     {
@@ -250,6 +260,7 @@ final class TemplateGeometry
                 'type' => $type,
                 'idx' => $idx,
                 'box' => $this->box($shape, $page),
+                'anchor' => self::anchor($shape),
             ];
         }
 
@@ -258,6 +269,11 @@ final class TemplateGeometry
 
     /**
      * The rectangle a placeholder occupies in pixels, or null where it states none.
+     *
+     * The anchor of the text in it is read beside the box rather than inside it, because the
+     * two are inherited separately: a layout that moves nothing but re-anchors the text is a
+     * thing PowerPoint writes, and a reader that took the master's anchor with the master's
+     * box would lose the one the layout stated.
      *
      * @param array{cx: int, cy: int} $page
      */
@@ -291,9 +307,30 @@ final class TemplateGeometry
     }
 
     /**
+     * Where the text sits in a placeholder's box, or null where the placeholder says nothing.
+     *
+     * The `anchor` attribute of the `a:bodyPr` in the placeholder's body: `t`, `ctr`, `b`,
+     * `just` or `dist`. An attribute that is not one of those is not read, because a
+     * placeholder that says something this library does not know is a template to be looked
+     * at rather than a value to be guessed at.
+     */
+    private static function anchor(DOMElement $shape): ?string
+    {
+        $body = self::first(self::first($shape, self::PRESENTATIONML, 'txBody'), self::DRAWINGML, 'bodyPr');
+
+        if ($body === null) {
+            return null;
+        }
+
+        $anchor = $body->getAttribute('anchor');
+
+        return in_array($anchor, self::ANCHORS, true) ? $anchor : null;
+    }
+
+    /**
      * What a layout's placeholders say about the roles it can stand for.
      *
-     * @param array<string, array{type: string, idx: int, box: ?Box}> $placeholders
+     * @param array<string, array{type: string, idx: int, box: ?Box, anchor: ?string}> $placeholders
      *
      * @return array{title?: Box, body?: non-empty-list<Box>}
      */
@@ -308,6 +345,12 @@ final class TemplateGeometry
             if ($box === null) {
                 continue;
             }
+
+            // The anchor is the other half of what a placeholder says about itself: the box
+            // is where the text goes and the anchor is where in the box it sits. A template
+            // whose title is anchored in the middle of its box and a template whose title is
+            // anchored at the top of it draw the same box and different documents.
+            $box = new Box($box->x, $box->y, $box->width, $box->height, $placeholder['anchor']);
 
             if (in_array($placeholder['type'], self::TITLE_TYPES, true)) {
                 $title ??= $box;

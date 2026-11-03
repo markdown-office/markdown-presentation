@@ -519,6 +519,23 @@ it('does not claim again what the code does not do', function (string $claim) {
     'the disk finder is the default of every role' => '`Files\DiskFinder` is the default',
     // A docblock that points at a property by name has to point at the property there is.
     'a docblock points at the property the rename left behind' => 'see {@see self::$files}',
+
+    // The notes master's theme is a copy of the deck's own, and the copy is made after the
+    // deck's theme has been named — so the copy carries the name with it. A docblock that
+    // says the copy is not named says the opposite of what the package holds, and a reader
+    // would go looking for a theme part that is not there.
+    'the notes master\'s copy of the theme is not named' => 'a name on the copy would say the notes master was drawn in a theme of its own',
+    // A layout's placeholder is written with the anchor its template gave it, so a layout's
+    // body properties are empty only where the template said nothing. The phrase is the one
+    // the docblock gave, and it said the layout's were empty either way.
+    'a layout\'s body properties are empty either way' => 'on a layout an empty one is right, and this writes a layout\'s own either way',
+    // The size of the type in a free text block travels with the block: it is an attribute
+    // of the directive rather than of the words in it, and the reader writes it back. A page
+    // that says it does not travel says the opposite of what the reader does.
+    'the size of the type in a free text block does not travel' => 'the size of the type in it does not',
+    // The placement table names eight attributes, and a count of them in prose is wrong the
+    // moment one is added. The phrase is the heading the page carried when it was one short.
+    'the placement table names seven attributes' => 'Seven attributes, on every name',
 ]);
 
 it('has no decorative dividers in it', function () {

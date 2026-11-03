@@ -4,6 +4,103 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A free shape may bleed off the edge of the slide.** `bleed=true` on a shape is the
+  permission: the shape may have a negative `left` or `top`, and may be wider than the
+  slide reaches.
+
+  A shape that bleeds still has to be **on** the slide. A shape whose whole box is past an
+  edge is a shape somewhere else, and `bleed=true` does not make it visible, so that is
+  refused too.
+
+  The permission is on the shape rather than on the deck, because the refusal it replaces is
+  on the shape too. A deck-level switch would silence the check for every shape in it,
+  including the ones nobody thought about, and a `left=-20` that was a typo is exactly what
+  the check is for.
+
+  The refusal names what would have worked, which it did not before:
+
+  > Slide 1 gives "roundrect" a left of "-20%". A length is not negative: a free shape lies
+  > within the slide unless it is written to bleed, so write left=0 rather than a negative
+  > one — or write bleed=true if the shape is meant to run off the edge.
+
+- **`preserveGeometry` writes the shapes a deck placed itself back out.** A deck read back
+  into Markdown came back as text, and every free shape in it was left out: the shape itself
+  disappeared, not merely its design, and `deck.md` → `deck.pptx` → `deck.md` lost every
+  position, colour and size.
+
+  With the switch on, a free shape comes back as the free shape it is, with the box it was
+  given and the colour it was painted, and a free text block comes back with the words it
+  holds:
+
+  ```markdown
+  ::roundrect{left=10% top=40% width=30% height=20% fill=4472C4}
+
+  :::content{left=50% top=40% width=30% height=20% color=000000 font-size=16}
+  Text in a free box.
+  :::
+  ```
+
+  The box is written as a percentage of the slide, because a shape is placed relative to the
+  slide rather than in the pixels of one page size, and a shape that runs off the edge is
+  written with `bleed=true`, because a shape off the edge is refused by the renderer unless
+  it says so.
+
+  **The paint travels with the box.** A shape comes back with the colour it was filled with and
+  the colour it was stroked in, and a free text block comes back with the colour and the size
+  of the type in it. A rule is a stroke and not a fill, and a rule that comes back with no
+  colour is a rule nobody can see.
+
+  What still does not travel is what a shape is besides its box and its paint: the theme
+  slot a colour came from, the shadow it casts, the corner radius of a rounded rectangle,
+  the layer it was drawn on and the anchor of its box. And one thing the format cannot say: a
+  border is born black, and a reader cannot tell a border that was never given a colour from
+  one that was given black — so a stroke of pure black comes back as no stroke at all.
+
+  **Two things are the design and do not travel.** The `layout:` of a slide is not in the
+  file: the role is a thing the deck said, and what the file holds is a layout part, which is
+  the design. And a picture the deck placed comes back as a picture — its bytes and its alt
+  text — because where a picture sits is part of the design and not part of the picture.
+
+- **A deck records the theme it was drawn in.** A `.pptx` carried the theme's colours and its
+  fonts and nothing else about it: the name a deck's `theme:` names was a property of the
+  Markdown the deck was written from, and nothing in the package said which directory it came
+  from. A deck read back into Markdown therefore came back in the library's own theme rather
+  than the one it was drawn in, and the difference is everything the theme is.
+
+  The name is written where PowerPoint writes the name of a theme — the `name` attribute of
+  the `a:theme` element in the theme part — and it comes back out of it into the frontmatter
+  of the Markdown:
+
+  ```markdown
+  ---
+  title: "A themed deck"
+  theme: "pitch"
+  ---
+  ```
+
+  A name the resolver does not offer is not written, because a deck that names a theme nobody
+  has is a deck that cannot be drawn again. Another program writes `Office Theme` there, and
+  that is not a name a deck can use.
+
+### Fixed
+
+- **The anchor of a template's placeholder is read and written.** The renderer read a
+  template's placeholder *geometry* and dropped its *anchor*, so a template whose title
+  placeholder was anchored in the middle of its box drew the title at the top of it, and
+  PowerPoint fell back to the top because that is what an anchor it is not told means.
+
+  The anchor is the `anchor` attribute of the `a:bodyPr` in the placeholder's body — the
+  text's anchor and not the box's, and the two are inherited separately, because a layout
+  that moves nothing but re-anchors its text is a thing PowerPoint writes.
+
+  The two decks in `tests/fixtures/powerpoint/` were authored in PowerPoint and carry the
+  anchor in nearly every one of their placeholders, so the suite had the proof of the defect
+  in its own test data and was not reading it.
+
 ## [0.3.1] - 2026-11-01
 
 ### Added

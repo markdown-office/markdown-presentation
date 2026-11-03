@@ -78,7 +78,13 @@ final class ShapeReader
 
         self::refusable($state->slide, $kind, $node, $attributes, $state->written($node));
 
-        $placement = Placement::read($state->slide, $kind->value, $attributes, $kind);
+        $placement = Placement::read(
+            $state->slide,
+            $kind->value,
+            $attributes,
+            $kind,
+            self::flag($state->slide, $kind->value, $attributes, 'bleed'),
+        );
 
         $state->place($this->shape($kind, $placement, $node, $attributes, $state));
     }
@@ -151,18 +157,27 @@ final class ShapeReader
     /**
      * Whether the number of the deck is written after the number of the slide.
      *
-     * A flag, and read as one: `getBool()` answers false for a word it does not know, so
-     * `of=maybe` was a page number with no deck count on it and nothing said so. Every other
-     * value in this vocabulary is refused with a sentence, and this one is refused with one
-     * too.
-     *
-     * A bare `of` asks for the attribute rather than for its value, so it means true.
-     *
      * @throws MalformedShape
      */
     private static function of(int $slide, DirectiveAttributes $attributes): bool
     {
-        $written = $attributes->get('of');
+        return self::flag($slide, ShapeKind::SlideNumber->value, $attributes, 'of');
+    }
+
+    /**
+     * A flag, read as one.
+     *
+     * `getBool()` answers false for a word it does not know, so `of=maybe` was a page number
+     * with no deck count on it and nothing said so. Every other value in this vocabulary is
+     * refused with a sentence, and this one is refused with one too.
+     *
+     * A bare attribute asks for the attribute rather than for its value, so it means true.
+     *
+     * @throws MalformedShape
+     */
+    private static function flag(int $slide, string $name, DirectiveAttributes $attributes, string $attribute): bool
+    {
+        $written = $attributes->get($attribute);
 
         if ($written === null) {
             return false;
@@ -178,7 +193,7 @@ final class ShapeReader
             return $lower === 'true';
         }
 
-        throw MalformedShape::flag($slide, ShapeKind::SlideNumber->value, 'of', $written);
+        throw MalformedShape::flag($slide, $name, $attribute, $written);
     }
 
     /**
