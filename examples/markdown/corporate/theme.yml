@@ -40,3 +40,45 @@ style:
   leading: 1.4
   heading-weight: bold
   heading-ink: ink
+
+# The layout name of each role.
+#
+# A `layouts:` section is the whole mapping: a role it does not name is a role the theme
+# does not map, and a deck that asks for one is told which roles the theme does map. This
+# one names every role.
+#
+# The names are Office's own, and they are the names a `template.pptx` dropped in beside
+# this file would carry. Until that file is there the names are labels: the boxes behind
+# them are the ones this theme computes from its own margins and type scale.
+layouts:
+  title: Title Slide
+  content: Title and Content
+  two-column: Two Content
+  section: Section Header
+  blank: Blank
+  image-text: Picture Left
+  image-title: Picture with Caption
+  image-slide: Full Bleed Picture
+
+# The named text styles: the words inside a box, written in a deck as `:brand[...]`.
+#
+# The properties are the same eight the inline style attributes have, and a size is
+# in points as it is everywhere else.
+#
+# These are the four a corporate deck uses most. The wordmark is the company's own
+# name, the brand is the primary colour, the eyebrow is the small line above a
+# title, and the muted style is what a caption is written in.
+textStyles:
+  wordmark:
+    color: dk1
+    bold: true
+  brand:
+    color: accent1
+    bold: true
+  eyebrow:
+    color: accent1
+    bold: true
+    size: 11
+  muted:
+    color: lt2
+    size: 12

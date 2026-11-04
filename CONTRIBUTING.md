@@ -66,12 +66,12 @@ renders of one deck differ; the parts are what a test reads.
 | The theme's twelve colours become the colour scheme | `ppt/theme/theme1.xml` |
 | A dark theme swaps the colour map, and its shapes follow it | `ppt/slideMasters/slideMaster1.xml`, `ppt/slides/slideN.xml` |
 | The theme's `heading`, `body` and `mono` reach the runs that use them | `<a:latin typeface="…">` |
-| `styles.yml` reaches no shape, because a `.pptx` has no use for a `.docx` style id | — |
+| A `styles.yml` beside a theme is refused, because a `.pptx` has no use for a `.docx` style id | — |
 
-The last row is the only one asserted by what is *absent*. `styles.yml` is not read, and
-a slot that does not exist still fails when the theme is loaded, so a typo in one is never
-rendered as silence — which is a test, but a test of the theme loader rather than of a
-rendered file.
+The last row is the only one asserted by what is *absent*. A `styles.yml` beside a theme is
+refused when the theme is loaded, so a theme that carries one is never read as though it had
+said nothing — which is a test, but a test of the theme loader rather than of a rendered
+file.
 
 Reading has the opposite problem, and it is where the fixtures earn their place. Everything
 above is checked against files this library wrote, which agree with the reader about every

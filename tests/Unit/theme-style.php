@@ -11,7 +11,6 @@ use MarkdownPresentation\Theme\StyleMapping;
 use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeMapping;
 use MarkdownPresentation\Theme\ThemeResolver;
-use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Tests\Support\Pptx;
 use MarkdownPresentation\Tests\Support\Scratch;
 
@@ -50,17 +49,10 @@ function styledTheme(array $style, array $colors = []): Theme
 function themedDeck(Theme $theme, string $markdown = "---\ntheme: %s\n---\n\n# T\n\n## Sub\n\nBody.\n\n***\n"): Pptx
 {
     $directory = Scratch::directoryPath('theme');
-    file_put_contents($directory . '/theme.yml', (string) json_encode(ThemeMapping::write($theme)));
 
-    // A theme with no `layouts.yml` maps no role at all, and a deck is written in the
-    // `content` role whether it says so or not — so the mappings a deck needs are the ones
-    // every shipped theme carries, and naming them here keeps what is under test the style.
-    file_put_contents($directory . '/layouts.yml', (string) json_encode([
-        'layouts' => array_combine(
-            LayoutRole::names(),
-            array_map(static fn (LayoutRole $role): string => ucwords(str_replace('-', ' ', $role->value)), LayoutRole::cases()),
-        ),
-    ]));
+    // A theme with no `layouts:` section is drawn with the library's own mapping, which
+    // covers every role, so what is under test here is the style and nothing else.
+    file_put_contents($directory . '/theme.yml', (string) json_encode(ThemeMapping::write($theme)));
 
     $path = Scratch::file('style.pptx', '');
 

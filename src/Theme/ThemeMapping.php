@@ -17,7 +17,13 @@ use MarkdownPresentation\Exception\MalformedTheme;
  */
 final class ThemeMapping
 {
-    /** The keys a `theme.yml` may have. */
+    /**
+     * The keys a theme's own values may have.
+     *
+     * The theme's own, and not the file's: the two sections a theme's file may carry
+     * beside them are read by {@see \MarkdownPresentation\Theme\ThemeLoader}, which is
+     * what tells the two apart and refuses a key that is neither.
+     */
     public const KEYS = ['name', 'description', 'author', 'dark', 'colors', 'fonts', 'style'];
 
     /**
@@ -79,10 +85,12 @@ final class ThemeMapping
     }
 
     /**
-     * The theme's `theme.yml` as an array, in DrawingML's spellings.
+     * The theme's own values as an array, in DrawingML's spellings.
      *
-     * The named text styles are not in here: they are read from a file of their own, and a
-     * `theme.yml` that carried them would be a theme with two places to say the same thing.
+     * The named text styles are not in here: they are not values a slide may lay over,
+     * and a theme's file carries them beside these rather than among them. They travel
+     * beside the round trip instead — {@see \MarkdownPresentation\Theme\ThemeVariables::apply()}
+     * hands the theme's own styles back to the reader.
      *
      * @return array{name: string, description: ?string, author: ?string, dark: bool, colors: array<string, string>, fonts: array<string, string>, style: array<string, mixed>}
      */

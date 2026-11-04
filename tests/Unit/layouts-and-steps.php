@@ -88,8 +88,7 @@ it('refuses a layout role that is not one, and names the ones there are', functi
 it('refuses a layout the theme does not map, and names the ones it maps', function () {
     // A role the theme does not map is the theme's to fix, and its message already says so.
     $themes = ThemeDirectory::create([
-        'theme.yml' => "name: Sparse\n",
-        'layouts.yml' => "layouts:\n  title: Title Slide\n  content: Title and Content\n",
+        'theme.yml' => "name: Sparse\nlayouts:\n  title: Title Slide\n  content: Title and Content\n",
     ]);
 
     $path = Scratch::file('deck.pptx', '');
@@ -151,7 +150,9 @@ it('takes a role\'s title and body from a template where one covers it', functio
 
 it('leaves the roles a template says nothing about where the library puts them', function () {
     // A template that maps only some layouts is a theme that works, not one that fails on
-    // the three its deck never asked for — the rule `layouts.yml` already follows.
+    // the three its deck never asked for. A theme's `layouts:` section is the other rule
+    // entirely: it is the whole mapping, so a role it does not name is a role the theme
+    // does not map.
     $geometry = (new SlideGeometry())->with(['content' => ['body' => [new Box(0, 0, 10, 10)]]]);
 
     expect($geometry->body(LayoutRole::TwoColumn))->toHaveCount(2)

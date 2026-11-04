@@ -1,0 +1,5 @@
+# The named text styles, in a file beside the theme. This file is no longer part of the
+# format: its content belongs in the "textStyles:" section of the theme's own file.
+brand:
+  color: accent1
+  bold: true

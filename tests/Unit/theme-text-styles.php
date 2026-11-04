@@ -9,22 +9,24 @@ use MarkdownPresentation\Theme\TextStyles;
 use MarkdownPresentation\Theme\Theme;
 
 /**
- * The theme's named text styles: what a `text-styles.yml` says, and what the loader makes
- * of it.
+ * The theme's named text styles: what a `textStyles:` section says, and what the loader
+ * makes of it.
  *
  * The styles are a theme's own vocabulary, and the loader is where a mistake in one is
  * caught: a theme that names an attribute nobody reads is a theme nobody wanted.
  */
 
 /**
- * A theme directory with the named text styles beside the manifest.
+ * A theme directory whose own file carries the named text styles.
  *
  * The manifest is the library's own, because the styles are what these tests are about and
  * a theme that shipped with one would put a second claim into every assertion.
  */
 function themeWithTextStyles(string $styles): string
 {
-    return ThemeDirectory::acme(['text-styles.yml' => $styles], 'text-style');
+    return ThemeDirectory::create([
+        'theme.yml' => "name: Acme\ntextStyles:\n" . preg_replace('/^/m', '  ', rtrim($styles, "\n")) . "\n",
+    ], 'text-style');
 }
 
 it('reads the named styles a theme carries', function () {

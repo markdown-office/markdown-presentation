@@ -24,3 +24,11 @@ fonts:
   heading: Source Sans Pro
   body: Source Sans Pro
   mono: Fira Code
+
+# The layout names this theme's own `template.pptx` gives each role.
+#
+# One role is mapped, because the template carries one layout. A role the section does
+# not name is a role the theme does not map, and a deck that asks for one is told which
+# roles this theme does have.
+layouts:
+  content: Title and Content

@@ -8,10 +8,11 @@ templates-file: ./templates/templates.md
 
 # Every frontmatter key
 
-Fifteen keys: `title`, `name`, `level`, `layout`, `theme`, `author`, `description`,
-`template`, `templates-file`, `template-settings`, `background`, `background-gradient`,
-`background-angle`, `background-radial` and `theme-variables`. A block naming a sixteenth is
-a failure that names these fifteen, and this slide carries the first four.
+Sixteen keys: `title`, `name`, `level`, `layout`, `theme`, `author`, `description`,
+`template`, `templates-file`, `template-settings`, `deck-settings`, `background`,
+`background-gradient`, `background-angle`, `background-radial` and `theme-variables`. A block
+naming a seventeenth is a failure that names these sixteen, and this slide carries the first
+four.
 
 ---
 name: A title that is not a heading

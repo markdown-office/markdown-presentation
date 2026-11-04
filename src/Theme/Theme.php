@@ -349,7 +349,7 @@ final class Theme
     /**
      * The named text styles this theme carries.
      *
-     * Empty for a theme without a `text-styles.yml`, which is most of them: a style is
+     * Empty for a theme without a `textStyles:` section, which is most of them: a style is
      * something a deck names, and a deck that names none has said nothing about the words
      * it draws.
      */

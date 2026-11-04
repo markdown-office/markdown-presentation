@@ -70,8 +70,10 @@ function measuredIn(string $theme, string $markdown): Pptx
 function themeNamingMono(string $face): string
 {
     return ThemeDirectory::create([
-        'theme.yml' => sprintf("name: Mono\nfonts:\n  mono: \"%s\"\n", $face),
-        'layouts.yml' => "layouts:\n  title: Title Slide\n  content: Title and Content\n",
+        'theme.yml' => sprintf(
+            "name: Mono\nfonts:\n  mono: \"%s\"\nlayouts:\n  title: Title Slide\n  content: Title and Content\n",
+            $face,
+        ),
     ]);
 }
 
@@ -464,8 +466,8 @@ function renderedIn(string $theme, bool $strict = false): PresentationRenderer
 function themeWithAnUnknownFace(): string
 {
     return ThemeDirectory::create([
-        'theme.yml' => "name: Odd\nfonts:\n  heading: \"Comic Sans MS\"\n  body: \"Comic Sans MS\"\n",
-        'layouts.yml' => "layouts:\n  title: Title Slide\n  content: Title and Content\n",
+        'theme.yml' => "name: Odd\nfonts:\n  heading: \"Comic Sans MS\"\n  body: \"Comic Sans MS\"\n"
+            . "layouts:\n  title: Title Slide\n  content: Title and Content\n",
     ]);
 }
 

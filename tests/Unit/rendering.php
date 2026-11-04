@@ -334,8 +334,7 @@ it('renders a deck whose theme sits beside it', function () {
     // The theme of a deck is in the deck's own directory, and the process rendering the
     // deck is somewhere else: a deck rendered by its path finds its theme either way.
     $directory = ThemeDirectory::create([
-        'themes/bakery/theme.yml' => "name: Bakery\n",
-        'themes/bakery/layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'themes/bakery/theme.yml' => "name: Bakery\nlayouts:\n  content: Title and Content\n",
     ], 'deck');
 
     $pptx = renderDeck("---\ntheme: bakery\n---\n\n# One\n", $directory);
@@ -349,8 +348,7 @@ it('renders a deck whose theme is a manifest beside it', function () {
     // path is: `theme: ./theme.yml` names the manifest next to the deck, and a build
     // script that renders a deck by its path must not have to change directory first.
     $directory = ThemeDirectory::create([
-        'theme.yml' => "name: Beside\n",
-        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'theme.yml' => "name: Beside\nlayouts:\n  content: Title and Content\n",
     ], 'deck');
 
     $pptx = renderDeck("---\ntheme: ./theme.yml\n---\n\n# One\n", $directory);
@@ -1909,7 +1907,7 @@ it('refuses a frontmatter key nobody acts on, and lists the ones there are', fun
             UnknownDirective::class,
             'The frontmatter of slide 1 names "transition", which is not a directive. '
             . 'The directives are: title, name, level, layout, theme, author, description, template, templates-file, '
-            . 'template-settings, background, background-gradient, background-angle, background-radial, theme-variables.',
+            . 'template-settings, deck-settings, background, background-gradient, background-angle, background-radial, theme-variables.',
         );
 });
 

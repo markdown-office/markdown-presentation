@@ -9,9 +9,9 @@ use MarkdownPresentation\Exception\MalformedTheme;
 /**
  * The named styles a theme carries.
  *
- * A theme without a `text-styles.yml` has none, and every named form is then a name this
- * theme does not have — which is a refusal naming the styles that exist, and there are
- * none.
+ * A theme without a `textStyles:` section has none, and every named form is then a name
+ * this theme does not have — which is a refusal naming the styles that exist, and there
+ * are none.
  *
  * The names are folded, because a style's name is a word to a reader: `:Brand[Bakery]` and
  * `:brand[Bakery]` are the same word written twice. The theme's own spelling is kept

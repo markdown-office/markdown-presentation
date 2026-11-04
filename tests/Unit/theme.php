@@ -7,7 +7,6 @@ use MarkdownPresentation\Tests\Support\Contrast;
 use MarkdownPresentation\Theme\Fonts;
 use MarkdownPresentation\Theme\LayoutRole;
 use MarkdownPresentation\Theme\Style;
-use MarkdownPresentation\Theme\StyleSlots;
 use MarkdownPresentation\Theme\Theme;
 use MarkdownPresentation\Theme\ThemeMapping;
 
@@ -131,6 +130,17 @@ it('gives the theme back as the array it was read from', function () {
         ->and(Theme::fromArray(ThemeMapping::write($night))->isDark())->toBeTrue();
 });
 
+it('writes the theme\'s own values and not the sections beside them', function () {
+    // The round trip a slide's own values make writes the theme out and reads it back, and
+    // the sections are not among the values: a section written here would be a key the
+    // reader does not know, and every slide that laid values over a theme would fail.
+    $written = ThemeMapping::write(Theme::fromArray(['name' => 'Round', 'style' => ['margin' => 48]]));
+
+    expect($written)->not->toHaveKey('layouts')
+        ->and($written)->not->toHaveKey('textStyles')
+        ->and($written)->toHaveKey('style');
+});
+
 it('refuses a theme with no name', function () {
     Theme::fromArray(['colors' => []]);
 })->throws(MalformedTheme::class, 'A theme needs a "name"');
@@ -247,11 +257,6 @@ it('lists the layout roles a deck may write', function () {
     ])
         ->and(LayoutRole::from('two-column'))->toBe(LayoutRole::TwoColumn)
         ->and(LayoutRole::tryFrom('Two Content'))->toBeNull();
-});
-
-it('lists the style slots a theme may name', function () {
-    expect(StyleSlots::names())->toContain('heading.1', 'paragraph', 'codeFont', 'tableCell')
-        ->and(StyleSlots::names())->not->toContain('blockquote');
 });
 
 it('loads every theme that ships with the library', function () {

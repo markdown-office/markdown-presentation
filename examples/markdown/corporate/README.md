@@ -9,9 +9,7 @@ decks have, and every part of it is a file you edit.
 
 | | |
 | --- | --- |
-| `theme.yml` | the design — the twelve colour slots, the faces, the type scale and the rhythm |
-| `layouts.yml` | which layout each of the eight roles gets |
-| `text-styles.yml` | the named text styles a deck writes words in |
+| `theme.yml` | the design — the twelve colour slots, the faces, the type scale, the rhythm, the named text styles a deck writes words in, and the layout each role gets |
 | `templates.md` | the furniture of a deck: the wordmark, the rule, the footer |
 | `logo.png`, `logo-light.png` | the mark, for a light page and for a dark one |
 | `make-logo.php` | draws the two marks from the theme's colours |
@@ -20,7 +18,7 @@ The deck that uses all of it is `../17-corporate-template.md`.
 
 ## Changing it to your company
 
-Three things, and each is one file.
+Four things, and each of them is a file or a section of one.
 
 **The name.** `templates.md` holds the wordmark, and the name is in it twice — once in the
 light template and once in the dark one. The dark one is the same named style with the
@@ -30,12 +28,23 @@ colour laid over it:
 :wordmark[Halden Instruments]{color=lt1}
 ```
 
-So the name is two edits, and the style behind it is one: `text-styles.yml`.
+So the name is two edits, and the style behind it is one: the `textStyles:` section of
+`theme.yml`.
 
 **The mark.** Drop your own `logo.png` and `logo-light.png` in beside the theme — same
 names, same 512 × 512 — and nothing else changes. To draw the mark that is here instead,
 `php make-logo.php` reads the theme's colours and writes both files, so the logo and the
 theme cannot drift apart.
+
+**The layouts.** `theme.yml` carries a `layouts:` section, and a section is the **whole**
+mapping: a role it does not name is a role the theme does not map, and a deck that asks for
+one is told which roles the theme does map. This one names every role, in Office's own
+names.
+
+Until a `template.pptx` is dropped in beside the theme the names are labels — the boxes
+behind them are the ones the theme computes from its own margins and type scale. That file
+is what makes them real: a template's own layout part carries the name the section gives
+it, and the theme that carries the template is drawn in the template's geometry.
 
 **The colours.** `theme.yml`, and nothing else. The names are the format's: `lt1` is the
 page, `dk1` the ink, `lt2` the quiet ink a caption is written in, `dk2` the panel a dark

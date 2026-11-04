@@ -36,6 +36,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `18-bleeding-shapes.md` | `18-bleeding-shapes.pptx` | Shapes that run off the edge of the slide: a circle cut off by the right edge, a panel running under the foot of the page, and the refusal that names `bleed=true` as the way out. The Word half has the same rule for a text box that hangs off the edge of the page |
 | `17-corporate-template.md` | `17-corporate-template.pptx` | A whole corporate template: a theme of the company's own, a brand mark in two colours — one for a light page and one for a dark one — and the furniture of a deck written once and named by every slide that wants it. Eight slides of the kinds a company deck is made of: a cover, an agenda, a headline, two columns with a chart, a quote, a table, a divider and a closing. The company is invented |
 | `19-gradient-background.md` | `19-gradient-background.pptx` | A gradient on a shape — two stops, three stops with the middle one at half, a radial one, and an angle of 0° — a background painted with a colour, with a gradient and with a radial gradient, a slide that names the theme's values for itself, and a template that carries settings of its own |
+| `20-deck-settings.md` | `20-deck-settings.pptx` | The settings of the deck: a page and an ink every slide of the deck is drawn with, and the two slides that name a setting of their own — one that wins over the deck's, and one that leaves the deck's other settings standing |
 
 ## The deck that is not anybody's business
 
@@ -196,3 +197,7 @@ A few of these are here because the render is the only honest evidence:
   move and the page around them is what the pair is for.
 - **`09`.** The title is `Ops **runbook**: what *changed*` and is drawn with the
   emphasis, once, and is not repeated in the body.
+- **`20`, the third and fourth slides.** The third names a background of its own and is
+  painted on it, and the fourth names an ink of its own and is written in it — and is
+  still painted on the deck's page, because one value laid over another leaves the rest
+  alone.

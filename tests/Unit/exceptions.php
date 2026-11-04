@@ -27,7 +27,7 @@ use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Exception\UnknownFont;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnknownMarker;
-use MarkdownPresentation\Exception\UnknownStyleSlot;
+use MarkdownPresentation\Exception\RetiredThemeFile;
 use MarkdownPresentation\Exception\UnknownTemplate;
 use MarkdownPresentation\Exception\UnknownTextStyle;
 use MarkdownPresentation\Exception\UnreadableDeck;
@@ -110,6 +110,7 @@ it('reports what a deck author can fix under the class that says so', function (
         MalformedTemplatesFile::class,
         MalformedTextStyle::class,
         MalformedTheme::class,
+        RetiredThemeFile::class,
         TemplatesFileNotFound::class,
         TemplatesFileTooLarge::class,
         ThemeNotFound::class,
@@ -119,7 +120,6 @@ it('reports what a deck author can fix under the class that says so', function (
         UnknownFont::class,
         UnknownLayoutRole::class,
         UnknownMarker::class,
-        UnknownStyleSlot::class,
         UnknownTemplate::class,
         UnknownTextStyle::class,
         UnsupportedColumn::class,

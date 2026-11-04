@@ -14,7 +14,7 @@ use MarkdownPresentation\Tests\Support\Scratch;
  *
  * The values are a `theme.yml`, so the vocabulary is the theme's own and the reader is the
  * theme's own. What is checked here is the merge: the slide's over the template's, the
- * template's over the theme's, and one value over another leaving the rest alone.
+ * template's over the deck's, and one value over another leaving the rest alone.
  */
 function variablesDeck(string $markdown): Pptx
 {
@@ -24,27 +24,6 @@ function variablesDeck(string $markdown): Pptx
         ->render((new DeckParser())->parse($markdown), $path);
 
     return Pptx::open($path);
-}
-
-/** The colours the words of a slide are drawn in, in the order the file lists them. */
-function inkOf(Pptx $pptx, int $slide = 1): array
-{
-    $xml = $pptx->part(sprintf('ppt/slides/slide%d.xml', $slide));
-    preg_match_all('#<a:rPr[^>]*>\s*<a:solidFill>\s*<a:srgbClr val="([0-9A-F]{6})"#', $xml, $matches);
-
-    return $matches[1];
-}
-
-/** The colour the page behind a slide is painted with, or null where it has none of its own. */
-function pageOf(Pptx $pptx, int $slide = 1): ?string
-{
-    $xml = $pptx->part(sprintf('ppt/slides/slide%d.xml', $slide));
-
-    if (preg_match('#<p:bg>.*?<a:srgbClr val="([0-9A-F]{6})"#s', $xml, $matches) !== 1) {
-        return null;
-    }
-
-    return $matches[1];
 }
 
 it('writes a slide in the colour it names', function () {
@@ -130,6 +109,15 @@ it('writes a slide in the type scale it names', function () {
 it('refuses a key that is not a value a theme holds', function () {
     expect(fn () => variablesDeck("---\ntheme-variables:\n  name: mine\n---\n\n# One\n"))
         ->toThrow(MalformedTheme::class, '"name" is not a value a theme holds');
+});
+
+it('refuses the sections of a theme\'s own file in a slide\'s values', function () {
+    // The values are the values: the layout roles and the named styles are the theme's own
+    // shape, and a slide has none of them to lay over it.
+    expect(fn () => variablesDeck("---\ntheme-variables:\n  layouts:\n    content: Body Text\n---\n\n# One\n"))
+        ->toThrow(MalformedTheme::class, '"layouts" is not a value a theme holds')
+        ->and(fn () => variablesDeck("---\ntheme-variables:\n  textStyles:\n    brand:\n      color: accent1\n---\n\n# One\n"))
+        ->toThrow(MalformedTheme::class, '"textStyles" is not a value a theme holds');
 });
 
 it('refuses a colour that is not a colour', function () {

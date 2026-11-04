@@ -1,7 +1,0 @@
-# The layout names this theme's own `template.pptx` gives each role.
-#
-# One role is mapped, because the template carries one layout: a theme that covers part of the
-# vocabulary is a theme that works, and the roles it says nothing about keep the geometry the
-# library puts them at.
-layouts:
-  content: Title and Content

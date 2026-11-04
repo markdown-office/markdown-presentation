@@ -142,9 +142,9 @@ All notable changes to this project are documented here. The format follows
   ---
   ```
 
-  A slide's values are laid over the template's, and the template's over the theme's, and one
-  value laid over another leaves the rest alone: a slide that names one colour leaves the
-  other eleven as they were.
+  A slide's values are laid over the template's, the template's over the deck's and the deck's
+  over the theme's, and one value laid over another leaves the rest alone: a slide that names
+  one colour leaves the other eleven as they were.
 
   The four roles the theme has — the page, the ink, the subtle ink and the panel — sit on
   **four different slots**, so overriding a slot moves exactly one of them and `dark:` says
@@ -174,6 +174,105 @@ All notable changes to this project are documented here. The format follows
   now a slide that names a template and nothing but its own settings, as it was before the
   settings arrived, and a template defined twice is refused rather than left to win
   quietly.
+
+- **A deck may name its own settings.** There was no layer for the deck: a deck's frontmatter
+  is its first slide's, and `theme-variables:` is read per slide, so a deck that named an
+  accent in its frontmatter painted the first slide in that accent and left every other slide
+  in the theme's own.
+
+  A deck's frontmatter may now carry `deck-settings:`, and every slide of the deck is drawn
+  with it:
+
+  ```markdown
+  ---
+  theme: corporate-dark
+  deck-settings:
+    background: "#101014"
+    theme-variables:
+      colors:
+        accent1: "#123456"
+  ---
+  ```
+
+  The ordinary keys mean the **slide's** own everywhere, so the deck's settings are named as
+  the deck's, the way a template's are named as the template's. The precedence is
+  **slide → template → deck → theme**: a slide's own settings are laid over the template's,
+  the template's over the deck's and the deck's over the theme's, and one value laid over
+  another leaves the rest alone.
+
+  It belongs in slide 1's front matter, which is the deck's own, and it is refused on any
+  other slide — the way `theme:` is.
+
+  `examples/markdown/20-deck-settings.md` is the deck that shows it: the deck's page and
+  ink on every slide of it, and the two slides that name a setting of their own — one that
+  wins over the deck's, and one that leaves the deck's other settings standing.
+
+### Changed
+
+- **A theme is one file.** A theme was a directory of up to five files: `theme.yml` for
+  the look, `layouts.yml` for the eight layout roles, `text-styles.yml` for the named
+  text styles, `styles.yml` for the Word half's style slots, and `template.pptx` for the
+  master. It is now `theme.yml` and the master, with the roles and the named styles as
+  two sections of the file:
+
+  ```yaml
+  name: Acme
+  layouts:
+    title: Title Slide
+    content: Title and Content
+  textStyles:
+    brand:
+      color: accent1
+      bold: true
+  ```
+
+  **What a theme that exists has to do.** Move the contents of `layouts.yml` into a
+  `layouts:` section of the `theme.yml` beside it, and the contents of `text-styles.yml`
+  into a `textStyles:` section of it, and delete both files. A `styles.yml` is the Word
+  half's file and this half does not read it, so it goes.
+
+  The three files are **refused** when they are beside a theme, each with a message
+  saying what the reader has to do with the file:
+
+  > The theme "acme" has a "layouts.yml" beside it. A theme is one file: move its content into the "layouts:" section of its "theme.yml", and delete the file.
+
+  > The theme "acme" has a "text-styles.yml" beside it. A theme is one file: move its content into the "textStyles:" section of its "theme.yml", and delete the file.
+
+  > The theme "acme" has a "styles.yml" beside it. That file is the Word half's, and this half does not read it: its slots name Word styles, which a deck of slides has no use for. Delete it, and the theme is read again.
+
+  They are refused rather than ignored, because **a file that is quietly not read is a
+  theme that looks like the one its author wrote and is not**: the author renames a
+  layout in the file beside the theme, the deck is drawn with the old mapping, and
+  nothing in the output says so.
+
+- **The library ships the default layout mapping.** All five themes that ship with the
+  library carried a byte-identical `layouts.yml` — the same eight Office names — so for
+  a theme without a master it was a default written out five times. A theme with no
+  `layouts:` section is drawn with the library's own mapping now:
+
+  | Role | Layout |
+  | --- | --- |
+  | `title` | Title Slide |
+  | `content` | Title and Content |
+  | `two-column` | Two Content |
+  | `section` | Section Header |
+  | `blank` | Blank |
+  | `image-text` | Picture Left |
+  | `image-title` | Picture with Caption |
+  | `image-slide` | Full Bleed Picture |
+
+  A theme **with** a `layouts:` section has the whole mapping: a role the section does
+  not name is a role the theme does not map, and the deck that asks for one is told which
+  roles the theme does map.
+
+  The five themes that ship with the library lost their `layouts.yml`, because it was the
+  library's own mapping written out.
+
+- **The Word half's style slots are gone from this half.** `Theme\StyleSlots`,
+  `Exception\UnknownStyleSlot` and `LoadedTheme::styles()` existed for a `styles.yml`
+  this half loaded and never used: the slots name Word styles, and a deck of slides has
+  no use for them. A theme that carried one looked like a theme with Word styles in it
+  and was not one.
 
 ### Fixed
 

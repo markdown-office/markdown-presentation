@@ -238,8 +238,9 @@ final class SlideGeometry
      * A copy whose named roles take their boxes from a template.
      *
      * Merged rather than replacing what this already knows, so a template that covers only some
-     * of the roles leaves the rest where this class puts them — the same rule
-     * `layouts.yml` follows, where a theme that maps two of them is a theme that works.
+     * of the roles leaves the rest where this class puts them. A theme's `layouts:` section is
+     * the other rule entirely: it is the whole mapping, so a role it does not name is a role
+     * the theme does not map.
      *
      * @param array<string, array{title?: Box, body?: non-empty-list<Box>}> $boxes
      */

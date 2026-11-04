@@ -13,8 +13,9 @@ use MarkdownPresentation\Exception\MalformedTheme;
  * the reader that reads the theme's own file. A slide writes `colors: {accent1: "#FF0000"}`
  * and a theme's file writes the same, and there is one vocabulary rather than two.
  *
- * What a slide may name is the theme's *values* and not its identity: `name`, `description`
- * and `author` are the theme's, and a slide has none of them.
+ * What a slide may name is the theme's *values* and not the rest of it: `name`,
+ * `description` and `author` are the theme's identity, and `layouts` and `textStyles` are
+ * its own shape rather than anything a slide may lay over it.
  *
  * The values are merged as the mappings they are and read once, rather than merged as the
  * objects they become. That is what makes an override of one value leave the others alone:

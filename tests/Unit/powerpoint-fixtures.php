@@ -36,9 +36,10 @@ function powerpointFixtures(): string
 /*
  * The layout names both decks carry, as PowerPoint spells them.
  *
- * A `layouts.yml` matches a template by the name its layout part carries, so these two strings
- * are the whole interface between the two, and a theme that spells one differently stops matching
- * with nothing to say so. Spelled once here rather than at every place a test happens to need one.
+ * A theme's `layouts:` section matches a template by the name its layout part carries, so these
+ * two strings are the whole interface between the two, and a theme that spells one differently
+ * stops matching with nothing to say so. Spelled once here rather than at every place a test
+ * happens to need one.
  */
 const PICTURE_WITH_CAPTION = 'Picture with Caption';
 
@@ -169,8 +170,7 @@ it('draws a slide in the geometry a real deck states', function () {
     // not write: the layout part the deck is given and the slide on it agree, so *Reset*
     // restores what the slide already has.
     $theme = ThemeDirectory::create([
-        'theme.yml' => HARBOUR_THEME,
-        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'theme.yml' => HARBOUR_THEME . "layouts:\n  content: Title and Content\n",
         'template.pptx' => file_get_contents(harbourLights()),
     ]);
 
@@ -193,8 +193,7 @@ it('draws a body in the box the deck states rather than the one the library woul
     // all and one whose theme is this deck are visibly different files, which is the point of
     // carrying it.
     $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Workshop\n",
-        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'theme.yml' => "name: Workshop\nlayouts:\n  content: Title and Content\n",
         'template.pptx' => file_get_contents(workshopNotes()),
     ]);
 
@@ -213,8 +212,7 @@ it('draws a body in the box the deck states rather than the one the library woul
 
 it('draws both columns of a two-content slide where a real deck puts them', function () {
     $theme = ThemeDirectory::create([
-        'theme.yml' => HARBOUR_THEME,
-        'layouts.yml' => "layouts:\n  two-column: Two Content\n",
+        'theme.yml' => HARBOUR_THEME . "layouts:\n  two-column: Two Content\n",
         'template.pptx' => file_get_contents(harbourLights()),
     ]);
 
@@ -234,14 +232,13 @@ it('draws both columns of a two-content slide where a real deck puts them', func
 
 it('leaves a role whose layout the deck does not have where the library puts it', function () {
     // The precedence is the same as it is for a written template: a template fills in the roles
-    // it covers and says nothing about the rest. A `layouts.yml` naming a layout the deck does
-    // not have is therefore not an error — it is a role kept where the library puts it, which is
-    // the only thing a half-matched theme can mean.
+    // it covers and says nothing about the rest. A `layouts:` section naming a layout the deck
+    // does not have is therefore not an error — it is a role kept where the library puts it,
+    // which is the only thing a half-matched theme can mean.
     $theme = ThemeDirectory::create([
-        'theme.yml' => HARBOUR_THEME,
         // A section mapped to a layout neither deck has, which is the ordinary way a theme is
         // written and then used against a deck nobody checked it against.
-        'layouts.yml' => "layouts:\n  content: Title and Content\n  section: Section Divider\n",
+        'theme.yml' => HARBOUR_THEME . "layouts:\n  content: Title and Content\n  section: Section Divider\n",
         'template.pptx' => file_get_contents(harbourLights()),
     ]);
 
@@ -258,7 +255,8 @@ it('leaves a role whose layout the deck does not have where the library puts it'
 });
 
 it('names nothing in either deck that PowerPoint did not write', function () {
-    // A `layouts.yml` matches a template by the name its layout part carries, so the names are
+    // A theme's `layouts:` section matches a template by the name its layout part carries, so
+    // the names are
     // the whole interface. They are checked here as a list because a rename in PowerPoint would
     // otherwise show up as a theme that silently stops matching: no error, and a deck drawn in
     // the library's geometry rather than the deck's.

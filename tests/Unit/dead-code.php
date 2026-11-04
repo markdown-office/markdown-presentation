@@ -414,6 +414,11 @@ it('does not claim again what the code does not do', function (string $claim) {
     // background of a slide was the master's. A slide may name its own background now, so
     // the phrase below is the old rule's own wording, and no comment or page may say it.
     'a slide wanting its own colour carries the colour as a shape' => 'so a slide wanting its own colour carries the colour as a shape',
+    // The deck's settings are between the template's and the theme's, so a sentence that put
+    // the template's straight over the theme's left a layer out. The phrase below is what
+    // the changelog and the tests said while the deck had no settings of its own, and no
+    // page or comment may say it now.
+    'the template\'s settings are laid over the theme\'s' => 'the template\'s over the theme\'s',
 
     // A manifest was named by the file the path resolved to rather than by the name the deck
     // wrote, so a `theme.yml` that was a link to a file of another name was refused for the
@@ -546,6 +551,63 @@ it('does not claim again what the code does not do', function (string $claim) {
     // The placement table names eight attributes, and a count of them in prose is wrong the
     // moment one is added. The phrase is the heading the page carried when it was one short.
     'the placement table names seven attributes' => 'Seven attributes, on every name',
+
+    // A theme is one file now, and the three files beside it that this format no longer has
+    // are refused rather than ignored. The phrases are the claims the pages and the comments
+    // made about them; the changelog has to be able to name what a theme used to be made
+    // of, so the phrases are the claims rather than the file names.
+    'a theme reads the named styles from a file of their own' => 'read from a file of their own',
+    'a theme without a layouts file maps no role at all' => 'maps no role at all',
+    'a theme without a layouts file says so in the failure' => 'the theme has no layouts.yml',
+    'a styles file beside a theme is read and not used' => '`styles.yml` is not read',
+    'a styles file beside a theme is read and not used, in a page' => '`styles.yml` is **not** read',
+    // The refusal for a file of the old format named one step where the reader has to take
+    // two: the content goes into a section and the file goes with it, because the refusal
+    // is about the file being there rather than about what is in it. A reader who followed
+    // the message as it was moved the content and left the file beside the theme, and the
+    // next render failed the same way. The phrase is the end of that message, so it cannot
+    // come back.
+    'a retired theme file only has to have its content moved' => 'of its "theme.yml".',
+    // The sentence about a role the mapping leaves out was about the template and read as
+    // being about the theme, and the two are different: a theme's `layouts:` section is the
+    // whole mapping, while a template that has no layout for a role leaves the role where
+    // the library puts it.
+    'a role the mapping leaves out keeps the library geometry' => 'A role left out keeps this library\'s own geometry rather than failing',
+
+    // The background of a slide is the last of the settings to say one and not the first:
+    // the slide's own is painted over the template's, and the template's over the deck's.
+    // The phrase is the sentence the docblock gave, and it said the opposite of what the
+    // merge does — and of what the next clause of the same paragraph said.
+    'a background is the first of the three that names one' => 'The background is the first of the three that',
+
+    // A `styles.yml` beside a theme is refused, and the reason was given in terms of the
+    // themes that used to ship one. None of them does now, and none can: the file is
+    // refused at loader time, so a theme this library ships cannot carry one. The phrase
+    // is the claim as it was made — the history in `CHANGELOG.md` names the same thing
+    // across a line break, so it is not caught by it.
+    'the shipped themes write the docx style ids' => 'the shipped themes write `.docx` style ids',
+
+    // A template and a theme's `layouts:` section are two different rules, and five
+    // sentences said they were the same one: a template fills in the roles it covers and
+    // leaves the rest where the library puts them, while a `layouts:` section is the whole
+    // mapping — a role it does not name is a role the theme does not map. The phrases are
+    // the words the sentences used, one line of each.
+    'a template\'s rule is the rule a theme\'s `layouts:` section follows' => 'rule a theme\'s `layouts:`',
+    'a theme\'s `layouts:` section follows a template\'s rule' => 'a theme\'s `layouts:` section follows',
+    // The other half of the same wrong claim, in three spellings: a theme that maps some
+    // of the roles is a theme that works. It is a template that fills in the roles it
+    // covers; a theme's section is all or nothing.
+    'a theme that maps two of them is a theme that works' => 'a theme that maps two of them is a theme',
+    'a theme that maps two roles is a theme that works' => 'a theme that maps two roles is a theme that works',
+    'a theme mapping some of the roles is a theme that works' => 'a theme mapping some of the roles is a theme that works',
+
+    // A theme directory was said to serve one half, which is not so: the two halves share
+    // `name`, `description`, `author` and `textStyles`, and part at the look — this half's is
+    // `dark:`, `colors:`, `fonts:`, `style:` and `layouts:`, the Word half's is `styles:`. A
+    // file carrying the other half's look is refused, which is what the refusal of a
+    // `styles.yml` is about. The phrase is the old claim, and the README has to be able to
+    // say what the halves part at without saying it.
+    'a theme directory serves one half' => 'a theme directory serves one half',
 ]);
 
 it('has no decorative dividers in it', function () {

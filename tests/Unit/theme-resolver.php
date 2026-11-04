@@ -66,8 +66,7 @@ it('reads a theme from the manifest file a path names', function () {
     // `theme: ./theme.yml` is the manifest rather than the directory holding it, and the
     // rest of the theme — the layouts, the styles, the template — is read from beside it.
     $directory = ThemeDirectory::create([
-        'theme.yml' => "name: Manifest\n",
-        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'theme.yml' => "name: Manifest\nlayouts:\n  content: Title and Content\n",
     ], 'manifest');
     $resolver = resolverIn($directory);
 
@@ -94,8 +93,7 @@ it('reads a manifest that is a link to a file of another name', function () {
     // rest of the theme is read from beside the file it reached.
     $deck = ThemeDirectory::create([
         'theme.yml' => "name: Manifest\n",
-        'other.yml' => "name: Linked\n",
-        'layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'other.yml' => "name: Linked\nlayouts:\n  content: Title and Content\n",
     ], 'manifest');
     ThemeDirectory::link($deck . '/theme.yml', $deck . '/other.yml');
     $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
@@ -264,8 +262,8 @@ it('credits a theme in a root the resolver was given', function () {
     // author does reach the file. Without this the test above would also pass if the author
     // were never copied at all.
     $library = ThemeDirectory::create([
-        'theme.yml' => "name: Shared\nauthor: Somebody\n",
-        'layouts.yml' => "layouts:\n  title: Title Slide\n  content: Title and Content\n",
+        'theme.yml' => "name: Shared\nauthor: Somebody\n"
+            . "layouts:\n  title: Title Slide\n  content: Title and Content\n",
     ], 'library');
     $working = ThemeDirectory::create([], 'working');
     $builtin = ThemeDirectory::create([], 'builtin');
@@ -409,20 +407,17 @@ it('names the path and the roots when a file of a theme is out of them', functio
     );
 });
 
-it('reads a theme whose files are all inside the roots', function () {
+it('reads a theme whose own files are all inside the roots', function () {
     // The other half of the refusals above: a theme whose own files are where it says
     // they are is a theme that reads.
     $deck = ThemeDirectory::create([
-        'themes/acme/theme.yml' => "name: Acme\n",
-        'themes/acme/styles.yml' => "heading.1: ReportTitle\n",
-        'themes/acme/layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'themes/acme/theme.yml' => "name: Acme\nlayouts:\n  content: Title and Content\n",
     ], 'deck');
     $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
 
     $theme = $resolver->resolve('acme');
 
     expect($theme->theme()->name())->toBe('Acme')
-        ->and($theme->styles())->toBe(['heading.1' => 'ReportTitle'])
         ->and($theme->layouts())->toBe(['content' => 'Title and Content']);
 });
 
@@ -430,14 +425,14 @@ it('reads a theme whose own file is a link that stays inside the roots', functio
     // A link is not a threat; where it points is. A theme laid out with links — one
     // file shared by two themes — is a theme that works.
     $deck = ThemeDirectory::create([
-        'themes/shared/styles.yml' => "heading.1: ReportTitle\n",
+        'themes/shared/theme.yml' => "name: Shared\n",
         'themes/acme/theme.yml' => "name: Acme\n",
     ], 'deck');
-    ThemeDirectory::link($deck . '/themes/acme/styles.yml', $deck . '/themes/shared/styles.yml');
+    ThemeDirectory::link($deck . '/themes/acme/theme.yml', $deck . '/themes/shared/theme.yml');
 
     $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
 
-    expect($resolver->resolve('acme')->styles())->toBe(['heading.1' => 'ReportTitle']);
+    expect($resolver->resolve('acme')->theme()->name())->toBe('Shared');
 });
 
 it('does not open a template outside the roots', function () {
@@ -447,8 +442,7 @@ it('does not open a template outside the roots', function () {
     // scope before it is handed over.
     $outside = ThemeDirectory::create(['template.pptx' => 'not really a template'], 'outside');
     $deck = ThemeDirectory::create([
-        'themes/acme/theme.yml' => "name: Acme\n",
-        'themes/acme/layouts.yml' => "layouts:\n  content: Title and Content\n",
+        'themes/acme/theme.yml' => "name: Acme\nlayouts:\n  content: Title and Content\n",
     ], 'deck');
     ThemeDirectory::link($deck . '/themes/acme/template.pptx', $outside . '/template.pptx');
     $working = ThemeDirectory::create([], 'working');

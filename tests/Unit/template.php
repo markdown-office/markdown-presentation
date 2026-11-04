@@ -29,10 +29,10 @@ const TEMPLATE_THEME = '/tests/fixtures/themes/templated';
 const TEMPLATED_PPTX = '/template.pptx';
 
 /**
- * The layouts mapping a theme built for these tests writes, and the layout name it maps to.
+ * The `layouts:` section a theme built for these tests writes.
  *
- * Both are constants rather than literals because every test below that builds a theme maps
- * the same role onto the same layout: a test that mapped `content` somewhere else would be
+ * A constant rather than a literal because every test below that builds a theme maps the
+ * same role onto the same layout: a test that mapped `content` somewhere else would be
  * testing something else, and spelling it out each time is how that happens quietly.
  */
 const CONTENT_LAYOUT = "layouts:\n  content: Title and Content\n";
@@ -247,8 +247,7 @@ it('splits a role the template gives two columns to, whatever the role is called
     // used to get wrong too — it asked the constructor's default geometry rather than the
     // merged one, so the second box was laid out and left empty with nothing saying so.
     $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Two Columns\n",
-        'layouts.yml' => "layouts:\n  content: Two Content\n",
+        'theme.yml' => "name: Two Columns\nlayouts:\n  content: Two Content\n",
         'template.pptx' => file_get_contents(templatedTheme() . TEMPLATED_PPTX),
     ]);
 
@@ -342,8 +341,7 @@ it('refuses a template that does not say how big its slides are', function () {
     // Every box in a template is a fraction of its page, so one that does not state a page
     // cannot place anything. `p:sldSz` is optional in the schema and this is what that costs.
     $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Sizeless\n",
-        'layouts.yml' => CONTENT_LAYOUT,
+        'theme.yml' => "name: Sizeless\n" . CONTENT_LAYOUT,
         // The contents, not the path: this copies a file into a theme directory rather than
         // naming one.
         'template.pptx' => file_get_contents(builtTemplate(page: ['cx' => 0, 'cy' => 0])),
@@ -387,8 +385,7 @@ it('leaves the anchor of a template it says nothing about alone', function () {
 
 it('refuses a template with a part it cannot read', function () {
     $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Broken\n",
-        'layouts.yml' => CONTENT_LAYOUT,
+        'theme.yml' => "name: Broken\n" . CONTENT_LAYOUT,
     ]);
 
     $zip = new ZipArchive();
@@ -459,8 +456,7 @@ it('refuses a theme whose template has a part too large to read', function () {
     // The refusal has to reach the caller of the library and not only the reader, or a render ends
     // in a fatal error that names neither the theme nor the part.
     $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Oversized\n",
-        'layouts.yml' => CONTENT_LAYOUT,
+        'theme.yml' => "name: Oversized\n" . CONTENT_LAYOUT,
         'template.pptx' => (string) file_get_contents(templateWithPartOf(TemplateGeometry::MAX_PART_BYTES + 1)),
     ]);
 
@@ -475,8 +471,7 @@ it('leaves a layout that inherits from nothing where the library puts it', funct
     // inherit, so its placeholders have nowhere to come from and the role keeps the geometry
     // the library puts it at — rather than this reading a master it was never told about.
     $theme = ThemeDirectory::create([
-        'theme.yml' => "name: Orphaned\n",
-        'layouts.yml' => CONTENT_LAYOUT,
+        'theme.yml' => "name: Orphaned\n" . CONTENT_LAYOUT,
         'template.pptx' => file_get_contents(builtTemplate(
             [['name' => TITLE_AND_CONTENT, 'shapes' => [['type' => 'title']]]],
             layoutHasMaster: false,

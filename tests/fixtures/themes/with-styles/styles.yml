@@ -1,0 +1,5 @@
+# Word style slots, by the names in a .docx template's styles. This file belongs to the
+# Word half, and this half does not read it: the slots name Word styles, which a deck of
+# slides has no use for.
+heading.1: Heading1
+paragraph: BodyText
