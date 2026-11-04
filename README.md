@@ -2897,8 +2897,11 @@ the old mapping, and nothing in the output says so — which is why the files ar
 rather than ignored.
 
 The third of them is the Word half's, and this half loaded it for years without ever using
-it. Its slots name Word styles, and a deck of slides has no use for them, so the file
-belongs to a theme of the other half — a theme directory serves one half.
+it. Its slots name Word styles, and a deck of slides has no use for them. **The halves part
+at the look**: this half's is `dark:`, `colors:`, `fonts:`, `style:` and `layouts:`, the
+Word half's is `styles:`, and a file carrying the other half's look is refused here. So
+`styles.yml`, which holds the look in the Word half's vocabulary, is a file this half does
+not read.
 
 ### Where a deck's files come from
 

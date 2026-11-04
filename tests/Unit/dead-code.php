@@ -600,6 +600,14 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a theme that maps two of them is a theme that works' => 'a theme that maps two of them is a theme',
     'a theme that maps two roles is a theme that works' => 'a theme that maps two roles is a theme that works',
     'a theme mapping some of the roles is a theme that works' => 'a theme mapping some of the roles is a theme that works',
+
+    // A theme directory was said to serve one half, which is not so: the two halves share
+    // `name`, `description`, `author` and `textStyles`, and part at the look — this half's is
+    // `dark:`, `colors:`, `fonts:`, `style:` and `layouts:`, the Word half's is `styles:`. A
+    // file carrying the other half's look is refused, which is what the refusal of a
+    // `styles.yml` is about. The phrase is the old claim, and the README has to be able to
+    // say what the halves part at without saying it.
+    'a theme directory serves one half' => 'a theme directory serves one half',
 ]);
 
 it('has no decorative dividers in it', function () {
