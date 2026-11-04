@@ -53,8 +53,12 @@ final class ThemeLoader
      *
      * The theme's own keys are {@see ThemeMapping::KEYS}, and a key that is neither one
      * nor a section is refused: the typo-catching is the point of a closed vocabulary.
+     *
+     * Public because the refusal already names it — {@see MalformedTheme::unknownKey()}
+     * offers the whole vocabulary — so a reader of the format is given the list and then
+     * asked to find it somewhere else.
      */
-    private const SECTIONS = ['layouts', 'textStyles'];
+    public const SECTIONS = ['layouts', 'textStyles'];
 
     /**
      * The files whose content has become a section of the theme's own file.
