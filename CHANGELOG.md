@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-11-04
 
 ### Added
 
@@ -2847,6 +2847,7 @@ slide begins and which theme a deck means, and renders the deck to a `.pptx`.
   tag. A floating branch reference would let a deck's bytes change with no commit
   here, and the library's releases trail its `master`.
 
+[0.4.0]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.4.0
 [0.1.0]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.1.0
 [0.2.0]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.2.0
 [0.2.1]: https://github.com/markdown-office/markdown-presentation/releases/tag/v0.2.1
