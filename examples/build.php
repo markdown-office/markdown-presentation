@@ -11,7 +11,23 @@ declare(strict_types=1);
  * examples/out, and a PNG of every slide beside them in examples/out/<deck>/.
  */
 
-require_once __DIR__ . '/../vendor/autoload.php';
+$autoload = __DIR__ . '/../vendor/autoload.php';
+
+// The build drives the library's own API, so it needs the library. A copy of this
+// directory on its own — the one the `mdword` skill carries, as `examples/slides/` — has
+// the sources and the templates but not the library that builds them, and a missing
+// `require` would say nothing about that.
+if (!is_file($autoload)) {
+    fwrite(
+        STDERR,
+        "This build needs the library itself: put a `vendor/autoload.php` in this directory's parent,"
+        . " or run `composer install` in the checkout it came from.\n",
+    );
+
+    exit(1);
+}
+
+require_once $autoload;
 require_once __DIR__ . '/decks.php';
 
 use MarkdownPresentation\Document\DeckParser;
