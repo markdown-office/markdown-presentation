@@ -2330,7 +2330,7 @@ echo (new PowerPointToMarkdown($path, new Options(mediaDirectory: null)))->conve
 
 ```text
 ---
-title: "Untitled Presentation"
+title: "One"
 author: "markdown-office"
 ---
 
@@ -2340,8 +2340,13 @@ Text.
 ```
 
 The frontmatter carries what the deck said about itself — its title, its author and its
-description — because a deck's own properties are the only thing about it that is not on a
-slide.
+description. The title is the deck's own where it has one, and the first slide's where it
+has not: PHPPresentation gives every deck the title `Untitled Presentation`, and that is
+its own default rather than a title somebody wrote. The frontmatter is the first slide's,
+and a `title:` in it is that slide's title — so a deck whose title is on its slide and
+nowhere else keeps it. The author is the deck's own, and the name PHPPresentation gives a
+deck that carries none — `Unknown Creator` — is a name nobody wrote, so a deck carrying it
+carries no author.
 
 What comes back is the text and the structure. What does not is the design: the type sizes,
 the colours and the geometry live in the theme and the master, and neither travels to a new

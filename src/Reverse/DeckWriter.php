@@ -28,6 +28,22 @@ final class DeckWriter
      */
     private const INDENT = '    ';
 
+    /**
+     * The title PHPPresentation gives a deck that carries none.
+     *
+     * It is the library's own default rather than a title somebody wrote, so a
+     * deck that carries it says nothing about its title.
+     */
+    private const DEFAULT_TITLE = 'Untitled Presentation';
+
+    /**
+     * The author PHPPresentation gives a deck that carries none.
+     *
+     * It is the library's own default rather than a name somebody wrote, so a deck
+     * that carries it says nothing about its author.
+     */
+    private const DEFAULT_AUTHOR = 'Unknown Creator';
+
     public function __construct(private readonly Options $options)
     {
     }
@@ -49,7 +65,7 @@ final class DeckWriter
             if ($index === 0) {
                 // The deck's own frontmatter is the first slide's, so the first slide's own
                 // settings are written into it rather than beside it.
-                $frontmatter = $this->frontmatter($properties, $theme, $slide->frontmatter);
+                $frontmatter = $this->frontmatter($properties, $theme, $slide->frontmatter, $slide->title);
 
                 if ($frontmatter !== '') {
                     $body = $frontmatter . "\n" . $body;
@@ -105,20 +121,27 @@ final class DeckWriter
      * the theme it was drawn in rather than in the library's own, and the design of a deck is
      * most of what a deck is.
      *
+     * The title is the deck's own where it has one, and the first slide's where it has not:
+     * the frontmatter is the first slide's, and a `title:` in it is that slide's title, so a
+     * deck whose title is on its slide and nowhere else would lose it.
+     *
      * @param string|null $theme The name of the theme the deck was drawn in, when it is one
      *                           a deck can name again.
      * @param array<string, string|int|bool> $own The first slide's own settings, which are
      *                           written into the deck's own block with them.
+     * @param string|null $slideTitle The title of the first slide, which stands in for the
+     *                           deck's own title where the properties carry none.
      */
     private function frontmatter(
         DocumentProperties $properties,
         ?string $theme = null,
         array $own = [],
+        ?string $slideTitle = null,
     ): string {
         $values = [
-            'title' => $properties->getTitle(),
+            'title' => $this->title($properties, $slideTitle),
             'theme' => $theme,
-            'author' => $properties->getCreator(),
+            'author' => $this->author($properties),
             'description' => $properties->getDescription(),
             ...$own,
         ];
@@ -148,6 +171,37 @@ final class DeckWriter
         }
 
         return "---\n" . implode("\n", $lines) . "\n---\n";
+    }
+
+    /**
+     * The title the deck's frontmatter carries, or null where it carries none.
+     *
+     * The properties' title is the deck's own, unless it is {@see self::DEFAULT_TITLE},
+     * which says nothing about a deck that carries it.
+     *
+     * The first slide's title stands in for it then, because the frontmatter is the first
+     * slide's and a `title:` in it is that slide's title: a deck whose title is on its slide
+     * and nowhere else would lose it otherwise.
+     */
+    private function title(DocumentProperties $properties, ?string $slideTitle): ?string
+    {
+        $title = $properties->getTitle();
+
+        return $title === self::DEFAULT_TITLE ? $slideTitle : $title;
+    }
+
+    /**
+     * The author the deck's frontmatter carries, or null where it carries none.
+     *
+     * The properties' author is the deck's own, unless it is {@see self::DEFAULT_AUTHOR},
+     * which says nothing about a deck that carries it: an author called "Unknown Creator"
+     * is a name nobody wrote, and the Markdown would carry it as though they had.
+     */
+    private function author(DocumentProperties $properties): ?string
+    {
+        $author = $properties->getCreator();
+
+        return $author === self::DEFAULT_AUTHOR ? null : $author;
     }
 
     /**
