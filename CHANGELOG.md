@@ -4,6 +4,39 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A deck read back into Markdown carries no title it never had.** PHPPresentation gives
+  every deck the title `Untitled Presentation`, and the frontmatter carried it as though
+  somebody had written it: a deck without a title came back with one, and drawing that
+  Markdown again put a title placeholder and the words "Untitled Presentation" on a slide
+  that never had a title.
+
+  The title in the frontmatter is the deck's own where the deck has one, and the first
+  slide's title where it has not — the frontmatter is the first slide's, and a `title:` in
+  it is that slide's title. So a deck whose title is on its slide and nowhere else keeps
+  it, and a deck with no title at all comes back with no `title:` line.
+
+  It is the first slide's title and not a later one's, the way it is in the other
+  direction: a `title:` in the first slide's frontmatter is that slide's title and wins
+  over its own heading. So a deck whose second slide has a title and whose first does not
+  gains no title.
+
+- **The slides example says what it needs when the library is not beside it.** The
+  `mdword` skill bundle carries this half's gallery as `examples/slides/` and ships no
+  `vendor/`, so `php examples/slides/build.php` died with a PHP fatal error that said
+  nothing about what was missing.
+
+  It says what the build needs and stops:
+
+  > This build needs the library itself: put a `vendor/autoload.php` in this directory's
+  > parent, or run `composer install` in the checkout it came from.
+
+  The Word half's build has said this for a while, and the two halves ship side by side in
+  one bundle, so they fail the same way.
+
 ## [0.4.0] - 2026-11-04
 
 ### Added
