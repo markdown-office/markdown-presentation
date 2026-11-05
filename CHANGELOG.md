@@ -24,6 +24,14 @@ All notable changes to this project are documented here. The format follows
   over its own heading. So a deck whose second slide has a title and whose first does not
   gains no title.
 
+- **A deck read back into Markdown carries no author it never had.** PHPPresentation gives
+  every deck the author `Unknown Creator`, and that is the library's own default rather
+  than a name somebody wrote: the frontmatter carried it as though somebody had, and the
+  deck drawn from that Markdown was made by "Unknown Creator".
+
+  The author in the frontmatter is the deck's own, and a deck that carries the default
+  carries no author, so none is written.
+
 - **The slides example says what it needs when the library is not beside it.** The
   `mdword` skill bundle carries this half's gallery as `examples/slides/` and ships no
   `vendor/`, so `php examples/slides/build.php` died with a PHP fatal error that said

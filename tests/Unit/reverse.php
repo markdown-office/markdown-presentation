@@ -932,6 +932,20 @@ it('writes the title of the deck into the frontmatter where it has one', functio
     expect(converted($path))->toContain('title: "Harbour lights"');
 });
 
+it('writes no author into the frontmatter of a deck that has none', function () {
+    // PHPPresentation gives every deck the author "Unknown Creator", and that is the
+    // library's own default rather than a name somebody wrote: the Markdown carried it
+    // as though somebody had, and the deck drawn from that Markdown was made by
+    // "Unknown Creator".
+    $path = deckWithShapes(
+        static function (AbstractSlide $slide): void {
+            placeholderShape($slide, 'title', 'What broke');
+        },
+    );
+
+    expect(converted($path))->not->toContain('author:');
+});
+
 it('draws the same slide again when the Markdown it came from is drawn again', function () {
     // The round trip has to be a round trip: the Markdown a deck is read back into, drawn
     // again, has to be the deck it came from. The title in the frontmatter is the first
@@ -1576,15 +1590,21 @@ it('refuses a package that is not a deck', function () {
 
 it('writes nothing for a block that holds nothing', function () {
     $writer = new DeckWriter(new Options(mediaDirectory: null));
+    $properties = new DocumentProperties();
+    $properties->setTitle('A deck');
 
-    expect($writer->write([
+    $markdown = $writer->write([
         new Slide(0, null, [
             Block::paragraph([]),
             Block::list([Block::item([Block::paragraph([])])]),
             Block::table([]),
             Block::image(new Image('A dot', '', '')),
         ]),
-    ], new DocumentProperties()))->toContain('---');
+    ], $properties);
+
+    // The deck's own frontmatter and nothing after it: every block holds nothing, so
+    // every block writes nothing.
+    expect(trim(str_replace('---', '', $markdown)))->toBe('title: "A deck"');
 });
 
 it('leaves a picture with nothing in it out', function () {

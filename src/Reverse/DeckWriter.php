@@ -36,6 +36,14 @@ final class DeckWriter
      */
     private const DEFAULT_TITLE = 'Untitled Presentation';
 
+    /**
+     * The author PHPPresentation gives a deck that carries none.
+     *
+     * It is the library's own default rather than a name somebody wrote, so a deck
+     * that carries it says nothing about its author.
+     */
+    private const DEFAULT_AUTHOR = 'Unknown Creator';
+
     public function __construct(private readonly Options $options)
     {
     }
@@ -133,7 +141,7 @@ final class DeckWriter
         $values = [
             'title' => $this->title($properties, $slideTitle),
             'theme' => $theme,
-            'author' => $properties->getCreator(),
+            'author' => $this->author($properties),
             'description' => $properties->getDescription(),
             ...$own,
         ];
@@ -180,6 +188,20 @@ final class DeckWriter
         $title = $properties->getTitle();
 
         return $title === self::DEFAULT_TITLE ? $slideTitle : $title;
+    }
+
+    /**
+     * The author the deck's frontmatter carries, or null where it carries none.
+     *
+     * The properties' author is the deck's own, unless it is {@see self::DEFAULT_AUTHOR},
+     * which says nothing about a deck that carries it: an author called "Unknown Creator"
+     * is a name nobody wrote, and the Markdown would carry it as though they had.
+     */
+    private function author(DocumentProperties $properties): ?string
+    {
+        $author = $properties->getCreator();
+
+        return $author === self::DEFAULT_AUTHOR ? null : $author;
     }
 
     /**
