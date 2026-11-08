@@ -115,7 +115,6 @@ final class ShapeReader
 
         return match (true) {
             $kind === ShapeKind::Image => FreePicture::at(
-                $kind,
                 $placement,
                 $state->step,
                 $paint,

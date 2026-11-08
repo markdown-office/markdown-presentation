@@ -14,6 +14,9 @@ use MarkdownPresentation\Render\Block\Image;
  * all one set of rules rather than two: `::image{src="logo.png"}` and `![Logo](logo.png)` find
  * the same file through the same {@see \MarkdownPresentation\Filesystem\PathScope}, and a
  * picture outside it fails the same way.
+ *
+ * The kind is the picture's own and is not asked for: a free shape that is a picture is
+ * {@see ShapeKind::Image}, and the ten ink shapes are the ones that are asked for.
  */
 final class FreePicture extends FreeShape
 {
@@ -25,7 +28,6 @@ final class FreePicture extends FreeShape
      *                         the rectangle a picture is drawn in.
      */
     private function __construct(
-        ShapeKind $kind,
         Placement $placement,
         int $step,
         Paint $paint,
@@ -34,11 +36,10 @@ final class FreePicture extends FreeShape
         public readonly ?Mask $mask,
         ?Shadow $shadow,
     ) {
-        parent::__construct($kind, $placement, $step, $paint, '', $shadow);
+        parent::__construct(ShapeKind::Image, $placement, $step, $paint, '', $shadow);
     }
 
     public static function at(
-        ShapeKind $kind,
         Placement $placement,
         int $step,
         Paint $paint,
@@ -47,6 +48,6 @@ final class FreePicture extends FreeShape
         ?Mask $mask,
         ?Shadow $shadow,
     ): self {
-        return new self($kind, $placement, $step, $paint, $image, $fit, $mask, $shadow);
+        return new self($placement, $step, $paint, $image, $fit, $mask, $shadow);
     }
 }
