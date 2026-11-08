@@ -1492,6 +1492,29 @@ A shadow is on the shape, not on the words inside it: a `label` takes the shadow
 sits in, and a `:::content` block casts one from its own border. `::image` casts one too — a
 `p:pic` carries an effect list of its own.
 
+#### A panel over a picture
+
+A shape painted with a colour and an alpha is seen through the page. `alpha` is one percentage
+for the whole shape, written into the colour of the fill and of the stroke, so the shape is seen
+slightly through the page rather than a fill and an outline that disagree about how solid they
+are.
+
+That is what gives words over a picture something to be read against. The picture, a panel over
+it and the words over that are three shapes, and the order they are written in is the order they
+are drawn in:
+
+```markdown
+::image{src="landscape.webp" left=0 top=0 width=100% height=100% fit=stretch layer=back}
+::rectangle{left=0 top=0 width=100% height=100% fill=lt1 alpha=75 layer=back}
+:::content{left=8% top=38% width=84% height=24% color=dk1}
+Words on a panel.
+:::
+```
+
+The library knows the colour of the panel and the colour of the words, and not what the
+photograph is made of — so how readable the words are is a thing to look at rather than a thing
+the library can promise.
+
 #### A picture in a shape
 
 A picture is drawn in a rectangle, and a picture can be drawn in another shape instead. The shape
