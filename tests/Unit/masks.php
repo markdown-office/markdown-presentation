@@ -91,6 +91,15 @@ it('writes a picture without a mask in a rectangle', function () {
     expect($deck->part('ppt/slides/slide1.xml'))->toContain('<a:prstGeom prst="rect">');
 });
 
+it('writes the shape as the geometry of the picture and not of a frame around it', function () {
+    // The mask is the picture's own: the geometry is written inside the picture's own
+    // `p:spPr`, which is where PowerPoint writes it for a picture cropped to a shape.
+    $deck = maskDeckFile(maskDeck('mask=heart'));
+
+    expect($deck->part('ppt/slides/slide1.xml'))
+        ->toMatch('#<p:pic>.*?<p:spPr>.*?<a:prstGeom prst="heart">#s');
+});
+
 it('refuses a mask that is not one of the names it offers', function () {
     expect(fn () => maskDeckFile(maskDeck('mask=blob')))
         ->toThrow(
