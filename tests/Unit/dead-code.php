@@ -608,6 +608,10 @@ it('does not claim again what the code does not do', function (string $claim) {
     // `styles.yml` is about. The phrase is the old claim, and the README has to be able to
     // say what the halves part at without saying it.
     'a theme directory serves one half' => 'a theme directory serves one half',
+
+    // The frontmatter was said to carry what is not on a slide, but a deck's title can be
+    // on its first slide and nowhere else, and the frontmatter is the first slide's.
+    'the frontmatter carries only what is not on a slide' => 'the only thing about it that is not on a slide',
 ]);
 
 it('has no decorative dividers in it', function () {
