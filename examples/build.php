@@ -59,7 +59,7 @@ const DESCRIPTIONS = [
     '11-type-scale-default' => 'One deck at the library\'s own type scale.',
     '11-type-scale-dense' => 'The same slides at thirteen points, with the gaps with them.',
     '21-masked-images' => 'Pictures drawn in a shape rather than in a rectangle: six masks on one picture, and what the mask is and is not.',
-    '22-legible-over-image' => 'Words over a picture, with and without a translucent panel between them.',
+    '22-legible-over-image' => 'Words over a picture: with nothing between them and the photograph, with a translucent panel over it, and in an opaque box behind the words alone.',
 ];
 
 $assets = SOURCES . '/assets';

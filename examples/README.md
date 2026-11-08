@@ -38,7 +38,7 @@ quietly. The profile and the scratch script go to the temporary directory, so
 | `19-gradient-background.md` | `19-gradient-background.pptx` | A gradient on a shape — two stops, three stops with the middle one at half, a radial one, and an angle of 0° — a background painted with a colour, with a gradient and with a radial gradient, a slide that names the theme's values for itself, and a template that carries settings of its own |
 | `20-deck-settings.md` | `20-deck-settings.pptx` | The settings of the deck: a page and an ink every slide of the deck is drawn with, and the two slides that name a setting of their own — one that wins over the deck's, and one that leaves the deck's other settings standing |
 | `21-masked-images.md` | `21-masked-images.pptx` | Pictures drawn in a shape rather than in a rectangle: six masks on one picture — a circle, a hexagon, a star, a heart, a teardrop and a rounded rectangle — and what the mask is and is not |
-| `22-legible-over-image.md` | `22-legible-over-image.pptx` | Words over a picture, once with nothing between them and the photograph and once with a translucent panel, which is what the words are read against |
+| `22-legible-over-image.md` | `22-legible-over-image.pptx` | Words over a picture, three times: with nothing between them and the photograph, with a translucent panel over the whole picture, and in an opaque box behind the words alone |
 
 ## The deck that is not anybody's business
 

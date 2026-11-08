@@ -1515,6 +1515,17 @@ The library knows the colour of the panel and the colour of the words, and not w
 photograph is made of — so how readable the words are is a thing to look at rather than a thing
 the library can promise.
 
+**A box behind the words** is the same shape with an opaque fill, and only the words are on it:
+the picture around the box keeps its own colours. `fill=lt1` alone would be opaque as well — a
+colour without an alpha is whole — so `alpha=100` says it rather than leaving it to be read.
+
+```markdown
+::image{src="landscape.webp" left=0 top=0 width=100% height=100% fit=stretch layer=back}
+:::content{left=7% top=28% width=58% height=34% fill=lt1 alpha=100 padding=16}
+Words in a box.
+:::
+```
+
 #### A picture in a shape
 
 A picture is drawn in a rectangle, and a picture can be drawn in another shape instead. The shape
