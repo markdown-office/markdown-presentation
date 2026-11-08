@@ -58,6 +58,7 @@ const DESCRIPTIONS = [
     '09-inline-markup' => 'The eight things a paragraph turns into runs.',
     '11-type-scale-default' => 'One deck at the library\'s own type scale.',
     '11-type-scale-dense' => 'The same slides at thirteen points, with the gaps with them.',
+    '21-masked-images' => 'Pictures drawn in a shape rather than in a rectangle: six masks on one picture, and what the mask is and is not.',
 ];
 
 $assets = SOURCES . '/assets';

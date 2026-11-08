@@ -86,8 +86,10 @@ enum ShapeKind: string
      */
     private const LABEL = ['label'];
 
-    /** What a picture is taken from and how it is fitted to its box. */
-    private const PICTURE = ['src', 'alt', 'fit'];
+    /**
+     * What a picture is taken from, how it is fitted to its box, and what shape it is drawn in.
+     */
+    private const PICTURE = ['src', 'alt', 'fit', 'mask'];
 
     /**
      * The autoshape this is drawn as, or null where it is not drawn as one.

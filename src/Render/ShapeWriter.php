@@ -730,6 +730,13 @@ final class ShapeWriter
     {
         $written = $this->drawing($slide, $shape);
 
+        // The shape the picture is drawn in, which is the picture's own rather than a frame
+        // around it: the file writes the shape as the geometry of the picture, so the mask moves
+        // with the picture and the picture moves with the mask.
+        if ($shape->mask !== null) {
+            $written->setGeometry($shape->mask->prst());
+        }
+
         // The alt text is what a screen reader reads and what PowerPoint's own pane shows, and
         // a file path read aloud is not a description of a picture. {@see self::image()} has
         // the longer version of why nothing in the file records where the deck found it.

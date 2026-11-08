@@ -21,6 +21,8 @@ final class FreePicture extends FreeShape
      * @param string $fit {@see self::CONTAIN} or {@see self::STRETCH}; see
      *                     {@see \MarkdownPresentation\Render\Free\Pictures::fit()} for what a
      *                     third would cost.
+     * @param Mask|null $mask The shape the picture is drawn in, or null where it is drawn in
+     *                         the rectangle a picture is drawn in.
      */
     private function __construct(
         ShapeKind $kind,
@@ -29,6 +31,7 @@ final class FreePicture extends FreeShape
         Paint $paint,
         public readonly Image $image,
         public readonly string $fit,
+        public readonly ?Mask $mask,
         ?Shadow $shadow,
     ) {
         parent::__construct($kind, $placement, $step, $paint, '', $shadow);
@@ -41,8 +44,9 @@ final class FreePicture extends FreeShape
         Paint $paint,
         Image $image,
         string $fit,
+        ?Mask $mask,
         ?Shadow $shadow,
     ): self {
-        return new self($kind, $placement, $step, $paint, $image, $fit, $shadow);
+        return new self($kind, $placement, $step, $paint, $image, $fit, $mask, $shadow);
     }
 }
