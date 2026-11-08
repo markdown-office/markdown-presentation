@@ -892,34 +892,30 @@ it('writes the deck\'s own properties in the frontmatter', function () {
 });
 
 it('writes no title into the frontmatter of a deck that has none', function () {
-    // PHPPresentation gives every deck the title "Untitled Presentation", and that is the
-    // library's own default rather than a title somebody wrote: a deck carrying it says
-    // nothing about its title. The frontmatter wrote it all the same, and drawing the
-    // Markdown again added a title to a slide that never had one.
+    // PHPPresentation's own default, not a title somebody wrote: a deck carrying it says
+    // nothing about its title.
     $path = writtenDeck("Text only.\n");
 
     expect(converted($path))->not->toContain('title:');
 });
 
 it('writes the title of the first slide into the frontmatter of a deck that has none', function () {
-    // The frontmatter is the first slide's, and a `title:` in it is that slide's title, so
-    // a deck whose title is on its slide and nowhere else would lose it.
+    // The frontmatter is the first slide's, and a `title:` in it is that slide's title.
     $path = writtenDeck("# One\n\nText.\n");
 
     expect(converted($path))->toContain('title: "One"');
 });
 
 it('takes the title of the first slide and not the title of a later one', function () {
-    // The deck's title is the first slide's title, the way it is in the other direction:
-    // a deck whose second slide has a title and whose first does not gains no title.
+    // Only the first slide's title stands in: a deck whose second slide has a title and
+    // whose first does not gains none.
     $path = writtenDeck("Text only.\n\n---\n\n# Two\n");
 
     expect(converted($path))->not->toContain('title:');
 });
 
 it('writes the title of the deck into the frontmatter where it has one', function () {
-    // The deck's own title is the deck's, and the first slide's title is the first
-    // slide's: the two are told apart here, and the deck's is the one that is written.
+    // The deck's own title is the deck's, and it wins over the first slide's.
     $path = deckWithShapes(
         static function (AbstractSlide $slide): void {
             placeholderShape($slide, 'title', 'What broke');
@@ -933,10 +929,8 @@ it('writes the title of the deck into the frontmatter where it has one', functio
 });
 
 it('writes no author into the frontmatter of a deck that has none', function () {
-    // PHPPresentation gives every deck the author "Unknown Creator", and that is the
-    // library's own default rather than a name somebody wrote: the Markdown carried it
-    // as though somebody had, and the deck drawn from that Markdown was made by
-    // "Unknown Creator".
+    // PHPPresentation's own default, not a name somebody wrote: the Markdown carried it
+    // as though somebody had.
     $path = deckWithShapes(
         static function (AbstractSlide $slide): void {
             placeholderShape($slide, 'title', 'What broke');
@@ -948,8 +942,7 @@ it('writes no author into the frontmatter of a deck that has none', function () 
 
 it('draws the same slide again when the Markdown it came from is drawn again', function () {
     // The round trip has to be a round trip: the Markdown a deck is read back into, drawn
-    // again, has to be the deck it came from. The title in the frontmatter is the first
-    // slide's title, and a heading that says the same thing is not drawn a second time.
+    // again, has to be the deck it came from.
     $first = writtenDeck("# One\n\nText.\n");
     $back = converted($first);
     $second = writtenDeck($back);
@@ -1602,8 +1595,7 @@ it('writes nothing for a block that holds nothing', function () {
         ]),
     ], $properties);
 
-    // The deck's own frontmatter and nothing after it: every block holds nothing, so
-    // every block writes nothing.
+    // The deck's own frontmatter and nothing after it.
     expect(trim(str_replace('---', '', $markdown)))->toBe('title: "A deck"');
 });
 

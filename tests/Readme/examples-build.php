@@ -8,11 +8,8 @@ use MarkdownPresentation\Tests\Support\Scratch;
 /*
  * The slides example, run the way the skill bundle runs it.
  *
- * The `mdword` skill bundle carries this half's gallery as `examples/slides/` and ships no
- * `vendor/`, so the build has to say what it needs rather than die with a PHP fatal error
- * that says nothing about what is missing. The Word half's build says it, and the two
- * halves ship side by side in one bundle, so they fail the same way.
- *
+ * The bundle carries this half's gallery as `examples/slides/` and ships no `vendor/`, so
+ * the build has to say what it needs rather than die with a fatal error that says nothing.
  * The copy is made into a tree of its own rather than run where it lies, because the
  * library *is* beside it here: a build that found this repository's `vendor/` would carry
  * on and build the decks, and the test would be about nothing.
@@ -61,11 +58,9 @@ it('says what the slides example needs when the library is not beside it', funct
             'This build needs the library itself: put a `vendor/autoload.php` in this directory\'s parent,'
             . ' or run `composer install` in the checkout it came from.',
         )
-        // On the error output and not on the standard one: a build that says what it needs
-        // says it where a shell shows it.
+        // On the error output and not on the standard one, and not as a PHP failure: the
+        // build is there to replace a warning about a missing file.
         ->and($out)->not->toContain('This build needs the library itself')
-        // And not as a PHP failure either: a warning about a missing file is what the
-        // build is there to replace.
         ->and($errors)->not->toContain('Warning')
         ->and($errors)->not->toContain('Fatal error');
 });
@@ -73,8 +68,7 @@ it('says what the slides example needs when the library is not beside it', funct
 it('stops the slides example before it builds anything', function () {
     [$status, , , $directory] = slidesBuildWithoutLibrary();
 
-    // The build says what it needs and stops there: nothing is written, and the decks it
-    // would have built are not built.
+    // The build says what it needs and stops there: nothing is written.
     expect($status)->toBe(1)
         ->and(is_dir($directory . '/examples/out'))->toBeFalse()
         ->and(glob($directory . '/examples/*.pptx') ?: [])->toBe([]);

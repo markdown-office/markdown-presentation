@@ -13,10 +13,9 @@ declare(strict_types=1);
 
 $autoload = __DIR__ . '/../vendor/autoload.php';
 
-// The build drives the library's own API, so it needs the library. A copy of this
-// directory on its own — the one the `mdword` skill carries, as `examples/slides/` — has
-// the sources and the templates but not the library that builds them, and a missing
-// `require` would say nothing about that.
+// The build drives the library's own API, so it needs the library. The `mdword` skill
+// carries a copy of this directory as `examples/slides/`, with the sources and the
+// templates but not the library, where a missing `require` would say nothing.
 if (!is_file($autoload)) {
     fwrite(
         STDERR,
