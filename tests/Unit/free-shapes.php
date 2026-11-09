@@ -458,7 +458,7 @@ it('refuses an attribute the directive does not read, and names the ones it does
     // The one mistake in this vocabulary that would otherwise leave no trace: a shape drawn
     // without the fill that was asked for, on a deck that looks rendered.
     expect(fn () => placedShapes("::image{src=\"logo.png\" padding=8}\n"))
-        ->toThrow(MalformedShape::class, 'The attributes are: alt, anchor, bleed, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.');
+        ->toThrow(MalformedShape::class, 'The attributes are: alt, anchor, bleed, fit, height, layer, left, mask, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.');
 });
 
 it('gives each directive its own attribute vocabulary', function (ShapeKind $kind, string $last) {

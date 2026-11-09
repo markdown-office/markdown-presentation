@@ -6,6 +6,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A picture may be drawn in a shape.** `mask` on `::image` names the shape the picture is
+  drawn in: `circle`, `ellipse`, `roundrect`, `triangle`, `diamond`, `hexagon`, `chevron`,
+  `arrow`, `star`, `heart`, `teardrop`, `cloud`, `moon`, `donut`, `frame` and `plaque`.
+
+  The shape is the picture's own rather than a frame drawn around it: the file writes it as
+  the geometry of the picture, which is what PowerPoint writes for a picture cropped to a
+  shape — so a picture masked in a deck is a picture cropped to that shape in PowerPoint, and
+  can be cropped to another one there.
+
+  The mask is a shape and not a size: the picture keeps the box it was given, and the shape
+  is drawn in it. A `circle` and an `ellipse` are the same shape, and the picture's own
+  proportions decide which of the two it looks like.
+
+  It needs a PHPPresentation that can write it, which the patch this library carries now
+  does.
+
 ### Fixed
 
 - **A deck read back into Markdown carries no title it never had.** PHPPresentation gives

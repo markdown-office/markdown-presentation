@@ -67,6 +67,7 @@ The patch adds these to PHPPresentation:
 | `Fill::getGradientStops` | the writer and the reader | the stops a gradient is painted with, so that a gradient may have a colour in the middle of it |
 | `GradientStop::getPosition` | the writer and the reader | where one stop of a gradient sits, so that the stops need not be spread evenly |
 | `BackgroundGradient::getFill` | the writer and the reader | the gradient a background is painted with, which is the same fill a shape is painted with |
+| `AbstractDrawingAdapter::setGeometry` | the writer | the shape a picture is drawn in, which is what a picture cropped to a shape is written with |
 
 The writer is the direction that writes a `.pptx`; the reader is the direction that takes one
 apart, and it reads a deck through the patched `PowerPoint2007` reader. The check asks for
@@ -1362,6 +1363,7 @@ is refused rather than one of them being dropped.
 | `border-radius` | `::roundrect` only | in pixels |
 | `label` | the ten ink shapes | the shape's own text — see [Text inside a shape](#text-inside-a-shape) |
 | `src`, `alt`, `fit` | `::image` | |
+| `mask` | `::image` only | the shape the picture is drawn in — see [A picture in a shape](#a-picture-in-a-shape) |
 | `color`, `font-size`, `font-family`, `align`, `vertical-align`, `padding` | `::content`, `::slide-number` | |
 | `of` | `::slide-number` only | the number of the deck after the number of the slide |
 | `shadow-color`, `shadow-distance`, `shadow-blur`, `shadow-direction`, `shadow-alpha` | all thirteen | see [A shadow](#a-shadow) |
@@ -1490,6 +1492,59 @@ A shadow is on the shape, not on the words inside it: a `label` takes the shadow
 sits in, and a `:::content` block casts one from its own border. `::image` casts one too — a
 `p:pic` carries an effect list of its own.
 
+#### A panel over a picture
+
+A shape painted with a colour and an alpha is seen through the page. `alpha` is one percentage
+for the whole shape, written into the colour of the fill and of the stroke, so the shape is seen
+slightly through the page rather than a fill and an outline that disagree about how solid they
+are.
+
+That is what gives words over a picture something to be read against. The picture, a panel over
+it and the words over that are three shapes, and the order they are written in is the order they
+are drawn in:
+
+```markdown
+::image{src="landscape.webp" left=0 top=0 width=100% height=100% fit=stretch layer=back}
+::rectangle{left=0 top=0 width=100% height=100% fill=lt1 alpha=75 layer=back}
+:::content{left=8% top=38% width=84% height=24% color=dk1}
+Words on a panel.
+:::
+```
+
+The library knows the colour of the panel and the colour of the words, and not what the
+photograph is made of — so how readable the words are is a thing to look at rather than a thing
+the library can promise.
+
+**A box behind the words** is the same shape with an opaque fill, and only the words are on it:
+the picture around the box keeps its own colours. `fill=lt1` alone would be opaque as well — a
+colour without an alpha is whole — so `alpha=100` says it rather than leaving it to be read.
+
+```markdown
+::image{src="landscape.webp" left=0 top=0 width=100% height=100% fit=stretch layer=back}
+:::content{left=7% top=28% width=58% height=34% fill=lt1 alpha=100 padding=16}
+Words in a box.
+:::
+```
+
+#### A picture in a shape
+
+A picture is drawn in a rectangle, and a picture can be drawn in another shape instead. The shape
+is the picture's own rather than a frame drawn around it: the file writes it as the geometry of
+the picture, which is what PowerPoint writes for a picture cropped to a shape.
+
+```markdown
+::image{src="logo.png" mask=circle left=10% top=20% width=30% height=30% fit=contain}
+```
+
+The masks are `circle`, `ellipse`, `roundrect`, `triangle`, `diamond`, `hexagon`, `chevron`,
+`arrow`, `star`, `heart`, `teardrop`, `cloud`, `moon`, `donut`, `frame` and `plaque` — and a name
+outside them is refused with the list of what would have worked, the way every other name
+outside a vocabulary is.
+
+The mask is a shape and not a size: the picture keeps the box it was given, and the shape is
+drawn in it. A `circle` and an `ellipse` are the same shape, and the picture's own proportions
+decide which of the two it looks like.
+
 #### What is refused, and how it reads
 
 An attribute a directive does not read is refused rather than ignored, and that is the whole of
@@ -1533,7 +1588,7 @@ Slide 1 gives "rectangle" a fill of "chartreuse". A colour is either no colour a
 
 Slide 1 gives "rectangle" a rotate of "22.5". A rotation is a whole number of degrees, and turns the shape about the middle of its box: rotate=45, rotate=-30, rotate=45deg.
 
-Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, bleed, fit, height, layer, left, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.
+Slide 1 gives "image" an attribute "fill", which it does not read. The attributes are: alt, anchor, bleed, fit, height, layer, left, mask, rotate, shadow-alpha, shadow-blur, shadow-color, shadow-direction, shadow-distance, src, top, width.
 
 Slide 1 gives "rectangle" a left of "10%,". Attributes are separated by a space, not a comma. A length is a number, a number of pixels, a number of points, or — for a position or a size — a percentage of the slide: left=40%, left=320, font-size=24pt.
 ```

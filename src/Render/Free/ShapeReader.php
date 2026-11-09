@@ -115,12 +115,12 @@ final class ShapeReader
 
         return match (true) {
             $kind === ShapeKind::Image => FreePicture::at(
-                $kind,
                 $placement,
                 $state->step,
                 $paint,
                 $this->picture($attributes, $state),
                 Pictures::fit($state->slide, $kind->value, $attributes),
+                Mask::read($state->slide, $kind->value, $attributes),
                 $shadow,
             ),
             // Before the text block, which is a box whose body the deck wrote: this one's body

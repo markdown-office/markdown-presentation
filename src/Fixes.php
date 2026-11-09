@@ -8,6 +8,7 @@ use MarkdownPresentation\Exception\UnpatchedDependency;
 use PhpOffice\PhpPresentation\Reader\PowerPoint2007;
 use PhpOffice\PhpPresentation\Slide\Background\Gradient as BackgroundGradient;
 use PhpOffice\PhpPresentation\Shape\AutoShape;
+use PhpOffice\PhpPresentation\Shape\Drawing\AbstractDrawingAdapter;
 use PhpOffice\PhpPresentation\Shape\Drawing\Gd;
 use PhpOffice\PhpPresentation\Shape\RichText;
 use PhpOffice\PhpPresentation\Shape\Table;
@@ -20,8 +21,8 @@ use PhpOffice\PhpPresentation\Style\GradientStop;
  * The library writes a few things a released PHPPresentation cannot: a table that says
  * which row is its header, a shape that says how round its corners are, a run of text
  * that says what it is, a picture that says where it was read from, a gradient of more
- * than two stops, and a background painted with a gradient. It gets them from a patch
- * applied to the installed package.
+ * than two stops, a background painted with a gradient, and a picture that says what
+ * shape it is drawn in. It gets them from a patch applied to the installed package.
  *
  * The check is made once per conversion because the alternative is a fatal error in the
  * middle of the work naming a method rather than the reason. A reader of that error
@@ -51,6 +52,7 @@ final class Fixes
         Fill::class => 'getGradientStops',
         GradientStop::class => 'getPosition',
         BackgroundGradient::class => 'getFill',
+        AbstractDrawingAdapter::class => 'setGeometry',
     ];
 
     /**
