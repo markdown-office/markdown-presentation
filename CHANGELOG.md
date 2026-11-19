@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The example build names the skill that carries it.** The skill is called `mdoffice` now
+  — it is the suite's, and it carries both halves — and the build said the name it had
+  before. The bundle carries this directory as `examples/slides/`, so a copy of it told a
+  reader to look for a skill that is not there.
+
 ## [0.5.0] - 2026-11-09
 
 ### Added
