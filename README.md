@@ -680,6 +680,11 @@ every label in it and checks that the deck draws what the parser reads — so th
 agree with each other because they ask the same parser rather than because they keep the
 same rules.
 
+**A label holds no brackets.** It ends at the first `]`, so a link cannot be in one — a link
+is written in brackets. `:brand[[Bakery](https://example.com)]` is not a link with a styled
+word in it: the directive ends at `:brand` and the rest is ordinary Markdown. A link *around*
+the directive is the way to write one: `[:brand[Bakery]](https://example.com)`.
+
 **`highlight` is not drawn by this half.** PHPPresentation's font has no setter for one,
 so a highlight would be an element of the run's own properties in the file — a pass over the
 written package rather than a property of a run. Until there is one, the attribute is
