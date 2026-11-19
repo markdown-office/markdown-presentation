@@ -666,27 +666,19 @@ try {
 Slide 1 has the text style ":brand", which is not a style this theme has. The theme has no text styles; a theme names them in its "textStyles:" section.
 ```
 
-**The label is plain text.** The label of a directive is a string rather than Markdown, so
-`:brand[**Bakery**]` would be drawn as `**Bakery**` — a deck that renders and shows
-something the author did not write. It is refused instead, and the message says the two
-ways out: give the style the weight — in the theme's own `textStyles:` section for a named
-style, as an attribute for the raw form — or write the emphasis in the paragraph around it. A
-bare `*` or `_` is a character and not an intent, so `2 * 3` and `snake_case` are drawn as
-they are. So is a construct CommonMark does not call emphasis: `__ Bakery__` and
+**The label is parsed as inline Markdown.** `:brand[**Bakery**]` is drawn as the word
+`Bakery` in the brand style and in bold: the label is Markdown, and the markup in it is
+markup rather than characters. What CommonMark makes of a label is what the deck draws, so
+a bare `*` or `_` is a character and not an intent — `2 * 3` and `snake_case` are drawn as
+they are — and so is a construct CommonMark does not call emphasis: `__ Bakery__` and
 `** text**` are text, because a delimiter that opens an emphasis may not be followed by a
 space and one that closes it may not be preceded by one.
 
-**The two halves keep the same rules, and CommonMark does not.** The corpus of the labels
-a style may be given, and of what CommonMark makes of each one, is
-`tests/fixtures/labels.txt`; `tools/compare-label-patterns.php` runs it through both
-halves' rules and through the reference parser. The halves agree with each other on every
-label in it, and they differ from CommonMark in five of them, which the corpus records
-rather than leaves to be found again:
-
-| Label | CommonMark | Here |
-| --- | --- | --- |
-| `___Bakery___`, `_Bakery__`, `__Bakery_ __` | emphasis | text, so the label is drawn as it was written |
-| `a *Bakery**a`, `a *Bakery_*a` | text | a construct, so the label is refused |
+**The two halves ask the same parser.** The corpus of the labels a style may be given, and
+of what the parser makes of each one, is `tests/fixtures/labels.txt`, and the test reads
+every label in it and checks that the deck draws what the parser reads — so the halves
+agree with each other because they ask the same parser rather than because they keep the
+same rules.
 
 **`highlight` is not drawn by this half.** PHPPresentation's font has no setter for one,
 so a highlight would be an element of the run's own properties in the file — a pass over the

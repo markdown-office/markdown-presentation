@@ -1,7 +1,7 @@
 ---
 title: Inline styles
 theme: corporate-dark
-description: A word in a style of its own inside a box of its own, and the three things this half refuses.
+description: A word in a style of its own inside a box of its own, and the two things this half refuses.
 ---
 
 # Inline styles
@@ -36,6 +36,9 @@ Three words and three colours in one box.
 
 A style sets the properties it names and leaves the others alone.
 `brand` names a colour and a weight, so the size of the word is the size of the box it is in.
+
+A label is parsed as inline Markdown, so a word in a style may hold emphasis of its own:
+`:brand[**Instrument Works**]` is the same word in bold.
 :::
 
 ---
@@ -97,11 +100,10 @@ Slide 5 has the text style ":brands", which is not a style this theme has. The s
 
 ::column
 
-A style's text is plain text, so `:brand[**Barge**]` is refused.
-It is not drawn as the asterisks the author wrote:
+A style needs some text, so `:brand[]` is refused:
 
 ```text
-Slide 5 writes the text style ":brand" around "**Barge**", which is Markdown. A style's text is plain text: give the style the weight in the theme's "textStyles:" section ("brand: { bold: true }") or write the emphasis in the paragraph around it.
+Slide 5 writes the text style ":brand" with no text. A style needs some text.
 ```
 
 ---

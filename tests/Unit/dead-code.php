@@ -290,6 +290,15 @@ it('does not claim again what the code does not do', function (string $claim) {
     'a note has no name()' => 'and Quote::name()',
     'a frame spaces every paragraph but the last' => 'on every paragraph but the last',
 
+    // A label of a directive was plain text, and the rules that went with it: a label
+    // holding a complete Markdown construct was refused by this half and drawn as its own
+    // source text by the Word half. The label is parsed as inline Markdown now, and the
+    // phrases are the ones the page and the message used. `CHANGELOG.md` has to be able to
+    // name what a label used to be refused for, so the phrases are the wording rather than
+    // the claim — the entry says the label is parsed and does not say a label is text.
+    'a label of a directive is a string rather than Markdown' => 'the label of a directive is a string rather than Markdown',
+    "a style's text is plain text" => "a style's text is plain text",
+
     // Columns divided at a `##` until `::column` said otherwise. The phrase is the sentence
     // the README, the gallery and the renderer's own docblock all gave as the reason, and
     // none of them can now: a heading is an ordinary heading. `CHANGELOG.md` has to be able

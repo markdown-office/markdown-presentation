@@ -689,10 +689,10 @@ it('carries the messages the three refusals write', function () {
 
     // A refusal cannot be shown by being refused — the deck would not build — so the deck
     // carries the syntax and the message beside it. The messages are the library's own:
-    // the styles the theme does have, the two ways out of a label that holds Markdown, and
-    // the reason a highlight cannot be written.
+    // the styles the theme does have, a style with no text in it, and the reason a
+    // highlight cannot be written.
     expect($pptx->slideText(5))->toContain('The styles are: brand, muted.')
-        ->and($pptx->slideText(5))->toContain('which is Markdown')
+        ->and($pptx->slideText(5))->toContain('A style needs some text')
         ->and($pptx->slideText(6))->toContain('which the slides half does not draw');
 });
 

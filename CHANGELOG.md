@@ -4,6 +4,28 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A word in a style may hold emphasis of its own.** `:brand[**Bakery**]` is drawn as the
+  word `Bakery` in the brand style and in bold. It used to be refused, with a message
+  naming the two ways out, because the label of a directive was a string rather than
+  Markdown and a complete construct in one could not have it honoured.
+
+  The label is parsed as inline Markdown now, so what the parser reads is what the deck
+  draws: `2 * 3` and `snake_case` are drawn as they are, and `__ Bakery__` is text, because
+  a delimiter that opens an emphasis may not be followed by a space and one that closes it
+  may not be preceded by one.
+
+  The two halves agree with each other because they ask the same parser, so the list of
+  patterns each of them kept — the rules that said what a label may not hold — and the tool
+  that compared the two lists are gone. The corpus of the labels is still here, and the
+  test reads every label in it and checks that the deck draws what the parser reads.
+
+- **This half needs the directives package in version 0.4.0 or newer.** The label is parsed
+  by that package, and the version before it did not parse it.
+
 ## [0.5.0] - 2026-11-09
 
 ### Added

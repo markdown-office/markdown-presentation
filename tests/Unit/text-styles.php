@@ -2,6 +2,13 @@
 
 declare(strict_types=1);
 
+use League\CommonMark\Environment\Environment;
+use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
+use League\CommonMark\Extension\CommonMark\Node\Inline\Code;
+use League\CommonMark\Extension\Strikethrough\StrikethroughExtension;
+use League\CommonMark\Node\Inline\Text;
+use League\CommonMark\Node\Node;
+use League\CommonMark\Parser\MarkdownParser;
 use MarkdownPresentation\Document\DeckParser;
 use MarkdownPresentation\Exception\MalformedTextStyle;
 use MarkdownPresentation\Exception\MalformedTheme;
@@ -302,28 +309,29 @@ it('reads every attribute the vocabulary names', function () {
     }
 });
 
-it('refuses a label that holds Markdown, because a style\'s text is plain text', function () {
+it('draws a label that holds Markdown, because the label is parsed as inline Markdown', function () {
+    // The label is parsed as inline Markdown, so the asterisks are markup rather than
+    // characters: the word is drawn in the style and in bold, and the asterisks are
+    // not in the deck at all.
     [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[**Bakery**]');
 
-    expect(fn () => styledDeck($deck, $directory))
-        ->toThrow(MalformedTextStyle::class, 'which is Markdown');
+    $pptx = styledDeck($deck, $directory);
+
+    expect(runColours($pptx))->toBe([
+        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
+    ])->and(runXml($pptx, 'Bakery'))->toContain('b="1"');
 });
 
-it('refuses a label holding a strong emphasis written with two underscores', function () {
+it('draws a label holding a strong emphasis written with two underscores', function () {
     [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[__Bakery__]');
 
-    expect(fn () => styledDeck($deck, $directory))
-        ->toThrow(MalformedTextStyle::class, 'which is Markdown');
-});
+    $pptx = styledDeck($deck, $directory);
 
-it('names the way out of a label that holds Markdown, and it depends on the form', function () {
-    [$named, $namedDirectory] = wordmark("brand:\n  color: accent1\n", ':brand[**Bakery**]');
-    [$raw, $rawDirectory] = wordmark("brand:\n  color: accent1\n", ':style[**Bakery**]{bold=true}');
-
-    expect(fn () => styledDeck($named, $namedDirectory))
-        ->toThrow(MalformedTextStyle::class, 'give the style the weight in the theme\'s "textStyles:" section ("brand: { bold: true }")')
-        ->and(fn () => styledDeck($raw, $rawDirectory))
-        ->toThrow(MalformedTextStyle::class, 'give the style the weight as an attribute ("bold=true")');
+    expect(runColours($pptx))->toBe([
+        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
+    ])->and(runXml($pptx, 'Bakery'))->toContain('b="1"');
 });
 
 it('draws a label holding a strong emphasis CommonMark does not call one', function () {
@@ -345,15 +353,17 @@ it('draws a label holding a strong emphasis CommonMark does not call one', funct
     ]);
 });
 
-it('draws a label holding a strikethrough, because the tildes are two characters', function () {
-    // `~~struck~~` is GFM rather than CommonMark, and a label is plain text: the tildes are
-    // characters in a word rather than an intent.
+it('draws a label holding a strikethrough, because the tildes are markup', function () {
+    // `~~struck~~` is GFM rather than CommonMark, and the deck's own parser has it, so
+    // the tildes are a strikethrough rather than two characters in a word.
     [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[~~Bakery~~]');
 
-    expect(runColours(styledDeck($deck, $directory)))->toBe([
+    $pptx = styledDeck($deck, $directory);
+
+    expect(runColours($pptx))->toBe([
         'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        '~~Bakery~~' => ['colour' => '00B4D8', 'size' => 11],
-    ]);
+        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
+    ])->and(runXml($pptx, 'Bakery'))->toContain('strike="sngStrike"');
 });
 
 it('draws a label holding a bare marker, because a marker is a character', function () {
@@ -752,21 +762,52 @@ it('draws the four kinds of block a box holds, and a style in each of them', fun
         ->and($colours['item']['colour'])->toBe('00B4D8');
 });
 
-it('holds a label that is Markdown and draws one that is not', function () {
-    // The corpus is the list of labels a text style may be given and what CommonMark
-    // makes of each one. A label the directive grammar cannot carry — one with a bracket
-    // in it — is left out: the grammar says a label holds no brackets at all.
+/**
+ * The text the parser reads in a label, with the markup taken out of it.
+ *
+ * CommonMark with GFM's strikethrough, which is what both halves read, and read
+ * here rather than through the half under test: the claim is that the half draws
+ * what the parser reads, and a parser asked by the half cannot say so.
+ */
+function labelText(string $label): string
+{
+    $environment = new Environment();
+    $environment->addExtension(new CommonMarkCoreExtension());
+    $environment->addExtension(new StrikethroughExtension());
+
+    $document = (new MarkdownParser($environment))->parse($label);
+
+    $text = '';
+
+    $walk = static function (Node $node) use (&$walk, &$text): void {
+        if ($node instanceof Text || $node instanceof Code) {
+            $text .= $node->getLiteral();
+
+            return;
+        }
+
+        foreach ($node->children() as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($document);
+
+    return $text;
+}
+
+it('draws every label the way the parser reads it', function () {
+    // The corpus is the list of labels a text style may be given and what the parser
+    // makes of each one. The label is parsed as inline Markdown, so what the half
+    // draws is what the parser reads: the markup is gone from a label the parser
+    // reads as Markdown, and it is kept in one it does not.
     //
-    // The two markers that differ from CommonMark say which way the halves went, and
-    // this half holds what the corpus says it holds: a run of three underscores is
-    // emphasis to CommonMark and text here, and a run of one asterisk beside a run of
-    // two is text to CommonMark and a construct here.
+    // A label the directive grammar cannot carry — one with a bracket in it — is left
+    // out: the grammar says a label holds no brackets at all.
     $directory = textStyleTheme("brand:\n  color: accent1\n");
     $labels = file(dirname(__DIR__) . '/fixtures/labels.txt', FILE_IGNORE_NEW_LINES) ?: [];
     $wrong = [];
-    $held = 0;
     $drawn = 0;
-    $diverged = [];
 
     foreach ($labels as $line) {
         if ($line === '' || str_starts_with($line, '#')) {
@@ -779,62 +820,30 @@ it('holds a label that is Markdown and draws one that is not', function () {
             continue;
         }
 
-        $deck = (new DeckParser())->parse(sprintf("---\ntheme: ./theme.yml\n---\n\nA :brand[%s] here.\n", $label));
+        $deck = (new DeckParser())->parse(sprintf("---\ntheme: ./theme.yml\n---\n\n:brand[%s]\n", $label));
         $path = Scratch::file('deck.pptx', '');
-        $verdict = 'drawn';
 
         try {
             (new PresentationRenderer($directory))->render($deck, $path);
         } catch (Throwable $failure) {
-            $verdict = $failure instanceof MalformedTextStyle ? 'refused' : 'failed';
-        }
-
-        $want = in_array($marker, ['markdown', 'text-only'], true) ? 'refused' : 'drawn';
-
-        if ($want !== $verdict) {
-            $wrong[] = sprintf('%s: the corpus says %s, this half says %s', $label, $marker, $verdict);
-        }
-
-        if (in_array($marker, ['markdown-only', 'text-only'], true)) {
-            $diverged[$marker] = true;
-        }
-
-        if ($want === 'refused') {
-            $held++;
+            $wrong[] = sprintf('%s: the half refused it: %s', $label, $failure->getMessage());
 
             continue;
+        }
+
+        // The text of the runs the label made, which is the label with the markup the
+        // parser found in it taken out.
+        $text = implode('', Pptx::open($path)->texts(1));
+        $want = $marker === 'text' ? $label : labelText($label);
+
+        if ($text !== $want) {
+            $wrong[] = sprintf('%s: the half drew "%s", the parser reads "%s"', $label, $text, $want);
         }
 
         $drawn++;
     }
 
     expect($wrong)->toBe([])
-        ->and($held)->toBeGreaterThan(0)
-        ->and($drawn)->toBeGreaterThan(0)
-        ->and($diverged)->toHaveKeys(['markdown-only', 'text-only']);
+        ->and($drawn)->toBeGreaterThan(0);
 });
 
-it('names the labels the halves differ from CommonMark about, in the code', function () {
-    // The docblock has to say where the halves differ from CommonMark, and the labels it
-    // names have to be the labels the corpus records: a docblock that names a label the
-    // corpus does not, or leaves one out, is a claim nothing checks.
-    $doc = (string) file_get_contents(Doctest::root() . '/src/Render/CommonMark/StyleReader.php');
-    $labels = file(dirname(__DIR__) . '/fixtures/labels.txt', FILE_IGNORE_NEW_LINES) ?: [];
-
-    foreach ($labels as $line) {
-        if ($line === '' || str_starts_with($line, '#')) {
-            continue;
-        }
-
-        [$marker, $label] = array_pad(explode(' ', $line, 2), 2, '');
-
-        if (!in_array($marker, ['markdown-only', 'text-only'], true)) {
-            continue;
-        }
-
-        expect($doc)->toContain($label);
-    }
-
-    expect($doc)->toContain('Word half')
-        ->and($doc)->toContain('agree with each other');
-});
