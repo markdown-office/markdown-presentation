@@ -37,8 +37,29 @@ Three words and three colours in one box.
 A style sets the properties it names and leaves the others alone.
 `brand` names a colour and a weight, so the size of the word is the size of the box it is in.
 
-A label is parsed as inline Markdown, so a word in a style may hold emphasis of its own:
-`:brand[**Instrument Works**]` is the same word in bold.
+A label is parsed as inline Markdown, so a word in a style may hold emphasis of its
+own. The next slide shows one.
+:::
+
+---
+layout: blank
+---
+
+# A word in a style may hold emphasis of its own
+
+:::content{left=6% top=30% width=88% height=13% color=accent3 font-size=26}
+Sextant :brand[**Instrument Works**] — :muted[*est. 1934*]
+:::
+
+:::content{left=6% top=47% width=88% height=48% font-size=15}
+A label is parsed as inline Markdown, so the asterisks in it are markup and not
+characters, and the emphasis in it is drawn.
+
+`Instrument Works` is in the theme's `brand` style, which is bold already, so the
+emphasis in it changes nothing the eye can see.
+
+`est. 1934` is in `muted`, which is neither bold nor italic, so the italic in it is
+the emphasis's own: the label carries the emphasis and the style carries the rest.
 :::
 
 ---
