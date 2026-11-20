@@ -253,11 +253,15 @@ final class InlineTranslator
     }
 
     /**
-     * The run a text style draws, in the style the words around it were written in.
+     * The runs a text style draws, in the style the words around it were written in.
      *
      * The style's own properties win over the ones the words around it carry, because the
      * style is the more particular of the two statements: a word written in bold by the
      * paragraph and in a style that says not bold is not bold.
+     *
+     * The label is parsed as inline Markdown, so the runs are the ones the label makes
+     * rather than one run for the whole of it: a word in a style may hold emphasis of its
+     * own, and a run for the label would have to carry the markup inside it as text.
      *
      * @param Style     $style
      * @param list<Run> $runs
@@ -269,19 +273,7 @@ final class InlineTranslator
     {
         $style = self::merged($style, $this->styles->read($node, $slide, $theme));
 
-        $this->append($runs, new Run(
-            (string) $node->getLabel(),
-            bold: $style['bold'] === true,
-            italic: $style['italic'] === true,
-            code: $style['code'],
-            link: $style['link'],
-            strike: $style['strike'] === true,
-            colour: $style['colour'],
-            size: $style['size'],
-            font: $style['font'],
-            underline: $style['underline'] === true,
-            fontWhere: $style['fontWhere'],
-        ));
+        $this->walk($node->children(), $runs, $style, $slide, $theme);
     }
 
     /**
