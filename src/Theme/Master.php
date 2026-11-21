@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Theme;
 
+use MarkdownPresentation\Filesystem\FileSystem;
+
 /**
  * The master a theme carries: the `template.pptx` its layouts are drawn in.
  *
@@ -82,7 +84,7 @@ final class Master
      */
     public function path(): string
     {
-        if ($this->bytes !== null && !is_file($this->path)) {
+        if ($this->bytes !== null && !FileSystem::isFile($this->path)) {
             @file_put_contents($this->path, $this->bytes);
             @chmod($this->path, 0o600);
         }
@@ -103,7 +105,7 @@ final class Master
      */
     public function release(): void
     {
-        if ($this->owned && is_file($this->path)) {
+        if ($this->owned && FileSystem::isFile($this->path)) {
             @unlink($this->path);
         }
     }

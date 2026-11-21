@@ -11,6 +11,7 @@ use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Exception\UnknownLayoutRole;
 use MarkdownPresentation\Exception\UnservedTemplate;
 use MarkdownPresentation\Files\FileFinder;
+use MarkdownPresentation\Filesystem\FileSystem;
 use MarkdownPresentation\Filesystem\PathScope;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
@@ -270,7 +271,7 @@ final class ThemeLoader
 
         // `is_readable()` first, so a file that cannot be read is reported as that rather
         // than as a warning the test runner turns into a failure of its own.
-        $contents = is_readable($real) ? @file_get_contents($real) : false;
+        $contents = FileSystem::isReadable($real) ? @file_get_contents($real) : false;
 
         if ($contents === false) {
             throw new Exception(sprintf('Unable to read "%s".', $real));

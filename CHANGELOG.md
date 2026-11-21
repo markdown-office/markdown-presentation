@@ -15,6 +15,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A name holding a null byte is answered rather than raised.** PHP 8.6 raises a
+  `ValueError` from `is_file()` and its neighbours where earlier versions answered false. A
+  deck can write a null byte in a path, and the error is an `Error` rather than an
+  `Exception`, so it escaped every `catch` this library documents and left the caller with a
+  stack trace instead of an answer.
+
+  Every entry point that takes a name now answers null or false for such a name, as it
+  already did for a name that walked out of its base and for a name that is a URL. The
+  guard is in one place — the file system is asked through it — rather than at every call
+  site, so a name is answered the same way wherever it is asked about.
+
 - **A word in a style may hold emphasis of its own.** `:brand[**Bakery**]` is drawn as the
   word `Bakery` in the brand style and in bold. It used to be refused, with a message
   naming the two ways out, because the label of a directive was a string rather than

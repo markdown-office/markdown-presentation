@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MarkdownPresentation\Files;
 
+use MarkdownPresentation\Filesystem\FileSystem;
 use MarkdownPresentation\Theme\ThemeLoader;
 
 /**
@@ -74,7 +75,7 @@ final class DiskFinder implements FileFinder
         $names = [];
 
         foreach ($this->theme as $base) {
-            if (!is_dir($base)) {
+            if (!FileSystem::isDirectory($base)) {
                 continue;
             }
 
@@ -83,7 +84,7 @@ final class DiskFinder implements FileFinder
                     continue;
                 }
 
-                if (is_file(rtrim($base, '/') . '/' . $entry . '/' . ThemeLoader::THEME_FILE)) {
+                if (FileSystem::isFile(rtrim($base, '/') . '/' . $entry . '/' . ThemeLoader::THEME_FILE)) {
                     $names[$entry] = true;
                 }
             }
@@ -123,7 +124,7 @@ final class DiskFinder implements FileFinder
                 continue;
             }
 
-            if (is_file($directory . '/' . $entry)) {
+            if (FileSystem::isFile($directory . '/' . $entry)) {
                 $names[] = $entry;
             }
         }
@@ -143,7 +144,7 @@ final class DiskFinder implements FileFinder
         if (str_starts_with($name, '/')) {
             // A name that is already a path is taken as it stands: resolving it against
             // a base would name a file nobody meant.
-            return is_file($name) ? $name : null;
+            return FileSystem::isFile($name) ? $name : null;
         }
 
         if ($role === 'theme') {
@@ -161,7 +162,7 @@ final class DiskFinder implements FileFinder
         foreach ($this->worlds($role) as $base) {
             $path = rtrim($base, '/') . '/' . $name;
 
-            if (is_file($path)) {
+            if (FileSystem::isFile($path)) {
                 return $path;
             }
         }
@@ -194,7 +195,7 @@ final class DiskFinder implements FileFinder
 
         $path = $directory . '/' . substr($name, $slash + 1);
 
-        return is_file($path) ? $path : null;
+        return FileSystem::isFile($path) ? $path : null;
     }
 
     /**
@@ -209,7 +210,7 @@ final class DiskFinder implements FileFinder
         foreach ($this->theme as $base) {
             $directory = rtrim($base, '/') . '/' . $theme;
 
-            if (is_dir($directory)) {
+            if (FileSystem::isDirectory($directory)) {
                 return $directory;
             }
         }

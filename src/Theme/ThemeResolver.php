@@ -7,6 +7,7 @@ namespace MarkdownPresentation\Theme;
 use MarkdownPresentation\Exception\ThemeNotFound;
 use MarkdownPresentation\Files\DiskFinder;
 use MarkdownPresentation\Files\FileFinder;
+use MarkdownPresentation\Filesystem\FileSystem;
 use MarkdownPresentation\Filesystem\PathScope;
 
 /**
@@ -156,7 +157,7 @@ final class ThemeResolver
             // allowed is where it lands, which is the same question an image path asks.
             $path = str_starts_with($name, '/') ? $name : $this->base() . '/' . $name;
 
-            return is_file($path)
+            return FileSystem::isFile($path)
                 ? $this->themeOfManifest($this->held($name, $path), $name)
                 : $this->themeIn($this->directory($name, $path), $name);
         }
@@ -168,7 +169,7 @@ final class ThemeResolver
         }
 
         foreach ($this->themeDirectories() as $themes) {
-            if (is_dir($directory = $themes . '/' . $name)) {
+            if (FileSystem::isDirectory($directory = $themes . '/' . $name)) {
                 return $this->themeIn($this->directory($name, $directory), $name);
             }
         }
@@ -301,7 +302,7 @@ final class ThemeResolver
      */
     private function directory(string $name, string $found): string
     {
-        if (!is_dir($found)) {
+        if (!FileSystem::isDirectory($found)) {
             throw ThemeNotFound::noDirectory($found);
         }
 
