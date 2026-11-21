@@ -29,6 +29,15 @@ All notable changes to this project are documented here. The format follows
   The test asks the library what it writes for the directive beside each quote and compares
   the two, so a quote that has drifted fails the suite rather than a reader.
 
+- **A label keeps the break the words around it keep.** A list item written across two lines
+  is one line of text on the slide, and a label written across two lines inside one was
+  drawn with a newline in it: the break inside the label was answered by the translator's own
+  default rather than by the caller that asked for a space.
+
+  The break is carried down the tree now, so a label, a link and the words of a picture are
+  read with the break their caller asked for. A paragraph keeps its newline, which is what
+  this half has always done.
+
 - **A name holding a null byte is answered rather than raised.** PHP 8.6 raises a
   `ValueError` from `is_file()` and its neighbours where earlier versions answered false. A
   deck can write a null byte in a path, and the error is an `Error` rather than an
