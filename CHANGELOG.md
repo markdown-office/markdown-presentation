@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **PHP 8.6 is supported.** The suite runs on it, beside 8.2 and 8.5, and the requirement
+  stays PHP 8.2: a library that raises its floor with every release is a library nobody can
+  install.
+
 ### Changed
 
 - **The example build names the skill that carries it.** The skill is called `mdoffice` now
