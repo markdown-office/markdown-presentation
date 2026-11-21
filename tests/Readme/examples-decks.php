@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SvgRasteriser;
@@ -749,6 +750,95 @@ it('carries the messages the three refusals write', function () {
         ->and($pptx->slideText(6))->toContain('A style needs some text')
         ->and($pptx->slideText(7))->toContain('which the slides half does not draw');
 });
+
+it('writes the messages the deck quotes as the library writes them', function () use ($root) {
+    // The deck quotes what the library says, and a quote is only a quote while it says
+    // the same thing: a refusal names the slide it is written on, so a slide added above
+    // the refusals moves the number in the quote — and the quote is read by a person
+    // rather than run.
+    $source = (string) file_get_contents($root . '/examples/markdown/15-inline-styles.md');
+    $deck = (new DeckParser())->parse($source);
+    $theme = (string) $deck->frontmatterValue('theme', 'corporate-dark');
+    $directory = $root . '/examples/markdown';
+
+    $claims = [];
+
+    foreach ($deck->slides() as $slide) {
+        foreach (quotedRefusals($slide->content()) as $refusal) {
+            $claims[] = ['slide' => $slide->index() + 1] + $refusal;
+        }
+    }
+
+    expect($claims)->not->toBe([]);
+
+    foreach ($claims as $claim) {
+        expect(libraryRefusal($claim['directive'], $claim['slide'], $theme, $directory))
+            ->toBe($claim['message']);
+    }
+});
+
+/**
+ * The messages a slide quotes about the directives it names, in the order they are written.
+ *
+ * A message is a line of a fenced block that names a slide, and the directive it is about
+ * is the one the prose before it names.
+ *
+ * @return list<array{directive: string, message: string}>
+ */
+function quotedRefusals(string $content): array
+{
+    preg_match_all(
+        '/`(:[a-z]+(?:\[[^\]]*\])?(?:\{[^}]*\})?)`|^Slide \d+ .*$/m',
+        $content,
+        $found,
+        PREG_OFFSET_CAPTURE,
+    );
+
+    $claims = [];
+    $directive = null;
+
+    foreach ($found[0] as $index => [$text]) {
+        if (str_starts_with($text, 'Slide ')) {
+            if ($directive !== null) {
+                $claims[] = ['directive' => $directive, 'message' => $text];
+            }
+
+            continue;
+        }
+
+        $directive = $found[1][$index][0];
+    }
+
+    return $claims;
+}
+
+/**
+ * What the library writes when a deck carries the given directive on the given slide.
+ *
+ * The deck carries one slide after another and the directive on the slide the message is
+ * written on, because a refusal names the slide it is written on.
+ */
+function libraryRefusal(string $directive, int $slide, string $theme, string $directory): string
+{
+    $markdown = sprintf("---\ntheme: %s\n---\n\n# A slide\n", $theme);
+
+    for ($number = 2; $number <= $slide; $number++) {
+        $markdown .= "\n---\n\n# A slide\n";
+    }
+
+    $markdown .= "\n" . $directive . "\n";
+
+    try {
+        (new PresentationRenderer($directory))->render(
+            (new DeckParser())->parse($markdown),
+            sys_get_temp_dir() . '/mdp-refusal.pptx',
+        );
+    } catch (Exception $refusal) {
+        return $refusal->getMessage();
+    }
+
+    return 'DRAWN';
+}
 
 it('counts the slides of the templates deck and not its definitions', function () {
     [$pptx] = builtDeck('16-templates.md');

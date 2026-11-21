@@ -21,6 +21,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The messages the inline-styles example quotes are the ones the library writes.** The
+  example quotes what the library says when a deck is refused, and the quotes named the
+  slides the example carried before it gained one: a refusal names the slide it is written
+  on, and the slide it was written on had moved.
+
+  The test asks the library what it writes for the directive beside each quote and compares
+  the two, so a quote that has drifted fails the suite rather than a reader.
+
 - **A name holding a null byte is answered rather than raised.** PHP 8.6 raises a
   `ValueError` from `is_file()` and its neighbours where earlier versions answered false. A
   deck can write a null byte in a path, and the error is an `Error` rather than an

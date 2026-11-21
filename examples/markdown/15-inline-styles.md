@@ -116,7 +116,7 @@ The message names the styles the theme does have.
 Written `:brands[Barge]`, it says:
 
 ```text
-Slide 5 has the text style ":brands", which is not a style this theme has. The styles are: brand, muted.
+Slide 6 has the text style ":brands", which is not a style this theme has. The styles are: brand, muted.
 ```
 
 ::column
@@ -124,7 +124,7 @@ Slide 5 has the text style ":brands", which is not a style this theme has. The s
 A style needs some text, so `:brand[]` is refused:
 
 ```text
-Slide 5 writes the text style ":brand" with no text. A style needs some text.
+Slide 6 writes the text style ":brand" with no text. A style needs some text.
 ```
 
 ---
@@ -138,5 +138,5 @@ The attribute is refused by name rather than accepted and quietly dropped.
 Written `:brand[Barge]{highlight=accent4}`, it says:
 
 ```text
-Slide 6 gives the text style ":brand" a highlight, which the slides half does not draw: a highlight is a colour behind the word, and this library has no way to write one.
+Slide 7 gives the text style ":brand" a highlight, which the slides half does not draw: a highlight is a colour behind the word, and this library has no way to write one.
 ```
