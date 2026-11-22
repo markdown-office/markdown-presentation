@@ -1,7 +1,7 @@
 ---
 title: Inline styles
 theme: corporate-dark
-description: A word in a style of its own inside a box of its own, and the three things this half refuses.
+description: A word in a style of its own inside a box of its own, and the two things this half refuses.
 ---
 
 # Inline styles
@@ -36,6 +36,30 @@ Three words and three colours in one box.
 
 A style sets the properties it names and leaves the others alone.
 `brand` names a colour and a weight, so the size of the word is the size of the box it is in.
+
+A label is parsed as inline Markdown, so a word in a style may hold emphasis of its
+own. The next slide shows one.
+:::
+
+---
+layout: blank
+---
+
+# A word in a style may hold emphasis of its own
+
+:::content{left=6% top=30% width=88% height=13% color=accent3 font-size=26}
+Sextant :brand[**Instrument Works**] — :muted[*est. 1934*]
+:::
+
+:::content{left=6% top=47% width=88% height=48% font-size=15}
+A label is parsed as inline Markdown, so the asterisks in it are markup and not
+characters, and the emphasis in it is drawn.
+
+`Instrument Works` is in the theme's `brand` style, which is bold already, so the
+emphasis in it changes nothing the eye can see.
+
+`est. 1934` is in `muted`, which is neither bold nor italic, so the italic in it is
+the emphasis's own: the label carries the emphasis and the style carries the rest.
 :::
 
 ---
@@ -92,16 +116,15 @@ The message names the styles the theme does have.
 Written `:brands[Barge]`, it says:
 
 ```text
-Slide 5 has the text style ":brands", which is not a style this theme has. The styles are: brand, muted.
+Slide 6 has the text style ":brands", which is not a style this theme has. The styles are: brand, muted.
 ```
 
 ::column
 
-A style's text is plain text, so `:brand[**Barge**]` is refused.
-It is not drawn as the asterisks the author wrote:
+A style needs some text, so `:brand[]` is refused:
 
 ```text
-Slide 5 writes the text style ":brand" around "**Barge**", which is Markdown. A style's text is plain text: give the style the weight in the theme's "textStyles:" section ("brand: { bold: true }") or write the emphasis in the paragraph around it.
+Slide 6 writes the text style ":brand" with no text. A style needs some text.
 ```
 
 ---
@@ -115,5 +138,5 @@ The attribute is refused by name rather than accepted and quietly dropped.
 Written `:brand[Barge]{highlight=accent4}`, it says:
 
 ```text
-Slide 6 gives the text style ":brand" a highlight, which the slides half does not draw: a highlight is a colour behind the word, and this library has no way to write one.
+Slide 7 gives the text style ":brand" a highlight, which the slides half does not draw: a highlight is a colour behind the word, and this library has no way to write one.
 ```

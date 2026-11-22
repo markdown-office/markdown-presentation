@@ -4,6 +4,69 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **PHP 8.6 is supported.** The suite runs on it, beside 8.2 and 8.5, and the requirement
+  stays PHP 8.2: a library that raises its floor with every release is a library nobody can
+  install.
+
+### Changed
+
+- **The example build names the skill that carries it.** The skill is called `mdoffice` now
+  — it is the suite's, and it carries both halves — and the build said the name it had
+  before. The bundle carries this directory as `examples/slides/`, so a copy of it told a
+  reader to look for a skill that is not there.
+
+### Fixed
+
+- **The messages the inline-styles example quotes are the ones the library writes.** The
+  example quotes what the library says when a deck is refused, and the quotes named the
+  slides the example carried before it gained one: a refusal names the slide it is written
+  on, and the slide it was written on had moved.
+
+  The test asks the library what it writes for the directive beside each quote and compares
+  the two, so a quote that has drifted fails the suite rather than a reader.
+
+- **A label keeps the break the words around it keep.** A list item written across two lines
+  is one line of text on the slide, and a label written across two lines inside one was
+  drawn with a newline in it: the break inside the label was answered by the translator's own
+  default rather than by the caller that asked for a space.
+
+  The break is carried down the tree now, so a label, a link and the words of a picture are
+  read with the break their caller asked for. A paragraph keeps its newline, which is what
+  this half has always done.
+
+- **A name holding a null byte is answered rather than raised.** PHP 8.6 raises a
+  `ValueError` from `is_file()` and its neighbours where earlier versions answered false. A
+  deck can write a null byte in a path, and the error is an `Error` rather than an
+  `Exception`, so it escaped every `catch` this library documents and left the caller with a
+  stack trace instead of an answer.
+
+  Every entry point that takes a name now answers null or false for such a name, as it
+  already did for a name that walked out of its base and for a name that is a URL. The
+  guard is in one place — the file system is asked through it — rather than at every call
+  site, so a name is answered the same way wherever it is asked about.
+
+- **A word in a style may hold emphasis of its own.** `:brand[**Bakery**]` is drawn as the
+  word `Bakery` in the brand style and in bold. It used to be refused, with a message
+  naming the two ways out, because the label of a directive was a string rather than
+  Markdown and a complete construct in one could not have it honoured.
+
+  The label is parsed as inline Markdown now, so what the parser reads is what the deck
+  draws: `2 * 3` and `snake_case` are drawn as they are, and `__ Bakery__` is text, because
+  a delimiter that opens an emphasis may not be followed by a space and one that closes it
+  may not be preceded by one.
+
+  The two halves agree with each other because they ask the same parser, so the list of
+  patterns each of them kept — the rules that said what a label may not hold — and the tool
+  that compared the two lists are gone. The corpus of the labels is still here, and the
+  test reads every label in it and checks that the deck draws what the parser reads.
+
+- **This half needs the directives package in version 0.4.0 or newer.** The label is parsed
+  by that package, and the version before it did not parse it.
+
 ## [0.5.0] - 2026-11-09
 
 ### Added

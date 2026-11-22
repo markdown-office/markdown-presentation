@@ -181,6 +181,12 @@ final class InlineTranslator
     }
 
     /**
+     * The runs a node's children make, in the style they were given.
+     *
+     * The break is carried down the tree rather than defaulted at every step, so that a
+     * label, a link or the words of a picture are read with the break their caller asked
+     * for.
+     *
      * @param iterable<Node> $nodes
      * @param list<Run>      $runs
      * @param Style          $style
@@ -192,17 +198,17 @@ final class InlineTranslator
      * @throws UnknownTextStyle
      * @throws UnsupportedLink
      */
-    private function walk(iterable $nodes, array &$runs, array $style, int $slide, Theme $theme, string $break = "\n"): void
+    private function walk(iterable $nodes, array &$runs, array $style, int $slide, Theme $theme, string $break): void
     {
         foreach ($nodes as $node) {
             if ($node instanceof Link) {
-                array_push($runs, ...$this->linked($node, $style, $slide, $theme));
+                array_push($runs, ...$this->linked($node, $style, $slide, $theme, $break));
 
                 continue;
             }
 
             if ($node instanceof Image) {
-                $this->picture($node, $runs, $slide, $theme);
+                $this->picture($node, $runs, $slide, $theme, $break);
 
                 continue;
             }
@@ -226,7 +232,7 @@ final class InlineTranslator
             }
 
             if ($node instanceof DirectiveInline) {
-                $this->styled($node, $runs, $style, $slide, $theme);
+                $this->styled($node, $runs, $style, $slide, $theme, $break);
 
                 continue;
             }
@@ -253,11 +259,15 @@ final class InlineTranslator
     }
 
     /**
-     * The run a text style draws, in the style the words around it were written in.
+     * The runs a text style draws, in the style the words around it were written in.
      *
      * The style's own properties win over the ones the words around it carry, because the
      * style is the more particular of the two statements: a word written in bold by the
      * paragraph and in a style that says not bold is not bold.
+     *
+     * The label is parsed as inline Markdown, so the runs are the ones the label makes
+     * rather than one run for the whole of it: a word in a style may hold emphasis of its
+     * own, and a run for the label would have to carry the markup inside it as text.
      *
      * @param Style     $style
      * @param list<Run> $runs
@@ -265,23 +275,11 @@ final class InlineTranslator
      * @throws MalformedTextStyle
      * @throws UnknownTextStyle
      */
-    private function styled(DirectiveInline $node, array &$runs, array $style, int $slide, Theme $theme): void
+    private function styled(DirectiveInline $node, array &$runs, array $style, int $slide, Theme $theme, string $break): void
     {
         $style = self::merged($style, $this->styles->read($node, $slide, $theme));
 
-        $this->append($runs, new Run(
-            (string) $node->getLabel(),
-            bold: $style['bold'] === true,
-            italic: $style['italic'] === true,
-            code: $style['code'],
-            link: $style['link'],
-            strike: $style['strike'] === true,
-            colour: $style['colour'],
-            size: $style['size'],
-            font: $style['font'],
-            underline: $style['underline'] === true,
-            fontWhere: $style['fontWhere'],
-        ));
+        $this->walk($node->children(), $runs, $style, $slide, $theme, $break);
     }
 
     /**
@@ -299,12 +297,12 @@ final class InlineTranslator
      * @throws UnknownTextStyle
      * @throws UnsupportedLink
      */
-    private function linked(Link $node, array $style, int $slide, Theme $theme): array
+    private function linked(Link $node, array $style, int $slide, Theme $theme, string $break): array
     {
         $style['link'] = self::target($node->getUrl());
 
         $runs = [];
-        $this->walk($node->children(), $runs, $style, $slide, $theme);
+        $this->walk($node->children(), $runs, $style, $slide, $theme, $break);
 
         return $runs;
     }
@@ -323,14 +321,14 @@ final class InlineTranslator
      * @throws UnknownTextStyle
      * @throws UnsupportedLink
      */
-    private function picture(Image $node, array &$runs, int $slide, Theme $theme): void
+    private function picture(Image $node, array &$runs, int $slide, Theme $theme, string $break): void
     {
         $this->append($runs, new Run('!'));
 
         $style = self::PLAIN;
         $style['link'] = self::source($node->getUrl());
 
-        $this->walk($node->children(), $runs, $style, $slide, $theme);
+        $this->walk($node->children(), $runs, $style, $slide, $theme, $break);
     }
 
     /**

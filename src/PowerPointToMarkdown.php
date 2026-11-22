@@ -8,6 +8,7 @@ use MarkdownPresentation\Exception\FileNotWritable;
 use MarkdownPresentation\Exception\NothingToConvert;
 use MarkdownPresentation\Exception\UnpatchedDependency;
 use MarkdownPresentation\Exception\UnreadableDeck;
+use MarkdownPresentation\Filesystem\FileSystem;
 use MarkdownPresentation\Render\DeckTheme;
 use MarkdownPresentation\Reverse\Block;
 use MarkdownPresentation\Reverse\DeckReader;
@@ -147,7 +148,7 @@ final class PowerPointToMarkdown
             return Package::fromString($source, $this->options);
         }
 
-        if (! is_file($source)) {
+        if (! FileSystem::isFile($source)) {
             throw UnreadableDeck::notFound($source);
         }
 
@@ -217,14 +218,14 @@ final class PowerPointToMarkdown
 
         $directory = $this->mediaDirectory($directory, $target);
 
-        if (! is_dir($directory) && ! self::makeDirectory($directory)) {
+        if (! FileSystem::isDirectory($directory) && ! self::makeDirectory($directory)) {
             throw FileNotWritable::cannotCreateMediaDirectory($directory);
         }
 
         foreach ($this->pictures($slides) as $name => $contents) {
             $target = $directory . '/' . $name;
 
-            if (file_exists($target)) {
+            if (FileSystem::exists($target)) {
                 continue;
             }
 
@@ -314,7 +315,7 @@ final class PowerPointToMarkdown
 
         // A path given to a converter rarely has its directory made for it, and
         // a rename does not create one.
-        if (! is_dir($directory) && ! self::makeDirectory($directory)) {
+        if (! FileSystem::isDirectory($directory) && ! self::makeDirectory($directory)) {
             throw FileNotWritable::cannotCreateDirectory($directory);
         }
 
@@ -326,7 +327,7 @@ final class PowerPointToMarkdown
 
         $written = @file_put_contents($staged, $contents);
 
-        if ($written !== false && ! is_dir($target) && @rename($staged, $target)) {
+        if ($written !== false && ! FileSystem::isDirectory($target) && @rename($staged, $target)) {
             return;
         }
 
@@ -350,16 +351,16 @@ final class PowerPointToMarkdown
      */
     private static function makeDirectory(string $directory): bool
     {
-        if (file_exists($directory)) {
+        if (FileSystem::exists($directory)) {
             return false;
         }
 
         $parent = \dirname($directory);
 
-        if ($parent !== $directory && ! is_dir($parent) && ! self::makeDirectory($parent)) {
+        if ($parent !== $directory && ! FileSystem::isDirectory($parent) && ! self::makeDirectory($parent)) {
             return false;
         }
 
-        return @mkdir($directory, 0o777, true) && is_dir($directory);
+        return @mkdir($directory, 0o777, true) && FileSystem::isDirectory($directory);
     }
 }

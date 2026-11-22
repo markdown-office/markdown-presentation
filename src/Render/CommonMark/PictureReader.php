@@ -7,6 +7,7 @@ namespace MarkdownPresentation\Render\CommonMark;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Image;
 use MarkdownPresentation\Exception\ImageNotFound;
 use MarkdownPresentation\Exception\UnsupportedImageFormat;
+use MarkdownPresentation\Filesystem\FileSystem;
 use MarkdownPresentation\Filesystem\PathScope;
 use MarkdownPresentation\Render\Block\Image as ImageBlock;
 use MarkdownPresentation\Render\ImageConverter;
@@ -98,7 +99,7 @@ final class PictureReader
     public function release(): void
     {
         foreach ($this->staged as $path) {
-            if (is_file($path)) {
+            if (FileSystem::isFile($path)) {
                 @unlink($path);
             }
         }
@@ -139,7 +140,7 @@ final class PictureReader
         // allowed is where it lands.
         $joined = str_starts_with($written, '/') ? $written : rtrim($state->directory, '/') . '/' . $written;
 
-        if (!is_file($joined)) {
+        if (!FileSystem::isFile($joined)) {
             throw ImageNotFound::at($state->slide, $written, $joined);
         }
 
@@ -156,7 +157,7 @@ final class PictureReader
      */
     private function held(string $path, string $written, SlideState $state): string
     {
-        if (!is_file($path)) {
+        if (!FileSystem::isFile($path)) {
             throw ImageNotFound::at($state->slide, $written, $path);
         }
 

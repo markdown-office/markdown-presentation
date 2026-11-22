@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use MarkdownPresentation\Document\DeckParser;
+use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\UnknownDirective;
 use MarkdownPresentation\Render\PresentationRenderer;
 use MarkdownPresentation\Render\SvgRasteriser;
@@ -68,6 +69,48 @@ function builtDeck(string $name): array
 }
 
 /**
+ * The shapes on a slide that carry a name, in the order they are in the file.
+ *
+ * @return list<string>
+ */
+function shapesNamed(Pptx $pptx, string $name, int $slide): array
+{
+    return array_values(array_filter(
+        preg_split('#(?=<p:sp>|<p:graphicFrame>|<p:pic>)#', $pptx->part("ppt/slides/slide{$slide}.xml")) ?: [],
+        static fn (string $chunk): bool => preg_match(
+            '#<p:cNvPr id="\d+" name="' . preg_quote($name, '#') . '"#',
+            $chunk,
+        ) === 1,
+    ));
+}
+
+/**
+ * The runs of a shape on a slide, with the italic of each.
+ *
+ * A helper of its own rather than a key in {@see runsOfShape()}: a claim about a colour or
+ * a weight has nothing to say about an italic, and a key in every expectation is a key in
+ * every expectation.
+ *
+ * @return list<array{text: string, italic: bool}>
+ */
+function italicRunsOfShape(Pptx $pptx, string $name, int $slide = 1, int $index = 0): array
+{
+    $runs = [];
+
+    foreach (preg_split('#(?=<a:r>)#', shapesNamed($pptx, $name, $slide)[$index] ?? '') ?: [] as $chunk) {
+        if (preg_match('#<a:t>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</a:t>#s', $chunk, $text) !== 1) {
+            continue;
+        }
+
+        preg_match('#<a:rPr[^>]*\bi="1"#', $chunk, $italic);
+
+        $runs[] = ['text' => $text[1], 'italic' => ($italic[0] ?? '') !== ''];
+    }
+
+    return $runs;
+}
+
+/**
  * The runs of a shape on a slide, with the colour, the size and the weight of each.
  *
  * Read off the file rather than off the writer, because the claim is about what a reader
@@ -82,17 +125,9 @@ function builtDeck(string $name): array
  */
 function runsOfShape(Pptx $pptx, string $name, int $slide = 1, int $index = 0): array
 {
-    $shapes = array_values(array_filter(
-        preg_split('#(?=<p:sp>|<p:graphicFrame>|<p:pic>)#', $pptx->part("ppt/slides/slide{$slide}.xml")) ?: [],
-        static fn (string $chunk): bool => preg_match(
-            '#<p:cNvPr id="\d+" name="' . preg_quote($name, '#') . '"#',
-            $chunk,
-        ) === 1,
-    ));
-
     $runs = [];
 
-    foreach (preg_split('#(?=<a:r>)#', $shapes[$index] ?? '') ?: [] as $chunk) {
+    foreach (preg_split('#(?=<a:r>)#', shapesNamed($pptx, $name, $slide)[$index] ?? '') ?: [] as $chunk) {
         if (preg_match('#<a:t>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</a:t>#s', $chunk, $text) !== 1) {
             continue;
         }
@@ -671,13 +706,33 @@ it('draws a word in a style of the theme in the colour that style names', functi
     ]);
 });
 
+it('draws the emphasis in a label rather than the asterisks around it', function () {
+    [$pptx] = builtDeck('15-inline-styles.md');
+
+    // "A word in a style may hold emphasis of its own": the label is Markdown, so the
+    // asterisks in it are markup and not characters, and the emphasis in it is drawn.
+    // The `brand` style is bold already, so the emphasis in that word changes nothing
+    // the eye can see; the `muted` style says nothing about a weight, so the italic in
+    // that word is the emphasis's own.
+    expect(italicRunsOfShape($pptx, 'content', 3, 0))->toBe([
+        ['text' => 'Sextant ', 'italic' => false],
+        ['text' => 'Instrument Works', 'italic' => false],
+        ['text' => ' — ', 'italic' => false],
+        ['text' => 'est. 1934', 'italic' => true],
+    ]);
+
+    // The asterisks are not in the deck at all: the old behaviour refused the word, and
+    // the one before that drew the asterisks the author wrote.
+    expect($pptx->slideText(3))->not->toContain('*');
+});
+
 it('lays one property over a named style and leaves the rest of it alone', function () {
     [$pptx] = builtDeck('15-inline-styles.md');
 
     // "The raw form" needs no style of the theme's, and the word after it is in `brand`
     // with its colour replaced: it is still bold, because the attribute named no weight,
     // and it is still the size of the box, because the attribute named no size.
-    expect(runsOfShape($pptx, 'content', 3, 0))->toBe([
+    expect(runsOfShape($pptx, 'content', 4, 0))->toBe([
         ['text' => 'Barge', 'colour' => 'A6E3A1', 'size' => 18, 'bold' => false],
         ['text' => ' · ', 'colour' => 'BAC2DE', 'size' => 20, 'bold' => false],
         ['text' => 'No. 4', 'colour' => 'A6E3A1', 'size' => 20, 'bold' => true],
@@ -689,12 +744,101 @@ it('carries the messages the three refusals write', function () {
 
     // A refusal cannot be shown by being refused — the deck would not build — so the deck
     // carries the syntax and the message beside it. The messages are the library's own:
-    // the styles the theme does have, the two ways out of a label that holds Markdown, and
-    // the reason a highlight cannot be written.
-    expect($pptx->slideText(5))->toContain('The styles are: brand, muted.')
-        ->and($pptx->slideText(5))->toContain('which is Markdown')
-        ->and($pptx->slideText(6))->toContain('which the slides half does not draw');
+    // the styles the theme does have, a style with no text in it, and the reason a
+    // highlight cannot be written.
+    expect($pptx->slideText(6))->toContain('The styles are: brand, muted.')
+        ->and($pptx->slideText(6))->toContain('A style needs some text')
+        ->and($pptx->slideText(7))->toContain('which the slides half does not draw');
 });
+
+it('writes the messages the deck quotes as the library writes them', function () use ($root) {
+    // The deck quotes what the library says, and a quote is only a quote while it says
+    // the same thing: a refusal names the slide it is written on, so a slide added above
+    // the refusals moves the number in the quote — and the quote is read by a person
+    // rather than run.
+    $source = (string) file_get_contents($root . '/examples/markdown/15-inline-styles.md');
+    $deck = (new DeckParser())->parse($source);
+    $theme = (string) $deck->frontmatterValue('theme', 'corporate-dark');
+    $directory = $root . '/examples/markdown';
+
+    $claims = [];
+
+    foreach ($deck->slides() as $slide) {
+        foreach (quotedRefusals($slide->content()) as $refusal) {
+            $claims[] = ['slide' => $slide->index() + 1] + $refusal;
+        }
+    }
+
+    expect($claims)->not->toBe([]);
+
+    foreach ($claims as $claim) {
+        expect(libraryRefusal($claim['directive'], $claim['slide'], $theme, $directory))
+            ->toBe($claim['message']);
+    }
+});
+
+/**
+ * The messages a slide quotes about the directives it names, in the order they are written.
+ *
+ * A message is a line of a fenced block that names a slide, and the directive it is about
+ * is the one the prose before it names.
+ *
+ * @return list<array{directive: string, message: string}>
+ */
+function quotedRefusals(string $content): array
+{
+    preg_match_all(
+        '/`(:[a-z]+(?:\[[^\]]*\])?(?:\{[^}]*\})?)`|^Slide \d+ .*$/m',
+        $content,
+        $found,
+        PREG_OFFSET_CAPTURE,
+    );
+
+    $claims = [];
+    $directive = null;
+
+    foreach ($found[0] as $index => [$text]) {
+        if (str_starts_with($text, 'Slide ')) {
+            if ($directive !== null) {
+                $claims[] = ['directive' => $directive, 'message' => $text];
+            }
+
+            continue;
+        }
+
+        $directive = $found[1][$index][0];
+    }
+
+    return $claims;
+}
+
+/**
+ * What the library writes when a deck carries the given directive on the given slide.
+ *
+ * The deck carries one slide after another and the directive on the slide the message is
+ * written on, because a refusal names the slide it is written on.
+ */
+function libraryRefusal(string $directive, int $slide, string $theme, string $directory): string
+{
+    $markdown = sprintf("---\ntheme: %s\n---\n\n# A slide\n", $theme);
+
+    for ($number = 2; $number <= $slide; $number++) {
+        $markdown .= "\n---\n\n# A slide\n";
+    }
+
+    $markdown .= "\n" . $directive . "\n";
+
+    try {
+        (new PresentationRenderer($directory))->render(
+            (new DeckParser())->parse($markdown),
+            sys_get_temp_dir() . '/mdp-refusal.pptx',
+        );
+    } catch (Exception $refusal) {
+        return $refusal->getMessage();
+    }
+
+    return 'DRAWN';
+}
 
 it('counts the slides of the templates deck and not its definitions', function () {
     [$pptx] = builtDeck('16-templates.md');

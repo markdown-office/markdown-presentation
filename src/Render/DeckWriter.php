@@ -6,6 +6,7 @@ namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Exception\Exception;
 use MarkdownPresentation\Exception\FileNotWritable;
+use MarkdownPresentation\Filesystem\FileSystem;
 use MarkdownPresentation\Theme\LayoutRole;
 use PhpOffice\PhpPresentation\IOFactory;
 use PhpOffice\PhpPresentation\PhpPresentation;
@@ -54,14 +55,14 @@ final class DeckWriter
     ): string {
         $directory = dirname($path);
 
-        if (!is_dir($directory)) {
+        if (!FileSystem::isDirectory($directory)) {
             throw new Exception(sprintf('There is no directory at "%s" to write "%s" into.', $directory, basename($path)));
         }
 
         // A path that names something that is not a file is refused here rather than by the
         // writer, which would open it and report an empty file or a deprecation instead of
         // a sentence that says what was wrong.
-        if (file_exists($path) && !is_file($path)) {
+        if (FileSystem::exists($path) && !FileSystem::isFile($path)) {
             throw FileNotWritable::notAFile($path);
         }
 

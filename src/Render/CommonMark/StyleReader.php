@@ -32,44 +32,6 @@ use MarkdownPresentation\Theme\Theme;
 final class StyleReader
 {
     /**
-     * The Markdown a label may not hold.
-     *
-     * A complete construct only. An unbalanced marker is a character rather than an
-     * intent, and `2 * 3`, `snake_case` and `a[b]` are ordinary text that a rule refusing
-     * every marker would refuse all day.
-     *
-     * What makes a construct complete is CommonMark's own rule: a delimiter run that opens
-     * an emphasis may not be followed by whitespace, and one that closes it may not be
-     * preceded by whitespace. So `__ Bakery__` and `** text**` are text rather than
-     * emphasis, and a label holding one is drawn as it was written.
-     *
-     * The underscore is the only one with a rule of its own: CommonMark does not open an
-     * emphasis inside a word with an underscore, so `snake_case_name` is text.
-     *
-     * `~~struck~~` is not among them: it is GFM rather than CommonMark, and a label is
-     * plain text, so the tildes are two characters in a word rather than an intent.
-     *
-     * The Word half keeps these rules in a list of patterns of its own, and the two lists
-     * are the same: the halves agree with each other on every label in
-     * `tests/fixtures/labels.txt`, which is what the corpus is for. They differ from
-     * CommonMark in five of them, and the corpus records which — a run of three or more
-     * underscores (`___Bakery___`, `_Bakery__`, `__Bakery_ __`) is emphasis to CommonMark
-     * and text here, and a run of one asterisk beside a run of two (`a *Bakery**a`,
-     * `a *Bakery_*a`) is text to CommonMark and a construct here. A change to either
-     * half's rules has to say what it does about them.
-     *
-     * @var list<string>
-     */
-    private const MARKDOWN = [
-        '/\*\*[^*\s](?:[^*]*[^*\s])?\*\*/',
-        '/(?<![\w])__[^_\s](?:[^_]*[^_\s])?__(?![\w])/',
-        '/\*[^*\s](?:[^*]*[^*\s])?\*/',
-        '/(?<![\w])_[^\s_](?:[^_]*[^\s_])?_(?![\w])/',
-        '/`[^`]+`/',
-        '/\[[^\]]*\]\([^)]*\)/',
-    ];
-
-    /**
      * The smallest a size of type may be, in points.
      */
     private const MINIMUM_POINTS = 0.5;
@@ -183,7 +145,7 @@ final class StyleReader
     }
 
     /**
-     * The label, which is plain text and has to be some.
+     * The label, which has to be some.
      *
      * @throws MalformedTextStyle
      */
@@ -194,27 +156,6 @@ final class StyleReader
         if ($label === null || trim($label) === '') {
             throw MalformedTextStyle::noText($slide, $name);
         }
-
-        foreach (self::MARKDOWN as $pattern) {
-            if (preg_match($pattern, $label) === 1) {
-                throw MalformedTextStyle::label($slide, $name, $label, self::wayOut($name));
-            }
-        }
-    }
-
-    /**
-     * The way out of a label that holds Markdown.
-     *
-     * Two, and they are in two different places: a named style is given its weight in the
-     * theme's own `textStyles:` section, and the raw form carries it as an attribute — the
-     * raw form has no theme to ask, because `style` is the one name a theme may not give a
-     * style of its own.
-     */
-    private static function wayOut(string $name): string
-    {
-        return TextStyle::isReserved($name)
-            ? 'give the style the weight as an attribute ("bold=true")'
-            : sprintf('give the style the weight in the theme\'s "textStyles:" section ("%s: { bold: true }")', $name);
     }
 
     /**

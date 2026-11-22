@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MarkdownPresentation\Render;
 
 use MarkdownPresentation\Exception\Exception;
+use MarkdownPresentation\Filesystem\FileSystem;
 
 /**
  * The staging half of writing a deck: a file of the library's own, read back and given back.
@@ -46,14 +47,14 @@ final class Staging
             // one that was not there to be replaced: the writer creates that file at the
             // process umask, and a deck in flight through a shared temporary directory is
             // then readable by every account on the machine.
-            if (is_file($path)) {
+            if (FileSystem::isFile($path)) {
                 @chmod($path, 0o600);
             }
 
             // `is_readable()` first, so that a file that cannot be read is reported as
             // that rather than as a warning the test runner turns into a failure of its
             // own. A deck that was not written is a failure and not an empty deck.
-            $contents = is_readable($path) ? @file_get_contents($path) : false;
+            $contents = FileSystem::isReadable($path) ? @file_get_contents($path) : false;
 
             if ($contents === false) {
                 throw new Exception('Unable to read the generated deck.');
@@ -61,7 +62,7 @@ final class Staging
 
             return $contents;
         } finally {
-            if (is_file($path)) {
+            if (FileSystem::isFile($path)) {
                 @unlink($path);
             }
         }

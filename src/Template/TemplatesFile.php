@@ -7,6 +7,7 @@ namespace MarkdownPresentation\Template;
 use MarkdownPresentation\Exception\TemplatesFileNotFound;
 use MarkdownPresentation\Exception\TemplatesFileTooLarge;
 use MarkdownPresentation\Files\FileFinder;
+use MarkdownPresentation\Filesystem\FileSystem;
 use MarkdownPresentation\Filesystem\PathScope;
 
 /**
@@ -72,7 +73,7 @@ final class TemplatesFile
 
         $joined = str_starts_with($written, '/') ? $written : rtrim($this->directory, '/') . '/' . $written;
 
-        if (!is_file($joined)) {
+        if (!FileSystem::isFile($joined)) {
             throw TemplatesFileNotFound::at($joined);
         }
 
@@ -121,7 +122,7 @@ final class TemplatesFile
      */
     private function fromPath(string $written, string $path): string
     {
-        if (!is_file($path)) {
+        if (!FileSystem::isFile($path)) {
             throw TemplatesFileNotFound::at($path);
         }
 
@@ -171,7 +172,7 @@ final class TemplatesFile
     {
         $length = max(0, $this->maxBytes) + 1;
 
-        $markdown = is_readable($resolved)
+        $markdown = FileSystem::isReadable($resolved)
             ? file_get_contents($resolved, false, null, 0, $length)
             : false;
 
@@ -193,8 +194,8 @@ final class TemplatesFile
      */
     private function size(string $resolved, int $read): int
     {
-        $size = filesize($resolved);
+        $size = FileSystem::size($resolved);
 
-        return max($size === false ? 0 : $size, $read);
+        return max($size ?? 0, $read);
     }
 }
