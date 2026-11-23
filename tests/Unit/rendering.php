@@ -334,10 +334,10 @@ it('renders a deck whose theme sits beside it', function () {
     // The theme of a deck is in the deck's own directory, and the process rendering the
     // deck is somewhere else: a deck rendered by its path finds its theme either way.
     $directory = ThemeDirectory::create([
-        'themes/bakery/theme.yml' => "name: Bakery\nlayouts:\n  content: Title and Content\n",
+        'themes/corp/theme.yml' => "name: Corp\nlayouts:\n  content: Title and Content\n",
     ], 'deck');
 
-    $pptx = renderDeck("---\ntheme: bakery\n---\n\n# One\n", $directory);
+    $pptx = renderDeck("---\ntheme: corp\n---\n\n# One\n", $directory);
 
     expect($pptx->slideCount())->toBe(1)
         ->and($pptx->slideText(1))->toBe('One');

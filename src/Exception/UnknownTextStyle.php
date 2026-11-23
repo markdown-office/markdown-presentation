@@ -7,7 +7,7 @@ namespace MarkdownPresentation\Exception;
 /**
  * An inline style whose name the theme does not carry.
  *
- * A deck that writes `:brand[Bakery]` is asking for a style the theme has to have, and a
+ * A deck that writes `:brand[Corp]` is asking for a style the theme has to have, and a
  * theme that has none has said nothing about the words it draws. Drawing the directive as
  * its own source text would be the outcome this library exists to avoid: a deck that
  * renders, showing the mistake as prose.

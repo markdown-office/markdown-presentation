@@ -131,7 +131,7 @@ final class MalformedTheme extends InvalidInput
     {
         return new self(self::in($file, sprintf(
             'The style "%s" is named with a reserved word: "style" is how the raw form of a text style is written, '
-            . 'as in ":style[Bakery]{color=00B4D8}".',
+            . 'as in ":style[Corp]{color=6D4BD1}".',
             $style,
         )));
     }

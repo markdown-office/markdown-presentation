@@ -13,8 +13,8 @@ use MarkdownPresentation\Exception\MalformedTheme;
  * this theme does not have — which is a refusal naming the styles that exist, and there
  * are none.
  *
- * The names are folded, because a style's name is a word to a reader: `:Brand[Bakery]` and
- * `:brand[Bakery]` are the same word written twice. The theme's own spelling is kept
+ * The names are folded, because a style's name is a word to a reader: `:Brand[Corp]` and
+ * `:brand[Corp]` are the same word written twice. The theme's own spelling is kept
  * beside it, because that is the spelling the author has to change.
  *
  * A name written twice is refused here rather than where the styles are read from,

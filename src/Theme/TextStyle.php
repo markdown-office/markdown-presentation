@@ -39,7 +39,7 @@ final class TextStyle
     /**
      * The name a theme may not give a style of its own.
      *
-     * `style` is the word the raw form of a text style is written with — `:style[Bakery]`
+     * `style` is the word the raw form of a text style is written with — `:style[Corp]`
      * — and a theme that defined a style of that name would have two things called by one
      * word.
      */
@@ -49,7 +49,7 @@ final class TextStyle
      * A style's name as the suite folds it.
      *
      * Without regard to case and without the space around it: a style's name is a word to
-     * a reader, and `:Brand[Bakery]` and `:brand[Bakery]` are the same word written twice.
+     * a reader, and `:Brand[Corp]` and `:brand[Corp]` are the same word written twice.
      * The Word half folds its names the same way, and the directives package folds the
      * names of the directives themselves.
      */

@@ -77,7 +77,7 @@ final class MalformedTextStyle extends InvalidInput
     {
         return new self(sprintf(
             'Slide %d writes ":style" with no attributes, which says nothing. Write the properties: '
-            . '":style[Bakery]{color=00B4D8}".',
+            . '":style[Corp]{color=6D4BD1}".',
             $slide,
         ));
     }
