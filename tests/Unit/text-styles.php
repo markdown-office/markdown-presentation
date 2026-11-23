@@ -30,16 +30,16 @@ use MarkdownPresentation\Theme\ThemeLoader;
  * named here rather than left to the library's defaults, so that a colour in the file is a
  * colour the test wrote down.
  */
-const TEXT_STYLE_THEME = "name: Acme\ncolors:\n  accent1: \"#00B4D8\"\n";
+const TEXT_STYLE_THEME = "name: Acme\ncolors:\n  accent1: \"#6D4BD1\"\n";
 
 /**
  * The box the wordmark is drawn in, which has a colour of its own.
  *
- * The size and the position are the review's deck's own, because the claim is about the
+ * The size and the position are the deck's own, because the claim is about the
  * colours and not about the geometry: a box that carries a colour of its own is the case
  * the feature answers.
  */
-const WORDMARK_BOX = 'left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11';
+const WORDMARK_BOX = 'left=4.5% top=3.9% width=30% height=5% fill=none padding=0 color=FFFFFF font-size=11';
 
 /**
  * A theme directory whose own file carries the named styles, or carries none at all.
@@ -77,7 +77,7 @@ function wordmark(?string $styles, string $word): array
 {
     return [
         sprintf(
-            "---\ntheme: ./theme.yml\n---\n\n:::content{%s}\nResilience %s\n:::\n",
+            "---\ntheme: ./theme.yml\n---\n\n:::content{%s}\nAcme %s\n:::\n",
             WORDMARK_BOX,
             $word,
         ),
@@ -157,37 +157,37 @@ function styledRenderer(string $markdown, string $directory, bool $strict = fals
 function wordmarkIn(string $face): string
 {
     return sprintf(
-        "---\ntheme: ./theme.yml\n---\n\n:::content{left=10%% top=10%% width=30%% height=10%% font-size=11 font-family=%s}\nResilience\n:::\n",
+        "---\ntheme: ./theme.yml\n---\n\n:::content{left=10%% top=10%% width=30%% height=10%% font-size=11 font-family=%s}\nAcme\n:::\n",
         $face,
     );
 }
 
 it('colours a word inside a box that has a colour of its own', function () {
-    // The wordmark of the review's deck: two words, two colours, one box. A box carried
+    // The wordmark of a deck: two words, two colours, one box. A box carried
     // one colour before, so the wordmark was two boxes.
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]');
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '6D4BD1', 'size' => 11],
     ]);
 });
 
 it('draws the raw form, which names no style of its own', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':style[Bakery]{color=00B4D8}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':style[Corp]{color=6D4BD1}');
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '6D4BD1', 'size' => 11],
     ]);
 });
 
 it('overrides the named style\'s value for the property it names, and for that one only', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n  size: 20\n", ':brand[Bakery]{size=30}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n  size: 20\n", ':brand[Corp]{size=30}');
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '00B4D8', 'size' => 30],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '6D4BD1', 'size' => 30],
     ]);
 });
 
@@ -200,58 +200,58 @@ it('draws a named style on a slide that lays values over the theme', function ()
     $directory = textStyleTheme("brand:\n  color: accent1\n");
 
     $deck = sprintf(
-        "---\ntheme: ./theme.yml\ntheme-variables:\n  colors:\n    accent1: \"#123456\"\n---\n\n:::content{%s}\nResilience :brand[Bakery]\n:::\n",
+        "---\ntheme: ./theme.yml\ntheme-variables:\n  colors:\n    accent1: \"#123456\"\n---\n\n:::content{%s}\nAcme :brand[Corp]\n:::\n",
         WORDMARK_BOX,
     );
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '123456', 'size' => 11],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '123456', 'size' => 11],
     ]);
 });
 
 it('sets the weight a style names, and leaves the rest of the run to the box', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n  bold: true\n", ':brand[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n  bold: true\n", ':brand[Corp]');
 
     expect(styledDeck($deck, $directory)->part('ppt/slides/slide1.xml'))
-        ->toMatch('#<a:r>\s*<a:rPr[^>]*\bb="1"[^>]*>(?:(?!</a:rPr>).)*<a:srgbClr val="00B4D8">#s');
+        ->toMatch('#<a:r>\s*<a:rPr[^>]*\bb="1"[^>]*>(?:(?!</a:rPr>).)*<a:srgbClr val="6D4BD1">#s');
 });
 
 it('refuses a style the theme does not have, and names the styles it has', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\nmuted:\n  color: lt2\n", ':nope[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\nmuted:\n  color: lt2\n", ':nope[Corp]');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(UnknownTextStyle::class, 'The styles are: brand, muted.');
 });
 
 it('draws a style the theme spells with a capital letter, whichever case the deck writes it in', function () {
-    // A style's name is a word to a reader, and `:Brand[Bakery]` and `:brand[Bakery]` are
+    // A style's name is a word to a reader, and `:Brand[Corp]` and `:brand[Corp]` are
     // the same word written twice — the directives package folds the names of the
     // directives themselves the same way.
-    [$deck, $directory] = wordmark("Brand:\n  color: accent1\n", ':brand[Bakery]');
+    [$deck, $directory] = wordmark("Brand:\n  color: accent1\n", ':brand[Corp]');
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '6D4BD1', 'size' => 11],
     ]);
 
-    [$deck, $directory] = wordmark("Brand:\n  color: accent1\n", ':Brand[Bakery]');
+    [$deck, $directory] = wordmark("Brand:\n  color: accent1\n", ':Brand[Corp]');
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '6D4BD1', 'size' => 11],
     ]);
 
     // The refusal names the style as the theme spells it, because that is the spelling the
     // author has to change.
-    [$deck, $directory] = wordmark("Brand:\n  color: accent1\nmuted:\n  color: lt2\n", ':nope[Bakery]');
+    [$deck, $directory] = wordmark("Brand:\n  color: accent1\nmuted:\n  color: lt2\n", ':nope[Corp]');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(UnknownTextStyle::class, 'The styles are: Brand, muted.');
 });
 
 it('refuses an attribute a text style does not read, and names the attributes it reads', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{colour=accent1}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{colour=accent1}');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(
@@ -275,7 +275,7 @@ it('reads every attribute the vocabulary names', function () {
     ];
 
     $properties = [
-        'color' => '#<a:srgbClr val="00B4D8"#',
+        'color' => '#<a:srgbClr val="6D4BD1"#',
         'size' => '#\bsz="1800"#',
         'font' => '#<a:latin typeface="Inter"#',
         'bold' => '#\bb="1"#',
@@ -294,10 +294,10 @@ it('reads every attribute the vocabulary names', function () {
 
         [$deck, $directory] = wordmark(
             "brand:\n  color: accent1\n",
-            sprintf(':brand[Bakery]{%s=%s}', $attribute, $values[$attribute]),
+            sprintf(':brand[Corp]{%s=%s}', $attribute, $values[$attribute]),
         );
 
-        $run = runXml(styledDeck($deck, $directory), 'Bakery');
+        $run = runXml(styledDeck($deck, $directory), 'Corp');
 
         expect($run)->toMatch($properties[$attribute]);
 
@@ -313,57 +313,57 @@ it('draws a label that holds Markdown, because the label is parsed as inline Mar
     // The label is parsed as inline Markdown, so the asterisks are markup rather than
     // characters: the word is drawn in the style and in bold, and the asterisks are
     // not in the deck at all.
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[**Bakery**]');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[**Corp**]');
 
     $pptx = styledDeck($deck, $directory);
 
     expect(runColours($pptx))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
-    ])->and(runXml($pptx, 'Bakery'))->toContain('b="1"');
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '6D4BD1', 'size' => 11],
+    ])->and(runXml($pptx, 'Corp'))->toContain('b="1"');
 });
 
 it('draws a label holding a strong emphasis written with two underscores', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[__Bakery__]');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[__Corp__]');
 
     $pptx = styledDeck($deck, $directory);
 
     expect(runColours($pptx))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
-    ])->and(runXml($pptx, 'Bakery'))->toContain('b="1"');
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '6D4BD1', 'size' => 11],
+    ])->and(runXml($pptx, 'Corp'))->toContain('b="1"');
 });
 
 it('draws a label holding a strong emphasis CommonMark does not call one', function () {
     // A delimiter run that opens an emphasis may not be followed by whitespace, and one that
-    // closes it may not be preceded by whitespace: `__ Bakery__` and `** text**` are text,
+    // closes it may not be preceded by whitespace: `__ Corp__` and `** text**` are text,
     // and a label holding one is drawn as it was written.
     [$deck, $directory] = wordmark(
         "brand:\n  color: accent1\n",
-        ':brand[__ Bakery__] a :brand[** text**] b :brand[**Bakery **]',
+        ':brand[__ Corp__] a :brand[** text**] b :brand[**Corp **]',
     );
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        '__ Bakery__' => ['colour' => '00B4D8', 'size' => 11],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        '__ Corp__' => ['colour' => '6D4BD1', 'size' => 11],
         ' a ' => ['colour' => 'FFFFFF', 'size' => 11],
-        '** text**' => ['colour' => '00B4D8', 'size' => 11],
+        '** text**' => ['colour' => '6D4BD1', 'size' => 11],
         ' b ' => ['colour' => 'FFFFFF', 'size' => 11],
-        '**Bakery **' => ['colour' => '00B4D8', 'size' => 11],
+        '**Corp **' => ['colour' => '6D4BD1', 'size' => 11],
     ]);
 });
 
 it('draws a label holding a strikethrough, because the tildes are markup', function () {
     // `~~struck~~` is GFM rather than CommonMark, and the deck's own parser has it, so
     // the tildes are a strikethrough rather than two characters in a word.
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[~~Bakery~~]');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[~~Corp~~]');
 
     $pptx = styledDeck($deck, $directory);
 
     expect(runColours($pptx))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '00B4D8', 'size' => 11],
-    ])->and(runXml($pptx, 'Bakery'))->toContain('strike="sngStrike"');
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '6D4BD1', 'size' => 11],
+    ])->and(runXml($pptx, 'Corp'))->toContain('strike="sngStrike"');
 });
 
 it('draws a label holding a bare marker, because a marker is a character', function () {
@@ -372,8 +372,8 @@ it('draws a label holding a bare marker, because a marker is a character', funct
     [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[2 * 3] snake_case');
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        '2 * 3' => ['colour' => '00B4D8', 'size' => 11],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        '2 * 3' => ['colour' => '6D4BD1', 'size' => 11],
         ' snake_case' => ['colour' => 'FFFFFF', 'size' => 11],
     ]);
 });
@@ -386,7 +386,7 @@ it('refuses a label with no text in it, because a style needs some', function ()
 });
 
 it('refuses the raw form written without an attribute, because it says nothing', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':style[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':style[Corp]');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(MalformedTextStyle::class, 'which says nothing');
@@ -396,7 +396,7 @@ it('refuses a highlight, which this half does not draw', function () {
     // PHPPresentation's font has no highlight setter, so a highlight would need a pass
     // over the written package. Accepting the attribute and dropping it would be a deck
     // that renders and shows something the author did not write.
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{highlight=FFFF00}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{highlight=FFFF00}');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(MalformedTextStyle::class, 'a highlight, which the slides half does not draw');
@@ -405,15 +405,15 @@ it('refuses a highlight, which this half does not draw', function () {
 it('draws a deck whose theme names no text styles at all', function () {
     // The words are one run, because there is nothing to tell them apart: a style is what
     // makes a word a run of its own.
-    [$deck, $directory] = wordmark(null, 'Bakery');
+    [$deck, $directory] = wordmark(null, 'Corp');
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience Bakery' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Acme Corp' => ['colour' => 'FFFFFF', 'size' => 11],
     ]);
 });
 
 it('refuses a named style against a theme that has no text styles', function () {
-    [$deck, $directory] = wordmark(null, ':brand[Bakery]');
+    [$deck, $directory] = wordmark(null, ':brand[Corp]');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(UnknownTextStyle::class, 'The theme has no text styles');
@@ -423,13 +423,13 @@ it('draws a word in a named style a shipped theme brings', function () {
     // A shipped theme is the one a deck can name without carrying a theme of its own, and
     // one of them brings the named styles, so the form can be tried without one.
     $deck = sprintf(
-        "---\ntheme: corporate-dark\n---\n\n:::content{%s}\nResilience :brand[Bakery]\n:::\n",
+        "---\ntheme: corporate-dark\n---\n\n:::content{%s}\nAcme :brand[Corp]\n:::\n",
         WORDMARK_BOX,
     );
 
     expect(runColours(styledDeck($deck, Scratch::directory())))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => '89B4FA', 'size' => 11],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => '89B4FA', 'size' => 11],
     ]);
 });
 
@@ -440,7 +440,7 @@ it('reports a face a word names that there is no table for, and not one there is
     // a face that was not measured says something.
     [$deck, $directory] = wordmark(
         "brand:\n  color: accent1\n",
-        ':style[Bakery]{font=Inter} and :style[Shop]{font="Comic Sans MS"}',
+        ':style[Corp]{font=Inter} and :style[Shop]{font="Comic Sans MS"}',
     );
 
     expect(styledRenderer($deck, $directory)->unknownFonts())->toBe([
@@ -453,7 +453,7 @@ it('reports a face a word names once, however many words name it', function () {
     // are on one slide and the attribute is the same one.
     [$deck, $directory] = wordmark(
         "brand:\n  color: accent1\n",
-        ':style[Bakery]{font="Comic Sans MS"} and :style[Shop]{font="Comic Sans MS"}',
+        ':style[Corp]{font="Comic Sans MS"} and :style[Shop]{font="Comic Sans MS"}',
     );
 
     expect(styledRenderer($deck, $directory)->unknownFonts())->toBe([
@@ -464,7 +464,7 @@ it('reports a face a word names once, however many words name it', function () {
 it('refuses a deck whose word names a face it cannot measure when the renderer is strict', function () {
     // Strict is for a caller that would rather have no file than a file whose text was
     // measured with another face's widths, and the message says where the face was named.
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':style[Bakery]{font="Comic Sans MS"}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':style[Corp]{font="Comic Sans MS"}');
 
     expect(fn () => styledRenderer($deck, $directory, strict: true))
         ->toThrow(UnknownFont::class, 'The face "Comic Sans MS" has no table of advance widths')
@@ -476,11 +476,11 @@ it('draws a link in a text style in the style\'s colour and keeps it underlined'
     // rather than the theme's hyperlink colour; the underline stays, so the word is still
     // a link to a reader. The reference says so too, because a reader would otherwise take
     // the theme's hyperlink colour for every link there is.
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", '[:brand[Bakery]](https://example.com)');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", '[:brand[Corp]](https://example.com)');
 
-    $run = runXml(styledDeck($deck, $directory), 'Bakery');
+    $run = runXml(styledDeck($deck, $directory), 'Corp');
 
-    expect($run)->toMatch('#<a:srgbClr val="00B4D8">#')
+    expect($run)->toMatch('#<a:srgbClr val="6D4BD1">#')
         ->and($run)->toMatch('#\bu="sng"#')
         ->and($run)->toMatch('#<a:hlinkClick#');
 
@@ -507,9 +507,9 @@ it('says in the reference that the round trip does not keep a text style', funct
 it('draws every flag an attribute names, and the face it names', function () {
     // A bare attribute asks for the attribute rather than for its value, which is a thing
     // only a flag can be: `{bold}` is a word set in bold.
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{font=Inter bold italic underline strike}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{font=Inter bold italic underline strike}');
 
-    $run = runXml(styledDeck($deck, $directory), 'Bakery');
+    $run = runXml(styledDeck($deck, $directory), 'Corp');
 
     expect($run)->toMatch('#\bb="1"#')
         ->and($run)->toMatch('#\bi="1"#')
@@ -519,35 +519,35 @@ it('draws every flag an attribute names, and the face it names', function () {
 });
 
 it('refuses a bare attribute that is not a flag, because it has no value in it', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{size}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{size}');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(MalformedTextStyle::class, 'A bare attribute asks for the attribute rather than for its value');
 });
 
 it('takes the colour of the box where a style names none of its own', function () {
-    [$deck, $directory] = wordmark("brand:\n  bold: true\n", ':brand[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  bold: true\n", ':brand[Corp]');
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience ' => ['colour' => 'FFFFFF', 'size' => 11],
-        'Bakery' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Acme ' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Corp' => ['colour' => 'FFFFFF', 'size' => 11],
     ]);
 });
 
 it('takes the colour of the box where a style names no colour of its own', function () {
     // A style that says "no colour of my own" is a style that says nothing, and a word in
     // it is the word beside it: one run rather than two.
-    [$deck, $directory] = wordmark("brand:\n  color: none\n", ':brand[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  color: none\n", ':brand[Corp]');
 
     expect(runColours(styledDeck($deck, $directory)))->toBe([
-        'Resilience Bakery' => ['colour' => 'FFFFFF', 'size' => 11],
+        'Acme Corp' => ['colour' => 'FFFFFF', 'size' => 11],
     ]);
 });
 
 it('draws a word in the face a style names', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n  font: Inter\n", ':brand[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n  font: Inter\n", ':brand[Corp]');
 
-    expect(runXml(styledDeck($deck, $directory), 'Bakery'))->toMatch('#<a:latin typeface="Inter"#');
+    expect(runXml(styledDeck($deck, $directory), 'Corp'))->toMatch('#<a:latin typeface="Inter"#');
 });
 
 it('measures a placed box in the face it is drawn in', function () {
@@ -555,7 +555,7 @@ it('measures a placed box in the face it is drawn in', function () {
     // face is measured for type it does not draw: the words wrap where the other face
     // wraps them, and the box comes out the wrong height for what is in it.
     $directory = textStyleTheme(null);
-    $words = str_repeat('Resilience Bakery ', 5);
+    $words = str_repeat('Acme Corp ', 8);
 
     $wanted = function (string $face) use ($directory, $words): int {
         $deck = sprintf(
@@ -571,9 +571,8 @@ it('measures a placed box in the face it is drawn in', function () {
     };
 
     // Calibri is the theme's body face and Arial Narrow is narrower, so the same words
-    // wrap into fewer lines in it and the box is shorter. Five repetitions of the two
-    // words are 815px in Arial Narrow and 875px in Calibri, and the box leaves 840px for
-    // the text: one line in the first and two in the second.
+    // wrap into fewer lines in it and the box is shorter. Eight repetitions of the two
+    // words fit on one line in Arial Narrow and take two in Calibri.
     expect($wanted('"Arial Narrow"'))->toBeLessThan($wanted('Calibri'));
 });
 
@@ -582,7 +581,7 @@ it('measures a word in the face a style names', function () {
     // box's own face is: a word measured in another face wraps where the other face wraps
     // it, and the box comes out the wrong height for what is in it.
     $directory = textStyleTheme("brand:\n  font: \"Arial Narrow\"\n");
-    $word = str_repeat('Bakery', 80);
+    $word = str_repeat('Corp', 110);
 
     $wanted = function (string $word) use ($directory): int {
         $deck = sprintf(
@@ -597,9 +596,8 @@ it('measures a word in the face a style names', function () {
     };
 
     // Arial Narrow is narrower than the theme's body face, so the same word takes fewer
-    // lines in it and the box is shorter. Eighty repetitions are 817px in Arial Narrow
-    // and 889px in Calibri, and the box leaves 850px for the text: one line in the
-    // first and two in the second.
+    // lines in it and the box is shorter. A hundred and ten repetitions fit on one line
+    // in Arial Narrow and take two in Calibri.
     expect($wanted(':brand[' . $word . ']'))->toBeLessThan($wanted($word));
 });
 
@@ -608,7 +606,7 @@ it('reports a face a text style names that there is no table for', function () {
     // is measured with the reference face's widths — which are not that face's. The report
     // is where that is said, and it names the style, because the face alone does not say
     // where to change it.
-    [$deck, $directory] = wordmark("brand:\n  font: \"Comic Sans MS\"\n", ':brand[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  font: \"Comic Sans MS\"\n", ':brand[Corp]');
 
     expect(styledRenderer($deck, $directory)->unknownFonts())->toBe([
         ['face' => 'Comic Sans MS', 'where' => 'the text style "brand"'],
@@ -644,7 +642,7 @@ it('reports no face for a text style and a box that name faces there are tables 
     // A face there is a table for is not a finding, and neither is one the theme names by
     // its own slot: a style that says `font: heading` is the theme's heading face, which the
     // theme has already said.
-    [$deck, $directory] = wordmark("brand:\n  font: Inter\n", ':brand[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  font: Inter\n", ':brand[Corp]');
 
     expect(styledRenderer($deck, $directory)->unknownFonts())->toBe([])
         ->and(styledRenderer(wordmarkIn('Inter'), $directory)->unknownFonts())->toBe([])
@@ -654,7 +652,7 @@ it('reports no face for a text style and a box that name faces there are tables 
 it('refuses a deck whose text style names a face it cannot measure when the renderer is strict', function () {
     // Strict is for a caller that would rather have no file than a file whose text was
     // measured with another face's widths, and the message says where the face was named.
-    [$deck, $directory] = wordmark("brand:\n  font: \"Comic Sans MS\"\n", ':brand[Bakery]');
+    [$deck, $directory] = wordmark("brand:\n  font: \"Comic Sans MS\"\n", ':brand[Corp]');
 
     expect(fn () => styledRenderer($deck, $directory, strict: true))
         ->toThrow(UnknownFont::class, 'The face "Comic Sans MS" has no table of advance widths')
@@ -670,12 +668,12 @@ it('refuses a deck whose placed box names a face it cannot measure when the rend
 });
 
 it('leaves a word unbold where a style says it is not bold', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{bold=false}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{bold=false}');
 
-    $run = runXml(styledDeck($deck, $directory), 'Bakery');
+    $run = runXml(styledDeck($deck, $directory), 'Corp');
 
     expect($run)->not->toMatch('#\bb="1"#')
-        ->and($run)->toMatch('#<a:srgbClr val="00B4D8"#');
+        ->and($run)->toMatch('#<a:srgbClr val="6D4BD1"#');
 });
 
 it('leaves a word to the weight of its block where a style says it carries none of its own', function () {
@@ -692,39 +690,39 @@ it('leaves a word to the weight of its block where a style says it carries none 
     $run = runXml(styledDeck($deck, $directory), 'heading');
 
     expect($run)->toMatch('#\bb="1"#')
-        ->and($run)->toMatch('#<a:srgbClr val="00B4D8"#');
+        ->and($run)->toMatch('#<a:srgbClr val="6D4BD1"#');
 });
 
 it('refuses a colour that is not a colour', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{color=chartreuse}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{color=chartreuse}');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(MalformedTextStyle::class, 'A colour is either no colour at all (none or transparent), a role (page, ink, subtle, panel)');
 });
 
 it('refuses a size that is not a size', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{size=big}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{size=big}');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(MalformedTextStyle::class, 'A size of type is a number of points');
 });
 
 it('refuses a size below half a point, because it is a box with nothing in it', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{size=0.2}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{size=0.2}');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(MalformedTextStyle::class, 'A size of type is at least half a point');
 });
 
 it('refuses a font that is not a name', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{font=""}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{font=""}');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(MalformedTextStyle::class, 'A font is a family name');
 });
 
 it('refuses a flag that is neither set nor not set', function () {
-    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Bakery]{bold=maybe}');
+    [$deck, $directory] = wordmark("brand:\n  color: accent1\n", ':brand[Corp]{bold=maybe}');
 
     expect(fn () => styledDeck($deck, $directory))
         ->toThrow(MalformedTextStyle::class, 'A flag is true or false');
@@ -756,10 +754,10 @@ it('draws the four kinds of block a box holds, and a style in each of them', fun
         'A ',
         'item',
     ])
-        ->and($colours['heading']['colour'])->toBe('00B4D8')
-        ->and($colours['paragraph']['colour'])->toBe('00B4D8')
-        ->and($colours['quote']['colour'])->toBe('00B4D8')
-        ->and($colours['item']['colour'])->toBe('00B4D8');
+        ->and($colours['heading']['colour'])->toBe('6D4BD1')
+        ->and($colours['paragraph']['colour'])->toBe('6D4BD1')
+        ->and($colours['quote']['colour'])->toBe('6D4BD1')
+        ->and($colours['item']['colour'])->toBe('6D4BD1');
 });
 
 /**

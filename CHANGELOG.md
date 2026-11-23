@@ -14,6 +14,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **The examples name a company that does not exist.** The wordmark in them was read
+  out of a real deck, and so were the colour it is drawn in, the place it sat on a slide
+  and the sentence around it. `Acme :brand[Corp]` and a colour of the suite's own stand
+  there now.
+
 - **The example build names the skill that carries it.** The skill is called `mdoffice` now
   — it is the suite's, and it carries both halves — and the build said the name it had
   before. The bundle carries this directory as `examples/slides/`, so a copy of it told a
@@ -49,13 +54,13 @@ All notable changes to this project are documented here. The format follows
   guard is in one place — the file system is asked through it — rather than at every call
   site, so a name is answered the same way wherever it is asked about.
 
-- **A word in a style may hold emphasis of its own.** `:brand[**Bakery**]` is drawn as the
-  word `Bakery` in the brand style and in bold. It used to be refused, with a message
+- **A word in a style may hold emphasis of its own.** `:brand[**Corp**]` is drawn as the
+  word `Corp` in the brand style and in bold. It used to be refused, with a message
   naming the two ways out, because the label of a directive was a string rather than
   Markdown and a complete construct in one could not have it honoured.
 
   The label is parsed as inline Markdown now, so what the parser reads is what the deck
-  draws: `2 * 3` and `snake_case` are drawn as they are, and `__ Bakery__` is text, because
+  draws: `2 * 3` and `snake_case` are drawn as they are, and `__ Corp__` is text, because
   a delimiter that opens an emphasis may not be followed by a space and one that closes it
   may not be preceded by one.
 
@@ -568,7 +573,7 @@ All notable changes to this project are documented here. The format follows
   code, a link and a strike, and nothing else: the colour of a word was the colour of
   the box it was in, so a wordmark in two colours was two boxes. A **text style** is a
   name a theme gives to a set of a word's properties, and a word written in one is drawn
-  in it — `:brand[Bakery]` — so the wordmark is one box, two words and two colours.
+  in it — `:brand[Corp]` — so the wordmark is one box, two words and two colours.
 
   Three forms, one grammar: `:accent[brand]` is a style the theme names, `:accent[brand]`
   with attributes on it is that style with the attributes laid over it, and `:style[brand]`
@@ -591,7 +596,7 @@ All notable changes to this project are documented here. The format follows
   — the word the raw form is written with — and a style that sets a `highlight`, which this
   half does not draw, are refused when the theme is read.
 
-- **A boolean set to `false` is not "off" but "not set".** `:brand[Bakery]{bold=false}`
+- **A boolean set to `false` is not "off" but "not set".** `:brand[Corp]{bold=false}`
   takes the weight off a style that has it, and the word then takes the weight of the block
   it is in. The Word half reads it the same way, because a run cannot be written with a
   weight of none, and the two halves of the suite say the same thing about it.
@@ -823,7 +828,7 @@ All notable changes to this project are documented here. The format follows
   now.
 
 - **The advice for a label that holds Markdown names the file it is given in.** A style's
-  text is plain text, so `:style[**Bakery**]` is refused — and the advice was to give the
+  text is plain text, so `:style[**Corp**]` is refused — and the advice was to give the
   style the weight in the theme's file, under the name `style`, which is the one name a theme
   may not give a style of its own. A named style is given its weight in the theme's
   `text-styles.yml` and the raw form carries it as an attribute, and the message says which
@@ -917,7 +922,7 @@ All notable changes to this project are documented here. The format follows
   text is measured with, and a face with no table of advance widths is measured with the
   reference face's widths instead — which are not that face's. The report of that said so
   for the theme's slots and for nothing else, so a word naming a face of its own
-  (`:style[Bakery]{font="Comic Sans MS"}`) was measured with another face's widths and
+  (`:style[Corp]{font="Comic Sans MS"}`) was measured with another face's widths and
   nothing said so, and the strict renderer accepted it.
 
   The report's second field was `slot` and is `where` now, because a text style, a box and
@@ -926,7 +931,7 @@ All notable changes to this project are documented here. The format follows
   the theme's `heading` slot for the theme.
 
 - **A style's name is a word, and a word does not care about case.** A theme that spelled a
-  style `Brand` had it under `:Brand[…]` alone, so a deck writing `:brand[Bakery]` was
+  style `Brand` had it under `:Brand[…]` alone, so a deck writing `:brand[Corp]` was
   refused with a message naming styles the author could not have written. The names are
   folded now, the way the directives package folds the names of the directives themselves,
   and the refusal for a name the theme does not have spells the styles it does have the
@@ -936,7 +941,7 @@ All notable changes to this project are documented here. The format follows
   of the two be reached at random.
 
 - **A label holds no Markdown that CommonMark does not call emphasis.** The rule refused
-  `__ Bakery__` and `** text**`, which are not emphasis: a delimiter run that opens an
+  `__ Corp__` and `** text**`, which are not emphasis: a delimiter run that opens an
   emphasis may not be followed by whitespace, and one that closes it may not be preceded by
   whitespace. A label holding one is drawn as it was written.
 
@@ -972,9 +977,9 @@ All notable changes to this project are documented here. The format follows
   `tools/compare-label-patterns.php` runs it through both halves' rules and through the
   reference parser. The halves agree with each other on every label in it, and they
   differ from CommonMark in five of them, which the corpus records rather than leaves to
-  be found again: a run of three or more underscores (`___Bakery___`, `_Bakery__`,
-  `__Bakery_ __`) is emphasis to CommonMark and text to both halves, and a run of one
-  asterisk beside a run of two (`a *Bakery**a`, `a *Bakery_*a`) is text to CommonMark and
+  be found again: a run of three or more underscores (`___Corp___`, `_Corp__`,
+  `__Corp_ __`) is emphasis to CommonMark and text to both halves, and a run of one
+  asterisk beside a run of two (`a *Corp**a`, `a *Corp_*a`) is text to CommonMark and
   Markdown to both.
 
   The docblock beside the rules says so, and the test beside it says which labels the

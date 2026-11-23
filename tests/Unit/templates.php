@@ -22,9 +22,9 @@ use MarkdownPresentation\Template\TemplatesFile;
 /**
  * Slide templates: a piece of furniture written once and drawn on every slide that names it.
  *
- * The deck this came from wrote the same wordmark and the same rule on all twenty-eight of
- * its slides, and the repetition was the fault: change the wordmark and twenty-eight slides
- * had to be found and changed. A template is that furniture written once.
+ * The deck this came from wrote the same wordmark and the same rule on every one of its
+ * slides, and the repetition was the fault: change the wordmark and every slide had to be
+ * found and changed. A template is that furniture written once.
  *
  * Split into the three things that have to agree about it — what a definition is, which
  * slides are slides, and what a slide that names a template gets — because each of them is
@@ -36,7 +36,7 @@ const WITH_TEMPLATE = <<<'MARKDOWN'
     ---
     template: brand
     ---
-    ::line{left=5% top=72.889% width=30% height=0.185%}
+    ::line{left=5% top=72.9% width=30% height=0.2%}
 
     ---
     layout: blank
@@ -189,11 +189,11 @@ const WITH_CHROME = <<<'MARKDOWN'
     ---
     template: brand
     ---
-    :::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
-    Resilience
+    :::content{left=4.5% top=3.9% width=30% height=5% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+    Acme
     :::
 
-    ::line{left=5% top=72.889% width=30% height=0.185% stroke=00B4D8 stroke-width=1}
+    ::line{left=5% top=72.9% width=30% height=0.2% stroke=6D4BD1 stroke-width=1}
 
     ---
     layout: blank
@@ -280,7 +280,7 @@ it('draws the chrome of a template on every slide that names it', function () {
 
     expect($file->shapeNames(1))->toBe(['content', 'line'])
         ->and($file->shapeNames(2))->toBe(['content', 'line'])
-        ->and($file->slideText(1))->toContain('Resilience');
+        ->and($file->slideText(1))->toContain('Acme');
 });
 
 it('draws the chrome of two templates on a slide that names both', function () {
@@ -288,14 +288,14 @@ it('draws the chrome of two templates on a slide that names both', function () {
         ---
         template: brand
         ---
-        :::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
-        Resilience
+        :::content{left=4.5% top=3.9% width=30% height=5% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+        Acme
         :::
 
         ---
         template: page
         ---
-        ::line{left=5% top=72.889% width=30% height=0.185% stroke=00B4D8 stroke-width=1}
+        ::line{left=5% top=72.9% width=30% height=0.2% stroke=6D4BD1 stroke-width=1}
 
         ---
         layout: blank
@@ -316,8 +316,8 @@ it('keeps the layout of a slide and the chrome of its template apart', function 
         ---
         template: brand
         ---
-        :::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
-        Resilience
+        :::content{left=4.5% top=3.9% width=30% height=5% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+        Acme
         :::
 
         ---
@@ -408,8 +408,8 @@ it('draws the chrome of a template over the shapes the slide placed itself', fun
         ---
         template: brand
         ---
-        :::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
-        Resilience
+        :::content{left=4.5% top=3.9% width=30% height=5% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+        Acme
         :::
 
         ---
@@ -506,7 +506,7 @@ it('draws a picture the deck placed on two slides as two pictures', function () 
 });
 
 it('imports the templates of a templates file beside the deck', function () {
-    $templates = Scratch::file('templates.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n");
+    $templates = Scratch::file('templates.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.9% width=30% height=0.2%}\n");
 
     $deck = sprintf("---\ntemplates-file: %s\nlayout: blank\n---\n\n---\nlayout: blank\ntemplate: brand\n---\n", $templates);
 
@@ -517,7 +517,7 @@ it('imports the templates of a templates file beside the deck', function () {
 
 it('lets the deck\'s own template override an imported one of the same name', function () {
     // The same rule the theme resolver applies by search order: the deck's own wins.
-    $templates = Scratch::file('templates.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n");
+    $templates = Scratch::file('templates.md', "---\ntemplate: brand\n---\n::line{left=5% top=72.9% width=30% height=0.2%}\n");
 
     $deck = sprintf(
         "---\ntemplates-file: %s\nlayout: blank\n---\n\n---\ntemplate: brand\n---\n:::content{left=5%% top=5%% width=30%% height=5%%}\nDeck\n:::\n\n---\nlayout: blank\ntemplate: brand\n---\n",
@@ -545,7 +545,7 @@ it('reads a templates file the source holds as bytes', function () {
     // The source the finder exists for: a plugin that keeps its files in a database and
     // never had a directory to hand over. The furniture comes from it and is drawn.
     $finder = new MemoryFinder([
-        'templates.md' => "---\ntemplate: brand\n---\n::line{left=5% top=72.889% width=30% height=0.185%}\n",
+        'templates.md' => "---\ntemplate: brand\n---\n::line{left=5% top=72.9% width=30% height=0.2%}\n",
     ]);
 
     $deck = "---\ntemplates-file: templates.md\nlayout: blank\n---\n\n---\nlayout: blank\ntemplate: brand\n---\n";
@@ -798,8 +798,8 @@ it('writes the number of the slide on a slide that carries the page number itsel
  * A template whose chrome names a face there is no table for.
  */
 const WORDMARK_IN_A_FACE = "---\ntemplate: brand\n---\n"
-    . ":::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=\"Comic Sans MS\" align=left vertical-align=middle}\n"
-    . "Resilience\n:::\n\n---\nlayout: blank\ntemplate: brand\n---\n";
+    . ":::content{left=4.5% top=3.9% width=30% height=5% fill=none padding=0 color=FFFFFF font-size=11 font-family=\"Comic Sans MS\" align=left vertical-align=middle}\n"
+    . "Acme\n:::\n\n---\nlayout: blank\ntemplate: brand\n---\n";
 
 it('reports a face the chrome of a template names that there is no table for', function () {
     // The chrome of a template is held apart from the shapes of the slides: it is read
@@ -836,8 +836,8 @@ it('reports the face a template names once, however many slides draw it', functi
     // template, so the face is named in one place: in the chrome. A report of one entry
     // per slide would say the same thing twenty-eight times.
     $deck = "---\ntemplate: brand\n---\n"
-        . ":::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=\"Comic Sans MS\" align=left vertical-align=middle}\n"
-        . "Resilience\n:::\n\n"
+        . ":::content{left=4.5% top=3.9% width=30% height=5% fill=none padding=0 color=FFFFFF font-size=11 font-family=\"Comic Sans MS\" align=left vertical-align=middle}\n"
+        . "Acme\n:::\n\n"
         . "---\nlayout: blank\ntemplate: brand\n---\n\n"
         . "---\nlayout: blank\ntemplate: brand\n---\n\n"
         . "---\nlayout: blank\ntemplate: brand\n---\n";

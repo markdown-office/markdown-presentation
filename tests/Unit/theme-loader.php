@@ -67,7 +67,7 @@ it('draws a deck with the roles and the named styles a theme\'s own file carries
     // part is named by the theme's mapping, and a word written in a named style is drawn
     // in it.
     $directory = ThemeDirectory::withManifest(
-        "name: Acme\nlayouts:\n  content: Body Text\ntextStyles:\n  brand:\n    color: \"#00B4D8\"\n",
+        "name: Acme\nlayouts:\n  content: Body Text\ntextStyles:\n  brand:\n    color: \"#6D4BD1\"\n",
     );
 
     $deck = (new DeckParser())->parse(sprintf(
@@ -82,7 +82,7 @@ it('draws a deck with the roles and the named styles a theme\'s own file carries
     $pptx = Pptx::open($path);
 
     expect($pptx->layoutNames())->toBe([1 => 'Body Text'])
-        ->and($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:srgbClr val="00B4D8">');
+        ->and($pptx->part('ppt/slides/slide1.xml'))->toContain('<a:srgbClr val="6D4BD1">');
 });
 
 it('refuses a layouts section that names a role which is not one', function () {

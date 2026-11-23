@@ -33,10 +33,10 @@ it('finds a theme beside the deck when the working directory is somewhere else',
     // The theme of a deck is in the deck's own directory, and the process rendering the
     // deck is somewhere else entirely: a build script that renders a deck by its path
     // must not have to change directory first.
-    $deck = ThemeDirectory::create(['themes/bakery/theme.yml' => "name: Bakery\n"], 'deck');
+    $deck = ThemeDirectory::create(['themes/corp/theme.yml' => "name: Corp\n"], 'deck');
     $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
 
-    expect($resolver->resolve('bakery')->theme()->name())->toBe('Bakery');
+    expect($resolver->resolve('corp')->theme()->name())->toBe('Corp');
 });
 
 it('falls back to the working directory when the deck has no theme of that name', function () {
@@ -49,11 +49,11 @@ it('falls back to the working directory when the deck has no theme of that name'
 it('lists the themes of the deck and of the library together', function () {
     // A failure names every theme that resolves, so the list has to hold the deck's own
     // themes as well as the ones that ship with the library.
-    $deck = ThemeDirectory::create(['themes/bakery/theme.yml' => "name: Bakery\n"], 'deck');
+    $deck = ThemeDirectory::create(['themes/corp/theme.yml' => "name: Corp\n"], 'deck');
     $resolver = (new ThemeResolver(ThemeDirectory::create([], 'working')))->beside($deck);
 
     expect($resolver->available())->toBe([
-        'bakery',
+        'corp',
         'corporate-dark',
         'default',
         'dense',
@@ -132,7 +132,7 @@ it('refuses a theme outside the roots when the deck has a directory of its own',
     // The deck's directory is one more root, not a licence to reach the whole disk: a
     // theme outside every root is still a theme this render may not read.
     $outside = ThemeDirectory::minimal('Stolen');
-    $deck = ThemeDirectory::create(['themes/bakery/theme.yml' => "name: Bakery\n"], 'deck');
+    $deck = ThemeDirectory::create(['themes/corp/theme.yml' => "name: Corp\n"], 'deck');
     $resolver = resolverIn(ThemeDirectory::create([], 'working'))->beside($deck);
 
     expect(fn () => $resolver->resolve($outside))

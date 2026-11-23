@@ -555,8 +555,8 @@ not. A **text style** is a name a theme gives to a set of those, and a word writ
 is drawn in it:
 
 ```markdown
-:::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri}
-Resilience :brand[Bakery]
+:::content{left=4.5% top=3.9% width=30% height=5% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri}
+Acme :brand[Corp]
 :::
 ```
 
@@ -595,7 +595,7 @@ the face they will be drawn in — the theme's own for a frame, the `font-family
 for a placed one, and the `font` of the style for a word written in one — so a word in a
 narrower face takes fewer lines and the box around it is the height it needs.
 
-**A boolean set to `false` is not "off" but "not set".** `:brand[Bakery]{bold=false}`
+**A boolean set to `false` is not "off" but "not set".** `:brand[Corp]{bold=false}`
 takes the weight off a style that has it, and the word then takes the weight of the block
 it is in — a paragraph's is none and a heading's is bold. The Word half reads it the same
 way, because a run cannot be written with a weight of none.
@@ -609,8 +609,8 @@ The named styles come from the theme's own file, under a `textStyles:` section, 
 optional:
 
 ```yaml
-# themes/resilience-bakery/theme.yml
-name: Resilience Bakery
+# themes/acme-corp/theme.yml
+name: Acme Corp
 textStyles:
   brand:
     color: accent1
@@ -654,7 +654,7 @@ use MarkdownPresentation\Render\PresentationRenderer;
 
 try {
     (new PresentationRenderer())->render(
-        (new DeckParser())->parse("Resilience :brand[Bakery]\n"),
+        (new DeckParser())->parse("Acme :brand[Corp]\n"),
         sys_get_temp_dir() . '/deck.pptx',
     );
 } catch (Exception $failure) {
@@ -666,11 +666,11 @@ try {
 Slide 1 has the text style ":brand", which is not a style this theme has. The theme has no text styles; a theme names them in its "textStyles:" section.
 ```
 
-**The label is parsed as inline Markdown.** `:brand[**Bakery**]` is drawn as the word
-`Bakery` in the brand style and in bold: the label is Markdown, and the markup in it is
+**The label is parsed as inline Markdown.** `:brand[**Corp**]` is drawn as the word
+`Corp` in the brand style and in bold: the label is Markdown, and the markup in it is
 markup rather than characters. What CommonMark makes of a label is what the deck draws, so
 a bare `*` or `_` is a character and not an intent — `2 * 3` and `snake_case` are drawn as
-they are — and so is a construct CommonMark does not call emphasis: `__ Bakery__` and
+they are — and so is a construct CommonMark does not call emphasis: `__ Corp__` and
 `** text**` are text, because a delimiter that opens an emphasis may not be followed by a
 space and one that closes it may not be preceded by one.
 
@@ -681,9 +681,9 @@ agree with each other because they ask the same parser rather than because they 
 same rules.
 
 **A label holds no brackets.** It ends at the first `]`, so a link cannot be in one — a link
-is written in brackets. `:brand[[Bakery](https://example.com)]` is not a link with a styled
+is written in brackets. `:brand[[Corp](https://example.com)]` is not a link with a styled
 word in it: the directive ends at `:brand` and the rest is ordinary Markdown. A link *around*
-the directive is the way to write one: `[:brand[Bakery]](https://example.com)`.
+the directive is the way to write one: `[:brand[Corp]](https://example.com)`.
 
 **`highlight` is not drawn by this half.** PHPPresentation's font has no setter for one,
 so a highlight would be an element of the run's own properties in the file — a pass over the
@@ -1605,11 +1605,11 @@ every slide that names it is drawn with it.
 ---
 template: brand
 ---
-:::content{left=4.5% top=3.913% width=29.996% height=4.969% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
-Resilience
+:::content{left=4.5% top=3.9% width=30% height=5% fill=none padding=0 color=FFFFFF font-size=11 font-family=Calibri align=left vertical-align=middle}
+Acme
 :::
 
-::line{left=5% top=72.889% width=30% height=0.185% stroke=00B4D8 stroke-width=1}
+::line{left=5% top=72.9% width=30% height=0.2% stroke=6D4BD1 stroke-width=1}
 ```
 
 and every slide that wants that furniture says so:
@@ -2141,7 +2141,7 @@ A caller that would rather have no file than a file whose text was measured with
 face's widths asks for the strict renderer, and gets `UnknownFont` naming the faces there
 are tables for.
 
-A face a word writes for itself is reported the same way: `:style[Bakery]{font="Comic Sans
+A face a word writes for itself is reported the same way: `:style[Corp]{font="Comic Sans
 MS"}` is drawn in that face and measured with the reference face's widths, and the report
 names the place it was written in — `a font attribute on slide 1` — because the face alone
 does not say where to change the name.
@@ -2588,7 +2588,7 @@ style:
   heading-weight: bold
   heading-ink: accent
 
-# Named text styles: the words inside a box, written in a deck as `:brand[Bakery]`.
+# Named text styles: the words inside a box, written in a deck as `:brand[Corp]`.
 # The properties are the same eight the inline style attributes have, and a size is in
 # points as it is everywhere else.
 #
@@ -2605,7 +2605,7 @@ textStyles:
 ```
 
 **One of them brings the named styles.** `corporate-dark` carries a `textStyles:` section
-with a `brand` and a `muted`, so a deck can write `:brand[Bakery]` against a theme that
+with a `brand` and a `muted`, so a deck can write `:brand[Corp]` against a theme that
 ships with the library rather than against one of its own.
 
 The colours are DrawingML's twelve. The longer spellings an earlier draft of the
